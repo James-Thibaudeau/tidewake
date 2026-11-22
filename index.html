@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1856c4">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Tidewake — a cel-shaded open-world sailing adventure that runs in your browser.">
+  <title>Tidewake</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+  {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+  </script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- ===================== HUD ===================== -->
+  <div id="hud" class="hidden">
+    <div id="hudTopLeft">
+      <div class="panel" id="purse">
+        <div class="row" id="rowBanked"><span class="ico" data-icon="coin"></span><span id="goldBanked" class="num">0</span><small>banked</small></div>
+        <div class="row" id="rowCargo"><span class="ico" data-icon="chest"></span><span id="goldCargo" class="num">0</span><small>in hold</small></div>
+      </div>
+      <div class="panel" id="hullPanel">
+        <div class="hullLabel"><span class="ico" data-icon="hull"></span><span>Hull</span><span id="hullText">100</span></div>
+        <div class="bar"><div id="hullBar"></div></div>
+      </div>
+      <div id="toasts"></div>
+    </div>
+
+    <div id="hudTop">
+      <div id="compass" class="panel">
+        <div id="compassStrip"></div>
+        <div id="compassMark"></div>
+      </div>
+      <div id="compassDeg">0°</div>
+      <div id="warning"></div>
+    </div>
+
+    <div id="hudTopRight">
+      <div id="minimapWrap"><canvas id="minimap"></canvas></div>
+      <div class="panel small" id="clock"><span id="clockIcon" class="ico"></span><span id="clockText">Day 1</span><span id="weatherText"></span></div>
+      <div class="btnRow">
+        <button id="btnMap" class="iconBtn" aria-label="Map"><span data-icon="map"></span><kbd>M</kbd></button>
+        <button id="btnPause" class="iconBtn" aria-label="Pause"><span data-icon="pause"></span><kbd>Esc</kbd></button>
+      </div>
+    </div>
+
+    <div id="hudBottom">
+      <div id="windDial" class="panel">
+        <svg viewBox="-50 -50 100 100" aria-hidden="true">
+          <circle r="44" fill="rgba(255,255,255,0.06)" stroke="rgba(244,213,141,0.5)" stroke-width="2"/>
+          <path d="M0,-22 C8,-12 9,6 7,20 L-7,20 C-9,6 -8,-12 0,-22 Z" fill="#c8915a" stroke="#0b1830" stroke-width="2.5"/>
+          <g id="windArrow">
+            <path d="M0,20 L11,33 L4,33 L4,46 L-4,46 L-4,33 L-11,33 Z" fill="currentColor" stroke="#0b1830" stroke-width="2.5" stroke-linejoin="round"/>
+          </g>
+        </svg>
+        <div id="windLabel">Wind</div>
+      </div>
+      <div id="sailGauge" class="panel">
+        <div class="notches">
+          <span data-l="0">Furled</span><span data-l="1">Half</span><span data-l="2">Full</span>
+        </div>
+        <div id="speedText">0 kn</div>
+      </div>
+    </div>
+
+    <div id="prompt" class="hidden"></div>
+    <div id="banner"><div id="bannerSub"></div><div id="bannerTitle"></div></div>
+
+    <!-- Touch controls (visible when body.touch) -->
+    <div id="touchControls">
+      <div id="tiller"><span class="tArrow left" data-icon="chevLeft"></span><span class="tArrow right" data-icon="chevRight"></span><div id="tillerKnob"><span data-icon="rudder"></span></div></div>
+      <div id="sailBtns">
+        <button id="btnSpy" aria-label="Spyglass"><span data-icon="spyglass"></span></button>
+        <button id="btnSailUp" aria-label="Raise sail"><span data-icon="chevUp"></span></button>
+        <button id="btnSailDown" aria-label="Lower sail"><span data-icon="chevDown"></span></button>
+      </div>
+      <button id="btnAction" class="hidden" aria-label="Action"><span data-icon="anchor"></span><span id="btnActionLabel"></span></button>
+    </div>
+  </div>
+
+  <div id="vignette"></div>
+  <div id="damageFlash"></div>
+
+  <!-- ===================== Screens ===================== -->
+  <div id="title" class="screen hidden">
+    <div class="titleInner">
+      <div class="logo">
+        <div class="logoText">Tidewake</div>
+        <svg class="logoWave" viewBox="0 0 300 24" aria-hidden="true"><path d="M0,12 Q25,0 50,12 T100,12 T150,12 T200,12 T250,12 T300,12" fill="none" stroke="#fff8e7" stroke-width="5" stroke-linecap="round"/></svg>
+        <div class="tagline">Chart the endless isles</div>
+      </div>
+      <div class="titleBtns">
+        <button id="btnContinue" class="btn primary big hidden">Continue Voyage</button>
+        <button id="btnNew" class="btn big">New Voyage</button>
+      </div>
+      <div class="titleHint" id="titleHint"></div>
+    </div>
+  </div>
+
+  <div id="portScreen" class="screen hidden">
+    <div class="sheet port">
+      <div class="sheetHead">
+        <div class="eyebrow"><span class="ico" data-icon="anchor"></span> Harbor</div>
+        <h2 id="portName">Port</h2>
+        <div class="saved"><span class="ico" data-icon="check"></span> Cargo banked &middot; progress saved</div>
+      </div>
+      <div class="portBar">
+        <div class="goldBig"><span class="ico" data-icon="coin"></span><span id="portGold">0</span></div>
+        <div class="repairBox">
+          <div class="hullMini" id="portHull">Hull 100/100</div>
+          <button id="btnRepair" class="btn">Repair</button>
+        </div>
+      </div>
+      <h3 class="sectionTitle">Shipwright</h3>
+      <div id="upgradeGrid" class="grid"></div>
+      <div class="sheetFoot"><button id="btnSetSail" class="btn primary big"><span class="ico" data-icon="sail"></span> Set Sail</button></div>
+    </div>
+  </div>
+
+  <div id="mapScreen" class="screen hidden">
+    <canvas id="mapCanvas"></canvas>
+    <div class="mapHead"><span class="ico" data-icon="map"></span> Sea Chart</div>
+    <div class="mapTools">
+      <button id="mapZoomIn" class="iconBtn" aria-label="Zoom in"><span data-icon="plus"></span></button>
+      <button id="mapZoomOut" class="iconBtn" aria-label="Zoom out"><span data-icon="minus"></span></button>
+      <button id="mapCenter" class="iconBtn" aria-label="Centre on ship"><span data-icon="target"></span></button>
+      <button id="mapClose" class="iconBtn" aria-label="Close map"><span data-icon="close"></span><kbd>M</kbd></button>
+    </div>
+    <div class="mapFoot panel" id="mapStats"></div>
+  </div>
+
+  <div id="pauseScreen" class="screen hidden">
+    <div class="sheet pause">
+      <h2>Paused</h2>
+      <button id="btnResume" class="btn primary big">Resume</button>
+      <div class="settings">
+        <button id="setSound" class="toggle">Sound: On</button>
+        <button id="setMusic" class="toggle">Music: On</button>
+        <button id="setQuality" class="toggle">Quality: High</button>
+      </div>
+      <div class="note">Quality applies after reload.</div>
+      <h3 class="sectionTitle">Controls</h3>
+      <div class="controls" id="controlsHelp"></div>
+      <h3 class="sectionTitle">Sailing tips</h3>
+      <ul class="tips">
+        <li>The flag and wind dial show the wind. Sailing across it (a beam reach) is fastest.</li>
+        <li>You can't sail straight into the wind. Turn away until the dial turns green.</li>
+        <li>In a storm, lower your sails to protect the hull.</li>
+        <li>Gold in your hold is lost if you're shipwrecked. Dock at a port to bank it and save.</li>
+      </ul>
+      <button id="btnReset" class="btn danger">New Voyage (erase save)</button>
+    </div>
+  </div>
+
+  <div id="wreckScreen" class="screen hidden">
+    <div class="sheet wreck">
+      <div class="wreckTitle">Shipwrecked!</div>
+      <p id="wreckText">Your cargo was lost to the sea.</p>
+      <button id="btnRespawn" class="btn primary big">Wash ashore</button>
+    </div>
+  </div>
+
+  <div id="confirm" class="screen hidden">
+    <div class="sheet confirm">
+      <p id="confirmText">Are you sure?</p>
+      <div class="row2"><button id="confirmNo" class="btn">Cancel</button><button id="confirmYes" class="btn danger">Yes</button></div>
+    </div>
+  </div>
+
+  <div id="fade"></div>
+  <div id="loading"><div class="loadLogo">Tidewake</div><div class="spinner"></div><div id="loadingText">Raising the sails…</div></div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
