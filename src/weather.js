@@ -3,13 +3,15 @@
 import * as THREE from 'three';
 import { clamp, lerp, damp, TAU, noise2 } from './util.js';
 
+// cloud: sky cover (≥ ~0.9 reads as a full overcast deck); dark: how much the
+// weather greys and dims the world on top of that.
 export const WEATHER = {
-  clear: { cloud: 0.25, rain: 0, wave: 0.35, wind: 0.85, fog: 1.0, dark: 0.0, storm: 0, label: 'Clear skies' },
-  breezy: { cloud: 0.45, rain: 0, wave: 0.6, wind: 1.2, fog: 0.95, dark: 0.05, storm: 0, label: 'Fresh breeze' },
-  cloudy: { cloud: 0.85, rain: 0, wave: 0.5, wind: 0.95, fog: 0.75, dark: 0.25, storm: 0, label: 'Overcast' },
-  rain: { cloud: 1.0, rain: 0.55, wave: 0.75, wind: 1.05, fog: 0.55, dark: 0.42, storm: 0, label: 'Rain' },
-  storm: { cloud: 1.0, rain: 1.0, wave: 1.45, wind: 1.45, fog: 0.38, dark: 0.7, storm: 1, label: 'Storm!' },
-  fog: { cloud: 0.55, rain: 0, wave: 0.25, wind: 0.55, fog: 0.18, dark: 0.12, storm: 0, label: 'Fog' },
+  clear: { cloud: 0.3, rain: 0, wave: 0.35, wind: 0.85, fog: 1.0, dark: 0.0, storm: 0, label: 'Clear skies' },
+  breezy: { cloud: 0.48, rain: 0, wave: 0.6, wind: 1.2, fog: 0.95, dark: 0.04, storm: 0, label: 'Fresh breeze' },
+  cloudy: { cloud: 0.96, rain: 0, wave: 0.5, wind: 0.95, fog: 0.72, dark: 0.3, storm: 0, label: 'Overcast' },
+  rain: { cloud: 1.0, rain: 0.55, wave: 0.75, wind: 1.05, fog: 0.55, dark: 0.46, storm: 0, label: 'Rain' },
+  storm: { cloud: 1.0, rain: 1.0, wave: 1.45, wind: 1.45, fog: 0.38, dark: 0.72, storm: 1, label: 'Storm!' },
+  fog: { cloud: 0.85, rain: 0, wave: 0.25, wind: 0.55, fog: 0.18, dark: 0.14, storm: 0, label: 'Fog' },
 };
 const NEXT = {
   clear: ['breezy', 'cloudy', 'fog', 'clear', 'breezy'],
@@ -30,7 +32,7 @@ uniform vec3 uCenter;
 varying float vA;
 float h1(float n) { return fract(sin(n * 91.345) * 47453.21); }
 void main() {
-  float cycle = 4.5 + h1(aSeed) * 3.0;
+  float cycle = 10.0 + h1(aSeed) * 5.0; // ~10-14 units/s: a lazy drift, not a zip
   float t = uTime / cycle + h1(aSeed + 1.0);
   float ph = fract(t);
   float id = floor(t);
@@ -228,6 +230,6 @@ export class Weather {
     this.streakUniforms.uTime.value = this.time;
     this.streakUniforms.uWind.value.set(Math.sin(this.windAngle), Math.cos(this.windAngle));
     this.streakUniforms.uCenter.value.copy(boatPos);
-    this.streakUniforms.uAlpha.value = clamp((this.windStrength - 0.5) * 0.9, 0.15, 0.75) * (1 - r * 0.6);
+    this.streakUniforms.uAlpha.value = clamp((this.windStrength - 0.5) * 0.6, 0.1, 0.45) * (1 - r * 0.6);
   }
 }

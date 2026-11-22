@@ -684,10 +684,19 @@ export class Boat {
     this.wakeMat = new THREE.ShaderMaterial({
       uniforms: { uScale: { value: 500 }, uLight: { value: new THREE.Color(1, 1, 1) } },
       vertexShader: `attribute float aAlpha; attribute float aSize; varying float vA; uniform float uScale;
-        void main(){ vA = aAlpha; vec4 mv = modelViewMatrix * vec4(position,1.0); gl_PointSize = aSize * uScale / -mv.z; gl_Position = projectionMatrix * mv; }`,
+        varying float vSeed;
+        void main(){ vA = aAlpha; vSeed = fract(dot(position.xz, vec2(0.173, 0.291)));
+          vec4 mv = modelViewMatrix * vec4(position,1.0); gl_PointSize = aSize * uScale / -mv.z;
+          mv.z += 1.2; // nudge toward the camera so wave crests don't slice the sprite
+          gl_Position = projectionMatrix * mv; }`,
       fragmentShader: `varying float vA; uniform vec3 uLight;
-        void main(){ vec2 c = gl_PointCoord - 0.5; float d = length(c); if (d > 0.5 || vA < 0.01) discard;
-          float a = step(d, 0.5) * vA; gl_FragColor = vec4(vec3(0.95,0.98,1.0) * uLight, a);
+        varying float vSeed;
+        void main(){ vec2 c = gl_PointCoord - 0.5; float d = length(c);
+          // lumpy foam blob, matching the ocean's foam style
+          float ang = atan(c.y, c.x);
+          float edge = 0.5 * (0.8 + 0.13 * sin(ang * 2.0 + vSeed * 40.0) + 0.08 * sin(ang * 3.0 - vSeed * 23.0));
+          if (d > edge || vA < 0.01) discard;
+          float a = vA * 0.7; gl_FragColor = vec4(vec3(0.95,0.98,1.0) * uLight, a);
           #include <colorspace_fragment>
         }`,
       transparent: true, depthWrite: false,
@@ -799,14 +808,18 @@ export class Boat {
     // where the wind comes FROM, relative to the bow (positive = from port/left)
     this.relWind = wrapAngle(wind.angle + Math.PI - this.heading);
     this.efficiency = pointOfSail(this.relWind);
-    const sailF = [0, 0.55, 1][this.sailLevel];
+    // Thrust follows how much canvas is actually up (sailVis eases between
+    // settings), so reefing or furling eases the drive off instead of cutting it.
+    const sailF = clamp((this.sailVis - 0.06) / 0.94, 0, 1);
     let target = sailF * this.efficiency * wind.strength * 15 * up.sail;
     if (this.sailLevel > 0) target = Math.max(target, 1.2 * sailF);
-    const rate = target > this.speed ? 0.45 : 0.7;
+    // Hull drag grows with speed: a fast boat sheds speed noticeably, but a
+    // slow one coasts on for a good while (roughly 10-15 s to glide to a stop).
+    const rate = target > this.speed ? 0.45 : 0.1 + Math.abs(this.speed) * 0.011;
     this.speed = damp(this.speed, target, rate, dt);
     const turnRate = (0.35 + 0.65 * Math.min(1, Math.abs(this.speed) / 8)) * 0.85 * up.rudder;
     this.heading -= this.rudder * turnRate * dt;
-    this.speed *= 1 - Math.abs(this.rudder) * 0.12 * dt;
+    this.speed *= 1 - Math.abs(this.rudder) * 0.08 * dt;
 
     const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
     this.pos.x += (fx * this.speed + this.push.x) * dt;
@@ -886,7 +899,7 @@ export class Boat {
 
     // Sail trim and billow
     const sailTarget = [0.06, 0.55, 1][this.sailLevel];
-    this.sailVis = damp(this.sailVis, sailTarget, 3, dt);
+    this.sailVis = damp(this.sailVis, sailTarget, 1.8, dt);
     const a = Math.abs(this.relWind);
     const boomMag = clamp((a - 0.45) * 0.55, 0.12, 1.45);
     this.boomAngle = damp(this.boomAngle, Math.sign(this.relWind || 1) * boomMag, 2.5, dt);
