@@ -412,7 +412,9 @@ export class Game {
     s.dayT += dt / DAY_LENGTH;
     if (s.dayT >= 1) { s.dayT -= 1; s.day++; }
     w.update(dt, this.camera, boat.group.position);
-    updateWaves(this.elapsed, w.p.wave);
+    // Run the sea a bit slower than real time: calmer, rolling swells that
+    // don't drag the foam across the screen. CPU + GPU share this clock.
+    updateWaves(this.elapsed * 0.6, w.p.wave);
     const wind = { angle: w.windAngle, strength: w.windStrength };
     const up = this.upv;
 
@@ -470,10 +472,13 @@ export class Game {
     const ou = this.ocean.uniforms;
     ou.uSunDir.value.copy(this.env.lightDir);
     ou.uLightCol.value.copy(this.env.oceanLight);
-    ou.uAmbient.value.copy(this.env.oceanAmbient);
+    // Night water should read as dark, moonlit blue rather than teal
+    ou.uAmbient.value.copy(this.env.oceanAmbient).multiplyScalar(lerp(1, 0.55, this.env.night));
     ou.uLantern.value.set(boat.pos.x, 0, boat.pos.z, this.env.night);
     ou.uLanternR.value = up.lantern;
     ou.uRain.value = w.p.rain;
+    this.ocean.setWind(w.wind.x, w.wind.y, w.windStrength);
+    ou.uSkyColor.value.copy(this.env.horizon);
     const L = ringUniforms.uLight.value.copy(this.env.oceanAmbient).add(this.env.oceanLight);
     L.r = Math.min(L.r, 1.1); L.g = Math.min(L.g, 1.1); L.b = Math.min(L.b, 1.1);
     boat.wakeMat.uniforms.uLight.value.copy(L);
