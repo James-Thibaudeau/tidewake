@@ -2,7 +2,7 @@
 // storms and shipwrecks, camera.
 import * as THREE from 'three';
 import { UPGRADES, upgradeValue, MAP_RES, MAP_CELL, WORLD_HALF, DAY_LENGTH, isTouch } from './config.js';
-import { clamp, damp, dampAngle, smoothstep, lerp, wrapAngle, TAU } from './util.js';
+import { clamp, damp, dampAngle, smoothstep, lerp, wrapAngle, bearingDeg, TAU } from './util.js';
 import { updateWaves, waveHeight } from './waves.js';
 import { ringUniforms } from './world.js';
 import { propMesh } from './props.js';
@@ -31,7 +31,8 @@ export class Game {
     this.paused = false;
     this.state = this.freshState();
     this.saveData = {};
-    this.cam = { yaw: 0, pitch: 0.3, dist: 30, lastLook: -10, shake: 0, fov: 55 };
+    this.cam = { yaw: 0, pitch: 0.3, dist: 30, lastLook: -10, shake: 0, fov: 55, spyYaw: 0, spyPitch: 0 };
+    this.spyOn = false;
     this.elapsed = 0;
     this.sailEfficiency = 0;
     this.pointOfSail = '';
@@ -287,13 +288,13 @@ export class Game {
   }
 
   // ------------------------------------------------------------ discovery
-  discover(I) {
+  discover(I, how) {
     const s = this.state;
     if (s.discovered.has(I.id)) return;
     s.discovered.add(I.id);
     s.stats.discoveries = s.discovered.size;
     s.cargo += I.discoverValue;
-    this.ui.banner(I.name, I.port ? 'Port discovered' : I.landmark ? 'Landmark discovered' : 'Island discovered');
+    this.ui.banner(I.name, how || (I.port ? 'Port discovered' : I.landmark ? 'Landmark discovered' : 'Island discovered'));
     this.ui.toast(`+${I.discoverValue} gold for charting ${I.name}`, 'gold');
     this.audio.play('discover');
   }
@@ -465,6 +466,7 @@ export class Game {
 
     this.updateCamera(dt);
     this.env.update(dt, s.dayT, w.p, this.camera, w.wind, this.elapsed);
+    if (this.spyOn) this.scene.fog.far *= 1.35; // the glass cuts through haze
     const ou = this.ocean.uniforms;
     ou.uSunDir.value.copy(this.env.lightDir);
     ou.uLightCol.value.copy(this.env.oceanLight);
@@ -479,6 +481,7 @@ export class Game {
     this.ocean.update(this.camera);
     this.streamer.update(boat.pos.x, boat.pos.z, 1);
     this.streamer.animate(this.elapsed, this.env.night);
+    this.streamer.lod(this.camera.position.x, this.camera.position.z, this.spyOn ? 55 / this.camera.fov : 1);
 
     this.audio.update(dt, {
       speed: Math.abs(boat.speed), wind: w.windStrength, rain: w.p.rain, storm: w.p.storm,
@@ -557,12 +560,6 @@ export class Game {
   updateCamera(dt) {
     const c = this.cam, cam = this.camera, boat = this.boat;
     const L = this.input.consumeLook();
-    if (L.dx || L.dy) {
-      c.yaw -= L.dx * 0.006;
-      c.pitch = clamp(c.pitch + L.dy * 0.004, 0.04, 1.3);
-      c.lastLook = this.elapsed;
-    }
-    if (L.zoom) c.dist = clamp(c.dist * Math.exp(L.zoom * 0.0012), 12, 120);
     let tx, ty, tz;
     if (this.mode === 'title') {
       this.titleAngle += dt * 0.04;
@@ -573,10 +570,56 @@ export class Game {
       this.setFov(55, dt);
       return;
     }
+
+    // ---- spyglass: first person from the explorer's eyes, looking where he looks
+    const tier = this.state.upgrades.spyglass;
+    if (this.input.spyHeld && tier === 0 && !this._spyHint) {
+      this._spyHint = true;
+      this.ui.toast('Buy a spyglass at a port to zoom', 'info');
+    }
+    const spy = this.input.spyHeld && tier > 0 && (this.mode === 'sailing' || this.mode === 'docked');
+    if (spy !== this.spyOn) {
+      this.spyOn = spy;
+      boat.group.visible = !spy; // nothing of the boat should block the lens
+      this.ui.setSpyglass(spy, ['', '×2', '×4', '×7'][tier]);
+      if (spy) { c.spyYaw = c.yaw; c.spyPitch = 0.0; this._spyHeading = boat.heading; this.audio.play('click'); }
+      else if (Number.isFinite(c.spyYaw)) { c.yaw = c.spyYaw; c.lastLook = this.elapsed; }
+    }
+    if (spy) {
+      const fov = [55, 26, 14, 8][tier];
+      const k = c.fov / 55; // pan slower the more we zoom
+      if (L.dx || L.dy) {
+        c.spyYaw -= L.dx * 0.005 * k;
+        c.spyPitch = clamp(c.spyPitch + L.dy * 0.004 * k, -0.45, 0.35);
+      }
+      // A/D still steers the boat, so the view turns with the hull
+      c.spyYaw += wrapAngle(boat.heading - (this._spyHeading ?? boat.heading));
+      this._spyHeading = boat.heading;
+      const eye = boat.getEyePosition ? boat.getEyePosition(this._v) : boat.group.localToWorld(this._v.set(-0.2, 2.4, -2.2));
+      cam.position.copy(eye);
+      const cp = Math.cos(c.spyPitch);
+      cam.lookAt(eye.x + Math.sin(c.spyYaw) * cp, eye.y + Math.sin(c.spyPitch), eye.z + Math.cos(c.spyYaw) * cp);
+      boat.lookYaw = c.spyYaw;
+      this.ui.setSpyBearing(bearingDeg(c.spyYaw));
+      c.fov = damp(c.fov, fov, 14, dt);
+      this.camera.fov = c.fov;
+      this.camera.updateProjectionMatrix();
+      this.spotIslands(dt, tier, c.spyYaw, fov);
+      return;
+    }
+
+    if (L.dx || L.dy) {
+      c.yaw -= L.dx * 0.006;
+      c.pitch = clamp(c.pitch + L.dy * 0.004, 0.04, 1.3);
+      c.lastLook = this.elapsed;
+    }
+    if (L.zoom) c.dist = clamp(c.dist * Math.exp(L.zoom * 0.0012), 12, 120);
     if (this.mode === 'sailing' && this.elapsed - c.lastLook > 2.5) {
       c.yaw = dampAngle(c.yaw, boat.heading, 0.9 * Math.min(1, Math.abs(boat.speed) / 4 + 0.3), dt);
     }
     if (this.mode === 'docked') c.yaw += dt * 0.05;
+    // The explorer looks where you look (while you're steering the view)
+    boat.lookYaw = this.elapsed - c.lastLook < 4 ? c.yaw : null;
     const p = boat.group.position;
     tx = p.x; ty = p.y + 3.5; tz = p.z;
     const cp = Math.cos(c.pitch), sp = Math.sin(c.pitch);
@@ -589,12 +632,27 @@ export class Game {
     }
     cam.position.set(x, y, z);
     cam.lookAt(tx, ty, tz);
-    const spy = this.input.spyHeld && this.state.upgrades.spyglass > 0 && this.mode === 'sailing';
-    if (this.input.spyHeld && this.state.upgrades.spyglass === 0 && !this._spyHint) {
-      this._spyHint = true;
-      this.ui.toast('Buy a spyglass at a port to zoom', 'info');
+    this.setFov(55, dt);
+  }
+
+  // Islands caught in the spyglass's field of view get charted from afar.
+  spotIslands(dt, tier, yaw, fov) {
+    this.timers.spot = (this.timers.spot || 0) - dt;
+    if (this.timers.spot > 0) return;
+    this.timers.spot = 0.3;
+    const b = this.boat.pos, s = this.state;
+    const range = [0, 1500, 2100, 2700][tier];
+    const half = (fov * Math.PI) / 360 * Math.max(1, this.camera.aspect) * 0.8;
+    for (const I of this.world.islands) {
+      if (s.discovered.has(I.id)) continue;
+      const dx = I.x - b.x, dz = I.z - b.z, d = Math.hypot(dx, dz);
+      if (d > range + I.r) continue;
+      const off = Math.abs(wrapAngle(Math.atan2(dx, dz) - yaw));
+      if (off < half + Math.atan2(I.r, d)) {
+        this.revealAround(I.x, I.z, I.r + 120);
+        this.discover(I, 'Spotted through the spyglass');
+      }
     }
-    this.setFov(spy ? [55, 26, 18, 12][this.state.upgrades.spyglass] : 55, dt);
   }
 
   setFov(f, dt) {

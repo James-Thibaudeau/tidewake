@@ -405,3 +405,33 @@ body.touch #prompt { display: none !important; }
 @media (max-width: 640px) and (min-height: 461px) {
   body.touch #hudBottom { bottom: calc(var(--sab) + 150px); }
 }
+
+/* ------------------------------------------------------------ spyglass */
+#spyOverlay {
+  --r: min(42vmin, 46vw);
+  position: fixed; inset: 0; z-index: 8; pointer-events: none; opacity: 0; visibility: hidden;
+  transition: opacity 0.18s ease-out, visibility 0s linear 0.18s;
+  /* dark surround with a soft-edged circular lens cut out */
+  background: radial-gradient(circle at 50% 50%, transparent calc(var(--r) - 2px), #050a12 calc(var(--r) + 1px));
+}
+body.spy #spyOverlay { opacity: 1; visibility: visible; transition: opacity 0.18s ease-out, visibility 0s; }
+#spyOverlay .spyLens {
+  position: absolute; left: 50%; top: 50%; width: calc(var(--r) * 2); height: calc(var(--r) * 2);
+  transform: translate(-50%, -50%) scale(1.08); border-radius: 50%;
+  /* brass rim, inner shadow and a warm glass tint with a soft vignette */
+  box-shadow: 0 0 0 6px #7a5a22, 0 0 0 9px #e3b85a, 0 0 0 12px #5c4116, 0 0 0 14px rgba(0, 0, 0, 0.5),
+    inset 0 0 calc(var(--r) * 0.35) calc(var(--r) * 0.08) rgba(10, 18, 30, 0.75);
+  background: radial-gradient(circle at 38% 32%, rgba(255, 255, 255, 0.10), transparent 30%),
+    radial-gradient(circle, rgba(255, 236, 190, 0.05) 60%, rgba(40, 30, 10, 0.25) 100%);
+  transition: transform 0.25s cubic-bezier(.2, 1.4, .4, 1);
+}
+body.spy #spyOverlay .spyLens { transform: translate(-50%, -50%) scale(1); }
+#spyOverlay .spyReticle { position: absolute; left: 50%; top: 50%; width: 0; height: 0; opacity: 0.55; }
+#spyOverlay .spyReticle i { position: absolute; background: rgba(20, 24, 30, 0.8); }
+#spyOverlay .spyReticle .h { width: 34px; height: 2px; left: -17px; top: -1px; box-shadow: -40px 0 0 rgba(20, 24, 30, 0.8), 40px 0 0 rgba(20, 24, 30, 0.8); }
+#spyOverlay .spyReticle .v { width: 2px; height: 14px; left: -1px; top: -7px; }
+#spyOverlay .spyInfo {
+  position: absolute; left: 50%; top: calc(50% + var(--r) + 20px); transform: translateX(-50%);
+  display: flex; gap: 14px; font-weight: 700; font-size: 16px; color: #f4d58d; text-shadow: var(--outline-sm);
+}
+body.spy #hudBottom, body.spy #minimapWrap, body.spy #topRight canvas { opacity: 0; pointer-events: none; }

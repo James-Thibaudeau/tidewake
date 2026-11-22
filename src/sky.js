@@ -32,16 +32,23 @@ void main() {
   col = mix(col, mix(uHorizon, uTop, 0.12), step(0.035, y) * (1.0 - step(0.075, y)) * 0.5);
   col = y < 0.0 ? uHorizon : col;
   float vis = 1.0 - uCloud * 0.85;
-  // sun: hard disc + toon halo ring
+  // Angular distances (radians, small-angle) to the sun and moon centres
   float sd = dot(d, uSunDir);
-  col = mix(col, mix(col, uSunCol, 0.35), step(0.992, sd) * vis);
-  col = mix(col, uSunCol * 1.4 + 0.15, step(0.9986, sd) * vis);
-  // moon with a crescent bite
+  float sa = sqrt(max(0.0, 2.0 * (1.0 - sd)));
   float md = dot(d, uMoonDir);
+  float ma = sqrt(max(0.0, 2.0 * (1.0 - md)));
+  // sun: crisp-but-antialiased disc with a soft, layered glow
+  float sunGlow = exp(-sa * sa / 0.004) * 0.45 + exp(-sa * sa / 0.05) * 0.18;
+  col += uSunCol * sunGlow * vis * (1.0 - uNight);
+  col = mix(col, uSunCol * 1.4 + 0.15, (1.0 - smoothstep(0.050, 0.056, sa)) * vis);
+  // moon with a crescent bite and a gentle falloff glow (no hard ring)
   vec3 off = normalize(uMoonDir + vec3(0.015, 0.008, 0.0));
-  float moon = step(0.9994, md) * (1.0 - step(0.9994, dot(d, off)) * 0.85);
-  col = mix(col, vec3(0.96, 0.95, 0.84), moon * uNight * vis);
-  col += vec3(0.25, 0.3, 0.45) * step(0.996, md) * uNight * vis * 0.3;
+  float oa = sqrt(max(0.0, 2.0 * (1.0 - dot(d, off))));
+  float disc = 1.0 - smoothstep(0.031, 0.036, ma);
+  float bite = 1.0 - smoothstep(0.031, 0.037, oa);
+  float moonGlow = exp(-ma * ma / 0.0035) * 0.32 + exp(-ma * ma / 0.03) * 0.12;
+  col += vec3(0.55, 0.62, 0.85) * moonGlow * uNight * vis;
+  col = mix(col, vec3(0.96, 0.95, 0.84), disc * (1.0 - bite * 0.82) * uNight * vis);
   // stars
   vec3 sp = d * 170.0;
   vec3 cell = floor(sp);
