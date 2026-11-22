@@ -23,7 +23,8 @@ Built with [three.js](https://threejs.org/) as plain ES modules. There's no buil
 - **Lower your sails in storms.** Full sail in a storm batters your hull.
 - **Bank your gold.** Gold in your hold is lost if you're shipwrecked. Docking at a port banks your cargo and saves your progress. Ports are your save points.
 - Glowing golden beams mark sunken treasure. Sail over one slowly and haul it up.
-- Spend banked gold at any port's shipwright: sails, hull, rudder, keel, lantern and spyglass.
+- Spend banked gold at any port's shipwright: sails, hull, rudder, keel, lantern and spyglass. Every tier changes how the ship looks.
+- With a spyglass, hold `Z` / `Shift` (or the spyglass button) to look through it from the explorer's eyes; drag to pan. Islands you spot through it are charted from afar.
 
 ## Run locally
 
@@ -53,6 +54,7 @@ src/
   world.js        procedural islands, terrain height, island streaming
   props.js        low-poly prop library (trees, huts, lighthouse, rocks, chests…)
   boat.js         boat model, upgrade visuals and sailing physics
+  explorer.js     the anime explorer character (model + animation)
   ocean.js        toon water shader
   sky.js          sky dome, sun/moon/stars, clouds, lighting
   weather.js      weather states, wind, rain, lightning, wind streaks

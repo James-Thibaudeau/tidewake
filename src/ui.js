@@ -334,6 +334,18 @@ export class UI {
     el.classList.add('bump');
   }
 
+  setSpyglass(on, zoomLabel = '') {
+    document.body.classList.toggle('spy', !!on);
+    const z = document.getElementById('spyZoom');
+    if (z) z.textContent = zoomLabel;
+  }
+
+  setSpyBearing(deg) {
+    const el = document.getElementById('spyBearing');
+    const t = `${String(Math.round(deg) % 360).padStart(3, '0')}°`;
+    if (el && el.textContent !== t) el.textContent = t;
+  }
+
   setPrompt(text) {
     const t = text || null;
     if (t === this.last.prompt) return;

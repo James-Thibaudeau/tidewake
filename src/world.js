@@ -20,15 +20,15 @@ const SUFFIX_L = ['Isle', 'Island', 'Spire', 'Crag', 'Heights', 'Highlands'];
 
 export const BIOMES = {
   temperate: { sand: '#ecd9a0', grass: '#6cc24a', grass2: '#58b043', rock: '#8f877d', wet: '#c9b27a',
-    trees: [['roundTree', 0.5], ['pine', 0.28], ['bush', 0.15], ['flower', 0.07]], density: 1 },
+    trees: [['roundTree', 0.34], ['pine', 0.22], ['birch', 0.12], ['fruitTree', 0.07], ['bush', 0.12], ['berryBush', 0.06], ['flower', 0.07]], density: 1 },
   tropical: { sand: '#f7e3a6', grass: '#7fd35a', grass2: '#66c24c', rock: '#a39079', wet: '#d8c084',
-    trees: [['palm', 0.62], ['bush', 0.26], ['flower', 0.12]], density: 0.85 },
+    trees: [['palm', 0.58], ['bush', 0.18], ['berryBush', 0.08], ['fruitTree', 0.04], ['flower', 0.12]], density: 0.85 },
   cold: { sand: '#d9d3c3', grass: '#8fb07e', grass2: '#7ea573', rock: '#7d8590', wet: '#b9b3a3', snow: '#f4f8ff',
     trees: [['snowPine', 0.72], ['snowRock', 0.18], ['deadTree', 0.1]], density: 0.7 },
   volcanic: { sand: '#5d504b', grass: '#6f8a4a', grass2: '#62803f', rock: '#4a3d3a', wet: '#463c39', lava: '#ff7a2a',
     trees: [['darkRock', 0.5], ['deadTree', 0.28], ['palm', 0.22]], density: 0.35 },
   rocky: { sand: '#e0cda0', grass: '#7aa95c', grass2: '#6a9a50', rock: '#9a8f86', wet: '#c2ae80',
-    trees: [['rock', 0.45], ['pine', 0.35], ['bush', 0.2]], density: 0.55 },
+    trees: [['rock', 0.42], ['pine', 0.33], ['birch', 0.1], ['bush', 0.15]], density: 0.55 },
 };
 
 export function edgeFactor(I, ang) {
@@ -265,7 +265,71 @@ const EMPTY = [];
 
 // ---------------------------------------------------------------- rendering
 
+const TERRAIN_DETAIL_GLSL = /* glsl */ `
+float tdHash(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+float tdNoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(tdHash(i), tdHash(i + vec2(1.0, 0.0)), u.x), mix(tdHash(i + vec2(0.0, 1.0)), tdHash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+// One short stroke (or dot when len = 0) per jittered cell; anti-aliased coverage 0..1.
+float tdStroke(vec2 p, float density, float len, float wid) {
+  vec2 ci = floor(p);
+  vec2 f = fract(p) - 0.5;
+  float on = step(tdHash(ci), density);
+  vec2 o = (vec2(tdHash(ci + 3.7), tdHash(ci + 9.1)) - 0.5) * 0.4;
+  float a = tdHash(ci + 5.3) * 3.14159;
+  vec2 dir = vec2(cos(a), sin(a));
+  vec2 q = f - o;
+  float t = clamp(dot(q, dir), -len, len);
+  float d = length(q - dir * t);
+  float fw = fwidth(d) + 1e-4;
+  return on * (1.0 - smoothstep(wid - fw, wid + fw, d));
+}
+vec3 terrainDetail(vec3 wp, float m, float dist) {
+  float near = 1.0 - smoothstep(30.0, 110.0, dist);
+  float mid = 1.0 - smoothstep(120.0, 450.0, dist);
+  vec2 p = wp.xz;
+  float k = 1.0;
+  if (m < 0.5) {            // sand: wind ripples + speckles
+    float rip = sin(dot(p, vec2(0.8, 0.55)) * 1.7 + tdNoise(p * 0.15) * 6.0);
+    k *= 1.0 + (step(0.8, rip) * 0.05 - step(rip, -0.88) * 0.045) * mid;
+    k *= 1.0 - tdStroke(p * 2.2, 0.35, 0.0, 0.07) * 0.16 * near;
+    k *= 1.0 + tdStroke(p * 1.7 + 11.0, 0.2, 0.0, 0.06) * 0.14 * near;
+  } else if (m < 1.5) {     // grass: clumps + blade strokes
+    float c = tdNoise(p * 0.09) * 0.65 + tdNoise(p * 0.31) * 0.35;
+    float tone = c > 0.62 ? 1.08 : (c < 0.36 ? 0.9 : 1.0);
+    k *= mix(1.0, tone, 0.3 + mid * 0.7);
+    float blades = max(tdStroke(p * 1.6, 0.55, 0.22, 0.035), tdStroke(p * 1.6 + 17.3, 0.45, 0.18, 0.03));
+    k *= 1.0 - blades * 0.24 * near;
+    k *= 1.0 + tdStroke(p * 1.1 + 5.0, 0.3, 0.16, 0.03) * 0.15 * near;
+  } else if (m < 2.5) {     // rock: strata, patches, cracks
+    float n = tdNoise(p * 0.05 + wp.y * 0.02);
+    float s = sin(wp.y * 2.0 + n * 8.0);
+    k *= 1.0 - smoothstep(0.82, 0.95, s) * 0.18 * mid;
+    k *= tdNoise(p * 0.2 + wp.y * 0.1) > 0.6 ? 1.07 : 1.0;
+    k *= 1.0 - tdStroke(p * 0.7 + wp.y * 0.3, 0.35, 0.35, 0.025) * 0.3 * near;
+  } else if (m < 3.5) {     // snow: soft drifts + sparkles
+    k *= 1.0 - step(0.64, tdNoise(p * 0.12)) * 0.06 * mid;
+    k += tdStroke(p * 3.0, 0.07, 0.0, 0.05) * near * 0.5;
+  } else {                  // lava crust
+    k *= tdNoise(p * 0.4 + uTime * 0.05) > 0.55 ? 0.35 : 1.1;
+  }
+  return vec3(k);
+}
+`;
+
 const terrainMaterial = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonGradient() });
+terrainMaterial.onBeforeCompile = (shader) => {
+  shader.uniforms.uTime = waveUniforms.uTime;
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nattribute float aMat;\nvarying float vMat;\nvarying vec3 vWPos;')
+    .replace('#include <project_vertex>', '#include <project_vertex>\nvMat = aMat;\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', '#include <common>\nuniform float uTime;\nvarying float vMat;\nvarying vec3 vWPos;\n' + TERRAIN_DETAIL_GLSL)
+    .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= terrainDetail(vWPos, floor(vMat + 0.5), length(cameraPosition - vWPos));')
+    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\nif (vMat > 3.5) totalEmissiveRadiance += vec3(1.0, 0.32, 0.05) * (0.55 + 0.25 * sin(uTime * 2.0 + vWPos.x * 0.2));');
+};
+terrainMaterial.customProgramCacheKey = () => 'tidewake-terrain';
 
 export const ringUniforms = { uLight: { value: new THREE.Color(1, 1, 1) } };
 
@@ -371,8 +435,29 @@ function glowTexture() {
   glowTex = new THREE.CanvasTexture(c);
   return glowTex;
 }
-const beamMat = new THREE.MeshBasicMaterial({ color: 0xfff0b0, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
-const beamGeo = new THREE.ConeGeometry(7, 70, 16, 1, true).translate(0, -35, 0).rotateZ(Math.PI / 2);
+// Soft beam: fades along its length and toward the cone's silhouette (no hard edges).
+const beamMat = new THREE.ShaderMaterial({
+  uniforms: { uIntensity: { value: 0 } },
+  vertexShader: `varying vec3 vN; varying vec3 vV; varying float vL;
+    void main() {
+      vL = position.x / 70.0;
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vN = normalize(mat3(modelMatrix) * normal);
+      vV = normalize(cameraPosition - wp.xyz);
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }`,
+  fragmentShader: `uniform float uIntensity; varying vec3 vN; varying vec3 vV; varying float vL;
+    void main() {
+      float facing = abs(dot(normalize(vN), normalize(vV)));
+      float edge = pow(facing, 2.5);
+      float l = clamp(vL, 0.0, 1.0);
+      float along = pow(1.0 - l, 1.8) * smoothstep(0.0, 0.08, l);
+      float a = edge * along * uIntensity * 0.4;
+      gl_FragColor = vec4(1.0, 0.93, 0.72, a);
+    }`,
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+});
+const beamGeo = new THREE.ConeGeometry(7, 70, 24, 6, true).translate(0, -35, 0).rotateZ(Math.PI / 2);
 
 export class IslandStreamer {
   constructor(scene, world, quality) {
@@ -380,6 +465,7 @@ export class IslandStreamer {
     this.world = world;
     this.built = new Map();
     this.range = quality === 'low' ? 2000 : 2800;
+    this.quality = quality;
     this.lamps = [];
     this.smoke = [];
   }
@@ -443,6 +529,8 @@ export class IslandStreamer {
     }
     this.buildRocks(F, group);
     this.scene.add(group);
+    rec.lod = { outline: [], detail: [], state: '' };
+    group.traverse((o) => { if (o.userData.lod) rec.lod[o.userData.lod].push(o); });
     this.built.set(F, rec);
   }
 
@@ -479,23 +567,27 @@ export class IslandStreamer {
     const cs = {}; for (const k of ['sand', 'grass', 'grass2', 'rock', 'wet', 'snow', 'lava']) if (P[k]) cs[k] = new THREE.Color(P[k]);
     const snowLine = I.biome === 'cold' ? Math.max(14, I.peak * 0.42) : Infinity;
     const tmp = new THREE.Color();
+    const mat = new Float32Array(N * N); // 0 sand, 1 grass, 2 rock, 3 snow, 4 lava
     for (let k = 0; k < N * N; k++) {
       const h = hs[k];
       const x = pos[k * 3] + I.x, z = pos[k * 3 + 2] + I.z;
       const n = noise2(x * 0.05, z * 0.05, I.seed + 3);
       const ny = nrm.getY(k);
+      let id = 0;
       if (h < 0.25) tmp.copy(cs.wet);
       else if (h < 1.9 + n * 0.7) tmp.copy(cs.sand);
       else {
-        tmp.copy(n > 0.1 ? cs.grass2 : cs.grass);
-        if (ny < 0.74 || (I.biome === 'volcanic' && h > I.peak * 0.45) || (I.biome === 'rocky' && h > I.peak * 0.7)) tmp.copy(cs.rock);
-        if (h > snowLine + n * 6 && ny > 0.55) tmp.copy(cs.snow);
-        if (I.crater && h < I.peak * 0.78 && Math.hypot(x - I.x, z - I.z) < I.r * 0.15) tmp.copy(cs.lava);
+        tmp.copy(n > 0.1 ? cs.grass2 : cs.grass); id = 1;
+        if (ny < 0.74 || (I.biome === 'volcanic' && h > I.peak * 0.45) || (I.biome === 'rocky' && h > I.peak * 0.7)) { tmp.copy(cs.rock); id = 2; }
+        if (h > snowLine + n * 6 && ny > 0.55) { tmp.copy(cs.snow); id = 3; }
+        if (I.crater && h < I.peak * 0.78 && Math.hypot(x - I.x, z - I.z) < I.r * 0.15) { tmp.copy(cs.lava); id = 4; }
       }
+      mat[k] = id;
       const v = 1 + noise2(x * 0.3, z * 0.3, 9) * 0.04;
       col[k * 3] = tmp.r * v; col[k * 3 + 1] = tmp.g * v; col[k * 3 + 2] = tmp.b * v;
     }
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.setAttribute('aMat', new THREE.BufferAttribute(mat, 1));
     g.computeBoundingSphere();
     const m = new THREE.Mesh(g, terrainMaterial);
     m.userData.own = true;
@@ -651,14 +743,51 @@ export class IslandStreamer {
       (buckets[type] ||= []).push(m.clone());
       placed++;
     }
+    // Ground cover: grass tufts on meadows and pebbles on beaches (nearby detail, high quality only)
+    if (this.quality !== 'low' && I.biome !== 'volcanic') {
+      const tufts = Math.min(320, Math.floor(Math.PI * I.r * I.r / 110));
+      const pebbles = Math.min(70, Math.floor(I.r * 0.45));
+      let nt = 0, np = 0;
+      for (let n = 0; n < (tufts + pebbles) * 3 && (nt < tufts || np < pebbles); n++) {
+        const a = rng() * TAU, rr = Math.sqrt(rng()) * I.r * 1.1;
+        const lx = Math.cos(a) * rr, lz = Math.sin(a) * rr;
+        const h = islandHeight(I, I.x + lx, I.z + lz);
+        if (exclusions.some(([ex, ez, er]) => Math.hypot(ex - lx, ez - lz) < er * 0.6)) continue;
+        let type = null;
+        if (h > 0.5 && h < 1.7 && np < pebbles) { type = 'pebble'; np++; }
+        else if (h > 2.3 && h < Math.min(snowLine - 2, I.peak * 0.8) && nt < tufts) {
+          const hx = islandHeight(I, I.x + lx + 1, I.z + lz) - h, hz = islandHeight(I, I.x + lx, I.z + lz + 1) - h;
+          if (hx * hx + hz * hz > 0.45) continue;
+          type = 'grassTuft'; nt++;
+        }
+        if (!type) continue;
+        const s = type === 'pebble' ? 0.6 + rng() * 1.2 : 0.8 + rng() * 0.9;
+        e.set(0, rng() * TAU, 0); q.setFromEuler(e);
+        v.set(lx, h - 0.05, lz); sc.set(s, s, s);
+        m.compose(v, q, sc);
+        (buckets[type] ||= []).push(m.clone());
+      }
+    }
+    const grassCol = new THREE.Color(P.grass).multiplyScalar(1.05);
+    const tint = new THREE.Color();
     for (const [type, mats] of Object.entries(buckets)) {
       const mesh = new THREE.InstancedMesh(PROPS[type], propMaterial, mats.length);
-      mats.forEach((mm, i) => mesh.setMatrixAt(i, mm));
+      mats.forEach((mm, i) => {
+        mesh.setMatrixAt(i, mm);
+        // subtle per-instance colour variation (grass tufts take the island's grass colour)
+        const b = 0.9 + rng() * 0.18;
+        if (type === 'grassTuft') tint.copy(grassCol).multiplyScalar(0.92 + rng() * 0.16);
+        else tint.setRGB(b * (1 + (rng() - 0.5) * 0.08), b, b * (1 + (rng() - 0.5) * 0.08));
+        mesh.setColorAt(i, tint);
+      });
       mesh.computeBoundingSphere();
-      const small = type === 'flower' || type === 'bush';
+      if (type === 'grassTuft') { mesh.userData.lod = 'detail'; group.add(mesh); continue; }
+      const small = type === 'flower' || type === 'bush' || type === 'berryBush' || type === 'pebble';
+      if (type === 'flower' || type === 'pebble') mesh.userData.lod = 'detail';
       const ol = new THREE.InstancedMesh(PROPS[type], small ? thinOutline : propOutline, mats.length);
       ol.instanceMatrix = mesh.instanceMatrix;
       ol.boundingSphere = mesh.boundingSphere;
+      ol.userData.lod = small ? 'detail' : 'outline';
       group.add(mesh, ol);
     }
   }
@@ -687,11 +816,26 @@ export class IslandStreamer {
     }
   }
 
+  // Level of detail: outlines and small ground cover only on nearby islands,
+  // where they can actually be seen. Cuts triangle count roughly in half.
+  lod(cx, cz, zoom = 1) {
+    for (const [F, rec] of this.built) {
+      if (!rec.lod) continue;
+      const d = (Math.hypot(F.x - cx, F.z - cz) - F.bound) / zoom;
+      const state = d < 450 ? 'near' : d < 1000 ? 'mid' : 'far';
+      if (state === rec.lod.state) continue;
+      rec.lod.state = state;
+      for (const o of rec.lod.outline) o.visible = state !== 'far';
+      for (const o of rec.lod.detail) o.visible = state === 'near';
+    }
+  }
+
   animate(time, night) {
+    beamMat.uniforms.uIntensity.value = smoothstep(0.2, 0.65, night);
     for (const L of this.lamps) {
       L.glow.material.opacity = 0.25 + night * 0.75;
       L.glow.scale.setScalar(10 + night * 14);
-      L.beam.visible = night > 0.3;
+      L.beam.visible = night > 0.2;
       L.beam.rotation.y = time * 0.6;
     }
     for (const S of this.smoke) {

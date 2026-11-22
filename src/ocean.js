@@ -70,6 +70,10 @@ void main() {
 
   // two-tone body: crests get the lighter blue
   vec3 col = mix(uDeep, uMid, smoothstep(0.32, 0.40, hn));
+  // slow-drifting large patches of deeper / brighter water (toon-stepped)
+  float big = vnoise(p * 0.0025 + vec2(uTime * 0.004, -uTime * 0.003)) * 0.6
+            + vnoise(p * 0.0011 + vec2(17.0 - uTime * 0.002, 4.0)) * 0.4;
+  col *= mix(0.92, 1.06, smoothstep(0.47, 0.53, big));
   // toon slope shading relative to a flat sea
   vec3 sd = normalize(uSunDir);
   float rel = dot(n, sd) - sd.y;
@@ -93,11 +97,47 @@ void main() {
     * uRain * (1.0 - smoothstep(20.0, 60.0, dist));
   foam = max(foam, rd * 0.6);
 
+  float ripple = 0.0, sparkle = 0.0;
+#ifndef LOW_Q
+  // finer secondary swirl lines close to the camera
+  vec2 q2 = p * 0.16;
+  vec2 warp2 = vec2(vnoise(q2 * 0.6 + uTime * 0.12), vnoise(q2 * 0.6 + 9.1 - uTime * 0.1));
+  float n2 = vnoise(q2 + warp2 * 1.3 + vec2(-uTime * 0.05, uTime * 0.04));
+  float fw2 = fwidth(n2);
+  float line2 = 1.0 - smoothstep(fw2 * 0.5 + 0.002, fw2 * 1.5 + 0.006, abs(n2 - 0.5));
+  float mask2 = smoothstep(0.55, 0.7, vnoise(p * 0.03 + vec2(uTime * 0.02, 7.7)));
+  foam = max(foam, line2 * mask2 * (1.0 - smoothstep(35.0, 120.0, dist)) * 0.5);
+
+  // little wind-ripple chevrons drifting with the swell
+  vec2 wd = vec2(0.94, 0.34);
+  vec2 r = vec2(dot(p, wd), dot(p, vec2(-wd.y, wd.x))) * vec2(0.8, 0.65) + vec2(uTime * 0.45, 0.0);
+  vec2 ci = floor(r);
+  vec2 f = fract(r) - 0.5;
+  f -= (vec2(hash12(ci + 3.1), hash12(ci + 7.7)) - 0.5) * 0.4;
+  float chev = abs(f.x + abs(f.y) * 0.8);
+  float cw = fwidth(chev) + 1e-4;
+  ripple = (1.0 - smoothstep(0.03, 0.03 + cw * 1.5, chev)) * step(abs(f.y), 0.2)
+         * step(0.86, hash12(ci + floor(uTime * 0.4 + hash12(ci) * 4.0)))
+         * (1.0 - smoothstep(15.0, 55.0, dist));
+
+  // twinkling toon sparkles on sunlit crests
+  vec2 sc = p * 1.3 + vec2(uTime * 0.2, uTime * 0.1);
+  vec2 si = floor(sc);
+  float sl = length(fract(sc) - 0.5);
+  float sfw = fwidth(sl) + 1e-4;
+  sparkle = (1.0 - smoothstep(0.07, 0.07 + sfw * 1.5, sl))
+          * step(0.95, hash12(si + floor(uTime * 3.0 + hash12(si) * 3.0)))
+          * smoothstep(0.2, 0.45, hn) * step(0.0, rel + 0.02) * step(0.05, sd.y)
+          * (1.0 - smoothstep(20.0, 110.0, dist)) * (1.0 - uRain);
+#endif
+
   vec3 light = uAmbient + uLightCol;
   float ld = length(vWorld - uLantern.xyz);
   light += vec3(1.0, 0.72, 0.38) * uLantern.w * (step(ld, uLanternR * 0.45) * 0.35 + step(ld, uLanternR) * 0.35);
   vec3 lit = col * light;
   lit = mix(lit, vec3(0.92, 0.97, 1.0) * min(light, vec3(1.15)), foam);
+  lit = mix(lit, mix(uMid, vec3(0.9, 0.96, 1.0), 0.35) * light, ripple * 0.4);
+  lit += sparkle * (uLightCol * 0.9 + 0.05);
 
   // sharp toon sun glints
   vec3 v = normalize(cameraPosition - vWorld);
@@ -127,6 +167,7 @@ export class Ocean {
     };
     this.material = new THREE.ShaderMaterial({
       uniforms: this.uniforms, vertexShader, fragmentShader, fog: true,
+      defines: quality === 'low' ? { LOW_Q: 1 } : {},
     });
     this.mesh = new THREE.Mesh(oceanGeometry(4200, segs), this.material);
     this.mesh.frustumCulled = false;
