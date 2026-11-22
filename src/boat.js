@@ -5,6 +5,7 @@ import { toon, toonGradient, outlineMaterial } from './toon.js';
 import { waveHeight } from './waves.js';
 import { clamp, damp, smoothstep, wrapAngle, lerp, TAU } from './util.js';
 import { WORLD_HALF } from './config.js';
+import { Wake } from './wake.js';
 import { Explorer, part, mergeParts } from './explorer.js';
 
 const SAIL_U = 12, SAIL_V = 10;
@@ -670,43 +671,8 @@ export class Boat {
   }
 
   buildWake() {
-    const N = 260;
-    this.wakeN = N;
-    this.wake = [];
-    const geo = new THREE.BufferGeometry();
-    this.wakePos = new Float32Array(N * 3);
-    this.wakeAlpha = new Float32Array(N);
-    this.wakeSize = new Float32Array(N);
-    geo.setAttribute('position', new THREE.BufferAttribute(this.wakePos, 3));
-    geo.setAttribute('aAlpha', new THREE.BufferAttribute(this.wakeAlpha, 1));
-    geo.setAttribute('aSize', new THREE.BufferAttribute(this.wakeSize, 1));
-    for (let i = 0; i < N; i++) this.wake.push({ x: 0, z: 0, age: 99, life: 1, size: 1, vx: 0, vz: 0 });
-    this.wakeMat = new THREE.ShaderMaterial({
-      uniforms: { uScale: { value: 500 }, uLight: { value: new THREE.Color(1, 1, 1) } },
-      vertexShader: `attribute float aAlpha; attribute float aSize; varying float vA; uniform float uScale;
-        varying float vSeed;
-        void main(){ vA = aAlpha; vSeed = fract(dot(position.xz, vec2(0.173, 0.291)));
-          vec4 mv = modelViewMatrix * vec4(position,1.0); gl_PointSize = aSize * uScale / -mv.z;
-          mv.z += 1.2; // nudge toward the camera so wave crests don't slice the sprite
-          gl_Position = projectionMatrix * mv; }`,
-      fragmentShader: `varying float vA; uniform vec3 uLight;
-        varying float vSeed;
-        void main(){ vec2 c = gl_PointCoord - 0.5; float d = length(c);
-          // lumpy foam blob, matching the ocean's foam style
-          float ang = atan(c.y, c.x);
-          float edge = 0.5 * (0.8 + 0.13 * sin(ang * 2.0 + vSeed * 40.0) + 0.08 * sin(ang * 3.0 - vSeed * 23.0));
-          if (d > edge || vA < 0.01) discard;
-          float a = vA * 0.7; gl_FragColor = vec4(vec3(0.95,0.98,1.0) * uLight, a);
-          #include <colorspace_fragment>
-        }`,
-      transparent: true, depthWrite: false,
-    });
-    this.wakePoints = new THREE.Points(geo, this.wakeMat);
-    this.wakePoints.frustumCulled = false;
-    this.wakePoints.renderOrder = 3;
-    this.scene.add(this.wakePoints);
-    this.wakeIdx = 0;
-    this.wakeTimer = 0;
+    this.wake = new Wake(this.scene);
+    this.wakeMat = this.wake.material; // game.js feeds it the scene light
   }
 
   applyUpgrades(levels, values) {
@@ -794,7 +760,7 @@ export class Boat {
     this.sink = 0;
     this.sailLevel = 0;
     this.sailVis = 0;
-    for (const w of this.wake) w.age = 99;
+    this.wake.reset();
   }
 
   /**
@@ -976,45 +942,11 @@ export class Boat {
     }
     if (this.runeBand.visible) this.runeMat.opacity = 0.55 + 0.35 * Math.sin(t * 1.6) + night * 0.2;
 
-    this.updateWake(dt, fx, fz, rx, rz);
+    this.updateWake(dt, fx, fz);
   }
 
-  updateWake(dt, fx, fz, rx, rz) {
-    const sp = Math.abs(this.speed);
-    this.wakeTimer += dt * (sp * 1.6);
-    while (this.wakeTimer > 1 && sp > 1) {
-      this.wakeTimer -= 1;
-      for (const s of [-1, 1]) {
-        const w = this.wake[this.wakeIdx];
-        this.wakeIdx = (this.wakeIdx + 1) % this.wakeN;
-        w.x = this.pos.x - fx * 2.8 + rx * s * 1.1 + (Math.random() - 0.5) * 0.4;
-        w.z = this.pos.z - fz * 2.8 + rz * s * 1.1 + (Math.random() - 0.5) * 0.4;
-        w.vx = rx * s * 1.2; w.vz = rz * s * 1.2;
-        w.age = 0; w.life = 1.6 + Math.random() * 1.0; w.size = 0.55 + Math.min(sp, 20) * 0.03;
-      }
-      // bow spray
-      if (sp > 6 && Math.random() < 0.5) {
-        const w = this.wake[this.wakeIdx];
-        this.wakeIdx = (this.wakeIdx + 1) % this.wakeN;
-        const s = Math.random() < 0.5 ? -1 : 1;
-        w.x = this.pos.x + fx * 3.3 + rx * s * 0.8; w.z = this.pos.z + fz * 3.3 + rz * s * 0.8;
-        w.vx = rx * s * 3; w.vz = rz * s * 3; w.age = 0; w.life = 1; w.size = 1.0;
-      }
-    }
-    for (let i = 0; i < this.wakeN; i++) {
-      const w = this.wake[i];
-      w.age += dt;
-      if (w.age > w.life) { this.wakeAlpha[i] = 0; continue; }
-      w.x += w.vx * dt; w.z += w.vz * dt;
-      w.vx *= 0.98; w.vz *= 0.98;
-      const k = w.age / w.life;
-      this.wakePos[i * 3] = w.x; this.wakePos[i * 3 + 1] = waveHeight(w.x, w.z) + 0.35; this.wakePos[i * 3 + 2] = w.z;
-      this.wakeAlpha[i] = (1 - k) * 0.75;
-      this.wakeSize[i] = w.size * (1 + k * 1.6);
-    }
-    const g = this.wakePoints.geometry;
-    g.attributes.position.needsUpdate = true;
-    g.attributes.aAlpha.needsUpdate = true;
-    g.attributes.aSize.needsUpdate = true;
+  updateWake(dt, fx, fz) {
+    const x = this.pos.x, z = this.pos.z;
+    this.wake.update(dt, x - fx * 2.9, z - fz * 2.9, x + fx * 3.2, z + fz * 3.2, fx, fz, this.speed);
   }
 }

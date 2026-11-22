@@ -414,7 +414,7 @@ export class Game {
     w.update(dt, this.camera, boat.group.position);
     // Run the sea a bit slower than real time: calmer, rolling swells that
     // don't drag the foam across the screen. CPU + GPU share this clock.
-    updateWaves(this.elapsed * 0.6, w.p.wave);
+    updateWaves(this.elapsed * 0.6, w.p.wave, w.p.swell);
     const wind = { angle: w.windAngle, strength: w.windStrength };
     const up = this.upv;
 
@@ -430,7 +430,7 @@ export class Game {
       const storm = w.p.storm;
       if (storm > 0.3 && this.mode === 'sailing') {
         const sf = [0, 0.5, 1][boat.sailLevel];
-        this.damage(storm * (0.15 + 1.8 * sf * sf) * (1 - up.keel) * dt, 'storm');
+        this.damage(storm * (0.15 + 1.4 * sf * sf) * (1 - up.keel) * dt, 'storm'); // slams add the rest
       }
       this.updateSailingChecks(dt, acts);
     } else if (this.mode === 'docking') {
@@ -461,6 +461,7 @@ export class Game {
     }
 
     boat.animate(dt, this.elapsed, wind, s.health / boat.maxHealth, this.env.night, up);
+    this.checkBowSlam(dt);
     this.sailEfficiency = boat.efficiency;
     this.pointOfSail = pointOfSailName(boat.relWind);
     if (this.mode !== 'title') this.updateFlotsam(dt);
@@ -562,6 +563,23 @@ export class Game {
     if (warn !== this.warn) { this.warn = warn; this.ui.warning(warn); }
   }
 
+  // In heavy seas the bow plunges into troughs: a thud, spray-shake and a knock to the hull.
+  checkBowSlam(dt) {
+    const boat = this.boat, w = this.weather;
+    const rate = (boat.pitch - (this._lastPitch ?? boat.pitch)) / Math.max(dt, 1e-3);
+    this._lastPitch = boat.pitch;
+    this._slamCd = (this._slamCd || 0) - dt;
+    if (this.mode !== 'sailing' || w.p.swell < 0.4 || this._slamCd > 0) return;
+    if (boat.pitch > 0.08 && rate > 0.11 && Math.abs(boat.speed) > 2) {
+      this._slamCd = 3.5;
+      const k = Math.min(1, (rate - 0.11) * 4 + 0.4) * w.p.swell;
+      this.cam.shake = Math.max(this.cam.shake, 0.5 + k * 0.8);
+      this.audio.play('slam', { volume: k });
+      const sail = [0, 0.5, 1][boat.sailLevel];
+      this.damage((0.8 + 2.2 * sail) * k * (1 - this.upv.keel), 'storm');
+    }
+  }
+
   updateCamera(dt) {
     const c = this.cam, cam = this.camera, boat = this.boat;
     const L = this.input.consumeLook();
@@ -637,6 +655,9 @@ export class Game {
     }
     cam.position.set(x, y, z);
     cam.lookAt(tx, ty, tz);
+    // in heavy seas the horizon tilts a little with the hull
+    const heavy = this.weather.p.swell;
+    if (heavy > 0.05) cam.rotateZ(-boat.roll * 0.4 * heavy);
     this.setFov(55, dt);
   }
 

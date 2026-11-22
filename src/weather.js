@@ -6,12 +6,12 @@ import { clamp, lerp, damp, TAU, noise2 } from './util.js';
 // cloud: sky cover (≥ ~0.9 reads as a full overcast deck); dark: how much the
 // weather greys and dims the world on top of that.
 export const WEATHER = {
-  clear: { cloud: 0.3, rain: 0, wave: 0.35, wind: 0.85, fog: 1.0, dark: 0.0, storm: 0, label: 'Clear skies' },
-  breezy: { cloud: 0.48, rain: 0, wave: 0.6, wind: 1.2, fog: 0.95, dark: 0.04, storm: 0, label: 'Fresh breeze' },
-  cloudy: { cloud: 0.96, rain: 0, wave: 0.5, wind: 0.95, fog: 0.72, dark: 0.3, storm: 0, label: 'Overcast' },
-  rain: { cloud: 1.0, rain: 0.55, wave: 0.75, wind: 1.05, fog: 0.55, dark: 0.46, storm: 0, label: 'Rain' },
-  storm: { cloud: 1.0, rain: 1.0, wave: 1.45, wind: 1.45, fog: 0.38, dark: 0.72, storm: 1, label: 'Storm!' },
-  fog: { cloud: 0.85, rain: 0, wave: 0.25, wind: 0.55, fog: 0.18, dark: 0.14, storm: 0, label: 'Fog' },
+  clear: { cloud: 0.3, rain: 0, wave: 0.35, wind: 0.85, fog: 1.0, dark: 0.0, storm: 0, swell: 0, label: 'Clear skies' },
+  breezy: { cloud: 0.48, rain: 0, wave: 0.6, wind: 1.2, fog: 0.95, dark: 0.04, storm: 0, swell: 0.05, label: 'Fresh breeze' },
+  cloudy: { cloud: 0.96, rain: 0, wave: 0.5, wind: 0.95, fog: 0.72, dark: 0.3, storm: 0, swell: 0.08, label: 'Overcast' },
+  rain: { cloud: 1.0, rain: 0.55, wave: 0.75, wind: 1.05, fog: 0.55, dark: 0.46, storm: 0, swell: 0.35, label: 'Rain' },
+  storm: { cloud: 1.0, rain: 1.0, wave: 1.7, wind: 1.45, fog: 0.38, dark: 0.72, storm: 1, swell: 1.0, label: 'Storm!' },
+  fog: { cloud: 0.85, rain: 0, wave: 0.25, wind: 0.55, fog: 0.18, dark: 0.14, storm: 0, swell: 0, label: 'Fog' },
 };
 const NEXT = {
   clear: ['breezy', 'cloudy', 'fog', 'clear', 'breezy'],
@@ -176,7 +176,7 @@ export class Weather {
     }
     // smooth params
     const k = 1 - Math.exp(-dt / 18);
-    for (const key of ['cloud', 'rain', 'wave', 'wind', 'fog', 'dark', 'storm']) {
+    for (const key of ['cloud', 'rain', 'wave', 'swell', 'wind', 'fog', 'dark', 'storm']) {
       this.p[key] += (this.target[key] - this.p[key]) * k;
     }
     // wind direction wanders
