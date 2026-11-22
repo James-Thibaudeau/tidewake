@@ -85,7 +85,7 @@ void main() {
   float hL = waveHeight(p - vec2(e, 0.0)), hR = waveHeight(p + vec2(e, 0.0));
   float hD = waveHeight(p - vec2(0.0, e)), hU = waveHeight(p + vec2(0.0, e));
   vec3 n = normalize(vec3(hL - hR, 2.0 * e, hD - hU));
-  float amp = max(uWaveScale * 1.25, 0.05);
+  float amp = max(uWaveScale * 1.25 + uSwellScale * 3.2, 0.05);
   float hn = (hL + hR + hD + hU) * 0.25 / amp;
   float dist = length(cameraPosition - vWorld);
   vec3 v = normalize(cameraPosition - vWorld);
