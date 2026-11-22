@@ -9,9 +9,16 @@ import { Wake } from './wake.js';
 import { Explorer, part, mergeParts } from './explorer.js';
 
 const SAIL_U = 12, SAIL_V = 10;
+const JIB_U = 10, JIB_V = 7;     // along the luff, luff->leech
+const TOP_U = 8, TOP_V = 6;      // along the gaff, gaff->head
 const BOOM_Y = 1.55, BOOM_LEN = 3.1, MAST_Z = 0.9, MAST_BASE = 0.7;
-const SAIL_H = [6.2, 6.2, 6.9, 7.3];
-const MAST_TOP = [8.4, 8.4, 9.5, 9.9];
+const SAIL_H = [6.2, 6.2, 6.9, 7.3, 7.6, 8.0];
+const MAST_TOP = [8.4, 8.4, 9.5, 9.9, 11.5, 12.3];
+// Hull tiers 4-5 build a visibly bigger ship: the whole model scales up.
+export const SIZE_SCALE = [1, 1, 1, 1, 1.12, 1.25];
+const MAX_TIER = 5;
+const SAIL_BASE = ['#e3d4b1', '#fbf8ef', '#fbf9f2', '#fff1cc', '#9c2f27', '#fffaf0'];
+const ROPE = '#5a4632';
 
 // Efficiency by angle between bow and where the wind comes from (0 = into wind).
 export function pointOfSail(a) {
@@ -36,6 +43,8 @@ const HULL_STYLE = [
   { hull: '#7a4a22', trim: '#f2ead6', deck: '#d0a46a' },
   { hull: '#b8432f', trim: '#f5efe0', deck: '#d8ae74' },
   { hull: '#2e1f1a', trim: '#ffcf4a', deck: '#b88a55' },
+  { hull: '#4a1d13', trim: '#f3e7c9', deck: '#c08a52' },   // mahogany galleon
+  { hull: '#123c5c', trim: '#ffd75e', deck: '#cfa168' },   // royal flagship
 ];
 const GOLD = '#ffcf4a', BRASS = '#d9a441', COPPER = '#c8743a';
 
@@ -151,20 +160,55 @@ function deckTexture() {
 }
 
 const sailTexCache = {};
-function sailTexture(tier) {
-  if (sailTexCache[tier]) return sailTexCache[tier];
+// Compass-rose emblem, pre-squashed so it reads round on the tapered sail.
+function drawEmblem(g, S, H, { u = 0.36, v = 0.52, R = 1.05, ring = '#d4402e', inner = GOLD, a = '#d4402e', b = GOLD, fill = 'rgba(212,64,46,0.18)', points = 8 } = {}) {
+  const cx = u * S, cy = (1 - v) * S;
+  const rx = R / (BOOM_LEN / S), ry = R / ((H * (1 - 0.55 * u)) / S);
+  g.save(); g.translate(cx, cy); g.scale(1, ry / rx);
+  g.fillStyle = fill;
+  g.beginPath(); g.arc(0, 0, rx, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = ring; g.lineWidth = 9;
+  g.beginPath(); g.arc(0, 0, rx, 0, Math.PI * 2); g.stroke();
+  g.strokeStyle = inner; g.lineWidth = 4;
+  g.beginPath(); g.arc(0, 0, rx - 10, 0, Math.PI * 2); g.stroke();
+  for (let k = 0; k < points; k++) {
+    const ang = (k / points) * Math.PI * 2, L = k % 2 ? rx * 0.55 : rx * 0.92, w2 = rx * 0.14;
+    g.fillStyle = k % 2 ? a : b;
+    g.beginPath();
+    g.moveTo(Math.cos(ang) * L, Math.sin(ang) * L);
+    g.lineTo(Math.cos(ang + Math.PI / 2) * w2, Math.sin(ang + Math.PI / 2) * w2);
+    g.lineTo(Math.cos(ang - Math.PI / 2) * w2, Math.sin(ang - Math.PI / 2) * w2);
+    g.fill();
+  }
+  g.fillStyle = '#fff8e0'; g.beginPath(); g.arc(0, 0, rx * 0.1, 0, Math.PI * 2); g.fill();
+  g.restore();
+}
+
+// plain = the same cloth without emblems/stripes (for the jib and topsail)
+function sailTexture(tier, plain = false) {
+  const key = tier + (plain ? 'p' : '');
+  if (sailTexCache[key]) return sailTexCache[key];
   const H = SAIL_H[tier];
   const tex = canvasTex(256, 256, (g, S) => {
-    g.fillStyle = ['#e3d4b1', '#fbf8ef', '#fbf9f2', '#fff1cc'][tier];
+    g.fillStyle = SAIL_BASE[tier];
     g.fillRect(0, 0, S, S);
     for (let i = 0; i < 1400; i++) {
-      g.fillStyle = `rgba(120,100,60,${Math.random() * (tier === 0 ? 0.08 : 0.04)})`;
+      g.fillStyle = tier === 4 ? `rgba(40,10,5,${Math.random() * 0.08})` : `rgba(120,100,60,${Math.random() * (tier === 0 ? 0.08 : 0.04)})`;
       g.fillRect(Math.random() * S, Math.random() * S, 2, 2);
     }
-    // panel seams
-    g.strokeStyle = tier === 0 ? 'rgba(120,95,55,0.55)' : 'rgba(150,140,110,0.4)';
+    // panel seams (finer, doubled-stitch seams on the top rigs)
+    g.strokeStyle = tier === 0 ? 'rgba(120,95,55,0.55)' : tier === 4 ? 'rgba(60,15,10,0.45)' : tier === 5 ? 'rgba(190,150,70,0.45)' : 'rgba(150,140,110,0.4)';
     g.lineWidth = 2;
-    for (let y = 30; y < S; y += 30) { g.beginPath(); g.moveTo(0, y); g.lineTo(S, y); g.stroke(); }
+    const step = tier >= 4 ? 22 : 30;
+    for (let y = step; y < S; y += step) {
+      g.beginPath(); g.moveTo(0, y); g.lineTo(S, y); g.stroke();
+      if (tier >= 4) { g.globalAlpha = 0.5; g.beginPath(); g.moveTo(0, y + 4); g.lineTo(S, y + 4); g.stroke(); g.globalAlpha = 1; }
+    }
+    if (tier >= 4) {
+      // vertical cloth panels
+      g.strokeStyle = tier === 4 ? 'rgba(60,15,10,0.25)' : 'rgba(190,150,70,0.25)'; g.lineWidth = 1.5;
+      for (let x = 32; x < S; x += 32) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, S); g.stroke(); }
+    }
     if (tier === 0) {
       for (const [x, y, w, h, c] of [[36, 150, 62, 46, '#c8b083'], [150, 58, 52, 40, '#d8c497'], [118, 196, 46, 34, '#b99d6c'], [60, 70, 30, 26, '#cfb98d']]) {
         g.fillStyle = c; g.fillRect(x, y, w, h);
@@ -174,51 +218,52 @@ function sailTexture(tier) {
     }
     if (tier >= 1) {
       // reinforced corners
-      g.fillStyle = tier === 3 ? '#f3d58a' : 'rgba(200,190,160,0.6)';
+      g.fillStyle = tier === 3 || tier === 5 ? '#f3d58a' : tier === 4 ? '#f3e7c9' : 'rgba(200,190,160,0.6)';
       g.beginPath(); g.moveTo(0, S); g.lineTo(46, S); g.lineTo(0, S - 46); g.fill();
       g.beginPath(); g.moveTo(S, S); g.lineTo(S - 40, S); g.lineTo(S, S - 40); g.fill();
       g.beginPath(); g.moveTo(0, 0); g.lineTo(40, 0); g.lineTo(0, 40); g.fill();
     }
-    if (tier === 2) {
+    if (tier === 2 && !plain) {
       g.fillStyle = '#2f6fd0'; g.fillRect(0, 150, S, 22); g.fillRect(0, 184, S, 10);
       g.fillStyle = '#d4402e'; g.fillRect(0, 175, S, 5);
     }
-    if (tier === 3) {
-      // compass-rose emblem, pre-squashed so it reads round on the tapered sail
-      const u = 0.36, v = 0.52;
-      const cx = u * S, cy = (1 - v) * S;
-      const R = 1.05;
-      const rx = R / (BOOM_LEN / S), ry = R / ((H * (1 - 0.55 * u)) / S);
-      g.save(); g.translate(cx, cy); g.scale(1, ry / rx);
-      g.fillStyle = 'rgba(212,64,46,0.18)';
-      g.beginPath(); g.arc(0, 0, rx, 0, Math.PI * 2); g.fill();
-      g.strokeStyle = '#d4402e'; g.lineWidth = 9;
-      g.beginPath(); g.arc(0, 0, rx, 0, Math.PI * 2); g.stroke();
-      g.strokeStyle = GOLD; g.lineWidth = 4;
-      g.beginPath(); g.arc(0, 0, rx - 10, 0, Math.PI * 2); g.stroke();
-      for (let k = 0; k < 8; k++) {
-        const a = (k / 8) * Math.PI * 2, L = k % 2 ? rx * 0.55 : rx * 0.92, w2 = rx * 0.14;
-        g.fillStyle = k % 2 ? '#d4402e' : GOLD;
-        g.beginPath();
-        g.moveTo(Math.cos(a) * L, Math.sin(a) * L);
-        g.lineTo(Math.cos(a + Math.PI / 2) * w2, Math.sin(a + Math.PI / 2) * w2);
-        g.lineTo(Math.cos(a - Math.PI / 2) * w2, Math.sin(a - Math.PI / 2) * w2);
-        g.fill();
-      }
-      g.fillStyle = '#fff8e0'; g.beginPath(); g.arc(0, 0, rx * 0.1, 0, Math.PI * 2); g.fill();
-      g.restore();
+    if (tier === 3 && !plain) drawEmblem(g, S, H);
+    if (tier === 4 && !plain) {
+      // cream bands with gold piping, and a cream/gold rose
+      g.fillStyle = '#f3e7c9'; g.fillRect(0, 196, S, 16); g.fillRect(0, 222, S, 6);
+      g.fillStyle = GOLD; g.fillRect(0, 193, S, 3); g.fillRect(0, 212, S, 3);
+      drawEmblem(g, S, H, { R: 1.0, ring: '#f3e7c9', inner: GOLD, a: '#f3e7c9', b: GOLD, fill: 'rgba(243,231,201,0.18)' });
+    }
+    if (tier === 5 && !plain) {
+      // a big navy-and-gold sunburst rose on white-gold silk
+      g.fillStyle = 'rgba(255,207,74,0.16)'; g.fillRect(0, 0, S, S);
+      drawEmblem(g, S, H, { R: 1.55, v: 0.5, ring: '#173a63', inner: GOLD, a: '#173a63', b: GOLD, fill: 'rgba(23,58,99,0.14)', points: 16 });
+    }
+    if (tier === 3 || tier === 5) {
       // gold wave trim along the foot
       g.strokeStyle = GOLD; g.lineWidth = 5;
       g.beginPath();
       for (let x = 0; x <= S; x += 4) g.lineTo(x, S - 14 + Math.sin(x * 0.12) * 5);
       g.stroke();
     }
-    // edge tape
-    g.strokeStyle = tier === 3 ? GOLD : tier === 0 ? 'rgba(120,95,55,0.8)' : 'rgba(170,155,120,0.8)';
-    g.lineWidth = tier === 3 ? 10 : 6;
+    if (tier >= 4) {
+      // two rows of reef points with little dangling ties
+      for (const ry of [S - 44, S - 78]) {
+        for (let x = 10; x < S; x += 16) {
+          g.fillStyle = tier === 4 ? '#f3e7c9' : '#7a5a2a';
+          g.fillRect(x - 1.5, ry - 1.5, 3, 3);
+          g.strokeStyle = g.fillStyle; g.lineWidth = 1.2;
+          g.beginPath(); g.moveTo(x, ry); g.lineTo(x + 1, ry + 7); g.stroke();
+        }
+      }
+    }
+    // edge tape / bolt rope
+    g.strokeStyle = tier === 3 || tier === 5 ? GOLD : tier === 4 ? GOLD : tier === 0 ? 'rgba(120,95,55,0.8)' : 'rgba(170,155,120,0.8)';
+    g.lineWidth = tier >= 3 ? 10 : 6;
     g.strokeRect(0, 0, S, S);
+    if (tier >= 4) { g.strokeStyle = 'rgba(90,70,50,0.9)'; g.lineWidth = 3; g.strokeRect(5, 5, S - 10, S - 10); }
   });
-  sailTexCache[tier] = tex;
+  sailTexCache[key] = tex;
   return tex;
 }
 
@@ -268,7 +313,35 @@ function decoMesh(parts, outline = false) {
   return g;
 }
 
-function figurehead(gold) {
+// ---- ropes: static ones are merged tubes, dynamic ones are unit cylinders re-aimed each frame
+const _up = new THREE.Vector3(0, 1, 0), _d = new THREE.Vector3();
+function ropePart(a, b, sag = 0, r = 0.022, color = ROPE) {
+  const curve = sag
+    ? new THREE.QuadraticBezierCurve3(a, a.clone().lerp(b, 0.5).add(new THREE.Vector3(0, -sag, 0)), b)
+    : new THREE.LineCurve3(a, b);
+  return part(new THREE.TubeGeometry(curve, sag ? 8 : 1, r, 4, false), color);
+}
+function coilPart(x, y, z, r = 0.2, color = ROPE) {
+  const parts = [];
+  for (let k = 0; k < 3; k++) parts.push(part(new THREE.TorusGeometry(r - k * 0.035, 0.028, 4, 14), color, { x, y: y + k * 0.045, z, rx: Math.PI / 2 }));
+  return parts;
+}
+const ropeMat = new THREE.MeshToonMaterial({ color: ROPE, gradientMap: toonGradient() });
+function segMesh(r = 0.022) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 1, 5).translate(0, 0.5, 0), ropeMat);
+  m.frustumCulled = false;
+  return m;
+}
+function setSeg(mesh, a, b) {
+  mesh.position.copy(a);
+  _d.subVectors(b, a);
+  const L = _d.length() || 1e-3;
+  mesh.scale.set(1, L, 1);
+  mesh.quaternion.setFromUnitVectors(_up, _d.divideScalar(L));
+}
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+
+function figurehead(gold, winged = false) {
   const body = gold ? GOLD : '#f4efe4', wing = gold ? '#f2b93a' : '#dcd3c0', beak = gold ? '#e89a2a' : '#e8a13a';
   const parts = [
     part(new THREE.SphereGeometry(0.2, 12, 8), body, { sx: 0.8, sy: 0.8, sz: 1.6 }),
@@ -279,6 +352,14 @@ function figurehead(gold) {
   ];
   for (const s of [-1, 1]) {
     parts.push(part(new THREE.ConeGeometry(0.17, 0.9, 4), wing, { x: s * 0.2, y: 0.05, z: -0.2, rx: -Math.PI / 2 + 0.15, ry: s * 0.4, sz: 0.25 }));
+    if (winged) {
+      // great swept-back wings, three feathered layers each
+      for (let k = 0; k < 3; k++) {
+        parts.push(part(new THREE.ConeGeometry(0.2 - k * 0.03, 1.3 - k * 0.25, 4), k === 1 ? '#fff2b8' : wing,
+          { x: s * (0.35 + k * 0.08), y: 0.25 + k * 0.12, z: -0.55 - k * 0.05, rx: -Math.PI / 2 + 0.55 + k * 0.12, ry: s * (0.9 - k * 0.12), sz: 0.22 }));
+      }
+      parts.push(part(new THREE.TorusGeometry(0.12, 0.025, 5, 12), GOLD, { y: 0.42, z: 0.28, rx: Math.PI / 2 }));
+    }
   }
   const g = decoMesh(parts, true);
   g.position.set(0, 0.62, 3.98);
@@ -316,7 +397,12 @@ export class Boat {
   }
 
   build() {
-    const g = this.group;
+    // Everything that makes up the ship lives in `model`, which scales up with the
+    // big hull tiers. The explorer stays on the unscaled group so he keeps his size.
+    this.model = new THREE.Group();
+    this.group.add(this.model);
+    this.sizeScale = 1;
+    const g = this.model;
     const s = hullShape();
     // Hull: extruded top-view outline, tapered toward the keel, with plank banding
     const hullGeo = new THREE.ExtrudeGeometry(s, { depth: 1.2, bevelEnabled: true, bevelThickness: 0.2, bevelSize: 0.18, bevelSegments: 2, curveSegments: 12 });
@@ -392,20 +478,27 @@ export class Boat {
     this.sail.frustumCulled = false;
     this.boom.add(this.sail);
 
-    // Jib (front sail) for upgraded rigs
-    const jg = new THREE.BufferGeometry();
-    jg.setAttribute('position', new THREE.Float32BufferAttribute([0, 0.2, 0, 0, 5.6, -2.75, 0, 0.3, -2.3], 3));
-    jg.setIndex([0, 1, 2]);
-    jg.computeVertexNormals();
-    this.jibMat = toon('#fbf8ef', { side: THREE.DoubleSide });
-    this.jib = new THREE.Mesh(jg, this.jibMat);
-    this.jibPivot = new THREE.Group();
-    this.jibPivot.position.set(0, 1.0, 3.6);
-    this.jibPivot.add(this.jib);
-    g.add(this.jibPivot);
-    // forestay line from bow to mast
-    this.stay = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1, 4).translate(0, 0.5, 0), toon('#4a3a2a'));
-    g.add(this.stay);
+    // Jib: luff along the forestay, tack at the bow (or bowsprit), clew sheeted to leeward
+    this.jibGeo = this.makeSailGrid(JIB_U, JIB_V, true);
+    this.jibMat = new THREE.MeshToonMaterial({ map: sailTexture(1), gradientMap: toonGradient(), side: THREE.DoubleSide });
+    this.jib = new THREE.Mesh(this.jibGeo, this.jibMat);
+    this.jib.frustumCulled = false;
+    g.add(this.jib);
+    // Gaff topsail above the main (sail tiers 4-5): lives on the boom so it swings with it
+    this.topGeo = this.makeSailGrid(TOP_U, TOP_V, false);
+    this.topMat = new THREE.MeshToonMaterial({ map: sailTexture(4), gradientMap: toonGradient(), side: THREE.DoubleSide });
+    this.topsail = new THREE.Mesh(this.topGeo, this.topMat);
+    this.topsail.frustumCulled = false;
+    this.boom.add(this.topsail);
+    // standing rigging (rebuilt on upgrade) + running rigging (re-aimed every frame)
+    this.rig = new THREE.Group();
+    g.add(this.rig);
+    this.mainSheet = segMesh(0.02);
+    this.jibSheet = segMesh(0.018);
+    this.jibSheetSlack = segMesh(0.016);
+    g.add(this.mainSheet, this.jibSheet, this.jibSheetSlack);
+    this._a = new THREE.Vector3(); this._b = new THREE.Vector3(); this._c = new THREE.Vector3();
+    this._q = new THREE.Quaternion();
 
     // Flag at the masthead + racing pennant (tier 2+), both stream downwind
     this.flags = [];
@@ -424,7 +517,7 @@ export class Boat {
 
     // The explorer
     this.explorer = new Explorer();
-    g.add(this.explorer.root);
+    this.group.add(this.explorer.root);
   }
 
   buildHullTiers() {
@@ -487,12 +580,67 @@ export class Boat {
       grp.add(figurehead(gold));
       tiers.push(grp);
     }
+    // tiers 4 and 5: galleon and royal flagship (the whole model also scales up)
+    for (const royal of [false, true]) tiers.push(this.grandHull(royal));
     this.hullTiers = tiers;
-    for (const t of tiers) { t.visible = false; this.group.add(t); }
+    for (const t of tiers) { t.visible = false; this.model.add(t); }
+  }
+
+  grandHull(royal) {
+    const gold = GOLD, accent = royal ? '#1d8c8c' : '#f3e7c9', dark = royal ? '#0c2a40' : '#2a120c';
+    const parts = [
+      // double gold stripes with a coloured band between them
+      part(bandGeo(0.66, 0.76, 0.03), gold),
+      part(bandGeo(0.5, 0.6, 0.015), accent),
+      part(bandGeo(0.42, 0.48, 0.03), gold),
+      part(bandGeo(0.08, 0.14, 0.015), gold),
+    ];
+    for (const side of [-1, 1]) {
+      // a row of gold portholes
+      for (const z of [-2.2, -1.3, -0.4, 0.5, 1.4]) {
+        const S = sideAt(z, 0.3, side, 0.015);
+        parts.push(part(new THREE.TorusGeometry(0.085, 0.024, 6, 14), gold, { x: S.x, y: 0.3, z: S.z, ry: S.yaw }));
+        const q = onSide(S, 0, 0, -0.005);
+        parts.push(part(new THREE.CircleGeometry(0.07, 12), royal ? '#ffd88a' : '#24507f', { x: q.x, y: 0.3, z: q.z, ry: S.yaw }));
+      }
+      // gold scrollwork at the bow
+      for (const [z, y, r] of [[2.6, 0.55, 0.22], [3.05, 0.6, 0.16], [2.2, 0.2, 0.18]]) {
+        const S = sideAt(z, y, side, 0.03);
+        parts.push(part(new THREE.TorusGeometry(r, 0.03, 4, 16, Math.PI * 1.5), gold, { x: S.x, y, z: S.z, ry: S.yaw, rz: z * 2.1 }));
+      }
+      // deck lockers and lashed barrels
+      parts.push(part(new THREE.BoxGeometry(0.42, 0.3, 0.7), dark, { x: side * 0.78, y: 1.15, z: -1.25 }));
+      parts.push(part(new THREE.BoxGeometry(0.46, 0.05, 0.74), gold, { x: side * 0.78, y: 1.31, z: -1.25 }));
+      parts.push(part(new THREE.CylinderGeometry(0.2, 0.2, 0.42, 10), '#9c6b3a', { x: side * 0.7, y: 1.21, z: 2.05 }));
+      parts.push(part(new THREE.CylinderGeometry(0.21, 0.21, 0.05, 10), '#3a2a1e', { x: side * 0.7, y: 1.32, z: 2.05 }));
+      parts.push(part(new THREE.CylinderGeometry(0.21, 0.21, 0.05, 10), '#3a2a1e', { x: side * 0.7, y: 1.1, z: 2.05 }));
+      // stern lantern brackets
+      parts.push(part(new THREE.TorusGeometry(0.24, 0.035, 5, 16, Math.PI * 1.5), gold, { x: side * 1.18, y: 1.3, z: -3.35, ry: Math.PI / 2, rz: 0.6 }));
+      parts.push(part(new THREE.SphereGeometry(0.08, 8, 6), gold, { x: side * 1.18, y: 1.58, z: -3.35 }));
+    }
+    // carved transom: stern windows with a little gallery and balusters
+    parts.push(part(new THREE.BoxGeometry(2.1, 0.62, 0.06), dark, { y: 0.55, z: -3.43 }));
+    for (const x of [-0.6, 0, 0.6]) {
+      parts.push(part(new THREE.BoxGeometry(0.36, 0.34, 0.03), royal ? '#ffd88a' : '#ffcf7a', { x, y: 0.56, z: -3.47 }));
+      parts.push(part(new THREE.TorusGeometry(0.2, 0.025, 4, 4), gold, { x, y: 0.56, z: -3.48, rz: Math.PI / 4, sx: 1.0, sy: 1.0 }));
+    }
+    parts.push(part(new THREE.BoxGeometry(2.3, 0.07, 0.42), dark, { y: 0.18, z: -3.62 }));
+    parts.push(part(new THREE.BoxGeometry(2.32, 0.05, 0.05), gold, { y: 0.48, z: -3.82 }));
+    for (let k = 0; k < 9; k++) parts.push(part(new THREE.CylinderGeometry(0.025, 0.03, 0.3, 5), gold, { x: -1.08 + k * 0.27, y: 0.33, z: -3.81 }));
+    parts.push(part(new THREE.TorusGeometry(0.32, 0.04, 5, 18, Math.PI), gold, { y: 0.88, z: -3.44 }));
+    // bowsprit with a gilded tip and a bobstay to the stem
+    parts.push(part(new THREE.CylinderGeometry(0.07, 0.11, 2.3, 8), royal ? '#5b3a1f' : '#6e4a2c', { y: 1.37, z: 4.32, rx: Math.PI / 2 - 0.36 }));
+    parts.push(part(new THREE.SphereGeometry(0.1, 8, 6), gold, { y: 1.77, z: 5.42 }));
+    parts.push(part(new THREE.CylinderGeometry(0.115, 0.115, 0.08, 10), gold, { y: 1.2, z: 3.85, rx: Math.PI / 2 - 0.36 }));
+    const grp = decoMesh(parts);
+    const fig = figurehead(true, royal);
+    if (royal) fig.scale.setScalar(1.25);
+    grp.add(fig);
+    return grp;
   }
 
   buildHelm() {
-    const g = this.group;
+    const g = this.model;
     // tiller (tiers 0-1), angled up so the explorer can reach it
     this.tiller = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 1.4).translate(0, 0, 0.7), this.woodMat);
     this.tiller.position.set(0, 1.15, -3.3);
@@ -518,29 +666,52 @@ export class Boat {
       part(new THREE.BoxGeometry(0.28, 0.06, 0.24), '#5b3a1f', { y: 1.8, z: -2.36 }),
     ], true));
     this.wheels = [];
-    for (const gold of [false, true]) {
-      const metal = gold ? GOLD : BRASS, wood = gold ? '#4a2a1c' : '#8b5a2b';
+    // rudder tiers 2..5
+    const specs = [
+      { R: 0.42, wood: '#8b5a2b', metal: BRASS, knob: null, n: 8 },
+      { R: 0.42, wood: '#4a2a1c', metal: GOLD, knob: GOLD, n: 8 },
+      { R: 0.52, wood: '#3b2214', metal: BRASS, knob: BRASS, n: 10 },
+      { R: 0.55, wood: '#5a3018', metal: GOLD, knob: GOLD, n: 12, gilded: true },
+    ];
+    for (const sp of specs) {
+      const { R, wood, metal } = sp;
       const parts = [
-        part(new THREE.TorusGeometry(0.42, 0.04, 6, 26), wood),
-        part(new THREE.TorusGeometry(0.42, 0.012, 4, 26), metal, { z: 0.045 }),
-        part(new THREE.CylinderGeometry(0.09, 0.09, 0.14, 10), metal, { rx: Math.PI / 2 }),
+        part(new THREE.TorusGeometry(R, 0.04 + (R - 0.42) * 0.12, 6, 30), wood),
+        part(new THREE.TorusGeometry(R, 0.012, 4, 30), metal, { z: 0.045 }),
+        part(new THREE.CylinderGeometry(0.09 + (R - 0.42) * 0.3, 0.09, 0.14, 12), metal, { rx: Math.PI / 2 }),
       ];
-      for (let k = 0; k < 4; k++) parts.push(part(new THREE.CylinderGeometry(0.022, 0.022, 1.06, 5), wood, { rz: (k / 4) * Math.PI }));
-      for (let k = 0; k < 8; k++) {
-        const a = (k / 8) * TAU;
-        parts.push(part(new THREE.CylinderGeometry(0.03, 0.04, 0.14, 6), wood, { x: Math.sin(a) * 0.58, y: Math.cos(a) * 0.58, rz: -a }));
-        if (gold) parts.push(part(new THREE.SphereGeometry(0.045, 6, 4), GOLD, { x: Math.sin(a) * 0.66, y: Math.cos(a) * 0.66 }));
+      if (sp.gilded) {
+        parts.push(part(new THREE.TorusGeometry(R * 0.55, 0.02, 4, 24), GOLD, { z: 0.03 }));
+        parts.push(part(new THREE.TorusGeometry(R + 0.05, 0.015, 4, 30), GOLD, { z: -0.03 }));
+      }
+      for (let k = 0; k < sp.n / 2; k++) parts.push(part(new THREE.CylinderGeometry(0.022, 0.022, R * 2 + 0.22, 5), sp.gilded ? GOLD : wood, { rz: (k / (sp.n / 2)) * Math.PI }));
+      for (let k = 0; k < sp.n; k++) {
+        const a = (k / sp.n) * TAU;
+        parts.push(part(new THREE.CylinderGeometry(0.03, 0.04, 0.14, 6), wood, { x: Math.sin(a) * (R + 0.16), y: Math.cos(a) * (R + 0.16), rz: -a }));
+        if (sp.knob) parts.push(part(new THREE.SphereGeometry(0.045, 6, 4), sp.knob, { x: Math.sin(a) * (R + 0.24), y: Math.cos(a) * (R + 0.24) }));
       }
       const w = decoMesh(parts, true);
       w.position.set(0, 1.8, -2.48);
+      w.userData.R = R;
       this.helm.add(w);
       this.wheels.push(w);
     }
+    // compass binnacle ahead of the gilded wheel (rudder tier 5)
+    const bin = [
+      part(new THREE.CylinderGeometry(0.16, 0.22, 0.75, 10), '#3a2014', { y: 1.38, z: -1.85 }),
+      part(new THREE.CylinderGeometry(0.24, 0.24, 0.08, 14), GOLD, { y: 1.78, z: -1.85 }),
+      part(new THREE.SphereGeometry(0.21, 14, 8, 0, TAU, 0, Math.PI / 2), '#bfe6ff', { y: 1.8, z: -1.85 }),
+      part(new THREE.TorusGeometry(0.21, 0.025, 6, 16), GOLD, { y: 1.82, z: -1.85, rx: Math.PI / 2 }),
+      part(new THREE.SphereGeometry(0.06, 8, 6), GOLD, { y: 2.03, z: -1.85 }),
+    ];
+    for (const sd of [-1, 1]) bin.push(part(new THREE.SphereGeometry(0.08, 8, 6), sd < 0 ? '#d4402e' : '#2fa04a', { x: sd * 0.32, y: 1.8, z: -1.85 }));
+    this.binnacle = decoMesh(bin, true);
+    g.add(this.binnacle);
     this.wheelCenter = new THREE.Vector3(0, 1.8, -2.54);
   }
 
   buildKeel() {
-    const g = this.group;
+    const g = this.model;
     this.keelFin = decoMesh([
       part(new THREE.BoxGeometry(0.14, 0.75, 3.0), COPPER, { y: -0.95, z: -0.3 }),
       part(new THREE.BoxGeometry(0.18, 0.06, 3.02), '#9a5428', { y: -0.6, z: -0.3 }),
@@ -551,13 +722,35 @@ export class Boat {
     ]);
     this.runeMat = new THREE.MeshBasicMaterial({ map: runeTexture(), color: 0x7ff6ff, transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
     this.runeBand = new THREE.Mesh(bandGeo(0.13, 0.27, 0.035, 14), this.runeMat);
-    for (const m of [this.keelFin, this.keelBulb, this.runeBand]) { m.visible = false; g.add(m); }
+    // tier 4: twin bilge keels and riveted copper sheathing at the waterline
+    const bilge = [];
+    for (const side of [-1, 1]) {
+      bilge.push(part(new THREE.BoxGeometry(0.1, 0.55, 2.4), COPPER, { x: side * 0.72, y: -0.62, z: -0.4, rz: side * 0.45 }));
+      for (let z = -2.9; z <= 3.0; z += 0.32) {
+        if (halfW(z) < 0.2) continue;
+        for (const y of [-0.12, 0.0]) {
+          const S = sideAt(z, y, side, 0.02);
+          bilge.push(part(new THREE.SphereGeometry(0.028, 5, 3), '#e8a060', { x: S.x, y, z: S.z }));
+        }
+      }
+    }
+    bilge.push(part(bandGeo(-0.18, 0.06, 0.012), '#b8652e'));
+    this.keelBilge = decoMesh(bilge);
+    // tier 5: soft teal glow skirting the waterline
+    const glowTex = canvasTex(8, 64, (gx, w, h) => {
+      const gr = gx.createLinearGradient(0, 0, 0, h);
+      gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      gx.fillStyle = gr; gx.fillRect(0, 0, w, h);
+    });
+    this.waterGlowMat = new THREE.MeshBasicMaterial({ map: glowTex, color: 0x3ff0d8, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
+    this.waterGlow = new THREE.Mesh(bandGeo(-0.35, 0.45, 0.25), this.waterGlowMat);
+    for (const m of [this.keelFin, this.keelBulb, this.runeBand, this.keelBilge, this.waterGlow]) { m.visible = false; g.add(m); }
   }
 
   buildLanterns() {
     const root = new THREE.Group();
     root.position.set(-0.78, 1.0, -2.95);
-    this.group.add(root);
+    this.model.add(root);
     this.lanternRoot = root;
     const glow = (c) => new THREE.MeshBasicMaterial({ color: c });
     const post = (h, c = '#6e4a2c') => part(new THREE.CylinderGeometry(0.05, 0.06, h, 6), c, { y: h / 2 });
@@ -609,10 +802,15 @@ export class Boat {
       const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: softHalo(), color: 0xffc070, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
       halo.position.y = 1.95; halo.scale.setScalar(1.4);
       grp.add(halo);
-      this.lanterns.push({ group: grp, glowMat: gm, light: new THREE.Vector3(0, 1.95, 0), color: 0xffc880, halo });
+      this.lanterns.push({ group: grp, glowMat: gm, light: new THREE.Vector3(0, 1.95, 0), color: 0xffc880, halo, haloSize: 1.4 });
     }
-    // tier 3: Starlight Beacon, a floating crystal with a soft halo
-    {
+    const haloSprite = (color, size) => {
+      const h = new THREE.Sprite(new THREE.SpriteMaterial({ map: softHalo(), color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+      h.scale.setScalar(size);
+      return h;
+    };
+    // Starlight Beacon: a floating crystal with a soft halo (tier 3, and the stern light of tier 5)
+    const starlight = () => {
       const parts = [
         post(1.9, GOLD),
         part(new THREE.CylinderGeometry(0.16, 0.12, 0.06, 10), GOLD, { y: 1.92 }),
@@ -627,14 +825,76 @@ export class Boat {
       const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.17, 0), gm);
       crystal.position.y = 2.32; crystal.scale.y = 1.6;
       grp.add(crystal);
-      const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: softHalo(), color: 0x9fe8ff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
-      halo.position.y = 2.32; halo.scale.setScalar(2.2);
+      const halo = haloSprite(0x9fe8ff, 2.2);
+      halo.position.y = 2.32;
       grp.add(halo);
-      this.lanterns.push({ group: grp, glowMat: gm, light: new THREE.Vector3(0, 2.32, 0), color: 0xbfe6ff, halo, anim: crystal, spin: true });
+      return { group: grp, glowMat: gm, light: new THREE.Vector3(0, 2.32, 0), color: 0xbfe6ff, halo, haloSize: 2.2, anim: crystal, spin: true, animY: 2.32 };
+    };
+    this.lanterns.push(starlight());
+    // tier 4: twin brass lanterns, one at the stern and one at the bow
+    {
+      const brass = (h) => {
+        const parts = [
+          post(h, '#3b2214'),
+          part(new THREE.CylinderGeometry(0.24, 0.2, 0.08, 12), BRASS, { y: h + 0.02 }),
+          part(new THREE.ConeGeometry(0.29, 0.3, 12), BRASS, { y: h + 0.62 }),
+          part(new THREE.TorusGeometry(0.09, 0.02, 4, 10), BRASS, { y: h + 0.84 }),
+          part(new THREE.TorusGeometry(0.22, 0.02, 4, 16), BRASS, { y: h + 0.3, rx: Math.PI / 2 }),
+        ];
+        for (let k = 0; k < 6; k++) {
+          const a = (k / 6) * TAU;
+          parts.push(part(new THREE.CylinderGeometry(0.014, 0.014, 0.48, 4), BRASS, { x: Math.cos(a) * 0.21, y: h + 0.3, z: Math.sin(a) * 0.21 }));
+        }
+        const grp = decoMesh(parts, true);
+        const gm = glow(0xffd98a);
+        const globe = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.19, 0.44, 12), gm);
+        globe.position.y = h + 0.3;
+        grp.add(globe);
+        const halo = haloSprite(0xffc070, 1.6);
+        halo.position.y = h + 0.3;
+        grp.add(halo);
+        return { grp, gm, halo, y: h + 0.3 };
+      };
+      const st = brass(1.7), bw = brass(1.0);
+      const bowRoot = new THREE.Group();
+      bowRoot.position.set(0.62, 1.0, 2.6);
+      bowRoot.add(bw.grp);
+      bowRoot.visible = false;
+      this.model.add(bowRoot);
+      this.lanterns.push({
+        group: st.grp, glowMat: st.gm, light: new THREE.Vector3(0, st.y, 0), color: 0xffc878, halo: st.halo, haloSize: 1.6,
+        extra: { group: bowRoot, glowMat: bw.gm, halo: bw.halo, haloSize: 1.5, color: 0xffc878, light: new THREE.Vector3(0.62, 1.0 + bw.y, 2.6) },
+      });
+    }
+    // tier 5: Starlight stern beacon + the "Lighthouse Heart" crowning the mast
+    {
+      const stern = starlight();
+      const heart = new THREE.Group();
+      heart.add(decoMesh([
+        part(new THREE.CylinderGeometry(0.2, 0.14, 0.12, 12), GOLD),
+        part(new THREE.TorusGeometry(0.34, 0.03, 6, 24), GOLD, { y: 0.42, rx: Math.PI / 2 }),
+        part(new THREE.TorusGeometry(0.34, 0.02, 6, 24), GOLD, { y: 0.42 }),
+        part(new THREE.ConeGeometry(0.06, 0.25, 6), GOLD, { y: 0.92 }),
+      ], true));
+      const hm = glow(0xfff1c8);
+      const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.26, 0), hm);
+      crystal.position.y = 0.42; crystal.scale.y = 1.5;
+      heart.add(crystal);
+      const halo = haloSprite(0xffe7a8, 4.5);
+      halo.position.y = 0.42;
+      heart.add(halo);
+      heart.visible = false;
+      this.model.add(heart);
+      this.heart = heart;
+      stern.extra = { group: heart, glowMat: hm, halo, haloSize: 4.5, color: 0xffe9b8, light: new THREE.Vector3(0, 10, MAST_Z), anim: crystal, spin: true, animY: 0.42 };
+      this.lanterns.push(stern);
     }
     for (const L of this.lanterns) { L.group.visible = false; root.add(L.group); }
     this.light = new THREE.PointLight(0xffc070, 0, 40, 1.2);
     root.add(this.light);
+    // second light for the bow lantern / masthead heart (always present so shaders don't recompile)
+    this.light2 = new THREE.PointLight(0xffc070, 0, 40, 1.2);
+    this.model.add(this.light2);
   }
 
   buildNest() {
@@ -665,9 +925,39 @@ export class Boat {
         this.nestPennant = p;
       }
       grp.visible = false;
-      this.group.add(grp);
+      this.model.add(grp);
       this.nests.push(grp);
     }
+    // tier 4+: a brass telescope mounted on the nest rim
+    const tube = (len, r, metal) => [
+      part(new THREE.CylinderGeometry(r, r * 1.25, len, 10), metal, { rx: Math.PI / 2 }),
+      part(new THREE.CylinderGeometry(r * 1.35, r * 1.35, len * 0.12, 10), '#3b2214', { z: len * 0.15, rx: Math.PI / 2 }),
+      part(new THREE.TorusGeometry(r * 1.3, r * 0.25, 4, 12), GOLD, { z: len * 0.5 }),
+      part(new THREE.TorusGeometry(r * 1.05, r * 0.2, 4, 12), GOLD, { z: -len * 0.5 }),
+    ];
+    const mount = decoMesh([
+      ...tube(0.9, 0.06, BRASS).map((g) => g.translate(0, 0.42, 0.25).rotateX(-0.15)),
+      part(new THREE.CylinderGeometry(0.03, 0.03, 0.4, 5), '#3b2214', { y: 0.22, z: 0.2 }),
+    ], true);
+    mount.position.set(0.42, 0.1, 0.15);
+    mount.rotation.y = 0.5;
+    mount.visible = false;
+    this.nests[1].add(mount);
+    this.nestScope = mount;
+    // tier 5: an ornate long telescope on a tripod on the quarterdeck
+    const legs = [];
+    for (let k = 0; k < 3; k++) {
+      const a = (k / 3) * TAU + 0.3;
+      legs.push(part(new THREE.CylinderGeometry(0.025, 0.03, 1.25, 5), '#3b2214', { x: Math.cos(a) * 0.28, y: 0.58, z: Math.sin(a) * 0.28, rx: Math.sin(a) * 0.24, rz: -Math.cos(a) * 0.24 }));
+      legs.push(part(new THREE.SphereGeometry(0.035, 5, 4), GOLD, { x: Math.cos(a) * 0.43, y: 0.02, z: Math.sin(a) * 0.43 }));
+    }
+    legs.push(part(new THREE.SphereGeometry(0.07, 8, 6), GOLD, { y: 1.18 }));
+    legs.push(...tube(1.5, 0.075, GOLD).map((g) => g.rotateX(-0.22).translate(0, 1.3, 0.1)));
+    this.deckScope = decoMesh(legs, true);
+    this.deckScope.position.set(-0.85, 1.0, -2.2);
+    this.deckScope.rotation.y = 0.35;
+    this.deckScope.visible = false;
+    this.model.add(this.deckScope);
   }
 
   buildWake() {
@@ -675,47 +965,84 @@ export class Boat {
     this.wakeMat = this.wake.material; // game.js feeds it the scene light
   }
 
+  // An indexed grid of (u+1)*(v+1) vertices with uvs; positions are written every frame.
+  makeSailGrid(nu, nv, swapUV) {
+    const geo = new THREE.BufferGeometry();
+    const n = (nu + 1) * (nv + 1);
+    const uv = new Float32Array(n * 2);
+    for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
+      const k = j * (nu + 1) + i;
+      if (swapUV) { uv[k * 2] = j / nv; uv[k * 2 + 1] = i / nu; } else { uv[k * 2] = i / nu; uv[k * 2 + 1] = j / nv; }
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    const idx = [];
+    for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+      const a = j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1;
+      idx.push(a, b, c, b, d, c);
+    }
+    geo.setIndex(idx);
+    return geo;
+  }
+
   applyUpgrades(levels, values) {
-    const L = (k) => clamp(levels[k] || 0, 0, 3);
+    const L = (k) => clamp(levels[k] || 0, 0, MAX_TIER);
     this.levels = { sail: L('sail'), hull: L('hull'), rudder: L('rudder'), keel: L('keel'), lantern: L('lantern'), spyglass: L('spyglass') };
     const lv = this.levels;
-    // hull
+    // hull (tiers 4-5 also make the whole ship bigger)
     const hs = HULL_STYLE[lv.hull];
     this.hullMat.color.set(hs.hull);
     this.trimMat.color.set(hs.trim);
     this.deckMat.color.set(hs.deck);
     this.hullTiers.forEach((t, i) => { t.visible = i === lv.hull; });
+    this.sizeScale = SIZE_SCALE[lv.hull];
+    this.model.scale.setScalar(this.sizeScale);
+    this.hasBowsprit = lv.hull >= 4;
     // sails & rig
     this.sailMat.map = sailTexture(lv.sail);
     this.sailMat.needsUpdate = true;
-    this.jibMat.color.set(['#e3d4b1', '#fbf8ef', '#fbf9f2', '#fff1cc'][lv.sail]);
-    this.jibPivot.visible = lv.sail >= 1;
+    this.jibMat.map = sailTexture(lv.sail, true);
+    this.jibMat.needsUpdate = true;
+    this.jib.visible = lv.sail >= 1;
+    this.topsail.visible = lv.sail >= 4;
+    this.topMat.map = sailTexture(lv.sail, true);
+    this.topMat.needsUpdate = true;
     this.flagMat.color.set(lv.sail >= 3 ? GOLD : '#d64a3a');
     this.pennant.mesh.visible = lv.sail >= 2;
-    this.pennant.mat.color.set(lv.sail >= 3 ? GOLD : '#2f6fd0');
+    this.pennant.mat.color.set(lv.sail === 4 ? '#9c2f27' : lv.sail >= 3 ? GOLD : '#2f6fd0');
+    for (const p of this.extraPennants || []) p.mesh.visible = lv.sail >= 4;
     // helm
     this.tiller.visible = lv.rudder <= 1;
     this.rudderBlade.visible = lv.rudder >= 1;
     this.helm.visible = lv.rudder >= 2;
-    this.wheels[0].visible = lv.rudder === 2;
-    this.wheels[1].visible = lv.rudder === 3;
-    const ex = this.explorer;
-    if (lv.rudder >= 2) { ex.setControl('wheel'); ex.root.position.set(0, 1.0, -3.0); ex.root.rotation.y = 0; }
-    else { ex.setControl('tiller'); ex.root.position.set(0.42, 1.0, -2.55); ex.root.rotation.y = -0.25; }
+    this.wheels.forEach((w, i) => { w.visible = i === lv.rudder - 2; });
+    this.binnacle.visible = lv.rudder >= 5;
+    this.wheelR = lv.rudder >= 2 ? this.wheels[lv.rudder - 2].userData.R : 0.42;
+    const ex = this.explorer, k = this.sizeScale;
+    if (lv.rudder >= 2) { ex.setControl('wheel'); ex.root.position.set(0, 1.0 * k, -3.0 * k); ex.root.rotation.y = 0; }
+    else { ex.setControl('tiller'); ex.root.position.set(0.42 * k, 1.0 * k, -2.55 * k); ex.root.rotation.y = -0.25; }
     // keel
     this.keelFin.visible = lv.keel >= 1;
     this.keelBulb.visible = lv.keel >= 2;
     this.runeBand.visible = lv.keel >= 3;
+    this.runeMat.color.set(lv.keel >= 5 ? 0x3ff0d8 : 0x7ff6ff);
+    this.keelBilge.visible = lv.keel >= 4;
+    this.waterGlow.visible = lv.keel >= 5;
     // lantern
-    this.lanterns.forEach((l, i) => { l.group.visible = i === lv.lantern; });
+    this.lanterns.forEach((l, i) => {
+      l.group.visible = i === lv.lantern;
+      if (l.extra) l.extra.group.visible = i === lv.lantern;
+    });
     this.activeLantern = this.lanterns[lv.lantern];
     this.light.position.copy(this.activeLantern.light);
     this.light.color.set(this.activeLantern.color);
     this.lanternMat = this.activeLantern.glowMat;
-    // spyglass: belt spyglass, then a crow's nest
+    // spyglass: belt spyglass, then a crow's nest, a mounted scope and a deck telescope
     ex.setSpyglass(lv.spyglass);
     this.nests[0].visible = lv.spyglass === 2;
-    this.nests[1].visible = lv.spyglass === 3;
+    this.nests[1].visible = lv.spyglass >= 3;
+    this.nestScope.visible = lv.spyglass >= 4;
+    this.deckScope.visible = lv.spyglass >= 5;
     this.layoutRig();
 
     this.maxHealth = values.hull;
@@ -727,7 +1054,9 @@ export class Boat {
     this.sailH = SAIL_H[lv.sail];
     const sailTop = BOOM_Y + this.sailH + 0.08;
     let top = MAST_TOP[lv.sail];
-    this.nestY = sailTop + 0.55;
+    // the gaff topsail's head sits just under the masthead
+    this.topHead = lv.sail >= 4 ? top - 0.75 : sailTop;
+    this.nestY = (lv.sail >= 4 ? this.topHead : sailTop) + 0.55;
     if (lv.spyglass >= 2) top = Math.max(top, this.nestY + 1.0);
     const h = top - MAST_BASE;
     this.mast.scale.y = h; this.mastInk.scale.y = h;
@@ -735,14 +1064,82 @@ export class Boat {
     this.flag.position.set(0, top - 0.35, MAST_Z);
     this.pennant.mesh.position.set(0, top - 1.05, MAST_Z);
     for (const n of this.nests) n.position.set(0, this.nestY, MAST_Z);
-    const jibTop = top * 0.8;
-    this.jib.scale.y = (jibTop - 1.0) / 5.6;
-    // forestay from the bow to the jib head
-    const bow = new THREE.Vector3(0, 1.1, 3.75), head = new THREE.Vector3(0, jibTop, MAST_Z);
-    this.stay.position.copy(bow);
-    const d = head.clone().sub(bow);
-    this.stay.scale.set(1, d.length(), 1);
-    this.stay.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+    this.heart.position.set(0, top + 0.05, MAST_Z);
+    if (this.lanterns[5].extra) this.lanterns[5].extra.light.set(0, top + 0.47, MAST_Z);
+    if (lv.lantern === 5) this.flag.position.y = top - 0.6;
+
+    // ---- forestay, jib geometry anchors
+    this.tack = this.hasBowsprit ? V3(0, 1.77, 5.42) : V3(0, 1.12, 3.74);
+    this.stayHead = V3(0, top - 0.5, MAST_Z + 0.08);
+    const jibHeadY = Math.min(top - 1.0, BOOM_Y + this.sailH * 0.92);
+    const t = (jibHeadY - this.tack.y) / (this.stayHead.y - this.tack.y);
+    this.jibHead = this.tack.clone().lerp(this.stayHead, t);
+    this.stayAxis = this.stayHead.clone().sub(this.tack).normalize();
+    // clew (centred, before swinging): about 60% of the way from tack to mast, low over the deck
+    this.clew0 = V3(0, 1.5 + (this.hasBowsprit ? 0.2 : 0), MAST_Z + 0.35 + (this.hasBowsprit ? 0.5 : 0));
+    this.jibCleat = (side) => this._c.set(side * 1.0, 1.08, MAST_Z - 0.15);
+
+    // ---- standing rigging, merged into one mesh
+    for (const c of [...this.rig.children]) { this.rig.remove(c); c.geometry?.dispose(); }
+    const R = [];
+    const r = 0.02;
+    // forestay (with a bobstay under the bowsprit)
+    R.push(ropePart(this.tack, this.stayHead, 0, 0.024));
+    if (this.hasBowsprit) R.push(ropePart(V3(0, 1.75, 5.4), V3(0, 0.25, 3.78), 0, 0.022));
+    // shrouds: two per side from the hounds to chainplates on the rail
+    const hounds = V3(0, top - 0.95, MAST_Z);
+    const chain = [];
+    for (const side of [-1, 1]) {
+      const pair = [];
+      for (const z of [MAST_Z + 0.25, MAST_Z - 0.75]) {
+        const cp = V3(side * (halfW(z) + 0.12), 1.08, z);
+        R.push(ropePart(V3(side * 0.1, hounds.y, MAST_Z), cp, 0, r));
+        R.push(part(new THREE.BoxGeometry(0.05, 0.28, 0.1), BRASS, { x: cp.x, y: 0.98, z: cp.z }));
+        pair.push(cp);
+      }
+      chain.push([side, pair]);
+    }
+    // ratlines between the shrouds (sail tier 3+)
+    if (lv.sail >= 3) {
+      for (const [side, [a, b]] of chain) {
+        const ta = V3(side * 0.1, hounds.y, MAST_Z);
+        for (let y = 1.55; y < hounds.y - 1.2; y += 0.42) {
+          const fa = (y - a.y) / (ta.y - a.y), fb = (y - b.y) / (ta.y - b.y);
+          const pa = a.clone().lerp(ta, fa), pb = b.clone().lerp(ta, fb);
+          R.push(ropePart(pa, pb, 0.03, 0.012));
+        }
+      }
+    }
+    // twin backstays to the stern quarters
+    for (const side of [-1, 1]) R.push(ropePart(V3(0, top - 0.3, MAST_Z), V3(side * 0.98, 1.12, -3.05), 0, r));
+    // halyards running down the mast to cleats
+    for (const side of [-1, 1]) {
+      R.push(ropePart(V3(side * 0.13, top - 0.2, MAST_Z + 0.04), V3(side * 0.13, 1.25, MAST_Z + 0.04), 0, 0.012));
+      R.push(part(new THREE.BoxGeometry(0.05, 0.04, 0.16), '#3b2214', { x: side * 0.16, y: 1.25, z: MAST_Z + 0.04 }));
+    }
+    // topsail halyard + gaff peak lift (tiers 4-5)
+    if (lv.sail >= 4) R.push(ropePart(V3(0.05, top - 0.15, MAST_Z - 0.05), V3(0.05, this.topHead, MAST_Z - 0.05), 0, 0.012));
+    // coiled ropes on deck
+    R.push(...coilPart(0.45, 1.02, MAST_Z - 0.45, 0.2), ...coilPart(-0.45, 1.02, MAST_Z - 0.45, 0.18));
+    R.push(...coilPart(0.75, 1.02, -1.95, 0.2), ...coilPart(-0.55, 1.02, 2.75, 0.17));
+    const rigMesh = new THREE.Mesh(mergeParts(R), decoMat);
+    rigMesh.frustumCulled = false;
+    this.rig.add(rigMesh);
+
+    // extra pennants on the backstays for the grand rigs
+    if (!this.extraPennants) {
+      this.extraPennants = [];
+      for (const side of [-1, 1]) {
+        const p = makeFlag(1.4, 0.3, true, GOLD);
+        this.model.add(p.mesh); this.flags.push(p); this.extraPennants.push(p);
+      }
+    }
+    this.extraPennants.forEach((p, i) => {
+      const side = i ? 1 : -1;
+      p.mesh.position.set(side * 0.55, top * 0.62, MAST_Z - 1.6);
+      p.mat.color.set(lv.sail === 4 ? '#9c2f27' : GOLD);
+      p.mesh.visible = lv.sail >= 4;
+    });
   }
 
   /** World-space point between the explorer's eyes. */
@@ -803,8 +1200,10 @@ export class Boat {
 
     // Terrain collision: probe bow, sides and stern
     const rx = -fz, rz = fx;
+    const k = this.sizeScale;
     const probes = [[3.6, 0], [1.2, 1.3], [1.2, -1.3], [-2.9, 0.9], [-2.9, -0.9]];
-    for (const [f, r] of probes) {
+    for (const [f0, r0] of probes) {
+      const f = f0 * k, r = r0 * k;
       const px = this.pos.x + fx * f + rx * r, pz = this.pos.z + fz * f + rz * r;
       const h = world.heightAt(px, pz);
       if (h > -0.7) {
@@ -829,12 +1228,12 @@ export class Boat {
       }
     }
     // Rocks
-    const rock = world.rockHit(this.pos.x + fx * 1.5, this.pos.z + fz * 1.5, 2.2);
+    const rock = world.rockHit(this.pos.x + fx * 1.5 * k, this.pos.z + fz * 1.5 * k, 2.2 * k);
     if (rock) {
       let nx = this.pos.x - rock.x, nz = this.pos.z - rock.z;
       const d = Math.hypot(nx, nz) || 1; nx /= d; nz /= d;
       const into = -(fx * nx + fz * nz) * this.speed;
-      const pen = rock.r + 3.6 - d;
+      const pen = rock.r + 3.6 * k - d;
       if (pen > 0) { this.pos.x += nx * pen * 0.5; this.pos.z += nz * pen * 0.5; }
       if (into > 3 && this.hitCooldown <= 0) {
         events.push({ damage: (into - 3) * 5 * (1 - up.keel * 0.4), kind: 'rock', speed: into });
@@ -850,16 +1249,17 @@ export class Boat {
     const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
     const rx = -fz, rz = fx;
     const x = this.pos.x, z = this.pos.z;
-    const hb = waveHeight(x + fx * 3, z + fz * 3), hs = waveHeight(x - fx * 3, z - fz * 3);
-    const hp = waveHeight(x - rx * 1.4, z - rz * 1.4), hst = waveHeight(x + rx * 1.4, z + rz * 1.4);
+    const K = this.sizeScale;
+    const hb = waveHeight(x + fx * 3 * K, z + fz * 3 * K), hs = waveHeight(x - fx * 3 * K, z - fz * 3 * K);
+    const hp = waveHeight(x - rx * 1.4 * K, z - rz * 1.4 * K), hst = waveHeight(x + rx * 1.4 * K, z + rz * 1.4 * K);
     const hc = (hb + hs + hp + hst) * 0.25;
     const lowRide = (1 - healthFrac) * 0.35;
     this.y = damp(this.y, hc - lowRide - this.sink, 8, dt);
-    this.pitch = damp(this.pitch, -Math.atan2(hb - hs, 6) * 0.8, 5, dt);
+    this.pitch = damp(this.pitch, -Math.atan2(hb - hs, 6 * K) * 0.8, 5, dt);
     const heelTarget = Math.sign(this.relWind) * [0, 0.5, 1][this.sailLevel] * this.efficiency * wind.strength * 0.16 * (1 - up.keel * 0.5)
       + this.rudder * Math.min(1, this.speed / 10) * 0.06;
     this.heel = damp(this.heel, heelTarget, 2, dt);
-    this.roll = damp(this.roll, Math.atan2(hp - hst, 2.8) * 0.7 + this.heel, 5, dt);
+    this.roll = damp(this.roll, Math.atan2(hp - hst, 2.8 * K) * 0.7 + this.heel, 5, dt);
     this.group.position.set(x, this.y, z);
     this.group.rotation.set(this.pitch + this.sink * 0.05, this.heading, this.roll + this.sink * 0.12);
 
@@ -870,7 +1270,6 @@ export class Boat {
     const boomMag = clamp((a - 0.45) * 0.55, 0.12, 1.45);
     this.boomAngle = damp(this.boomAngle, Math.sign(this.relWind || 1) * boomMag, 2.5, dt);
     this.boom.rotation.y = this.boomAngle;
-    this.jibPivot.rotation.y = this.boomAngle * 0.55;
     const billow = (0.25 + this.efficiency * 0.6) * wind.strength * (this.sailVis > 0.2 ? 1 : 0.2);
     const side = -Math.sign(this.relWind || 1);
     const pos = this.sailGeo.attributes.position;
@@ -884,6 +1283,9 @@ export class Boat {
     }
     pos.needsUpdate = true;
     this.sailGeo.computeVertexNormals();
+    this.updateTopsail(t, side, billow);
+    this.updateJib(t, side, wind);
+    this.updateSheets(side);
 
     // flags and pennants stream downwind
     const downwind = wrapAngle(wind.angle - this.heading);
@@ -906,13 +1308,13 @@ export class Boat {
     for (const w of this.wheels) w.rotation.z = wheelRot;
     let gripR, gripL = null;
     if (this.levels.rudder >= 2) {
-      const R = 0.42, c = this.wheelCenter;
+      const R = this.wheelR, c = this.wheelCenter;
       const aL = 0.95 + wheelRot * 0.5, aR = -0.95 + wheelRot * 0.5;
-      gripL = this._grip2.set(c.x + Math.sin(aL) * R, c.y + Math.cos(aL) * R, c.z);
-      gripR = this._grip.set(c.x + Math.sin(aR) * R, c.y + Math.cos(aR) * R, c.z);
+      gripL = this._grip2.set(c.x + Math.sin(aL) * R, c.y + Math.cos(aL) * R, c.z).multiplyScalar(K);
+      gripR = this._grip.set(c.x + Math.sin(aR) * R, c.y + Math.cos(aR) * R, c.z).multiplyScalar(K);
     } else {
       const phi = 0.5, L = 1.25;
-      gripR = this._grip.set(Math.sin(tillerYaw) * Math.cos(phi) * L, 1.15 + Math.sin(phi) * L, -3.3 + Math.cos(tillerYaw) * Math.cos(phi) * L);
+      gripR = this._grip.set(Math.sin(tillerYaw) * Math.cos(phi) * L, 1.15 + Math.sin(phi) * L, -3.3 + Math.cos(tillerYaw) * Math.cos(phi) * L).multiplyScalar(K);
     }
     // apparent wind for the scarf
     const ws = wind.strength * 8;
@@ -932,21 +1334,103 @@ export class Boat {
     this.light.distance = this.lanternRange || 30;
     const glowK = 0.75 + night * 0.25;
     Lt.glowMat.color.set(Lt.color).multiplyScalar(glowK).offsetHSL(0, 0, night * 0.08);
-    if (Lt.halo) {
-      Lt.halo.material.opacity = 0.25 + night * 0.75;
-      Lt.halo.scale.setScalar((this.levels.lantern === 3 ? 2.2 : 1.4) * (1 + night * 0.6) * (1 + Math.sin(t * 2.2) * 0.04));
+    const animLamp = (E) => {
+      if (E.halo) {
+        E.halo.material.opacity = 0.25 + night * 0.75;
+        E.halo.scale.setScalar((E.haloSize || 1.4) * (1 + night * 0.6) * (1 + Math.sin(t * 2.2) * 0.04));
+      }
+      if (E.anim) {
+        if (E.spin) { E.anim.rotation.y = t * 1.2; E.anim.position.y = (E.animY ?? 2.32) + Math.sin(t * 1.8) * 0.05; }
+        else E.anim.scale.set(1, 1 + Math.sin(t * 13) * 0.15, 1);
+      }
+    };
+    animLamp(Lt);
+    const X = Lt.extra;
+    if (X) {
+      X.glowMat.color.set(X.color).multiplyScalar(glowK).offsetHSL(0, 0, night * 0.08);
+      animLamp(X);
+      this.light2.position.copy(X.light);
+      this.light2.color.set(X.color);
+      this.light2.intensity = night * 12 * (0.92 + Math.sin(t * 5.3) * 0.04);
+      this.light2.distance = (this.lanternRange || 30) * 0.8;
+    } else this.light2.intensity = 0;
+    if (this.runeBand.visible) {
+      const pulse = this.levels.keel >= 5 ? 0.5 + 0.5 * Math.sin(t * 2.4) : 0.5 + 0.5 * Math.sin(t * 1.6);
+      this.runeMat.opacity = 0.35 + 0.45 * pulse + night * 0.2;
     }
-    if (Lt.anim) {
-      if (Lt.spin) { Lt.anim.rotation.y = t * 1.2; Lt.anim.position.y = 2.32 + Math.sin(t * 1.8) * 0.05; }
-      else Lt.anim.scale.set(1, 1 + Math.sin(t * 13) * 0.15, 1);
+    if (this.waterGlow.visible) {
+      this.waterGlowMat.opacity = (0.25 + 0.2 * Math.sin(t * 2.4 + 1) + night * 0.35) * (0.6 + 0.4 * Math.min(1, Math.abs(this.speed) / 10));
     }
-    if (this.runeBand.visible) this.runeMat.opacity = 0.55 + 0.35 * Math.sin(t * 1.6) + night * 0.2;
 
     this.updateWake(dt, fx, fz);
   }
 
+  // Gaff topsail: a triangle from the main's head edge up to the masthead, on the boom.
+  updateTopsail(t, side, billow) {
+    if (!this.topsail.visible) return;
+    const vis = clamp((this.sailVis - 0.06) / 0.94, 0, 1);
+    const H = this.sailH * this.sailVis;
+    const Ay = H + 0.08, Cy = 0.45 * H + 0.08, Cz = -BOOM_LEN * 0.92;
+    const By = Ay + (this.topHead - BOOM_Y - Ay) * vis;
+    const p = this.topGeo.attributes.position;
+    for (let j = 0; j <= TOP_V; j++) for (let i = 0; i <= TOP_U; i++) {
+      const u = i / TOP_U, v = j / TOP_V;
+      const ey = Ay + (Cy - Ay) * u, ez = Cz * u;
+      const y = ey + (By - ey) * v, z = ez * (1 - v);
+      const bx = side * billow * 0.45 * Math.sin(Math.PI * u) * Math.sin(Math.PI * Math.min(1, v + 0.15)) * (1 - v * 0.6)
+        + Math.sin(t * 8 + u * 5 + v * 4) * 0.03 * (1 - this.efficiency);
+      p.setXYZ(j * (TOP_U + 1) + i, bx, y, z);
+    }
+    p.needsUpdate = true;
+    this.topGeo.computeVertexNormals();
+  }
+
+  // Jib: luff on the forestay, clew swings around the stay to leeward, rolls up when furled.
+  updateJib(t, side, wind) {
+    if (!this.jib.visible) return;
+    const T = this.tack, Hd = this.jibHead;
+    const swing = this.boomAngle * 0.85;
+    this._q.setFromAxisAngle(this.stayAxis, swing);
+    const C = this._a.copy(this.clew0).sub(T).applyQuaternion(this._q).add(T);
+    const vis = clamp(this.sailVis * 1.05, 0.05, 1);
+    // leeward normal of the sail plane
+    const e1 = this._b.copy(Hd).sub(T), e2 = this._c.copy(C).sub(T);
+    const n = e1.clone().cross(e2).normalize();
+    if (n.x * side < 0) n.negate();
+    const bil = (0.12 + this.efficiency * 0.35) * wind.strength * vis;
+    const p = this.jibGeo.attributes.position;
+    for (let j = 0; j <= JIB_V; j++) for (let i = 0; i <= JIB_U; i++) {
+      const u = i / JIB_U, v = (j / JIB_V) * vis;
+      // luff point and leech point at this height
+      const lx = T.x + (Hd.x - T.x) * u, ly = T.y + (Hd.y - T.y) * u, lz = T.z + (Hd.z - T.z) * u;
+      const ex = C.x + (Hd.x - C.x) * u, ey = C.y + (Hd.y - C.y) * u, ez = C.z + (Hd.z - C.z) * u;
+      const b = bil * Math.sin(Math.PI * (j / JIB_V)) * (1 - u) * 1.4 + Math.sin(t * 9 + u * 6 + v * 4) * 0.025 * (1 - this.efficiency) * v;
+      p.setXYZ(j * (JIB_U + 1) + i, lx + (ex - lx) * v + n.x * b, ly + (ey - ly) * v + n.y * b, lz + (ez - lz) * v + n.z * b);
+    }
+    p.needsUpdate = true;
+    this.jibGeo.computeVertexNormals();
+    this.jibClew = this._jc || (this._jc = new THREE.Vector3());
+    this.jibClew.set(T.x + (C.x - T.x) * vis, T.y + (C.y - T.y) * vis, T.z + (C.z - T.z) * vis);
+  }
+
+  // Running rigging: main sheet from the boom end, jib sheets from the clew.
+  updateSheets(side) {
+    const b = this.boomAngle, zl = -BOOM_LEN + 0.15;
+    const end = this._a.set(zl * Math.sin(b), BOOM_Y - 0.06, MAST_Z + zl * Math.cos(b));
+    setSeg(this.mainSheet, this._b.set(0, 1.04, MAST_Z - BOOM_LEN + 0.3), end);
+    const jv = this.jib.visible;
+    this.jibSheet.visible = this.jibSheetSlack.visible = jv;
+    if (!jv || !this.jibClew) return;
+    setSeg(this.jibSheet, this.jibCleat(side).clone(), this.jibClew);
+    // the windward sheet hangs slack across the deck
+    const w = this.jibCleat(-side).clone();
+    const mid = this._b.copy(w).lerp(this.jibClew, 0.5); mid.y = Math.max(1.06, mid.y - 0.5);
+    setSeg(this.jibSheetSlack, w, mid);
+  }
+
   updateWake(dt, fx, fz) {
     const x = this.pos.x, z = this.pos.z;
-    this.wake.update(dt, x - fx * 2.9, z - fz * 2.9, x + fx * 3.2, z + fz * 3.2, fx, fz, this.speed);
+    const k = this.sizeScale;
+    this.wake.update(dt, x - fx * 2.9 * k, z - fz * 2.9 * k, x + fx * (this.hasBowsprit ? 3.5 : 3.2) * k, z + fz * (this.hasBowsprit ? 3.5 : 3.2) * k, fx, fz, this.speed);
   }
 }

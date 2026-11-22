@@ -604,12 +604,12 @@ export class Game {
     if (spy !== this.spyOn) {
       this.spyOn = spy;
       boat.group.visible = !spy; // nothing of the boat should block the lens
-      this.ui.setSpyglass(spy, ['', '×2', '×4', '×7'][tier]);
+      this.ui.setSpyglass(spy, ['', '×2', '×4', '×7', '×9', '×12'][tier]);
       if (spy) { c.spyYaw = c.yaw; c.spyPitch = 0.0; this._spyHeading = boat.heading; this.audio.play('click'); }
       else if (Number.isFinite(c.spyYaw)) { c.yaw = c.spyYaw; c.lastLook = this.elapsed; }
     }
     if (spy) {
-      const fov = [55, 26, 14, 8][tier];
+      const fov = [55, 26, 14, 8, 6, 4.5][tier];
       const k = c.fov / 55; // pan slower the more we zoom
       if (L.dx || L.dy) {
         c.spyYaw -= L.dx * 0.005 * k;
@@ -667,7 +667,7 @@ export class Game {
     if (this.timers.spot > 0) return;
     this.timers.spot = 0.3;
     const b = this.boat.pos, s = this.state;
-    const range = [0, 1500, 2100, 2700][tier];
+    const range = [0, 1500, 2100, 2700, 3300, 3900][tier];
     const half = (fov * Math.PI) / 360 * Math.max(1, this.camera.aspect) * 0.8;
     for (const I of this.world.islands) {
       if (s.discovered.has(I.id)) continue;

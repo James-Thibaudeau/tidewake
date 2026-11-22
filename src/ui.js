@@ -259,7 +259,8 @@ export class UI {
     // hull
     const maxH = (b && b.maxHealth) || 100;
     const ratio = clampN((st.health || 0) / maxH, 0, 1);
-    const hullKey = Math.round(ratio * 200);
+    // key on the actual numbers so a hull upgrade (same %, bigger max) still refreshes
+    const hullKey = `${Math.ceil(st.health || 0)}/${maxH}`;
     if (hullKey !== this.last.hull) {
       this.last.hull = hullKey;
       const bar = this.el.hullBar;
