@@ -7,7 +7,9 @@ import { updateWaves, waveHeight } from './waves.js';
 import { ringUniforms } from './world.js';
 import { propMesh } from './props.js';
 import { pointOfSailName } from './boat.js';
-import { loadSave, writeSave, clearSave, encodeBytes, decodeBytes, loadSettings, saveSettings } from './save.js';
+import { loadSave, writeSave, clearSave, encodeBytes, decodeBytes, loadSettings, saveSettings, migrate } from './save.js';
+import { Emitter } from './events.js';
+import { STYLES, normalizeProfile } from './cosmetics.js';
 
 const TUTORIAL = isTouch ? [
   'Raise your sail with the ▲ button.',
@@ -26,6 +28,10 @@ const TUTORIAL = isTouch ? [
 export class Game {
   constructor(ctx) {
     Object.assign(this, ctx);
+    this.events = new Emitter();
+    // What main.js renders. Ashore swaps in its own scene; the sea is the default.
+    this.seaView = { scene: this.scene, camera: this.camera };
+    this.view = this.seaView;
     this.settings = loadSettings();
     this.mode = 'title';
     this.paused = false;
@@ -55,6 +61,11 @@ export class Game {
       discovered: new Set([0]), treasures: new Set(), pending: new Set(), savePort: 0,
       dayT: 0.3, day: 1, revealed: new Uint8Array(MAP_RES * MAP_RES),
       stats: { distance: 0, treasures: 0, wrecks: 0, discoveries: 1 }, tutorial: 0,
+      // v2: character, quests, story, ashore progress and quest cargo
+      profile: normalizeProfile(null), wardrobe: [],
+      quests: { active: [], done: [], boards: {} },
+      story: { chapter: 0, journals: [], flags: {}, seenCards: [] },
+      ashore: {}, hold: [],
     };
   }
 
@@ -75,10 +86,13 @@ export class Game {
 
   knowledge() {
     const s = this.state, d = this.saveData;
-    d.v = 1;
     d.discovered = [...s.discovered];
     d.revealed = encodeBytes(s.revealed);
     d.dayT = s.dayT; d.day = s.day; d.stats = s.stats; d.tutorial = s.tutorial;
+    // Things that persist the moment they happen (not banked like gold)
+    d.profile = s.profile; d.wardrobe = s.wardrobe; d.quests = s.quests;
+    d.story = s.story; d.ashore = s.ashore; d.hold = s.hold;
+    migrate(d); // stamps the current version
     return d;
   }
 
@@ -98,9 +112,23 @@ export class Game {
     writeSave(d);
   }
 
-  startNew() {
+  /** Switch what main.js renders (the sea, or a scene of our own like ashore). */
+  setView(view) { this.view = view || this.seaView; }
+
+  /** Title → character creator → a fresh voyage (or back to the title if cancelled). */
+  async newVoyage() {
+    if (!this.creator) return this.startNew();
+    this.ui.hideTitle();
+    const profile = await this.creator.open('new', normalizeProfile(null));
+    if (!profile) { this.ui.showTitle(this.hasSave()); return; }
+    this.startNew(profile);
+  }
+
+  startNew(profile = null) {
     clearSave();
     this.state = this.freshState();
+    this.state.profile = normalizeProfile(profile);
+    this.applyProfile();
     this.saveData = {};
     for (const I of this.world.islands) I.treasureTaken = false;
     this.applyUpgrades();
@@ -129,9 +157,12 @@ export class Game {
     s.revealed = decodeBytes(d.revealed, MAP_RES * MAP_RES);
     s.stats = { ...s.stats, ...(d.stats || {}) };
     s.tutorial = d.tutorial ?? 5;
+    s.profile = normalizeProfile(d.profile); s.wardrobe = d.wardrobe; s.quests = d.quests;
+    s.story = d.story; s.ashore = d.ashore; s.hold = d.hold;
     this.state = s;
     this.saveData = d;
     this.applyUpgrades();
+    this.applyProfile();
     s.health = d.health ?? this.boat.maxHealth;
     const v = d.voyage;
     if (v) {
@@ -189,10 +220,12 @@ export class Game {
     s.pending.clear();
     this.savePortState();
     this.audio.play('dock');
+    this.events.emit('dock', I);
     this.ui.openPort(I);
   }
 
   setSail() {
+    this.events.emit('setSail', this.dockedIsland);
     this.ui.closePort();
     this.dockedIsland = null;
     this.mode = 'sailing';
@@ -214,8 +247,51 @@ export class Game {
     if (key === 'hull') s.health += this.boat.maxHealth - oldMax;
     this.audio.play('upgrade');
     this.ui.toast(`${U.tiers[lvl + 1].label} installed!`, 'gold');
+    this.events.emit('upgrade', key, lvl + 1);
     this.savePortState();
     this.ui.refreshPort();
+    return true;
+  }
+
+  // ------------------------------------------------------------ wardrobe
+  applyProfile() { this.boat.explorer.setAppearance?.(this.state.profile); }
+
+  /** Open the creator in wardrobe mode from the port's Tailor tab. */
+  async openWardrobe() {
+    if (this.mode !== 'docked' || !this.creator) return;
+    this.ui.closePort();
+    const profile = await this.creator.open('wardrobe', this.state.profile);
+    if (profile) {
+      this.state.profile = profile;
+      this.savePortState();
+      this.events.emit('outfit', profile);
+    }
+    this.applyProfile();
+    this.ui.openPort(this.dockedIsland, 'tailor');
+  }
+
+  /** Buy a tailor item with banked gold. Returns true on success. */
+  buyCosmetic(id) {
+    const s = this.state, item = STYLES.find((x) => x.id === id);
+    if (!item || item.source !== 'tailor' || s.wardrobe.includes(id)) return false;
+    if (s.banked < item.price) { this.ui.toast('Not enough gold', 'warn'); return false; }
+    s.banked -= item.price;
+    s.wardrobe.push(id);
+    this.audio.play('upgrade');
+    this.ui.toast(`${item.name} added to your wardrobe`, 'gold');
+    this.events.emit('cosmetic', id, 'tailor');
+    this.savePortState();
+    this.ui.refreshPort();
+    return true;
+  }
+
+  /** Unlock a cosmetic from a chest, quest or the story (saved straight away). */
+  unlockCosmetic(id, how = 'found') {
+    const s = this.state;
+    if (!STYLES.some((x) => x.id === id) || s.wardrobe.includes(id)) return false;
+    s.wardrobe.push(id);
+    this.events.emit('cosmetic', id, how);
+    this.saveVoyage();
     return true;
   }
 
@@ -270,6 +346,7 @@ export class Game {
     this.ui.setPrompt(null);
     this.ui.warning(null);
     this.audio.play('wreck');
+    this.events.emit('wreck', this.lostCargo);
   }
 
   async respawn() {
@@ -283,6 +360,7 @@ export class Game {
     this.dockedIsland = port;
     this.cam.yaw = this.boat.heading + Math.PI * 0.8;
     this.savePortState();
+    this.events.emit('respawn', port);
     await this.ui.fade(0, 1);
     this.ui.openPort(port);
   }
@@ -297,6 +375,7 @@ export class Game {
     this.ui.banner(I.name, how || (I.port ? 'Port discovered' : I.landmark ? 'Landmark discovered' : 'Island discovered'));
     this.ui.toast(`+${I.discoverValue} gold for charting ${I.name}`, 'gold');
     this.audio.play('discover');
+    this.events.emit('discover', I, how || 'sailing');
   }
 
   revealAround(x, z, r) {
@@ -351,6 +430,7 @@ export class Game {
     this.streamer.setTreasureVisible(I, false);
     this.audio.play('treasure');
     this.ui.banner(`${I.treasure.value} gold`, 'Treasure hauled aboard!');
+    this.events.emit('haul', I);
     // chest rises beside the boat
     const chest = propMesh('chest');
     const r = new THREE.Vector2(-Math.cos(this.boat.heading), Math.sin(this.boat.heading));
@@ -398,6 +478,14 @@ export class Game {
 
   // ----------------------------------------------------------------- loop
   update(dt) {
+    // The creator borrows the explorer and renders its own studio scene
+    if (this.creator?.active) {
+      const a = this.input.consumeActions();
+      if (a.pause && this.creator.mode === 'wardrobe') this.creator.close(null);
+      const look = this.input.consumeLook();
+      if (this.creator.active) this.creator.update(dt, look);
+      return;
+    }
     const acts = this.input.consumeActions();
     if (acts.pause && this.mode !== 'title') {
       if (this.ui.isMapOpen) this.ui.closeMap();

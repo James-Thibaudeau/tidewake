@@ -24,6 +24,7 @@ Built with [three.js](https://threejs.org/) as plain ES modules. There's no buil
 - **Bank your gold.** Gold in your hold is lost if you're shipwrecked. Docking at a port banks your cargo and saves your progress. Ports are your save points.
 - Glowing golden beams mark sunken treasure. Sail over one slowly and haul it up.
 - Spend banked gold at any port's shipwright: sails, hull, rudder, keel, lantern and spyglass. Every tier changes how the ship looks.
+- Every new voyage starts with the character creator. Restyle any time for free at a port's **Tailor** tab, where new hats, coats and boots are sold. Rarer pieces are hidden on the islands.
 - With a spyglass, hold `Z` / `Shift` (or the spyglass button) to look through it from the explorer's eyes; drag to pan. Islands you spot through it are charted from afar.
 
 ## Run locally
@@ -51,10 +52,13 @@ style.css         all UI styling
 src/
   main.js         bootstrap: renderer, scene, main loop
   game.js         game state & rules: sailing, docking, discovery, treasure, shipwrecks
+  events.js       tiny event emitter (dock, discover, haul, wreck…) for quests and story
+  cosmetics.js    wardrobe catalogue: palettes, styles, unlock sources, appearance profile
+  creator.js      character creator / port wardrobe (studio scene + panel)
   world.js        procedural islands, terrain height, island streaming
   props.js        low-poly prop library (trees, huts, lighthouse, rocks, chests…)
   boat.js         boat model, upgrade visuals and sailing physics
-  explorer.js     the anime explorer character (model + animation)
+  explorer.js     the anime explorer character: rig, poses (helm / on foot), animation
   ocean.js        toon water shader
   sky.js          sky dome, sun/moon/stars, clouds, lighting
   weather.js      weather states, wind, rain, lightning, wind streaks
@@ -63,7 +67,7 @@ src/
   ui.js           HUD, minimap, sea chart, port/pause/wreck screens
   input.js        keyboard, mouse and touch controls
   audio.js        procedural WebAudio sound and music
-  save.js         localStorage save/load
+  save.js         localStorage save/load and save-version migration
   config.js       tuning constants and upgrade catalogue
   util.js         math and noise helpers
 ```

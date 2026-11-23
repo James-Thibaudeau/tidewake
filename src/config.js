@@ -5,7 +5,8 @@ export const MAP_CELL = 100;               // fog-of-war cell size
 export const MAP_RES = Math.ceil((WORLD_HALF * 2) / MAP_CELL);
 export const DAY_LENGTH = 720;             // seconds for a full day/night cycle
 export const WORLD_SEED = 1121;
-export const SAVE_KEY = 'tidewake.save.v1';
+export const SAVE_KEY = 'tidewake.save.v1'; // key stays put; the data inside is versioned
+export const SAVE_VERSION = 2;
 export const SETTINGS_KEY = 'tidewake.settings.v1';
 
 export const isTouch =

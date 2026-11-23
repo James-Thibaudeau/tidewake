@@ -1,6 +1,7 @@
 // DOM user interface: HUD, minimap, sea chart, port, pause, wreck and title
 // screens. Reads game state; calls game methods for actions.
 import { UPGRADES, MAP_RES, MAP_CELL, WORLD_HALF } from './config.js';
+import { STYLES, owns } from './cosmetics.js';
 import { bearingDeg } from './util.js';
 
 const $ = (id) => document.getElementById(id);
@@ -35,6 +36,9 @@ export const ICONS = {
   chevDown: S(`<path d="M5 9l7 7 7-7" ${STROKE} stroke-width="3.2"/>`),
   chevLeft: S(`<path d="M15 5l-7 7 7 7" ${STROKE} stroke-width="3"/>`),
   chevRight: S(`<path d="M9 5l7 7-7 7" ${STROKE} stroke-width="3"/>`),
+  needle: S(`<path d="M19.5 3.5L6 17" ${STROKE} stroke-width="2.6"/><ellipse cx="18" cy="5" rx="1.1" ry="2.2" transform="rotate(45 18 5)" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 17c-2 1-3.5 2.5-3 4 1.5.5 3-1 4-3" ${STROKE}/><path d="M17 6c-4 0-9 3-11 8" fill="none" stroke="#ff6b5b" stroke-width="1.8" stroke-linecap="round"/>`),
+  face: S(`<circle cx="12" cy="12" r="9" ${STROKE}/><circle cx="9" cy="11" r="1.4" fill="currentColor"/><circle cx="15" cy="11" r="1.4" fill="currentColor"/><path d="M8.5 15c2 2 5 2 7 0" ${STROKE}/>`),
+  dice: S(`<rect x="3.5" y="3.5" width="17" height="17" rx="4" ${STROKE}/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"/>`),
 };
 
 const POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -51,7 +55,8 @@ export class UI {
       'vignette', 'damageFlash', 'fade', 'loading', 'loadingText', 'title', 'btnContinue', 'btnNew', 'titleHint',
       'portScreen', 'portName', 'portGold', 'portHull', 'btnRepair', 'upgradeGrid', 'btnSetSail', 'mapScreen', 'mapCanvas',
       'mapStats', 'pauseScreen', 'setSound', 'setMusic', 'setQuality', 'controlsHelp', 'wreckScreen', 'wreckText',
-      'btnRespawn', 'confirm', 'confirmText', 'confirmYes', 'confirmNo'];
+      'btnRespawn', 'confirm', 'confirmText', 'confirmYes', 'confirmNo', 'portTabs', 'paneShipwright', 'paneTailor',
+      'tailorGrid', 'btnWardrobe', 'creatorScreen'];
     this.el = {};
     for (const id of ids) this.el[id] = $(id);
     this.notches = [...document.querySelectorAll('#sailGauge .notches span')];
@@ -75,7 +80,7 @@ export class UI {
       if (this.map.open) this.resizeMap();
     });
     // Keep UI interactions from leaking to the 3D view
-    for (const id of ['portScreen', 'pauseScreen', 'wreckScreen', 'confirm', 'title']) {
+    for (const id of ['portScreen', 'pauseScreen', 'wreckScreen', 'confirm', 'title', 'creatorScreen']) {
       const e = this.el[id];
       if (e) e.addEventListener('wheel', (ev) => ev.stopPropagation(), { passive: true });
     }
@@ -127,7 +132,7 @@ export class UI {
         const ok = await this.confirmBox('Start a new voyage? Your current save will be lost.', 'Start fresh');
         if (!ok) return;
       }
-      g.startNew?.();
+      g.newVoyage?.();
     });
     this.on('btnSetSail', () => g.setSail?.());
     this.on('btnRepair', () => { g.repair?.(); this.refreshPort(); });
@@ -146,6 +151,22 @@ export class UI {
     this.on('mapCenter', () => {
       const b = g.boat;
       if (b) { this.map.cx = b.pos.x; this.map.cz = b.pos.z; this.map.zoom = Math.max(this.map.zoom, this.mapFitZoom() * 4); this.map.dirty = true; }
+    });
+    // Port tabs
+    this.portTab = 'shipwright';
+    this.el.portTabs?.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-tab]');
+      if (!b) return;
+      this.click();
+      this.setPortTab(b.dataset.tab);
+    });
+    this.on('btnWardrobe', () => g.openWardrobe?.());
+    this.el.tailorGrid?.addEventListener('click', async (e) => {
+      const b = e.target.closest('button[data-buy]');
+      if (!b || b.disabled) return;
+      this.click();
+      g.buyCosmetic?.(b.dataset.buy);
+      this.refreshPort();
     });
     // Upgrade buy buttons (delegated)
     if (this.el.upgradeGrid) {
@@ -853,8 +874,9 @@ export class UI {
   }
 
   // ------------------------------------------------------------ port
-  openPort(island) {
+  openPort(island, tab = 'shipwright') {
     this.portIsland = island || this.game.dockedIsland || null;
+    this.setPortTab(tab);
     if (this.el.portName) this.el.portName.textContent = this.portIsland ? this.portIsland.name : 'Harbor';
     this.el.portScreen?.classList.remove('hidden');
     this.refreshPort();
@@ -863,10 +885,35 @@ export class UI {
   }
   closePort() { this.el.portScreen?.classList.add('hidden'); }
 
+  setPortTab(tab) {
+    this.portTab = tab;
+    this.el.portTabs?.querySelectorAll('button[data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+    this.el.paneShipwright?.classList.toggle('hidden', tab !== 'shipwright');
+    this.el.paneTailor?.classList.toggle('hidden', tab !== 'tailor');
+  }
+
+  refreshTailor() {
+    const st = this.game.state, grid = this.el.tailorGrid;
+    if (!grid) return;
+    const SLOT = { hat: 'Hat', top: 'Top', bottom: 'Bottoms', boots: 'Boots', neck: 'Neck', extra: 'Bag' };
+    grid.innerHTML = STYLES.filter((s) => s.source === 'tailor').map((s) => {
+      const have = owns(st.wardrobe, s.slot, s.style);
+      const afford = st.banked >= s.price;
+      const btn = have ? '<button class="btn" disabled>Owned</button>'
+        : `<button class="btn${afford ? ' primary' : ''}" data-buy="${s.id}" ${afford ? '' : 'disabled'}>Buy <span class="ico">${ICONS.coin}</span> ${fmt(s.price)}</button>`;
+      return `<div class="card${have ? ' owned' : ''}">
+        <div class="cardHead"><div class="cardIcon">${ICONS.needle}</div>
+          <div><div class="cardName">${esc(s.name)}</div><div class="cardStat">${SLOT[s.slot] || s.slot}</div></div></div>
+        <div class="cardCur">${have ? 'In your wardrobe' : 'Sold at every port tailor'}</div>
+        ${btn}</div>`;
+    }).join('');
+  }
+
   refreshPort() {
     const g = this.game, st = g.state, b = g.boat;
     if (!st || !this.el.upgradeGrid) return;
     this.el.portGold.textContent = fmt(st.banked);
+    this.refreshTailor();
     const maxH = (b && b.maxHealth) || 100;
     this.el.portHull.textContent = `Hull ${Math.ceil(st.health || 0)}/${maxH}`;
     const cost = g.repairCost ? g.repairCost() : 0;

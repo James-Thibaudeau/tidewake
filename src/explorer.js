@@ -2,38 +2,17 @@
 // primitives (toon shaded + ink outlines) with simple procedural animation:
 // breathing, leaning, scarf flutter, two-bone IK arms on the helm and a head
 // that turns toward wherever the player is looking.
+//
+// The skeleton (joint groups) is built once; the look (hair, clothes, face)
+// comes from an appearance profile and can be swapped at any time with
+// setAppearance(). Style geometry lives in outfits.js.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { toonGradient, outlineMaterial } from './toon.js';
 import { clamp, damp, wrapAngle } from './util.js';
+import { normalizeProfile, DEFAULT_PROFILE } from './cosmetics.js';
+import { part, mergeParts, buildOutfit, faceParams, acquireFace, releaseFace, HIP_Y, KNEE_Y, HC, BONES } from './outfits.js';
 
-// ------------------------------------------------------------ geometry helpers
-const _e = new THREE.Euler(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
-const _p = new THREE.Vector3(), _s = new THREE.Vector3();
-
-/** Bake a primitive into a vertex-coloured, non-indexed part. */
-export function part(geo, color, t = {}) {
-  let g = geo.index ? geo.toNonIndexed() : geo;
-  for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
-  _e.set(t.rx || 0, t.ry || 0, t.rz || 0, t.order || 'XYZ');
-  _q.setFromEuler(_e);
-  _p.set(t.x || 0, t.y || 0, t.z || 0);
-  _s.set(t.sx ?? t.s ?? 1, t.sy ?? t.s ?? 1, t.sz ?? t.s ?? 1);
-  _m.compose(_p, _q, _s);
-  g.applyMatrix4(_m);
-  const c = new THREE.Color(color);
-  const n = g.attributes.position.count;
-  const col = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  return g;
-}
-
-export function mergeParts(parts) {
-  const g = mergeGeometries(parts);
-  g.computeBoundingSphere();
-  return g;
-}
+export { part, mergeParts };
 
 export const charMaterial = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonGradient() });
 const inkOutline = outlineMaterial(0.022, 0x1a1420);
@@ -45,71 +24,17 @@ function inked(geo, parent, mat = charMaterial) {
   return m;
 }
 
-// ----------------------------------------------------------------- palette
-const C = {
-  skin: '#ffd8b4', skinShade: '#f4b994', hair: '#6e3318', hair2: '#8f4a22',
-  hat: '#e6cf92', hatBand: '#7a4a24', shirt: '#f7f0dd', vest: '#4f7d3a', vest2: '#3c6430',
-  shorts: '#c79f63', belt: '#5b3a1f', buckle: '#ffd24a', sock: '#ffffff', boot: '#6e4224',
-  sole: '#35200f', scarf: '#e8413a', scarf2: '#c22f2a', satchel: '#a9743c', satchel2: '#7f5428',
-  brass: '#e0a943', glove: '#8a5a32',
-};
+/** An empty group under `bone` that holds that bone's swappable look meshes. */
+function lookGroup(bone) {
+  const g = new THREE.Group();
+  g.name = 'look';
+  bone.add(g);
+  return g;
+}
 
-// ------------------------------------------------------------------- face
-function faceTexture() {
-  const S = 256;
-  const c = document.createElement('canvas');
-  c.width = c.height = S;
-  const g = c.getContext('2d');
-  g.clearRect(0, 0, S, S);
-  const eye = (cx, flip) => {
-    const cy = S * 0.56;
-    // sclera
-    g.fillStyle = '#ffffff';
-    g.beginPath(); g.ellipse(cx, cy, 19, 27, 0, 0, Math.PI * 2); g.fill();
-    // iris with a warm two-tone gradient
-    const gr = g.createLinearGradient(0, cy - 24, 0, cy + 24);
-    gr.addColorStop(0, '#3b1f0e'); gr.addColorStop(0.55, '#7a3d16'); gr.addColorStop(1, '#d48a3a');
-    g.fillStyle = gr;
-    g.beginPath(); g.ellipse(cx + flip * 1.5, cy + 3, 15, 23, 0, 0, Math.PI * 2); g.fill();
-    // pupil
-    g.fillStyle = '#1a0c05';
-    g.beginPath(); g.ellipse(cx + flip * 1.5, cy + 4, 7, 12, 0, 0, Math.PI * 2); g.fill();
-    // highlights
-    g.fillStyle = '#ffffff';
-    g.beginPath(); g.arc(cx - 6 + flip * 1.5, cy - 7, 6.5, 0, Math.PI * 2); g.fill();
-    g.beginPath(); g.arc(cx + 6 + flip * 1.5, cy + 12, 3, 0, Math.PI * 2); g.fill();
-    // upper lash line with an outer flick
-    g.strokeStyle = '#24110a'; g.lineWidth = 6; g.lineCap = 'round';
-    g.beginPath(); g.ellipse(cx, cy + 2, 21, 28, 0, Math.PI * 1.12, Math.PI * 1.88); g.stroke();
-    g.beginPath();
-    g.moveTo(cx + flip * 19, cy - 14); g.lineTo(cx + flip * 27, cy - 20); g.stroke();
-    // lower lid hint
-    g.lineWidth = 2.5;
-    g.beginPath(); g.ellipse(cx, cy, 18, 26, 0, Math.PI * 0.3, Math.PI * 0.7); g.stroke();
-    // brow
-    g.strokeStyle = '#5a2810'; g.lineWidth = 5;
-    g.beginPath(); g.moveTo(cx - 16 * flip, cy - 42); g.quadraticCurveTo(cx, cy - 50, cx + 18 * flip, cy - 43); g.stroke();
-  };
-  eye(S * 0.33, -1);
-  eye(S * 0.67, 1);
-  // blush
-  g.fillStyle = 'rgba(255, 110, 110, 0.42)';
-  for (const x of [S * 0.24, S * 0.76]) { g.beginPath(); g.ellipse(x, S * 0.74, 17, 8, 0, 0, Math.PI * 2); g.fill(); }
-  g.strokeStyle = 'rgba(230, 80, 80, 0.55)'; g.lineWidth = 2;
-  for (const x of [S * 0.24, S * 0.76]) for (const d of [-7, 0, 7]) {
-    g.beginPath(); g.moveTo(x + d - 2, S * 0.76); g.lineTo(x + d + 3, S * 0.72); g.stroke();
-  }
-  // nose + grin
-  g.fillStyle = '#e8a383';
-  g.beginPath(); g.ellipse(S * 0.5, S * 0.7, 3, 2, 0, 0, Math.PI * 2); g.fill();
-  g.fillStyle = '#7a2a1e';
-  g.beginPath(); g.moveTo(S * 0.455, S * 0.79); g.quadraticCurveTo(S * 0.5, S * 0.86, S * 0.545, S * 0.79); g.closePath(); g.fill();
-  g.fillStyle = '#ff8a7a';
-  g.beginPath(); g.ellipse(S * 0.5, S * 0.825, 9, 3, 0, 0, Math.PI * 2); g.fill();
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
+function clearLook(g) {
+  for (const o of g.children) o.geometry?.dispose();
+  g.clear();
 }
 
 // -------------------------------------------------------------- the explorer
@@ -117,76 +42,54 @@ const DOWN = new THREE.Vector3(0, -1, 0);
 const L1 = 0.25, L2 = 0.24; // upper arm, forearm + hand
 
 export class Explorer {
-  constructor() {
+  constructor(profile = DEFAULT_PROFILE) {
     this.root = new THREE.Group();
     this.root.scale.setScalar(1.15);
-    this.build();
+    this.buildSkeleton();
+    this.setAppearance(profile);
     this.headYaw = 0; this.headPitch = 0; this.twist = 0; this.lean = 0;
     this.glance = 0; this.glanceTimer = 3; this.glanceTarget = 0;
     this.control = 'tiller';
+    // 'helm' (on the boat, hands on tiller/wheel), 'ground' (on foot) or
+    // 'preview' (standing idle for the character creator).
+    this.pose = 'helm';
+    this.gait = 0;        // walk-cycle phase (radians)
+    this.stride = 0;      // 0 idle → 1 full run, smoothed
+    this.air = 0;         // 0 grounded → 1 airborne, smoothed
+    this.squash = 0;      // landing squash, decays
+    this.moveSpeed = 0;   // fallback ground speed when the caller passes none (console testing)
     this._v = new THREE.Vector3(); this._v2 = new THREE.Vector3(); this._v3 = new THREE.Vector3();
     this._m = new THREE.Matrix4(); this._qa = new THREE.Quaternion(); this._qb = new THREE.Quaternion();
   }
 
-  build() {
+  /** Joint groups, the spyglass and the face decal: everything that doesn't change with the outfit. */
+  buildSkeleton() {
     const R = this.root;
-    // ---- legs, socks and chunky boots (static, on the deck)
-    const legs = [];
-    for (const s of [-1, 1]) {
-      const x = s * 0.1;
-      legs.push(
-        part(new THREE.SphereGeometry(0.1, 12, 8), C.boot, { x, y: 0.075, z: 0.045, sx: 1.05, sy: 0.75, sz: 1.55 }),
-        part(new THREE.BoxGeometry(0.2, 0.04, 0.33), C.sole, { x, y: 0.02, z: 0.04 }),
-        part(new THREE.CylinderGeometry(0.088, 0.095, 0.09, 12), C.boot, { x, y: 0.16 }),
-        part(new THREE.TorusGeometry(0.088, 0.018, 5, 12), C.sole, { x, y: 0.2, rx: Math.PI / 2 }),
-        part(new THREE.CylinderGeometry(0.066, 0.072, 0.1, 10), C.sock, { x, y: 0.25 }),
-        part(new THREE.CylinderGeometry(0.056, 0.062, 0.14, 10), C.skin, { x, y: 0.35 }),
-        part(new THREE.CylinderGeometry(0.105, 0.1, 0.13, 12), C.shorts, { x: x * 1.05, y: 0.45 }),
-        part(new THREE.TorusGeometry(0.1, 0.014, 5, 12), C.shorts, { x: x * 1.05, y: 0.39, rx: Math.PI / 2 }),
-      );
+    const look = {};
+    // ---- legs: hip → knee joints so the explorer can walk, run and jump
+    this.legs = {};
+    for (const [name, s] of [['left', 1], ['right', -1]]) {
+      const hip = new THREE.Group();
+      hip.position.set(s * 0.1, HIP_Y, 0);
+      R.add(hip);
+      const knee = new THREE.Group();
+      knee.position.y = KNEE_Y - HIP_Y;
+      hip.add(knee);
+      this.legs[name] = { hip, knee, side: s };
+      look[s > 0 ? 'hipL' : 'hipR'] = lookGroup(hip);
+      look[s > 0 ? 'kneeL' : 'kneeR'] = lookGroup(knee);
     }
-    inked(mergeParts(legs), R);
 
     // ---- torso (pivots at the hips so it can twist and lean)
     const torso = new THREE.Group();
     torso.position.y = 0.48;
     R.add(torso);
     this.torso = torso;
-    const tp = [
-      part(new THREE.CylinderGeometry(0.235, 0.225, 0.14, 16), C.shorts, { y: 0.03 }),
-      part(new THREE.CylinderGeometry(0.245, 0.245, 0.055, 16), C.belt, { y: 0.11 }),
-      part(new THREE.BoxGeometry(0.085, 0.065, 0.03), C.buckle, { y: 0.11, z: 0.245 }),
-      part(new THREE.BoxGeometry(0.045, 0.03, 0.035), C.belt, { y: 0.11, z: 0.25 }),
-      part(new THREE.CylinderGeometry(0.205, 0.235, 0.38, 16), C.shirt, { y: 0.32 }),
-      part(new THREE.SphereGeometry(0.205, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), C.shirt, { y: 0.5, sy: 0.55 }),
-      // open-front vest
-      part(new THREE.CylinderGeometry(0.228, 0.255, 0.33, 16, 1, true, 0.5, Math.PI * 2 - 1.0), C.vest, { y: 0.3 }),
-      part(new THREE.CylinderGeometry(0.24, 0.24, 0.025, 16, 1, true, 0.5, Math.PI * 2 - 1.0), C.vest2, { y: 0.145 }),
-      // collar
-      part(new THREE.ConeGeometry(0.07, 0.09, 3), C.shirt, { x: 0.07, y: 0.53, z: 0.13, rx: 1.1, rz: -0.3 }),
-      part(new THREE.ConeGeometry(0.07, 0.09, 3), C.shirt, { x: -0.07, y: 0.53, z: 0.13, rx: 1.1, rz: 0.3 }),
-      // satchel strap across the chest (right shoulder → left hip)
-      part(new THREE.BoxGeometry(0.045, 0.62, 0.02), C.satchel2, { y: 0.3, z: 0.232, rz: 0.72 }),
-      part(new THREE.BoxGeometry(0.045, 0.62, 0.02), C.satchel2, { y: 0.3, z: -0.232, rz: -0.72 }),
-      // satchel on the left hip
-      part(new THREE.BoxGeometry(0.08, 0.16, 0.2), C.satchel, { x: 0.28, y: 0.06, z: 0.02 }),
-      part(new THREE.BoxGeometry(0.09, 0.07, 0.21), C.satchel2, { x: 0.285, y: 0.12, z: 0.02 }),
-      part(new THREE.BoxGeometry(0.03, 0.035, 0.035), C.buckle, { x: 0.33, y: 0.09, z: 0.02 }),
-      // neck
-      part(new THREE.CylinderGeometry(0.06, 0.07, 0.09, 10), C.skin, { y: 0.56 }),
-    ];
-    for (const s of [-1, 1]) {
-      tp.push(
-        part(new THREE.BoxGeometry(0.09, 0.08, 0.025), C.vest2, { x: s * 0.13, y: 0.27, z: 0.218, ry: s * 0.55 }),
-        part(new THREE.BoxGeometry(0.095, 0.03, 0.03), C.vest, { x: s * 0.13, y: 0.31, z: 0.222, ry: s * 0.55 }),
-        part(new THREE.SphereGeometry(0.012, 6, 4), C.buckle, { x: s * 0.13, y: 0.3, z: 0.24, ry: s * 0.55 }),
-      );
-    }
-    inked(mergeParts(tp), torso);
+    look.torso = lookGroup(torso);
 
     // brass spyglass on the belt (shown once the spyglass is upgraded)
     const sg = mergeParts([
-      part(new THREE.CylinderGeometry(0.03, 0.04, 0.32, 10), C.brass),
+      part(new THREE.CylinderGeometry(0.03, 0.04, 0.32, 10), '#e0a943'),
       part(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 10), '#8a5a1e', { y: 0.12 }),
       part(new THREE.CylinderGeometry(0.035, 0.035, 0.03, 10), '#8a5a1e', { y: -0.06 }),
     ]);
@@ -197,25 +100,15 @@ export class Explorer {
     this.spyglass.visible = false;
     torso.add(this.spyglass);
 
-    // ---- scarf with a two-segment fluttering tail
-    const scarf = mergeParts([
-      part(new THREE.TorusGeometry(0.12, 0.058, 8, 18), C.scarf, { y: 0.54, rx: Math.PI / 2 + 0.12 }),
-      part(new THREE.SphereGeometry(0.065, 8, 6), C.scarf2, { x: 0.08, y: 0.5, z: 0.1 }),
-    ]);
-    inked(scarf, torso);
+    // ---- scarf tail: two segments that flutter (hidden for tail-less neckwear)
     this.scarfTail = new THREE.Group();
     this.scarfTail.position.set(0.02, 0.52, -0.1);
     torso.add(this.scarfTail);
-    const segGeo = mergeParts([part(new THREE.BoxGeometry(0.11, 0.028, 0.22), C.scarf, { z: 0.11 })]);
-    const seg2Geo = mergeParts([
-      part(new THREE.BoxGeometry(0.1, 0.026, 0.2), C.scarf, { z: 0.1 }),
-      part(new THREE.BoxGeometry(0.1, 0.03, 0.03), C.scarf2, { z: 0.19 }),
-    ]);
-    inked(segGeo, this.scarfTail);
     this.scarfTail2 = new THREE.Group();
     this.scarfTail2.position.z = 0.21;
-    inked(seg2Geo, this.scarfTail2);
     this.scarfTail.add(this.scarfTail2);
+    look.tail1 = lookGroup(this.scarfTail);
+    look.tail2 = lookGroup(this.scarfTail2);
 
     // ---- arms (shoulder → elbow), driven by two-bone IK
     this.arms = {};
@@ -223,90 +116,86 @@ export class Explorer {
       const shoulder = new THREE.Group();
       shoulder.position.set(s * 0.255, 0.46, 0);
       torso.add(shoulder);
-      inked(mergeParts([
-        part(new THREE.SphereGeometry(0.09, 10, 8), C.shirt, { y: -0.02 }),
-        part(new THREE.CylinderGeometry(0.088, 0.08, 0.12, 10), C.shirt, { y: -0.07 }),
-        part(new THREE.TorusGeometry(0.08, 0.012, 5, 10), C.vest, { y: -0.13, rx: Math.PI / 2 }),
-        part(new THREE.CylinderGeometry(0.052, 0.048, 0.14, 10), C.skin, { y: -0.19 }),
-      ]), shoulder);
       const elbow = new THREE.Group();
       elbow.position.y = -L1;
       shoulder.add(elbow);
-      inked(mergeParts([
-        part(new THREE.SphereGeometry(0.05, 8, 6), C.skin),
-        part(new THREE.CylinderGeometry(0.048, 0.043, 0.15, 10), C.skin, { y: -0.08 }),
-        part(new THREE.CylinderGeometry(0.052, 0.052, 0.045, 10), C.glove, { y: -0.16 }),
-        part(new THREE.SphereGeometry(0.062, 10, 8), C.glove, { y: -0.205, sx: 0.9, sz: 1.1 }),
-        part(new THREE.SphereGeometry(0.03, 6, 4), C.glove, { x: s * -0.045, y: -0.19, z: 0.04 }),
-      ]), elbow);
       this.arms[name] = { shoulder, elbow, side: s };
+      look[s > 0 ? 'shL' : 'shR'] = lookGroup(shoulder);
+      look[s > 0 ? 'elL' : 'elR'] = lookGroup(elbow);
     }
 
-    // ---- head: big chibi head, spiky hair and a pith helmet
+    // ---- head (big chibi head; hair and hat come from the outfit)
     const head = new THREE.Group();
     head.position.y = 0.58;
     torso.add(head);
     this.head = head;
-    const HC = 0.3; // head centre height within the head group
-    const hp = [
-      part(new THREE.SphereGeometry(0.32, 24, 18), C.skin, { y: HC, sy: 0.95, sz: 0.97 }),
-      part(new THREE.SphereGeometry(0.06, 8, 6), C.skinShade, { x: 0.31, y: HC - 0.02, sx: 0.6 }),
-      part(new THREE.SphereGeometry(0.06, 8, 6), C.skinShade, { x: -0.31, y: HC - 0.02, sx: 0.6 }),
-    ];
-    // hair cap, tilted so the fringe sits high on the forehead
-    const cap = part(new THREE.SphereGeometry(0.338, 20, 12, 0, Math.PI * 2, 0, 1.55), C.hair, { rx: -0.28 });
-    cap.translate(0, HC + 0.012, -0.012);
-    hp.push(cap);
-    // fringe
-    const fringe = [[-0.2, 0.08, -0.25], [-0.1, 0.03, -0.08], [0.0, 0.05, 0.05], [0.1, 0.03, 0.12], [0.2, 0.08, 0.28]];
-    for (const [x, lift, rz] of fringe) {
-      hp.push(part(new THREE.ConeGeometry(0.075, 0.24, 5), C.hair, { x, y: HC + 0.05 + lift, z: 0.29 - Math.abs(x) * 0.25, rx: Math.PI - 0.35, rz }));
-    }
-    // side locks
-    for (const s of [-1, 1]) {
-      hp.push(part(new THREE.ConeGeometry(0.07, 0.26, 5), C.hair, { x: s * 0.3, y: HC - 0.05, z: 0.06, rz: s * -0.25 + Math.PI, rx: -0.1 }));
-      hp.push(part(new THREE.ConeGeometry(0.06, 0.2, 5), C.hair2, { x: s * 0.32, y: HC + 0.02, z: -0.1, rz: s * -(Math.PI / 2 + 0.5) }));
-    }
-    // spiky back tufts
-    const tufts = [[-0.2, 0.12], [0, 0.18], [0.2, 0.1], [-0.12, -0.02], [0.12, -0.04], [0, 0.04]];
-    for (const [x, y] of tufts) {
-      hp.push(part(new THREE.ConeGeometry(0.085, 0.3, 5), (x + y) % 0.2 > 0.05 ? C.hair2 : C.hair,
-        { x, y: HC + y, z: -0.27, rx: -Math.PI / 2 - 0.35 + y, rz: x * 1.4 }));
-    }
-    // a cheeky ahoge poking out the back of the helmet
-    hp.push(part(new THREE.ConeGeometry(0.04, 0.22, 4), C.hair, { x: 0.05, y: HC + 0.34, z: -0.22, rx: -0.9, rz: -0.3 }));
-    // pith helmet (built upright, then tipped back so the face shows)
-    const hat = mergeParts([
-      part(new THREE.SphereGeometry(0.355, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), C.hat, { y: 0.16, sy: 0.82, sz: 1.08 }),
-      part(new THREE.CylinderGeometry(0.36, 0.362, 0.075, 20, 1, true), C.hatBand, { y: 0.195 }),
-      part(new THREE.CylinderGeometry(0.53, 0.56, 0.03, 26), C.hat, { y: 0.16, sz: 1.12 }),
-      part(new THREE.TorusGeometry(0.545, 0.015, 4, 26), '#c9ad6e', { y: 0.16, rx: Math.PI / 2, sy: 1.12 }),
-      part(new THREE.SphereGeometry(0.045, 8, 6), C.hatBand, { y: 0.46 }),
-      part(new THREE.CylinderGeometry(0.02, 0.02, 0.06, 6), C.hatBand, { y: 0.43 }),
-    ]);
-    hat.rotateX(-0.2);
-    hat.translate(0, HC, -0.02);
-    hp.push(hat);
-    inked(mergeParts(hp), head);
+    look.head = lookGroup(head);
 
     // face decal on a sphere cap just in front of the skin
     const faceGeo = new THREE.SphereGeometry(0.32, 24, 16, Math.PI / 2 - 0.75, 1.5, Math.PI / 2 - 0.55, 1.1);
     faceGeo.scale(1.014, 0.964, 0.984);
     faceGeo.translate(0, HC, 0);
-    const faceMat = new THREE.MeshToonMaterial({
-      map: faceTexture(), gradientMap: toonGradient(), transparent: true, depthWrite: false,
+    this.faceMat = new THREE.MeshToonMaterial({
+      gradientMap: toonGradient(), transparent: true, depthWrite: false,
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
     });
-    const face = new THREE.Mesh(faceGeo, faceMat);
+    const face = new THREE.Mesh(faceGeo, this.faceMat);
     face.renderOrder = 1;
     head.add(face);
 
     this.eye = new THREE.Object3D();
     this.eye.position.set(0, HC - 0.02, 0.3);
     head.add(this.eye);
+    this.looks = look;
+  }
+
+  /**
+   * Dress the explorer from an appearance profile (see cosmetics.js). Safe to
+   * call every frame-ish: rebuilds only the look meshes and keeps the pose.
+   */
+  setAppearance(profile) {
+    const p = normalizeProfile(profile);
+    this.profile = p;
+    const { parts, tail } = buildOutfit(p);
+    for (const k of BONES) {
+      const g = this.looks[k];
+      clearLook(g);
+      if (parts[k].length) {
+        const geo = mergeParts(parts[k]);
+        for (const pt of parts[k]) pt.dispose();
+        inked(geo, g);
+      }
+    }
+    this.scarfTail.visible = tail.visible;
+    this.scarfTail2.position.z = tail.seg2Z;
+    // face: shared, cached textures
+    const fp = faceParams(p);
+    const key = JSON.stringify(fp);
+    if (key !== this.faceKey) {
+      const { tex } = acquireFace(fp);
+      if (this.faceKey) releaseFace(this.faceKey);
+      this.faceKey = key;
+      this.faceMat.map = tex;
+      this.faceMat.needsUpdate = true;
+    }
+    return p;
   }
 
   setControl(kind) { this.control = kind; }
+
+  /** 'helm' | 'ground' | 'preview'. Leaving the helm relaxes the legs. */
+  setPose(pose) {
+    if (pose === this.pose) return;
+    this.pose = pose;
+    this.stride = 0; this.air = 0; this.squash = 0;
+    for (const L of Object.values(this.legs)) { L.hip.rotation.set(0, 0, 0); L.knee.rotation.set(0, 0, 0); }
+    this.torso.rotation.x = 0;
+    const base = this.root.userData.baseScale;
+    if (base) this.root.scale.setScalar(base);
+  }
+
+  /** Squash on landing; `k` is roughly the impact strength 0..1. */
+  land(k = 1) { this.squash = Math.max(this.squash, clamp(k, 0, 1)); }
   setSpyglass(tier) { this.spyglass.visible = tier >= 1; }
 
   getEyePosition(target) { return this.eye.getWorldPosition(target); }
@@ -345,13 +234,12 @@ export class Explorer {
    *        gripR, gripL (boat-space Vector3, gripL may be null) }
    */
   update(dt, t, ctx) {
-    const k = 1 - Math.exp(-12 * dt);
-    // breathing + bob
-    const breath = Math.sin(t * 2.3);
-    this.torso.position.y = 0.48 + breath * 0.006;
-    this.torso.scale.set(1 + breath * 0.008, 1 + breath * 0.012, 1 + breath * 0.008);
+    if (this.pose === 'helm') this.updateHelm(dt, t, ctx);
+    else this.updateGround(dt, t, ctx);
+  }
 
-    // where to look: player's look direction, else idle glances
+  /** Head and torso twist toward ctx.lookRel (relative to the root), or idle glances. */
+  updateLook(dt, ctx) {
     const baseYaw = this.root.rotation.y;
     let look = 0;
     if (ctx.lookRel != null) look = wrapAngle(ctx.lookRel - baseYaw);
@@ -363,6 +251,19 @@ export class Explorer {
       }
       look = this.glanceTarget;
     }
+    return look;
+  }
+
+  updateHelm(dt, t, ctx) {
+    const k = 1 - Math.exp(-12 * dt);
+    // breathing + bob
+    const breath = Math.sin(t * 2.3);
+    this.torso.position.y = 0.48 + breath * 0.006;
+    this.torso.scale.set(1 + breath * 0.008, 1 + breath * 0.012, 1 + breath * 0.008);
+
+    // where to look: player's look direction, else idle glances
+    const baseYaw = this.root.rotation.y;
+    const look = this.updateLook(dt, ctx);
     const twistT = clamp(look * 0.35, -0.5, 0.5);
     const headT = clamp(look - twistT, -1.4, 1.4);
     this.twist = damp(this.twist, twistT, 5, dt);
@@ -397,6 +298,87 @@ export class Explorer {
       // relaxed: hand resting on the satchel, swaying a little
       T.set(0.3, 0.12 + Math.sin(t * 1.7) * 0.01, 0.1 + Math.sin(t * 1.3) * 0.02);
       this.solveArm(this.arms.left, T, pole.set(1, 0.2, -0.8), k);
+    }
+  }
+
+  /**
+   * On foot (and the creator's idle preview). ctx (all optional):
+   * { footSpeed: horizontal m/s, grounded: bool, vy: vertical m/s,
+   *   lookRel, lookPitch, windRel, windStrength, turn: yaw rate for leaning }
+   */
+  updateGround(dt, t, ctx = {}) {
+    const k = 1 - Math.exp(-12 * dt);
+    const speed = ctx.footSpeed ?? this.moveSpeed;
+    const grounded = ctx.grounded ?? true;
+    const vy = ctx.vy ?? 0;
+    // stride: 0 idle, ~0.5 walking (≈2.5 m/s), 1 running (≈6 m/s)
+    this.stride = damp(this.stride, clamp(speed / 6, 0, 1), 8, dt);
+    this.air = damp(this.air, grounded ? 0 : 1, grounded ? 18 : 10, dt);
+    this.squash = Math.max(0, this.squash - dt * 4);
+    const st = this.stride, air = this.air;
+
+    // cadence: steps per second rise with speed, but sub-linearly
+    if (grounded) this.gait += dt * (4 + 7 * st) * Math.min(1, speed * 1.5);
+    const g = this.gait;
+    const swing = Math.sin(g) * (0.25 + 0.55 * st) * Math.min(1, speed * 1.2) * (1 - air);
+
+    // ---- legs: thigh swings, knee bends on the back-swing; tucked in the air
+    for (const L of Object.values(this.legs)) {
+      const ph = L.side > 0 ? g : g + Math.PI;
+      const sw = L.side > 0 ? swing : -swing;
+      const lift = Math.max(0, -Math.cos(ph)) * (0.4 + 0.9 * st) * Math.min(1, speed * 1.2);
+      // airborne: knees up while rising, legs reach down while falling
+      const tuck = vy > 0 ? 0.55 : 0.2;
+      const hipX = -sw * (1 - air) + air * -tuck * (L.side > 0 ? 1.1 : 0.7);
+      const kneeX = lift * (1 - air) + air * (vy > 0 ? 1.0 : 0.45) * (L.side > 0 ? 1.1 : 0.8);
+      L.hip.rotation.x = damp(L.hip.rotation.x, hipX, 20, dt);
+      L.knee.rotation.x = damp(L.knee.rotation.x, kneeX, 20, dt);
+      L.hip.rotation.z = damp(L.hip.rotation.z, air * L.side * 0.08, 10, dt);
+    }
+
+    // ---- torso: bob twice per cycle, lean forward with speed, breathe when still
+    const breath = Math.sin(t * 2.3) * (1 - st);
+    const bob = Math.abs(Math.cos(g)) * 0.03 * st * (1 - air);
+    this.torso.position.y = 0.48 + breath * 0.006 + bob - this.squash * 0.06;
+    this.torso.scale.set(1 + breath * 0.008, 1 + breath * 0.012, 1 + breath * 0.008);
+    this.torso.rotation.x = damp(this.torso.rotation.x, st * 0.22 + air * (vy > 0 ? -0.1 : 0.12), 6, dt);
+    const look = this.updateLook(dt, ctx);
+    const twistT = clamp(look * 0.35, -0.5, 0.5) + swing * 0.18;
+    const headT = clamp(look - twistT * 0.7, -1.4, 1.4);
+    this.twist = damp(this.twist, twistT, 8, dt);
+    this.headYaw = damp(this.headYaw, headT, 7, dt);
+    this.headPitch = damp(this.headPitch, clamp((ctx.lookPitch || 0) - st * 0.15, -0.5, 0.6), 6, dt);
+    this.torso.rotation.y = this.twist;
+    this.head.rotation.set(-this.headPitch + Math.sin(t * 1.1) * 0.02 * (1 - st), this.headYaw, Math.sin(t * 0.7) * 0.03 * (1 - st), 'YXZ');
+
+    // lean into turns; landing squash on the whole body
+    this.lean = damp(this.lean, clamp(-(ctx.turn || 0) * 0.06 * st, -0.25, 0.25), 6, dt);
+    this.root.rotation.z = this.lean;
+    this.root.rotation.x = 0;
+    const base = this.root.userData.baseScale ?? (this.root.userData.baseScale = this.root.scale.x);
+    const sq = this.squash * 0.18;
+    this.root.scale.set(base * (1 + sq * 0.5), base * (1 - sq), base * (1 + sq * 0.5));
+
+    // scarf trails behind when moving, streams with the wind when still
+    const str = clamp((ctx.windStrength ?? 0.3) + st * 1.2 + air * 0.6, 0, 2);
+    const wrel = ctx.windRel != null ? wrapAngle(ctx.windRel - this.twist - this.root.rotation.y) : 0;
+    const trail = st > 0.15 || air > 0.2 ? 0 : wrel;
+    this.scarfTail.rotation.set(clamp(1.25 - str * 0.6, 0.15, 1.3) + Math.sin(t * 9) * 0.08 * str, trail + Math.sin(t * 7.3) * 0.15 * str, 0, 'YXZ');
+    this.scarfTail2.rotation.set(Math.sin(t * 11 + 1) * 0.35 * str - 0.1, Math.sin(t * 8.7) * 0.3 * str, 0);
+
+    // ---- arms swing opposite the legs; fling up in the air
+    const T = this._handT || (this._handT = new THREE.Vector3());
+    const pole = this._pole || (this._pole = new THREE.Vector3());
+    for (const [name, A] of Object.entries(this.arms)) {
+      const s = A.side;
+      const armSw = (name === 'left' ? -swing : swing) * 0.55;
+      const up = air * (vy > 0 ? 0.32 : 0.18);
+      T.set(
+        s * (0.31 + air * 0.12 + st * 0.02),
+        0.04 + up + Math.abs(armSw) * 0.12 + st * 0.06 + Math.sin(t * 1.7 + s) * 0.008 * (1 - st),
+        armSw * 0.45 + st * 0.05,
+      );
+      this.solveArm(A, T, pole.set(s * 0.4, 0, -1), k);
     }
   }
 }
