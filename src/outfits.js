@@ -41,6 +41,19 @@ export function mergeParts(parts) {
   return g;
 }
 
+/** Turn a part inside out (reverse winding, flip normals), e.g. for a lining. */
+function inward(g) {
+  const pos = g.attributes.position.array, nor = g.attributes.normal.array;
+  for (let i = 0; i < pos.length; i += 9) {
+    for (let k = 0; k < 3; k++) {
+      const t = pos[i + 3 + k]; pos[i + 3 + k] = pos[i + 6 + k]; pos[i + 6 + k] = t;
+      const u = nor[i + 3 + k]; nor[i + 3 + k] = nor[i + 6 + k]; nor[i + 6 + k] = u;
+    }
+  }
+  for (let i = 0; i < nor.length; i++) nor[i] = -nor[i];
+  return g;
+}
+
 /** Merge already-coloured parts and move the result as one piece. */
 function group(parts, t) {
   const g = mergeGeometries(parts);
@@ -78,7 +91,9 @@ function resolve(p) {
 
 // How far the outer layer sits from the torso centre at chest height, so
 // straps and packs ride on top of whatever is worn.
-const CHEST_R = { vest: 0.232, sailor: 0.222, tank: 0.222, coat: 0.262, poncho: 0.31 };
+const CHEST_R = { vest: 0.232, sailor: 0.222, tank: 0.222, coat: 0.262, poncho: 0.292 };
+// Half the angle each poncho panel (front, back) wraps; the rest is open at the sides
+const PONCHO_HALF = 0.82;
 
 /**
  * profile must already be normalized (see cosmetics.normalizeProfile).
@@ -239,18 +254,28 @@ function buildTorso(B, p, c) {
   } else if (top === 'poncho') {
     shirtBody(T, sc.base);
     T.push(
-      // drapes from the shoulders to just over the belt
-      part(cyl(0.2, 0.35, 0.42, 18, true), tc.base, { y: 0.31 }),
       part(sph(0.205, 18, 6, 0, TAU, 0, PI / 2), tc.base, { y: 0.52, sy: 0.5 }),
-      part(tor(0.316, 0.016, 4, 24), tc.dark, { y: 0.19, rx: PI / 2 }),
-      part(tor(0.298, 0.014, 4, 24), sc.base, { y: 0.24, rx: PI / 2 }),
-      part(tor(0.35, 0.02, 4, 24), tc.dark, { y: 0.105, rx: PI / 2 }),
       part(tor(0.085, 0.02, 5, 14), tc.dark, { y: 0.575, rx: PI / 2 }),
     );
-    // tassels round the hem
-    for (let i = 0; i < 14; i++) {
-      const a = (i / 14) * TAU;
-      T.push(part(box(0.018, 0.05, 0.018), tc.dark, { x: Math.sin(a) * 0.35, y: 0.075, z: Math.cos(a) * 0.35 }));
+    // A front and a back panel drape from the shoulders to just over the
+    // belt. The sides stay open so the arms hang and swing in the gaps
+    // instead of through the cloth.
+    const panel = (r0, r1, h, y, col, a) => part(cyl(r0, r1, h, 9, true, a - PONCHO_HALF, PONCHO_HALF * 2), col, { y });
+    for (const a of [0, PI]) {
+      T.push(
+        panel(0.2, 0.35, 0.42, 0.31, tc.base, a),
+        // ...with a lining, or the ink outline would show through the open
+        // sides as a solid black inside
+        inward(part(cyl(0.197, 0.347, 0.42, 9, true, a - PONCHO_HALF, PONCHO_HALF * 2), tc.dark, { y: 0.31 })),
+        panel(0.318, 0.322, 0.03, 0.19, tc.dark, a),
+        panel(0.3, 0.304, 0.026, 0.24, sc.base, a),
+        panel(0.352, 0.356, 0.04, 0.105, tc.dark, a),
+      );
+      // tassels along the hem
+      for (let i = 0; i < 6; i++) {
+        const t = a + (i / 5 - 0.5) * PONCHO_HALF * 1.85;
+        T.push(part(box(0.018, 0.05, 0.018), tc.dark, { x: Math.sin(t) * 0.35, y: 0.075, z: Math.cos(t) * 0.35 }));
+      }
     }
   } else if (top === 'coat') {
     shirtBody(T, sc.base);
@@ -371,11 +396,13 @@ function buildExtra(B, p, c) {
   const T = B.torso, st = p.extra.style, ec = c.extra;
   const R = CHEST_R[p.top.style] ?? 0.232;
   if (st === 'satchel') {
-    const bagX = { coat: 0.31, poncho: 0.37 }[p.top.style] ?? 0.28;
+    const bagX = { coat: 0.31 }[p.top.style] ?? 0.28;
+    // the poncho's panels slope out toward the hem, so the strap leans with them
+    const lean = p.top.style === 'poncho' ? 0.34 : 0;
     T.push(
       // strap across the chest (right shoulder → left hip)
-      part(box(0.045, 0.62, 0.02), ec.dark, { y: 0.3, z: R, rz: 0.72 }),
-      part(box(0.045, 0.62, 0.02), ec.dark, { y: 0.3, z: -R, rz: -0.72 }),
+      part(box(0.045, 0.62, 0.02), ec.dark, { y: 0.3, z: R, rz: 0.72, rx: -lean }),
+      part(box(0.045, 0.62, 0.02), ec.dark, { y: 0.3, z: -R, rz: -0.72, rx: lean }),
       // bag on the left hip
       part(box(0.08, 0.16, 0.2), ec.base, { x: bagX, y: 0.06, z: 0.02 }),
       part(box(0.09, 0.07, 0.21), ec.dark, { x: bagX + 0.005, y: 0.12, z: 0.02 }),
@@ -390,9 +417,10 @@ function buildExtra(B, p, c) {
       part(box(0.03, 0.035, 0.02), BUCKLE, { y: 0.37, z: z - 0.08 }),
       part(cyl(0.055, 0.055, 0.34, 10), '#e8dcc0', { y: 0.5, z, rz: PI / 2 }), // bedroll
     );
+    const poncho = p.top.style === 'poncho';
     for (const s of [-1, 1]) {
       T.push(
-        part(box(0.04, 0.3, 0.02), ec.dark, { x: s * 0.11, y: 0.33, z: R - 0.002 }),
+        part(box(0.04, 0.3, 0.02), ec.dark, { x: s * 0.11, y: 0.33, z: poncho ? 0.252 : R - 0.002, rx: poncho ? -0.34 : 0 }),
         part(box(0.04, 0.02, 0.42), ec.dark, { x: s * 0.11, y: 0.6, z: -0.01 }),
       );
     }
@@ -495,8 +523,8 @@ function buildHead(B, p, c) {
     part(sph(0.06, 8, 6), c.skinShade, { x: -0.31, y: HC - 0.02, sx: 0.6 }),
   );
   const hat = p.hat.style;
-  const fit = hat === 'none' || hat === 'circlet' || hat === 'flowerCrown' ? 'none' : hat === 'furHood' ? 'hood' : 'hat';
-  HAIR[p.hair.style](H, c, fit);
+  const fit = hat === 'none' || BANDS[hat] ? 'none' : hat === 'furHood' ? 'hood' : 'hat';
+  HAIR[p.hair.style](H, c, fit, BANDS[hat]);
   if (hat !== 'none') H.push(HATS[hat](c));
   // shape everything on the head (the field leaves the crown, and so hats, alone)
   for (let i = first; i < H.length; i++) shapeHeadGeometry(H[i], p.head);
@@ -515,10 +543,11 @@ function spikyFringe(H, c) {
     H.push(part(cone(0.075, 0.24, 5), c.hair, { x, y: HC + 0.05 + lift, z: 0.29 - Math.abs(x) * 0.25, rx: PI - 0.35, rz }));
   }
 }
-function sideLocks(H, c) {
+/** Locks framing the face, plus (unless the hair is pulled back) tufts swept out over the ears. */
+function sideLocks(H, c, swept = true) {
   for (const s of [-1, 1]) {
     H.push(part(cone(0.07, 0.26, 5), c.hair, { x: s * 0.3, y: HC - 0.05, z: 0.06, rz: s * -0.25 + PI, rx: -0.1 }));
-    H.push(part(cone(0.06, 0.2, 5), c.hair2, { x: s * 0.32, y: HC + 0.02, z: -0.1, rz: s * -(PI / 2 + 0.5) }));
+    if (swept) H.push(part(cone(0.06, 0.2, 5), c.hair2, { x: s * 0.32, y: HC + 0.02, z: -0.1, rz: s * -(PI / 2 + 0.5) }));
   }
 }
 
@@ -558,14 +587,23 @@ const HAIR = {
   ponytail(H, c, fit) {
     hairCap(H, c);
     spikyFringe(H, c);
-    sideLocks(H, c);
+    sideLocks(H, c, false);
     if (fit === 'hood') return;
-    const tieY = fit === 'hat' ? HC + 0.02 : HC + 0.12;
+    // Tied at the back of the head and hanging straight down behind it: a
+    // full lock just below the tie that tapers to a slightly flicked tip.
+    // (Under a hat the tie drops below the brim and the tail is shorter.)
+    const hat = fit === 'hat';
+    const tieY = hat ? HC : HC + 0.1, tieZ = -Math.sqrt(0.34 ** 2 - (tieY - HC) ** 2) - 0.02;
+    const len = hat ? 0.85 : 1;
+    const top = tieY - 0.15 * len, tip = tieY - 0.31 * len;
     H.push(
-      part(sph(0.075, 10, 8), c.hair, { y: tieY, z: -0.33 }),
-      part(tor(0.05, 0.02, 5, 10), c.hair2, { y: tieY - 0.01, z: -0.37, rx: 0.5 }),
-      part(cone(0.09, 0.44, 7), c.hair, { y: tieY - 0.2, z: -0.4, rx: PI + 0.3 }),
-      part(cone(0.05, 0.2, 5), c.hair2, { y: tieY - 0.26, z: -0.45, rx: PI + 0.45 }),
+      part(sph(0.072, 10, 8), c.hair, { y: tieY + 0.01, z: tieZ + 0.02 }),
+      part(tor(0.046, 0.018, 5, 10), c.hair2, { y: tieY - 0.02, z: tieZ - 0.03, rx: PI / 2 - 0.35 }),
+      // the lock: fuller at the top, close to the head and neck
+      part(sph(0.085, 10, 8), c.hair, { y: top, z: tieZ - 0.06, sx: 0.95, sy: 1.7, sz: 0.85, rx: 0.12 }),
+      part(cone(0.07, 0.16 * len, 7), c.hair, { y: tip, z: tieZ - 0.075, rx: PI - 0.12 }),
+      // a darker underside strand and the flicked tip
+      part(cone(0.04, 0.12 * len, 5), c.hair2, { x: 0.02, y: tip - 0.02, z: tieZ - 0.055, rx: PI + 0.08, rz: -0.15 }),
     );
   },
   buns(H, c, fit) {
@@ -587,8 +625,11 @@ const HAIR = {
     H.push(cap);
     for (const s of [-1, 1]) H.push(part(box(0.025, 0.08, 0.06), c.hair, { x: s * 0.305, y: HC - 0.02, z: 0.09 }));
   },
-  curly(H, c, fit) {
+  curly(H, c, fit, band) {
     hairCap(H, c);
+    // Under a circlet or flower crown the curls part round the band, so it
+    // sits on the hair (in a groove) rather than buried in it.
+    const clear = (x, y, z, r) => !band || Math.abs(bandHeight(band, x, y, z)) > r + band.clear;
     // curls on a Fibonacci sphere, skipping the face (and the crown under a hat)
     const N = 40;
     for (let i = 0; i < N; i++) {
@@ -598,10 +639,26 @@ const HAIR = {
       if (z > 0.35 && y < 0.55) continue;                      // face
       if (fit === 'hat' && y > 0.42) continue;                 // under the hat
       if (fit === 'hood' && !(z > 0.3 && y > 0.3)) continue;   // only a few at the hood's edge
-      H.push(part(sph(0.085, 7, 5), i % 3 ? c.hair : c.hair2, { x: x * 0.33, y: HC + y * 0.32, z: z * 0.33 }));
+      const P = [x * 0.33, HC + y * 0.32, z * 0.33];
+      if (!clear(...P, 0.085)) {
+        // a smaller curl tucked in under the band keeps the hairline full
+        if (Math.abs(bandHeight(band, ...P)) > 0.05) H.push(part(sph(0.05, 7, 5), c.hair2, { x: P[0] * 0.97, y: P[1], z: P[2] * 0.97 }));
+        continue;
+      }
+      H.push(part(sph(0.085, 7, 5), i % 3 ? c.hair : c.hair2, { x: P[0], y: P[1], z: P[2] }));
     }
     // fringe curls
-    for (const x of [-0.17, -0.06, 0.06, 0.17]) H.push(part(sph(0.07, 7, 5), c.hair, { x, y: HC + 0.18 + Math.abs(x) * 0.1, z: 0.27 - Math.abs(x) * 0.2 }));
+    for (const x of [-0.17, -0.06, 0.06, 0.17]) {
+      let y = HC + 0.18 + Math.abs(x) * 0.1, r = 0.07;
+      const z = 0.27 - Math.abs(x) * 0.2;
+      if (!clear(x, y, z, r)) {
+        // slip the curl (a little smaller) to whichever side of the band it's on
+        r = 0.06;
+        const h = bandHeight(band, x, y, z);
+        y += (Math.sign(h) * (r + band.clear) - h) / Math.cos(band.rx);
+      }
+      H.push(part(sph(r, 7, 5), c.hair, { x, y, z }));
+    }
   },
 };
 
@@ -609,6 +666,19 @@ const HAIR = {
 // Each returns one merged geometry in head space. Brimmed hats are built
 // upright and tipped back so the face shows, like the original pith helmet.
 const tipBack = (parts, tilt = -0.2) => group(parts, { y: HC, z: -0.02, rx: tilt });
+
+// Band-shaped headwear sits around the head rather than on top of it, so
+// hair isn't flattened under it. Shared with curly hair, which parts round the
+// band. y, z, rx place the band's plane; clear is its half-thickness (flowers
+// stand proud of the vine).
+const BANDS = {
+  circlet: { y: HC + 0.14, z: -0.02, rx: 0.15, clear: 0.025 },
+  flowerCrown: { y: HC + 0.19, z: -0.03, rx: -0.3, clear: 0.045 },
+};
+/** Signed height of a head-space point above a band's plane. */
+function bandHeight(b, x, y, z) {
+  return Math.cos(b.rx) * (y - b.y) + Math.sin(b.rx) * (z - b.z);
+}
 
 function pith(base, band, trim, extra = []) {
   return tipBack([
@@ -629,11 +699,55 @@ const HATS = {
     return pith(h.base, h.dark, h.id === 'sand' ? '#c9ad6e' : mix(h.base, h.dark, 0.25));
   },
   grandPith() {
-    // weathered, with a red band and a stitched patch
-    return pith('#c4ad78', '#b03a2e', '#9c8556', [
-      part(box(0.1, 0.07, 0.02), '#8f7a4c', { x: 0.2, y: 0.33, z: 0.18, ry: 0.8, rx: -0.4 }),
-      part(sph(0.03, 6, 4), '#7a2a1e', { x: 0.28, y: 0.22, z: 0.25 }),
-    ]);
+    // An old field helmet: weathered khaki, a wrapped red puggaree whose tails
+    // hang over the back of the brim, brass goggles strapped on the front, a
+    // stitched patch and a dent. Same pith shape underneath, but it reads as
+    // his from any angle.
+    const base = '#b59c66', shade = '#8f7a4c', red = '#b03a2e', redDk = '#86281f';
+    const BRASS = '#c9973a', GLASS = '#9fe0ec', STRAP = '#4a3020';
+    const dome = (dy) => 0.355 * Math.sqrt(1 - (dy / (0.355 * 0.82)) ** 2); // dome radius dy above its centre
+    const parts = [
+      part(sph(0.355, 20, 10, 0, TAU, 0, PI / 2), base, { y: 0.16, sy: 0.82, sz: 1.08 }),
+      // the puggaree: two wraps of cloth, each a little proud of the last
+      part(cyl(0.368, 0.372, 0.05, 20, true), red, { y: 0.185, sz: 1.08 }),
+      part(cyl(0.352, 0.364, 0.045, 20, true), red, { y: 0.232, sz: 1.08 }),
+      part(tor(0.366, 0.008, 3, 24), redDk, { y: 0.21, rx: PI / 2, sy: 1.08 }),
+      // brim, with a darker, frayed-looking edge
+      part(cyl(0.53, 0.56, 0.03, 26), base, { y: 0.16, sz: 1.12 }),
+      part(tor(0.545, 0.017, 4, 26), shade, { y: 0.16, rx: PI / 2, sy: 1.12 }),
+      // aged-brass vent on top
+      part(sph(0.048, 8, 6), BRASS, { y: 0.455 }),
+      part(cyl(0.024, 0.024, 0.06, 6), BRASS, { y: 0.43 }),
+      // stitched patch on one side, a dent on the other
+      part(box(0.11, 0.075, 0.02), shade, { x: 0.2, y: 0.33, z: -0.14, ry: -0.9, rx: 0.4 }),
+      part(sph(0.06, 8, 6), shade, { x: -0.24, y: 0.34, z: -0.1, sx: 0.35, sz: 1.2, ry: 0.4, rz: 0.75 }),
+    ];
+    for (const s of [-1, 1]) parts.push(part(box(0.014, 0.012, 0.035), STRAP, { x: 0.2 + s * 0.03, y: 0.33 + s * 0.008, z: -0.14 + s * 0.035, ry: -0.9, rx: 0.4 }));
+    // puggaree tails: lie along the back of the brim, then drop over its edge
+    for (const s of [-1, 1]) {
+      parts.push(
+        part(box(0.07, 0.014, 0.24), red, { x: s * 0.05, y: 0.185, z: -0.5, ry: s * 0.18 }),
+        part(box(0.065, 0.13, 0.014), red, { x: s * 0.075, y: 0.12, z: -0.625, rz: s * 0.12, rx: -0.15 }),
+        part(box(0.067, 0.02, 0.018), redDk, { x: s * 0.08, y: 0.06, z: -0.635, rz: s * 0.12, rx: -0.15 }),
+      );
+    }
+    // goggles resting on the front of the crown, on a strap round it
+    const gy = 0.28, gr = dome(gy - 0.16);
+    // the dome's surface faces up-and-forward here; the lenses face the same way
+    const tilt = 0.55, ny = Math.sin(tilt), nz = Math.cos(tilt);
+    parts.push(part(tor(gr + 0.006, 0.014, 4, 24), STRAP, { y: gy, rx: PI / 2, sy: 1.08 }));
+    for (const s of [-1, 1]) {
+      const x = s * 0.085, z = 1.08 * gr * Math.sqrt(1 - (x / gr) ** 2);
+      const at = (d) => ({ x, y: gy + ny * d, z: z + nz * d });
+      parts.push(
+        part(cyl(0.06, 0.066, 0.04, 14), BRASS, { ...at(0.02), rx: PI / 2 - tilt }),
+        part(cyl(0.046, 0.046, 0.012, 14), GLASS, { ...at(0.041), rx: PI / 2 - tilt }),
+        part(tor(0.052, 0.011, 4, 14), '#e0b860', { ...at(0.042), rx: -tilt }),
+        part(sph(0.014, 5, 4), '#ffffff', { ...at(0.05), x: x - 0.018, y: gy + ny * 0.05 + 0.012 }),
+      );
+    }
+    parts.push(part(box(0.06, 0.02, 0.02), BRASS, { y: gy + ny * 0.03 + 0.005, z: 1.08 * gr + 0.012, rx: -0.55 }));
+    return tipBack(parts);
   },
   bandana(c) {
     const h = c.hat;
@@ -700,6 +814,7 @@ const HATS = {
     ], { y: HC + 0.02 });
   },
   flowerCrown() {
+    const B = BANDS.flowerCrown;
     const parts = [part(tor(0.3, 0.025, 6, 26), '#5aa04a', { rx: PI / 2 })];
     const cols = ['#ff8fb0', '#fff8e7', '#ff7a5e', '#b79ce6', '#ff8fb0', '#ffd24a', '#fff8e7'];
     for (let i = 0; i < 7; i++) {
@@ -711,14 +826,15 @@ const HATS = {
         part(cone(0.025, 0.08, 3), '#4a8a3a', { x: Math.sin(a + 0.27) * 0.31, z: Math.cos(a + 0.27) * 0.31, ry: a, rz: PI / 2, order: 'YXZ' }),
       );
     }
-    return group(parts, { y: HC + 0.19, z: -0.03, rx: -0.3 });
+    return group(parts, { y: B.y, z: B.z, rx: B.rx });
   },
   circlet() {
+    const B = BANDS.circlet;
     return group([
       part(tor(0.345, 0.016, 6, 32), GOLD, { rx: PI / 2 }),
       part(sph(0.03, 8, 6), GOLD, { z: 0.35 }),
       part(new THREE.OctahedronGeometry(0.04), '#3ff0d8', { z: 0.37, sy: 1.4 }),
-    ], { y: HC + 0.14, z: -0.02, rx: 0.15 });
+    ], { y: B.y, z: B.z, rx: B.rx });
   },
 };
 
