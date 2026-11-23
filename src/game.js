@@ -499,6 +499,7 @@ export class Game {
     }
     const acts = this.input.consumeActions();
     if (acts.pause && this.ui.isStoryOpen) { this.ui.storyStep(Infinity); acts.pause = 0; }
+    if (acts.pause && this.ui.isFoundOpen) { this.ui.closeFound('later'); acts.pause = 0; }
     if (acts.pause && this.mode !== 'title') {
       if (this.ui.isJournalOpen) this.ui.closeJournal();
       else if (this.ui.isMapOpen) this.ui.closeMap();
@@ -506,7 +507,7 @@ export class Game {
     }
     if (acts.map && !this.paused) this.toggleMap();
     if (acts.journal && !this.paused && !this.ui.isMapOpen && this.mode !== 'title') this.ui.toggleJournal();
-    const frozen = this.paused || this.ui.isMapOpen || this.ui.isJournalOpen || this.ui.isStoryOpen;
+    const frozen = this.paused || this.ui.isMapOpen || this.ui.isJournalOpen || this.ui.isStoryOpen || this.ui.isFoundOpen;
     if (frozen) { this.input.consumeLook(); return; }
 
     this.elapsed += dt;
