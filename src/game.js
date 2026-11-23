@@ -10,6 +10,9 @@ import { pointOfSailName } from './boat.js';
 import { loadSave, writeSave, clearSave, encodeBytes, decodeBytes, loadSettings, saveSettings, migrate } from './save.js';
 import { Emitter } from './events.js';
 import { STYLES, normalizeProfile } from './cosmetics.js';
+import { LINES } from './story-text.js';
+
+const SPYGLASS_HINT = LINES.spyglassHint;
 
 const TUTORIAL = isTouch ? [
   'Raise your sail with the ▲ button.',
@@ -142,6 +145,7 @@ export class Game {
     this.revealAround(home.x, home.z, 700);
     this.savePortState();
     this.beginSailing();
+    this.story?.showPrologue();
   }
 
   continueGame() {
@@ -179,6 +183,8 @@ export class Game {
       this.placeAtDock(this.world.islands[s.savePort] || this.world.home);
     }
     this.beginSailing();
+    // voyages from before the story get the prologue once
+    if ((s.story?.chapter || 0) === 0) this.story?.showPrologue();
   }
 
   beginSailing() {
@@ -238,6 +244,7 @@ export class Game {
     const s = this.state, U = UPGRADES.find((u) => u.key === key);
     const lvl = s.upgrades[key];
     if (!U || lvl >= U.tiers.length - 1) return false;
+    if (key === 'spyglass' && lvl === 0) return false; // the first spyglass is grandfather's, found in his wreck
     const cost = U.tiers[lvl + 1].cost;
     if (s.banked < cost) return false;
     const oldMax = this.boat.maxHealth;
@@ -491,6 +498,7 @@ export class Game {
       return;
     }
     const acts = this.input.consumeActions();
+    if (acts.pause && this.ui.isStoryOpen) { this.ui.storyStep(Infinity); acts.pause = 0; }
     if (acts.pause && this.mode !== 'title') {
       if (this.ui.isJournalOpen) this.ui.closeJournal();
       else if (this.ui.isMapOpen) this.ui.closeMap();
@@ -498,7 +506,7 @@ export class Game {
     }
     if (acts.map && !this.paused) this.toggleMap();
     if (acts.journal && !this.paused && !this.ui.isMapOpen && this.mode !== 'title') this.ui.toggleJournal();
-    const frozen = this.paused || this.ui.isMapOpen || this.ui.isJournalOpen;
+    const frozen = this.paused || this.ui.isMapOpen || this.ui.isJournalOpen || this.ui.isStoryOpen;
     if (frozen) { this.input.consumeLook(); return; }
 
     this.elapsed += dt;
@@ -560,7 +568,7 @@ export class Game {
     this.pointOfSail = pointOfSailName(boat.relWind);
     if (this.mode !== 'title') this.updateFlotsam(dt);
     this.updateEffects(dt);
-    if (this.mode !== 'title') this.quests?.update(dt, this.elapsed);
+    if (this.mode !== 'title') { this.quests?.update(dt, this.elapsed); this.story?.update(); }
 
     this.updateCamera(dt);
     this.env.update(dt, s.dayT, w.p, this.camera, w.wind, this.elapsed);
@@ -624,7 +632,9 @@ export class Game {
 
     // contextual action
     let prompt = null, action = null;
-    if (this.dockCooldown <= 0) {
+    const sx = this.story?.interaction(b.x, b.z, boat.speed);
+    if (sx) { prompt = sx.prompt; action = sx.action || null; }
+    if (!prompt && this.dockCooldown <= 0) {
       for (const I of this.world.ports) {
         const D = I.dock;
         if (Math.hypot(D.x - b.x, D.z - b.z) < 34) {
@@ -700,7 +710,7 @@ export class Game {
     const tier = this.state.upgrades.spyglass;
     if (this.input.spyHeld && tier === 0 && !this._spyHint) {
       this._spyHint = true;
-      this.ui.toast('Buy a spyglass at a port to zoom', 'info');
+      this.ui.toast(SPYGLASS_HINT, 'info');
     }
     const spy = this.input.spyHeld && tier > 0 && (this.mode === 'sailing' || this.mode === 'docked');
     if (spy !== this.spyOn) {

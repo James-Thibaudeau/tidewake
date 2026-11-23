@@ -157,7 +157,12 @@ export class World {
       i++;
     }
 
-    this.all = [...this.islands, ...this.reefs];
+    // Grandfather's wreck near Port Haven. Placed with its own RNG *after*
+    // everything else so the islands, reefs and treasure of existing saves
+    // stay exactly where they were.
+    this.wreck = this.placeWreck();
+
+    this.all = [...this.islands, ...this.reefs, ...(this.wreck ? [this.wreck] : [])];
     for (const F of this.all) {
       const b = F.bound + 40;
       const c0x = Math.floor((F.x - b) / this.cell), c1x = Math.floor((F.x + b) / this.cell);
@@ -170,6 +175,43 @@ export class World {
     }
     this.home = this.islands[0];
     this.ports = this.islands.filter((I) => I.port);
+  }
+
+  /** A rocky outcrop with grandfather's ship run aground beside it. */
+  placeWreck() {
+    const rng = mulberry32(this.seed * 31 + 0x57ec);
+    const H = this.islands[0];
+    const depth = (x, z) => Math.max(-40, ...this.islands.map((I) => islandHeight(I, x, z)));
+    for (let t = 0; t < 400; t++) {
+      // "just past the point": beside the harbour mouth, visible on the way out
+      const side = rng() < 0.5 ? -1 : 1;
+      const a = H.dockAngle + side * (0.75 + rng() * 0.7);
+      const d = H.r + 260 + rng() * 160;
+      const x = H.x + Math.cos(a) * d, z = H.z + Math.sin(a) * d;
+      // the bow points at the rocks, roughly away from the harbour
+      const hd = Math.atan2(Math.cos(a), Math.sin(a)) + (rng() - 0.5) * 0.8;
+      const fx = Math.sin(hd), fz = Math.cos(hd);
+      const P = (k, s = 0) => ({ x: x + fx * k + fz * s, z: z + fz * k - fx * s });
+      const pts = [P(0), P(14), P(-12), P(-25), P(19, 8), P(19, -8)];
+      if (pts.some((p) => depth(p.x, p.z) > -6)) continue;
+      if (this.islands.some((I) => I !== H && Math.hypot(I.x - x, I.z - z) < I.bound + 120)) continue;
+      if (this.reefs.some((R) => Math.hypot(R.x - x, R.z - z) < 200)) continue;
+      const rocks = [];
+      const big = P(16, 2);
+      rocks.push({ x: big.x, z: big.z, r: 7, h: 19, type: 'stack' });
+      for (const [k, s, r, h] of [[21, 9, 3.8, 10], [19, -8, 3.4, 7], [26, 1, 3, 6], [10, 11, 2.6, 4], [28, -7, 2.4, 3.5]]) {
+        const p = P(k, s);
+        rocks.push({ x: p.x, z: p.z, r: r + rng() * 0.6, h: h + rng() * 2, type: 'stack' });
+      }
+      // the hull itself blocks the boat too
+      for (const k of [-7, 0.5, 8]) { const p = P(k); rocks.push({ x: p.x, z: p.z, r: 4.4, h: 0, type: 'hidden' }); }
+      const sp = P(-24);
+      const W = { id: 'wreck', isReef: true, wreck: true, name: "Grandfather's Wreck", x, z, heading: hd,
+        bound: 55, rocks, searchPoint: { x: sp.x, z: sp.z } };
+      W.bound2 = W.bound * W.bound;
+      return W;
+    }
+    return null;
   }
 
   finishIsland(I, rng) {
@@ -526,6 +568,14 @@ export class IslandStreamer {
       beacon.userData.glint = glint;
       group.add(beacon);
       rec.beacon = beacon;
+    }
+    if (F.wreck) {
+      // ran aground: bow raised on the rocks, rolled onto her side, half under
+      const ship = propMesh('wreckShip');
+      ship.rotation.set(-0.12, F.heading, 0.4, 'YXZ');
+      ship.position.set(0, -2.0, 0);
+      ship.scale.setScalar(1.5); // a proper explorer's ship, bigger than your first boat
+      group.add(ship);
     }
     this.buildRocks(F, group);
     this.scene.add(group);
