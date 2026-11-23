@@ -12,6 +12,7 @@ import { SoundSystem } from './audio.js';
 import { UI } from './ui.js';
 import { Game } from './game.js';
 import { Creator } from './creator.js';
+import { QuestSystem } from './quests.js';
 import { loadSettings } from './save.js';
 
 // Yield so the loading text can paint (setTimeout keeps working in background tabs).
@@ -54,6 +55,7 @@ async function boot() {
   const ui = new UI(game);
   game.ui = ui;
   game.creator = new Creator(game);
+  game.quests = new QuestSystem(game);
 
   loadingText('Raising the sails…');
   await nextFrame();

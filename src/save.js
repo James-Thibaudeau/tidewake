@@ -19,7 +19,7 @@ export function migrate(d) {
   d.profile = d.profile && typeof d.profile === 'object' ? d.profile : null;
   d.wardrobe = Array.isArray(d.wardrobe) ? d.wardrobe : [];
   const q = d.quests && typeof d.quests === 'object' ? d.quests : {};
-  d.quests = { active: Array.isArray(q.active) ? q.active : [], done: Array.isArray(q.done) ? q.done : [], boards: q.boards || {} };
+  d.quests = { active: Array.isArray(q.active) ? q.active : [], done: Array.isArray(q.done) ? q.done : [], boards: q.boards || {}, pinned: q.pinned ?? null };
   const st = d.story && typeof d.story === 'object' ? d.story : {};
   d.story = { chapter: st.chapter ?? 0, journals: Array.isArray(st.journals) ? st.journals : [], flags: st.flags || {}, seenCards: Array.isArray(st.seenCards) ? st.seenCards : [] };
   d.ashore = d.ashore && typeof d.ashore === 'object' ? d.ashore : {};

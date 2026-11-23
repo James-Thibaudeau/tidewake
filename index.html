@@ -31,12 +31,17 @@
         <div class="hullLabel"><span class="ico" data-icon="hull"></span><span>Hull</span><span id="hullText">100</span></div>
         <div class="bar"><div id="hullBar"></div></div>
       </div>
+      <button class="panel hidden" id="questTracker" aria-label="Open the journal">
+        <div class="qtHead"><span class="ico" data-icon="scroll"></span><span id="qtTitle"></span></div>
+        <div class="qtRow"><span id="qtArrow" class="qtArrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l7.5 18-7.5-4.2-7.5 4.2z" fill="currentColor" stroke="#0b1830" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span id="qtLabel"></span><span id="qtDist"></span></div>
+      </button>
       <div id="toasts"></div>
     </div>
 
     <div id="hudTop">
       <div id="compass" class="panel">
         <div id="compassStrip"></div>
+        <div id="compassQuest" class="hidden"></div>
         <div id="compassMark"></div>
       </div>
       <div id="compassDeg">0°</div>
@@ -47,6 +52,7 @@
       <div id="minimapWrap"><canvas id="minimap"></canvas></div>
       <div class="panel small" id="clock"><span id="clockIcon" class="ico"></span><span id="clockText">Day 1</span><span id="weatherText"></span></div>
       <div class="btnRow">
+        <button id="btnJournal" class="iconBtn" aria-label="Journal"><span data-icon="scroll"></span><kbd>J</kbd></button>
         <button id="btnMap" class="iconBtn" aria-label="Map"><span data-icon="map"></span><kbd>M</kbd></button>
         <button id="btnPause" class="iconBtn" aria-label="Pause"><span data-icon="pause"></span><kbd>Esc</kbd></button>
       </div>
@@ -129,10 +135,15 @@
       </div>
       <div class="tabs" id="portTabs" role="tablist">
         <button class="tab on" data-tab="shipwright" role="tab"><span class="ico" data-icon="hull"></span> Shipwright</button>
+        <button class="tab" data-tab="quests" role="tab"><span class="ico" data-icon="scroll"></span> Quest Board<span class="tabBadge hidden" id="questBadge"></span></button>
         <button class="tab" data-tab="tailor" role="tab"><span class="ico" data-icon="needle"></span> Tailor</button>
       </div>
       <div class="tabPane" id="paneShipwright">
         <div id="upgradeGrid" class="grid"></div>
+      </div>
+      <div class="tabPane hidden" id="paneQuests">
+        <div class="questCount" id="questCount"></div>
+        <div id="questOffers" class="grid"></div>
       </div>
       <div class="tabPane hidden" id="paneTailor">
         <div class="tailorIntro">
@@ -183,6 +194,17 @@
       <button id="mapClose" class="iconBtn" aria-label="Close map"><span data-icon="close"></span><kbd>M</kbd></button>
     </div>
     <div class="mapFoot panel" id="mapStats"></div>
+  </div>
+
+  <div id="journalScreen" class="screen hidden">
+    <div class="sheet journal">
+      <div class="sheetHead">
+        <div class="eyebrow"><span class="ico" data-icon="scroll"></span> Captain's journal</div>
+        <h2 id="journalTitle">Quests</h2>
+      </div>
+      <div id="journalBody"></div>
+      <div class="sheetFoot"><button id="journalClose" class="btn primary">Close <kbd>J</kbd></button></div>
+    </div>
   </div>
 
   <div id="pauseScreen" class="screen hidden">

@@ -6,7 +6,7 @@
 //   'land' – on foot: WASD move, Space jumps, E acts, Shift runs
 //   'menu' – nothing but map/pause
 
-const COMMON_KEYS = { KeyM: 'map', Escape: 'pause', KeyP: 'pause' };
+const COMMON_KEYS = { KeyM: 'map', KeyJ: 'journal', Escape: 'pause', KeyP: 'pause' };
 const KEYMAPS = {
   sea: {
     ...COMMON_KEYS,
@@ -21,8 +21,8 @@ const KEYMAPS = {
   },
   menu: { ...COMMON_KEYS },
 };
-const ACTIONS = ['sailUp', 'sailDown', 'action', 'map', 'pause', 'jump'];
-const ALWAYS = new Set(['map', 'pause']);
+const ACTIONS = ['sailUp', 'sailDown', 'action', 'map', 'pause', 'jump', 'journal'];
+const ALWAYS = new Set(['map', 'pause', 'journal']);
 const PREVENT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
 export class Input {
