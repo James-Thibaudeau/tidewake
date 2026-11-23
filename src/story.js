@@ -11,7 +11,9 @@
 //   chapter 10  complete (free roam)
 import { mulberry32, headingOf, TAU } from './util.js';
 import { islandHeight, edgeFactor } from './world.js';
-import { propMesh } from './props.js';
+import * as THREE from 'three';
+import { propMesh, part, merge, propMaterial, thinOutline } from './props.js';
+import { siteBeam } from './quests.js';
 import { JOURNALS, STEPS, LINES } from './story-text.js';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
@@ -25,9 +27,85 @@ export class Story {
   constructor(game) {
     this.game = game;
     this.camps = this.placeCamps();
+    this.anchorSpot = this.placeAnchorSpot();
     this.meshes = new Map(); // journal id -> camp mesh
     game.events.on('dock', (I) => this.onDock(I));
     game.events.on('respawn', (I) => this.onDock(I));
+    game.events.on('upgrade', (key, lvl) => { if (key === 'hull' && lvl >= 1) this.startAnchor(); });
+    game.events.on('wreck', () => this.onWreck());
+  }
+
+  // -------------------------------------------------- grandfather's anchor
+  // flags.anchor: undefined → 'quest' (haul it up by the wreck) → 'aboard'
+  // (take it to a shipwright) → 'fitted' (you can go ashore).
+  get anchor() { return this.S.flags.anchor || null; }
+  get canGoAshore() { return this.anchor === 'fitted'; }
+
+  /** On the seabed a little way off the wreck, on whichever side is deeper. */
+  placeAnchorSpot() {
+    const W = this.wreck;
+    if (!W) return null;
+    const fx = Math.sin(W.heading), fz = Math.cos(W.heading);
+    let best = null;
+    for (const s of [1, -1]) {
+      const x = W.searchPoint.x + fz * 22 * s + fx * 6, z = W.searchPoint.z - fx * 22 * s + fz * 6;
+      const d = this.world.heightAt(x, z);
+      if (!this.world.rockHit(x, z, 8) && (!best || d < best.d)) best = { x, z, d };
+    }
+    return best && { x: best.x, z: best.z };
+  }
+
+  async startAnchor() {
+    const g = this.game;
+    if (this.anchor || (g.state.upgrades.hull || 0) < 1 || !this.anchorSpot) return;
+    this.S.flags.anchor = 'quest';
+    g.quests.pin('anchor');
+    g.saveVoyage();
+    await g.ui.showFound({ eyebrow: 'The shipwright', title: 'A proper anchor',
+      items: [{ icon: 'anchor', name: "Grandfather's anchor",
+        text: "\"A hull this sound can carry a real anchor. Your grandfather's ship had the finest in the harbor, and it'll still be on the bottom beside the wreck.\" Haul it up and bring it to any shipwright. With an anchor you can go ashore." }],
+      main: "I'll find it" });
+  }
+
+  async onWreck() {
+    if (this.anchor !== 'aboard') return;
+    this.S.flags.anchor = 'quest';
+    this.game.saveVoyage();
+    this.game.ui.toast("Grandfather's anchor sank back to the bottom by the wreck.", 'warn');
+  }
+
+  haulAnchor() {
+    const g = this.game;
+    this.S.flags.anchor = 'aboard';
+    g.audio.play('treasure');
+    g.spawnChestRise?.();
+    g.saveVoyage();
+    g.ui.showFound({ eyebrow: "Beside grandfather's wreck", title: 'You hauled up his anchor!',
+      items: [{ icon: 'anchor', name: "Grandfather's anchor", text: 'Heavy, barnacled and still sound. Bring it to any port and the shipwright will fit it to your bow.' }],
+      main: 'Onward' });
+  }
+
+  async fitAnchor() {
+    const g = this.game;
+    this.S.flags.anchor = 'fitted';
+    if (g.quests.Q.pinned === 'anchor') g.quests.pin('story');
+    g.syncAnchor();
+    g.savePortState();
+    g.audio.play('upgrade');
+    g.events.emit('story:anchor');
+    await g.ui.showFound({ eyebrow: 'The shipwright', title: 'Anchor fitted!',
+      items: [{ icon: 'anchor', name: 'You can go ashore',
+        text: g.ui.touch ? 'Slow down near an island\'s shore and tap the action button to drop anchor and explore on foot.'
+          : 'Slow down near an island\'s shore and press <kbd>E</kbd> to drop anchor and explore on foot.' }],
+      main: 'Wonderful!' });
+  }
+
+  anchorQuest() {
+    const a = this.anchor;
+    if (a !== 'quest' && a !== 'aboard') return null;
+    return { id: 'anchor', type: 'story', state: 'active', title: "Grandfather's anchor",
+      text: a === 'quest' ? "Haul up grandfather's anchor from the seabed beside his wreck." : "Bring the anchor to any port's shipwright to have it fitted.",
+      giver: { name: 'Shipwright', role: 'Ship upgrade', label: 'Unlocks going ashore' }, reward: { gold: 0 } };
   }
 
   get S() {
@@ -93,6 +171,9 @@ export class Story {
 
   // --------------------------------------------------------------- the quest
   /** The main story as a quest-like object for the tracker, journal and maps. */
+  /** All story-track steps that are live right now. */
+  quests() { return [this.quest(), this.anchorQuest()].filter(Boolean); }
+
   quest() {
     const ch = this.chapter;
     if (ch < 1 || ch >= FINAL_CHAPTER) return null;
@@ -106,7 +187,18 @@ export class Story {
   }
 
   /** Where the story points now: { x, z, r?, label }. */
-  target() {
+  target(id = 'story') {
+    if (id === 'anchor') {
+      if (this.anchor === 'quest') return { x: this.anchorSpot.x, z: this.anchorSpot.z, label: "Haul up grandfather's anchor" };
+      const b = this.game.boat.pos;
+      let best = this.world.home, bd = Infinity;
+      for (const P of this.world.ports) {
+        if (!this.game.state.discovered.has(P.id)) continue;
+        const d = Math.hypot(P.dock.x - b.x, P.dock.z - b.z);
+        if (d < bd) { bd = d; best = P; }
+      }
+      return { x: best.dock.x, z: best.dock.z, label: `Take it to the shipwright: ${best.name}` };
+    }
     const ch = this.chapter, W = this.wreck;
     if ((ch === 1 || ch === 8) && W) return { x: W.searchPoint.x, z: W.searchPoint.z, label: ch === 1 ? "Search grandfather's wreck" : 'Open the chest under the bunk' };
     if (ch >= 2 && ch <= 7) {
@@ -125,6 +217,11 @@ export class Story {
   interaction(x, z, speed) {
     const ch = this.chapter, W = this.wreck;
     let spot = null, label = '', act = null;
+    const A = this.anchorSpot;
+    if (this.anchor === 'quest' && A && Math.hypot(A.x - x, A.z - z) < 18) {
+      if (Math.abs(speed) >= 7) return { prompt: 'Slow down to haul up the anchor' };
+      return { prompt: "Haul up grandfather's anchor", action: () => this.haulAnchor() };
+    }
     if ((ch === 1 || ch === 8) && W) {
       spot = W.searchPoint;
       label = ch === 1 ? "Search grandfather's wreck" : 'Open the chest under the bunk';
@@ -198,8 +295,11 @@ export class Story {
   }
 
   async onDock(port) {
-    if (this.chapter !== 9 || port !== this.world.home) return;
     const g = this.game, S = this.S;
+    // older saves that already own a sound hull get the anchor quest here
+    if (!this.anchor && (g.state.upgrades.hull || 0) >= 1) { await null; await this.startAnchor(); }
+    if (this.anchor === 'aboard') { await null; await this.fitAnchor(); }
+    if (this.chapter !== 9 || port !== this.world.home) return;
     S.chapter = FINAL_CHAPTER;
     S.flags.title = 'Wayfarer';
     g.unlockCosmetic('neck:grandScarf', 'story');
@@ -244,11 +344,38 @@ export class Story {
     }
   }
 
-  update() {
-    if (this.syncedState !== this.game.state || this.syncedChapter !== this.chapter) {
+  update(dt = 0, elapsed = 0) {
+    if (this.syncedState !== this.game.state || this.syncedChapter !== this.chapter || this.syncedAnchor !== this.anchor) {
       this.syncedState = this.game.state;
       this.syncedChapter = this.chapter;
+      this.syncedAnchor = this.anchor;
       this.syncCamps();
+      this.syncAnchorBuoy();
+    }
+    if (this.buoy) this.buoy.position.y = Math.sin(elapsed * 1.6) * 0.15;
+  }
+
+  /** A red-and-white buoy with a beam marks where the anchor lies. */
+  syncAnchorBuoy() {
+    const want = this.anchor === 'quest' && this.anchorSpot;
+    if (want && !this.buoyGroup) {
+      const g = new THREE.Group();
+      g.position.set(this.anchorSpot.x, 0, this.anchorSpot.z);
+      const geo = merge([
+        part(new THREE.CylinderGeometry(0.55, 0.7, 0.8, 10), '#d8342c', { y: 0.2 }),
+        part(new THREE.CylinderGeometry(0.42, 0.55, 0.5, 10), '#f4efe4', { y: 0.85 }),
+        part(new THREE.CylinderGeometry(0.06, 0.06, 1.4, 5), '#3b2614', { y: 1.7 }),
+        part(new THREE.BoxGeometry(0.04, 0.4, 0.6), '#d8342c', { y: 2.2, z: 0.3 }),
+      ]);
+      const buoy = new THREE.Group();
+      buoy.add(new THREE.Mesh(geo, propMaterial), new THREE.Mesh(geo, thinOutline));
+      g.add(buoy, siteBeam());
+      this.game.scene.add(g);
+      this.buoyGroup = g; this.buoy = buoy; this.buoyGeo = geo;
+    } else if (!want && this.buoyGroup) {
+      this.game.scene.remove(this.buoyGroup);
+      this.buoyGeo.dispose();
+      this.buoyGroup = this.buoy = this.buoyGeo = null;
     }
   }
 }

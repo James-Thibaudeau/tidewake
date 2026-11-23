@@ -14,6 +14,7 @@ import { Game } from './game.js';
 import { Creator } from './creator.js';
 import { QuestSystem } from './quests.js';
 import { Story } from './story.js';
+import { Ashore } from './ashore/ashore.js';
 import { loadSettings } from './save.js';
 
 // Yield so the loading text can paint (setTimeout keeps working in background tabs).
@@ -57,6 +58,7 @@ async function boot() {
   game.ui = ui;
   game.creator = new Creator(game);
   game.story = new Story(game);
+  game.ashore = new Ashore(game);
   game.quests = new QuestSystem(game);
 
   loadingText('Raising the sails…');
@@ -80,9 +82,9 @@ async function boot() {
   window.addEventListener('resize', resize);
   window.visualViewport?.addEventListener('resize', resize);
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && game.mode === 'sailing' && !game.paused) game.setPaused(true);
+    if (document.hidden && (game.mode === 'sailing' || game.mode === 'ashore') && !game.paused) game.setPaused(true);
   });
-  window.addEventListener('beforeunload', () => { if (game.mode === 'sailing') game.saveVoyage(); });
+  window.addEventListener('beforeunload', () => { if (game.mode === 'sailing' || game.mode === 'ashore') game.saveVoyage(); });
 
   let lastW = -1, lastH = -1;
   const clock = new THREE.Clock();

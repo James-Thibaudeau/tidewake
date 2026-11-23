@@ -81,7 +81,14 @@ export class Game {
   applyUpgrades() {
     this.upv = this.up;
     this.boat.applyUpgrades(this.state.upgrades, this.upv);
+    this.syncAnchor();
     this.state.health = Math.min(this.state.health, this.boat.maxHealth);
+  }
+
+  /** Grandfather's anchor shows at the bow once it's fitted (and is down while you're ashore). */
+  syncAnchor() {
+    const fitted = this.state.story?.flags?.anchor === 'fitted';
+    this.boat.setAnchor(!fitted ? 'none' : this.mode === 'ashore' || this.mode === 'landing' ? 'down' : 'stowed');
   }
 
   // ------------------------------------------------------------ save / load
@@ -109,7 +116,8 @@ export class Game {
 
   saveVoyage() {
     const s = this.state, d = this.knowledge();
-    if (this.mode === 'sailing') {
+    if (this.mode === 'sailing' || this.mode === 'landing' || this.mode === 'ashore') {
+      // ashore, the boat waits at anchor: Continue puts you back aboard it
       d.voyage = { x: this.boat.pos.x, z: this.boat.pos.z, heading: this.boat.heading, cargo: s.cargo, health: s.health, pending: [...s.pending] };
     }
     writeSave(d);
@@ -517,7 +525,9 @@ export class Game {
     w.update(dt, this.camera, boat.group.position);
     // Run the sea a bit slower than real time: calmer, rolling swells that
     // don't drag the foam across the screen. CPU + GPU share this clock.
-    updateWaves(this.elapsed * 0.6, w.p.wave, w.p.swell);
+    // ashore, keep the swell gentle so it doesn't wash over the beach
+    const ashoreSea = this.mode === 'ashore' || this.mode === 'landing' ? 0.35 : 1;
+    updateWaves(this.elapsed * 0.6, w.p.wave * ashoreSea, w.p.swell * ashoreSea);
     const wind = { angle: w.windAngle, strength: w.windStrength };
     const up = this.upv;
 
@@ -548,6 +558,9 @@ export class Game {
     } else if (this.mode === 'docked') {
       boat.speed = 0;
       boat.rudder = 0;
+    } else if (this.mode === 'ashore') {
+      boat.speed = 0;
+      this.ashore.update(dt, acts);
     } else if (this.mode === 'wrecking') {
       this.wreckT += dt;
       boat.sink = Math.min(6, this.wreckT * this.wreckT * 0.6);
@@ -563,15 +576,18 @@ export class Game {
       }
     }
 
-    boat.animate(dt, this.elapsed, wind, s.health / boat.maxHealth, this.env.night, up);
-    this.checkBowSlam(dt);
-    this.sailEfficiency = boat.efficiency;
-    this.pointOfSail = pointOfSailName(boat.relWind);
-    if (this.mode !== 'title') this.updateFlotsam(dt);
-    this.updateEffects(dt);
-    if (this.mode !== 'title') { this.quests?.update(dt, this.elapsed); this.story?.update(); }
-
-    this.updateCamera(dt);
+    // ashore, the boat waits at anchor in the sea scene and the explorer is on the island
+    const onLand = this.mode === 'ashore' || this.mode === 'landing';
+    if (!onLand) {
+      boat.animate(dt, this.elapsed, wind, s.health / boat.maxHealth, this.env.night, up);
+      this.checkBowSlam(dt);
+      this.sailEfficiency = boat.efficiency;
+      this.pointOfSail = pointOfSailName(boat.relWind);
+      if (this.mode !== 'title') this.updateFlotsam(dt);
+      this.updateEffects(dt);
+      if (this.mode !== 'title') { this.quests?.update(dt, this.elapsed); this.story?.update(dt, this.elapsed); }
+      this.updateCamera(dt);
+    }
     this.env.update(dt, s.dayT, w.p, this.camera, w.wind, this.elapsed);
     if (this.spyOn) this.scene.fog.far *= 1.35; // the glass cuts through haze
     const ou = this.ocean.uniforms;
@@ -589,9 +605,11 @@ export class Game {
     boat.wakeMat.uniforms.uLight.value.copy(L);
     boat.wakeMat.uniforms.uScale.value = this.renderer.domElement.height / (2 * Math.tan((this.camera.fov * Math.PI) / 360));
     this.ocean.update(this.camera);
-    this.streamer.update(boat.pos.x, boat.pos.z, 1);
-    this.streamer.animate(this.elapsed, this.env.night);
-    this.streamer.lod(this.camera.position.x, this.camera.position.z, this.spyOn ? 55 / this.camera.fov : 1);
+    if (!onLand) {
+      this.streamer.update(boat.pos.x, boat.pos.z, 1);
+      this.streamer.animate(this.elapsed, this.env.night);
+      this.streamer.lod(this.camera.position.x, this.camera.position.z, this.spyOn ? 55 / this.camera.fov : 1);
+    }
 
     this.audio.update(dt, {
       speed: Math.abs(boat.speed), wind: w.windStrength, rain: w.p.rain, storm: w.p.storm,
@@ -661,6 +679,10 @@ export class Game {
           break;
         }
       }
+    }
+    if (!prompt && this.ashore) {
+      const ax = this.ashore.interaction(boat);
+      if (ax) { prompt = ax.prompt; action = ax.action || null; }
     }
     if (prompt !== this.prompt) { this.prompt = prompt; this.ui.setPrompt(prompt); }
     if (acts.action && action) { action(); this.prompt = null; this.ui.setPrompt(null); }
