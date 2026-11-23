@@ -399,9 +399,96 @@ function buildExtra(B, p, c) {
   }
 }
 
+// ------------------------------------------------------------- head shape
+// The head starts as a sphere; a smooth deformation field reshapes the lower
+// half into a jaw and chin. The cranium (above the brow) is left alone, so
+// hair and hats keep fitting every shape. The same field is applied to the
+// skin, side hair, hoods and the face decal, so everything stays attached.
+//   w: overall width, jaw: taper toward the chin, chin: lengthen the front of
+//   the lower face, cheek: fullness at cheek height, flat: square off the chin
+export const HEAD_SHAPE_PARAMS = {
+  round: { w: 1, jaw: 0, chin: 0, cheek: 0, flat: 0 },
+  oval: { w: 0.91, jaw: 0.34, chin: 0.22, cheek: 0.012, flat: 0.15 },
+  heart: { w: 0.97, jaw: 0.56, chin: 0.2, cheek: 0.01, flat: 0 },
+  square: { w: 0.93, jaw: 0.16, chin: 0.15, cheek: 0, flat: 0.6 },
+  long: { w: 0.86, jaw: 0.36, chin: 0.38, cheek: 0, flat: 0 },
+  soft: { w: 0.96, jaw: 0.24, chin: 0.1, cheek: 0.035, flat: 0 },
+};
+
+const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+/** Map a point in head space (origin at the head centre) to its shaped position. */
+function shapePoint(P, x, y, z, out) {
+  const t = sstep(0.03, -0.3, y);          // 0 at the brow, 1 at the bottom of the head
+  const front = sstep(-0.12, 0.22, z);     // the chin is at the front
+  // every term fades to identity at the brow (y = 0.04), so there's no seam
+  let kx = 1 - (1 - P.w) * sstep(0.04, -0.1, y);
+  kx *= 1 - P.jaw * Math.pow(t, 1.4);
+  // cheeks: a soft band around cheek height
+  const band = Math.exp(-(((y + 0.1) / 0.09) ** 2)) * sstep(0.04, -0.02, y);
+  const r = Math.hypot(x, z) || 1;
+  const cheek = P.cheek * band * sstep(-0.05, 0.15, z);
+  let ny = y * (1 + P.chin * t * front);
+  if (P.flat) ny += P.flat * 0.06 * t * t * front;      // lift and flatten the chin line
+  out.x = x * kx + (x / r) * cheek;
+  out.y = ny;
+  out.z = z * (1 + P.chin * 0.25 * t * front) + (z / r) * cheek * 0.5;
+  return out;
+}
+
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _n = new THREE.Vector3();
+const NORMAL_FOLLOW = 0.3; // how much shading follows the reshaped jaw (0 = sphere, 1 = exact)
+const _J = new THREE.Matrix3();
+/**
+ * Reshape a head-bone geometry in place. `cy` is the head centre's y in the
+ * geometry's space. Normals follow the deformation (inverse-transpose of the
+ * field's Jacobian, by finite differences) so cel-shading traces the jaw.
+ */
+export function shapeHeadGeometry(geo, shape, cy = HC) {
+  const P = HEAD_SHAPE_PARAMS[shape];
+  if (!P || shape === 'round') return geo;
+  const pos = geo.attributes.position, nor = geo.attributes.normal;
+  const e = 1e-3;
+  const col = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i) - cy, z = pos.getZ(i);
+    if (y > 0.04) continue; // untouched above the brow
+    shapePoint(P, x, y, z, _a);
+    if (nor) {
+      // Jacobian columns: d(out)/dx, d(out)/dy, d(out)/dz
+      shapePoint(P, x + e, y, z, _b); col[0].subVectors(_b, _a).divideScalar(e);
+      shapePoint(P, x, y + e, z, _b); col[1].subVectors(_b, _a).divideScalar(e);
+      shapePoint(P, x, y, z + e, _b); col[2].subVectors(_b, _a).divideScalar(e);
+      _J.set(col[0].x, col[1].x, col[2].x, col[0].y, col[1].y, col[2].y, col[0].z, col[1].z, col[2].z);
+      _J.invert().transpose();
+      const nx = nor.getX(i), ny = nor.getY(i), nz = nor.getZ(i);
+      _n.set(nx, ny, nz).applyMatrix3(_J).normalize();
+      // Keep most of the sphere's shading: fully deformed normals tip the
+      // jaw into the cel-shade band and read as a beard shadow. Drawn anime
+      // faces stay lit down to the chin.
+      _n.lerp(_b.set(nx, ny, nz), 1 - NORMAL_FOLLOW).normalize();
+      nor.setXYZ(i, _n.x, _n.y, _n.z);
+    }
+    pos.setXYZ(i, _a.x, _a.y + cy, _a.z);
+  }
+  pos.needsUpdate = true;
+  if (nor) nor.needsUpdate = true;
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+/** The face decal: a sphere cap just in front of the skin, shaped to match. */
+export function faceGeometry(shape) {
+  const g = new THREE.SphereGeometry(0.32, 24, 16, PI / 2 - 0.75, 1.5, PI / 2 - 0.55, 1.1);
+  g.scale(1.014, 0.964, 0.984);
+  g.translate(0, HC, 0);
+  return shapeHeadGeometry(g, shape);
+}
+
 // ------------------------------------------------------------------- head
 function buildHead(B, p, c) {
   const H = B.head;
+  const first = H.length;
   H.push(
     part(sph(0.32, 24, 18), c.skin, { y: HC, sy: 0.95, sz: 0.97 }),
     part(sph(0.06, 8, 6), c.skinShade, { x: 0.31, y: HC - 0.02, sx: 0.6 }),
@@ -411,6 +498,8 @@ function buildHead(B, p, c) {
   const fit = hat === 'none' || hat === 'circlet' || hat === 'flowerCrown' ? 'none' : hat === 'furHood' ? 'hood' : 'hat';
   HAIR[p.hair.style](H, c, fit);
   if (hat !== 'none') H.push(HATS[hat](c));
+  // shape everything on the head (the field leaves the crown, and so hats, alone)
+  for (let i = first; i < H.length; i++) shapeHeadGeometry(H[i], p.head);
 }
 
 // ------------------------------------------------------------------- hair

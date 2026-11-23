@@ -2,7 +2,7 @@
 // from, and the appearance profile that ties them together.
 //
 // A profile is plain JSON (it lives in the save):
-//   { name, skin, eyes: { color, shape }, hair: { style, color },
+//   { name, skin, head, eyes: { color, shape }, hair: { style, color },
 //     face: { blush, freckles },
 //     hat:    { style, color },
 //     top:    { style, color, shirt },
@@ -55,6 +55,15 @@ export const EYE_COLORS = [
   pal('teal', 'Teal', '#1f8a86', '#0c3a38', { light: '#6ad8cf' }),
   pal('gold', 'Gold', '#b08a1a', '#4a3608', { light: '#f2d25a' }),
   pal('rose', 'Rose', '#a83a5a', '#4a1426', { light: '#f08aa8' }),
+];
+
+export const HEAD_SHAPES = [
+  { id: 'oval', name: 'Oval' },
+  { id: 'heart', name: 'Heart' },
+  { id: 'square', name: 'Square' },
+  { id: 'long', name: 'Long' },
+  { id: 'soft', name: 'Soft' },
+  { id: 'round', name: 'Round' },
 ];
 
 export const EYE_SHAPES = [
@@ -169,10 +178,12 @@ export function lockText(s) {
 }
 
 // ------------------------------------------------------------------ profile
-// The default reproduces the original explorer exactly.
+// The default is the original explorer, with an oval face rather than the
+// first version's perfectly round head ('round' is still offered).
 export const DEFAULT_PROFILE = Object.freeze({
   name: 'Captain',
   skin: 's2',
+  head: 'oval',
   eyes: { color: 'amber', shape: 'round' },
   hair: { style: 'spiky', color: 'chestnut' },
   face: { blush: true, freckles: false },
@@ -197,6 +208,7 @@ export function normalizeProfile(p) {
   const out = clone(d);
   if (typeof p.name === 'string' && p.name.trim()) out.name = p.name.trim().slice(0, 18);
   if (hasId(SKIN_TONES, p.skin)) out.skin = p.skin;
+  if (HEAD_SHAPES.some((h) => h.id === p.head)) out.head = p.head;
   if (p.eyes) {
     if (hasId(EYE_COLORS, p.eyes.color)) out.eyes.color = p.eyes.color;
     if (EYE_SHAPES.some((e) => e.id === p.eyes.shape)) out.eyes.shape = p.eyes.shape;
@@ -229,6 +241,7 @@ export function randomProfile(wardrobe, keepName = 'Captain', rnd = Math.random)
   return normalizeProfile({
     name: keepName,
     skin: pick(SKIN_TONES).id,
+    head: pick(HEAD_SHAPES).id,
     eyes: { color: pick(EYE_COLORS).id, shape: pick(EYE_SHAPES).id },
     hair: { style: ownedStyle('hair'), color: hairColor },
     face: { blush: rnd() < 0.7, freckles: rnd() < 0.3 },

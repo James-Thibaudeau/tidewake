@@ -6,7 +6,7 @@ import { toon, outlineMaterial } from './toon.js';
 import { propMesh } from './props.js';
 import { clamp, damp, wrapAngle } from './util.js';
 import {
-  SKIN_TONES, HAIR_COLORS, EYE_COLORS, EYE_SHAPES, CLOTH_COLORS, FIXED_COLOR,
+  SKIN_TONES, HAIR_COLORS, EYE_COLORS, EYE_SHAPES, HEAD_SHAPES, CLOTH_COLORS, FIXED_COLOR,
   stylesFor, styleInfo, owns, lockText, normalizeProfile, randomProfile,
 } from './cosmetics.js';
 
@@ -27,7 +27,7 @@ const TABS = [
 const FOV = 30;
 const FRAMES = {
   body: { span: 3.0, y: 0.98 },
-  face: { span: 1.3, y: 1.6 },
+  face: { span: 1.75, y: 1.5 },
 };
 
 export class Creator {
@@ -61,7 +61,7 @@ export class Creator {
 
     scene.add(new THREE.HemisphereLight(0xdcefff, 0x47607a, 1.5));
     const key = new THREE.DirectionalLight(0xfff1dc, 2.1);
-    key.position.set(2.5, 5, 4);
+    key.position.set(1.4, 4.2, 5.5); // mostly frontal so faces read clearly
     scene.add(key);
 
     // round plank platform with a rope rim
@@ -159,7 +159,7 @@ export class Creator {
     this.profile = normalizeProfile(this.profile);
     this.game.boat.explorer.setAppearance?.(this.profile);
     // jump to the face when changing facial features, back to the body for clothes
-    const faceish = a === 'eyes' || a === 'face' || a === 'hair' || a === 'hat';
+    const faceish = a === 'head' || a === 'eyes' || a === 'face' || a === 'hair' || a === 'hat';
     this.frame = faceish ? 'face' : 'body';
     this.renderPanel();
     this.syncFrameButtons();
@@ -278,6 +278,8 @@ export class Creator {
     const p = this.profile;
     let html = '';
     if (this.tab === 'body') {
+      html += this.section('Face shape', `<div class="chips">${HEAD_SHAPES.map((h) =>
+        `<button class="chip${h.id === p.head ? ' on' : ''}" data-set="head" data-val="${h.id}">${h.name}</button>`).join('')}</div>`);
       html += this.section('Skin', this.swatches('skin', SKIN_TONES, p.skin, 'skin'));
       html += this.section('Eye colour', this.swatches('eyes.color', EYE_COLORS, p.eyes.color, 'eyes'));
       html += this.section('Eye shape', `<div class="chips">${EYE_SHAPES.map((e) =>
