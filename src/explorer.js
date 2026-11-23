@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { toonGradient, outlineMaterial } from './toon.js';
 import { clamp, damp, wrapAngle } from './util.js';
 import { normalizeProfile, DEFAULT_PROFILE } from './cosmetics.js';
-import { part, mergeParts, buildOutfit, faceParams, acquireFace, releaseFace, faceGeometry, HIP_Y, KNEE_Y, HC, BONES } from './outfits.js';
+import { part, mergeParts, buildOutfit, backRadius, faceParams, acquireFace, releaseFace, faceGeometry, HIP_Y, KNEE_Y, HC, BONES } from './outfits.js';
 
 export { part, mergeParts };
 
@@ -40,6 +40,9 @@ function clearLook(g) {
 // -------------------------------------------------------------- the explorer
 const DOWN = new THREE.Vector3(0, -1, 0);
 const L1 = 0.25, L2 = 0.24; // upper arm, forearm + hand
+// The scarf tail streams at most this far (radians) to either side of straight
+// back, and keeps its centre line this far outside the clothes.
+const TAIL_SWING = 1.1, TAIL_CLEAR = 0.03;
 
 export class Explorer {
   constructor(profile = DEFAULT_PROFILE) {
@@ -60,6 +63,8 @@ export class Explorer {
     this.moveSpeed = 0;   // fallback ground speed when the caller passes none (console testing)
     this._v = new THREE.Vector3(); this._v2 = new THREE.Vector3(); this._v3 = new THREE.Vector3();
     this._m = new THREE.Matrix4(); this._qa = new THREE.Quaternion(); this._qb = new THREE.Quaternion();
+    this._tm = new THREE.Matrix4(); this._tp = new THREE.Vector3();
+    this.tailYaw = Math.PI;
   }
 
   /** Joint groups, the spyglass and the face decal: everything that doesn't change with the outfit. */
@@ -100,9 +105,9 @@ export class Explorer {
     this.spyglass.visible = false;
     torso.add(this.spyglass);
 
-    // ---- scarf tail: two segments that flutter (hidden for tail-less neckwear)
+    // ---- scarf tail: two segments that flutter (hidden for tail-less neckwear;
+    // where it hangs from comes from the outfit, see setAppearance)
     this.scarfTail = new THREE.Group();
-    this.scarfTail.position.set(0.02, 0.52, -0.1);
     torso.add(this.scarfTail);
     this.scarfTail2 = new THREE.Group();
     this.scarfTail2.position.z = 0.21;
@@ -173,7 +178,10 @@ export class Explorer {
       this.faceShape = p.head;
     }
     this.scarfTail.visible = tail.visible;
+    this.scarfTail.position.set(0.02, tail.anchor.y, tail.anchor.z);
     this.scarfTail2.position.z = tail.seg2Z;
+    this.tailLen2 = tail.len2;
+    this.tailBack = tail.back;
     // face: shared, cached textures
     const fp = faceParams(p);
     const key = JSON.stringify(fp);
@@ -235,6 +243,43 @@ export class Explorer {
   }
 
   /**
+   * Stream the scarf tail toward `yaw` (π = straight back) with wind strength
+   * `str`. The tail stays behind the explorer and is lifted just enough to
+   * ride over the clothes (outfits.js backProfile) rather than through them.
+   */
+  aimTail(dt, t, str, yaw) {
+    const A = this.scarfTail, B = this.scarfTail2;
+    const target = Math.PI + clamp(wrapAngle(yaw - Math.PI), -TAIL_SWING, TAIL_SWING);
+    this.tailYaw = damp(this.tailYaw, target, 5, dt);
+    const rx = clamp(1.55 - str * 0.8, 0.15, 1.55) + Math.sin(t * 9) * 0.08 * str; // hangs when calm
+    const ry = this.tailYaw + Math.sin(t * 7.3) * 0.15 * str;
+    B.rotation.set(Math.sin(t * 11 + 1) * 0.35 * str - 0.1, Math.sin(t * 8.7) * 0.3 * str, 0);
+    if (!A.visible || this.tailClears(rx, ry)) return;
+    // bisect for the steepest hang that still clears
+    let lo = -0.3, hi = rx;
+    for (let i = 0; i < 7; i++) {
+      const m = (lo + hi) / 2;
+      if (this.tailClears(m, ry)) lo = m; else hi = m;
+    }
+    this.tailClears(lo, ry);
+  }
+
+  /** Pose the tail's first segment; does the whole tail clear the clothes? */
+  tailClears(rx, ry) {
+    const A = this.scarfTail, B = this.scarfTail2, p = this._tp;
+    A.rotation.set(rx, ry, 0, 'YXZ');
+    A.updateMatrix();
+    B.updateMatrix();
+    const m2 = this._tm.multiplyMatrices(A.matrix, B.matrix);
+    for (let i = 1; i <= 7; i++) {
+      if (i <= 4) p.set(0, 0, B.position.z * i / 4).applyMatrix4(A.matrix);
+      else p.set(0, 0, this.tailLen2 * (i - 4) / 3).applyMatrix4(m2);
+      if (Math.hypot(p.x, p.z) < backRadius(this.tailBack, p.y) + TAIL_CLEAR) return false;
+    }
+    return true;
+  }
+
+  /**
    * ctx: { rudder, speed, roll, lookRel (radians relative to bow, or null), lookPitch,
    *        windRel (apparent wind direction relative to bow, heading convention), windStrength,
    *        gripR, gripL (boat-space Vector3, gripL may be null) }
@@ -287,8 +332,7 @@ export class Explorer {
     // scarf tail streams with the apparent wind
     const wrel = wrapAngle(ctx.windRel - this.twist - baseYaw);
     const str = clamp(ctx.windStrength, 0, 2);
-    this.scarfTail.rotation.set(clamp(1.25 - str * 0.6, 0.15, 1.3) + Math.sin(t * 9) * 0.08 * str, wrel + Math.sin(t * 7.3) * 0.15 * str, 0, 'YXZ');
-    this.scarfTail2.rotation.set(Math.sin(t * 11 + 1) * 0.35 * str - 0.1, Math.sin(t * 8.7) * 0.3 * str, 0);
+    this.aimTail(dt, t, str, wrel);
 
     // arms
     const T = this._handT || (this._handT = new THREE.Vector3());
@@ -367,10 +411,8 @@ export class Explorer {
 
     // scarf trails behind when moving, streams with the wind when still
     const str = clamp((ctx.windStrength ?? 0.3) + st * 1.2 + air * 0.6, 0, 2);
-    const wrel = ctx.windRel != null ? wrapAngle(ctx.windRel - this.twist - this.root.rotation.y) : 0;
-    const trail = st > 0.15 || air > 0.2 ? 0 : wrel;
-    this.scarfTail.rotation.set(clamp(1.25 - str * 0.6, 0.15, 1.3) + Math.sin(t * 9) * 0.08 * str, trail + Math.sin(t * 7.3) * 0.15 * str, 0, 'YXZ');
-    this.scarfTail2.rotation.set(Math.sin(t * 11 + 1) * 0.35 * str - 0.1, Math.sin(t * 8.7) * 0.3 * str, 0);
+    const wrel = ctx.windRel != null ? wrapAngle(ctx.windRel - this.twist - this.root.rotation.y) : Math.PI;
+    this.aimTail(dt, t, str, st > 0.15 || air > 0.2 ? Math.PI : wrel);
 
     // ---- arms swing opposite the legs; fling up in the air
     const T = this._handT || (this._handT = new THREE.Vector3());

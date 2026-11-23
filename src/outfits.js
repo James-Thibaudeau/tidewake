@@ -95,14 +95,87 @@ const CHEST_R = { vest: 0.232, sailor: 0.222, tank: 0.222, coat: 0.262, poncho: 
 // Half the angle each poncho panel (front, back) wraps; the rest is open at the sides
 const PONCHO_HALF = 0.82;
 
+// ------------------------------------------------------------ back profile
+// The scarf tail hangs down the back and has to ride over whatever is worn.
+// backProfile() gives the outer radius of the clothes round the torso axis at
+// each height (torso space), sampled every BACK_STEP from BACK_TOP down to
+// -0.3. It mirrors the torso geometry in buildTorso/buildExtra; the explorer
+// lifts the tail just clear of it (see Explorer.aimTail).
+export const BACK_TOP = 0.62, BACK_STEP = 0.02;
+const BACK_N = Math.round((BACK_TOP + 0.3) / BACK_STEP) + 1;
+
+function backProfile(p) {
+  const r = new Float32Array(BACK_N);
+  // Every piece also widens the samples either side of it, so thin rings
+  // (hems, stripes) between two samples aren't missed.
+  const each = (y0, y1, f) => {
+    for (let i = 0; i < BACK_N; i++) {
+      const y = BACK_TOP - i * BACK_STEP;
+      if (y > y0 + BACK_STEP || y < y1 - BACK_STEP) continue;
+      r[i] = Math.max(r[i], f(Math.min(y0, Math.max(y1, y))));
+    }
+  };
+  const ring = (y0, y1, r0, r1 = r0) => each(y0, y1, (y) => r0 + (r1 - r0) * (y0 - y) / (y0 - y1 || 1));
+  const dome = (yc, rr, h) => each(yc + h, yc, (y) => rr * Math.sqrt(Math.max(0, 1 - ((y - yc) / h) ** 2)));
+  const shirt = () => { ring(0.51, 0.13, 0.205, 0.235); dome(0.5, 0.205, 0.113); };
+
+  // hips and belt; the skirt flares out below them
+  ring(0.1, -0.04, 0.235, 0.225);
+  ring(0.1375, 0.0825, 0.245);
+  if (p.bottom.style === 'skirt') { ring(0.05, -0.17, 0.236, 0.31); ring(-0.1375, -0.1725, 0.312); }
+
+  const top = p.top.style;
+  if (top === 'vest') {
+    shirt();
+    ring(0.465, 0.135, 0.228, 0.255);
+  } else if (top === 'sailor') {
+    shirt();
+    for (const y of [0.2, 0.27, 0.34, 0.41]) ring(y + 0.013, y - 0.013, 0.235 - ((y - 0.13) / 0.38) * 0.03 + 0.015);
+    ring(0.541, 0.388, 0.18, 0.25); // the collar flap, tipped out at the bottom
+    ring(0.41, 0.39, 0.245);
+  } else if (top === 'tank') {
+    shirt();
+    ring(0.212, 0.188, 0.232);
+  } else if (top === 'poncho') {
+    shirt();
+    dome(0.52, 0.205, 0.1025);
+    ring(0.52, 0.1, 0.2, 0.35);
+    ring(0.205, 0.175, 0.322);
+    ring(0.253, 0.227, 0.304);
+    ring(0.125, 0.05, 0.36); // hem and tassels
+  } else if (top === 'coat') {
+    shirt();
+    ring(0.49, -0.01, 0.232, 0.268);
+    ring(0.01, -0.25, 0.268, 0.3);
+    ring(-0.225, -0.255, 0.302);
+  }
+
+  if (p.extra.style === 'satchel') {
+    // the strap across the back; on the poncho it leans with the panel
+    const R = (CHEST_R[top] ?? 0.232) + 0.011, lean = top === 'poncho' ? 0.355 : 0;
+    ring(0.42, 0.18, R - lean * 0.12, R + lean * 0.12);
+  }
+  return r;
+}
+
+/** Outer radius of the clothes at torso height `y`, from a backProfile(). */
+export function backRadius(back, y) {
+  const f = (BACK_TOP - y) / BACK_STEP;
+  if (f < 0) return 0;
+  const i = Math.floor(f);
+  if (i >= BACK_N - 1) return back[BACK_N - 1];
+  return Math.max(back[i], back[i + 1]);
+}
+
 /**
  * profile must already be normalized (see cosmetics.normalizeProfile).
- * Returns { parts: { bone: BufferGeometry[] }, tail: { visible, seg2Z } }.
+ * Returns { parts: { bone: BufferGeometry[] }, tail }, where tail is
+ * { visible, seg2Z, len2, anchor: { y, z }, back } for the scarf tail.
  */
 export function buildOutfit(p) {
   const c = resolve(p);
   const B = Object.fromEntries(BONES.map((k) => [k, []]));
-  const tail = { visible: false, seg2Z: 0.21 };
+  const tail = { visible: false, seg2Z: 0.21, len2: 0.2, anchor: { y: 0.52, z: -0.1 }, back: null };
   buildLegs(B, p, c);
   buildTorso(B, p, c);
   buildArms(B, p, c);
@@ -349,10 +422,26 @@ function buildNeck(B, p, c, tail) {
       part(tor(grand ? 0.125 : 0.12, grand ? 0.062 : 0.058, 8, 18), base, { y: 0.54, rx: PI / 2 + 0.12 }),
       part(sph(0.065, 8, 6), dark, { x: 0.08, y: 0.5, z: 0.1 }),
     );
-    tail.visible = true;
+    // A backpack (and its bedroll) covers the back of the neck: the tail is
+    // tucked away behind it.
+    tail.visible = p.extra.style !== 'backpack';
+    if (tail.visible) {
+      // The tail comes out of a knot at the back of the neck, sitting on top of
+      // whatever is worn round the shoulders, so it hangs over the clothes.
+      const back = backProfile(p);
+      let shoulder = 0;
+      for (let y = 0.44; y <= 0.56; y += BACK_STEP) shoulder = Math.max(shoulder, backRadius(back, y));
+      const ring = 0.17, az = Math.max(ring, shoulder + 0.025);
+      tail.back = back;
+      tail.anchor = { y: 0.51, z: -az };
+      T.push(part(sph(0.06, 10, 8), base, {
+        x: 0.02, y: 0.515, z: -(ring + az) / 2, sx: 1.25, sy: 0.85, sz: Math.max(1, ((az - ring) / 2 + 0.02) / 0.06),
+      }));
+    }
     if (grand) {
       // a longer, sun-faded scarf with a cream stripe and frayed end
       tail.seg2Z = 0.29;
+      tail.len2 = 0.29;
       B.tail1.push(part(box(0.12, 0.03, 0.3), base, { z: 0.15 }));
       B.tail2.push(
         part(box(0.11, 0.028, 0.28), base, { z: 0.14 }),
@@ -362,6 +451,7 @@ function buildNeck(B, p, c, tail) {
       );
     } else {
       tail.seg2Z = 0.21;
+      tail.len2 = 0.205;
       B.tail1.push(part(box(0.11, 0.028, 0.22), base, { z: 0.11 }));
       B.tail2.push(
         part(box(0.1, 0.026, 0.2), base, { z: 0.1 }),
