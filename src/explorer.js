@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { toonGradient, outlineMaterial } from './toon.js';
 import { clamp, damp, wrapAngle } from './util.js';
 import { normalizeProfile, DEFAULT_PROFILE } from './cosmetics.js';
-import { part, mergeParts, buildOutfit, faceParams, acquireFace, releaseFace, HIP_Y, KNEE_Y, HC, BONES } from './outfits.js';
+import { part, mergeParts, buildOutfit, faceParams, acquireFace, releaseFace, faceGeometry, HIP_Y, KNEE_Y, HC, BONES } from './outfits.js';
 
 export { part, mergeParts };
 
@@ -132,9 +132,9 @@ export class Explorer {
     look.head = lookGroup(head);
 
     // face decal on a sphere cap just in front of the skin
-    const faceGeo = new THREE.SphereGeometry(0.32, 24, 16, Math.PI / 2 - 0.75, 1.5, Math.PI / 2 - 0.55, 1.1);
-    faceGeo.scale(1.014, 0.964, 0.984);
-    faceGeo.translate(0, HC, 0);
+    // (its shape follows the head shape; see setAppearance)
+    const faceGeo = faceGeometry('round');
+    this.faceShape = 'round';
     this.faceMat = new THREE.MeshToonMaterial({
       gradientMap: toonGradient(), transparent: true, depthWrite: false,
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
@@ -142,6 +142,7 @@ export class Explorer {
     const face = new THREE.Mesh(faceGeo, this.faceMat);
     face.renderOrder = 1;
     head.add(face);
+    this.faceMesh = face;
 
     this.eye = new THREE.Object3D();
     this.eye.position.set(0, HC - 0.02, 0.3);
@@ -165,6 +166,11 @@ export class Explorer {
         for (const pt of parts[k]) pt.dispose();
         inked(geo, g);
       }
+    }
+    if (p.head !== this.faceShape) {
+      this.faceMesh.geometry.dispose();
+      this.faceMesh.geometry = faceGeometry(p.head);
+      this.faceShape = p.head;
     }
     this.scarfTail.visible = tail.visible;
     this.scarfTail2.position.z = tail.seg2Z;
