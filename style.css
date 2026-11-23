@@ -311,8 +311,16 @@ body.scheme-land #btnAction { right: calc(var(--sar) + 104px); }
 @keyframes float { 50% { transform: translateY(-8px); } }
 .logoText {
   font-size: clamp(64px, 16vw, 140px); font-weight: 700; line-height: 1; letter-spacing: 0.02em;
+  display: grid; filter: drop-shadow(0 6px 0 rgba(11, 24, 48, 0.8)) drop-shadow(0 12px 18px rgba(0, 0, 0, 0.35));
+}
+/* Two stacked copies: the ink outline behind, the gradient fill on top. A stroke
+   on the filled text itself traces Fredoka's overlapping contours (a seam
+   through the "d"); here the fill covers anything inside the letters. */
+.logoText > span { grid-area: 1 / 1; }
+.logoInk { color: var(--ink); -webkit-text-stroke: 6px var(--ink); }
+.logoFill {
   background: linear-gradient(180deg, #fffbe9 0%, #ffe48a 55%, #f0a92e 100%); -webkit-background-clip: text; background-clip: text;
-  color: transparent; -webkit-text-stroke: 3px var(--ink); filter: drop-shadow(0 6px 0 rgba(11, 24, 48, 0.8)) drop-shadow(0 12px 18px rgba(0, 0, 0, 0.35));
+  color: transparent;
 }
 .logoWave { width: min(300px, 60vw); height: 24px; margin-top: 4px; filter: drop-shadow(0 2px 0 var(--ink)); }
 .tagline { font-size: clamp(18px, 4vw, 26px); font-weight: 600; text-shadow: var(--outline); margin-top: 6px; }
