@@ -11,6 +11,7 @@ import { Input } from './input.js';
 import { SoundSystem } from './audio.js';
 import { UI } from './ui.js';
 import { Game } from './game.js';
+import { Creator } from './creator.js';
 import { loadSettings } from './save.js';
 
 // Yield so the loading text can paint (setTimeout keeps working in background tabs).
@@ -52,6 +53,7 @@ async function boot() {
   const game = new Game({ renderer, scene, camera, world, streamer, ocean, env, weather, boat, input, audio });
   const ui = new UI(game);
   game.ui = ui;
+  game.creator = new Creator(game);
 
   loadingText('Raising the sails…');
   await nextFrame();
@@ -66,8 +68,10 @@ async function boot() {
   const resize = () => {
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
+    for (const cam of new Set([camera, game.view.camera])) {
+      cam.aspect = w / h;
+      cam.updateProjectionMatrix();
+    }
   };
   window.addEventListener('resize', resize);
   window.visualViewport?.addEventListener('resize', resize);
@@ -92,7 +96,7 @@ async function boot() {
       resize();
     }
     game.update(dt);
-    renderer.render(scene, camera);
+    renderer.render(game.view.scene, game.view.camera);
   });
   window.tidewake = game; // handy for debugging in the console
 }

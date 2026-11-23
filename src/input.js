@@ -1,13 +1,27 @@
-// Keyboard, mouse and touch input. Exposes held state (steer, spyHeld) and
-// edge-triggered action counts that the game consumes once per frame.
+// Keyboard, mouse and touch input. Exposes held state (steer, spyHeld, move,
+// run) and edge-triggered action counts that the game consumes once per frame.
+//
+// Bindings depend on the control scheme:
+//   'sea'  – sailing: W/S trim the sail, A/D steer, E/Space act
+//   'land' – on foot: WASD move, Space jumps, E acts, Shift runs
+//   'menu' – nothing but map/pause
 
-const ACTION_KEYS = {
-  KeyW: 'sailUp', ArrowUp: 'sailUp',
-  KeyS: 'sailDown', ArrowDown: 'sailDown',
-  KeyE: 'action', Space: 'action', Enter: 'action', NumpadEnter: 'action',
-  KeyM: 'map',
-  Escape: 'pause', KeyP: 'pause',
+const COMMON_KEYS = { KeyM: 'map', Escape: 'pause', KeyP: 'pause' };
+const KEYMAPS = {
+  sea: {
+    ...COMMON_KEYS,
+    KeyW: 'sailUp', ArrowUp: 'sailUp',
+    KeyS: 'sailDown', ArrowDown: 'sailDown',
+    KeyE: 'action', Space: 'action', Enter: 'action', NumpadEnter: 'action',
+  },
+  land: {
+    ...COMMON_KEYS,
+    Space: 'jump',
+    KeyE: 'action', Enter: 'action', NumpadEnter: 'action',
+  },
+  menu: { ...COMMON_KEYS },
 };
+const ACTIONS = ['sailUp', 'sailDown', 'action', 'map', 'pause', 'jump'];
 const ALWAYS = new Set(['map', 'pause']);
 const PREVENT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
@@ -16,7 +30,10 @@ export class Input {
     this.canvas = canvas;
     this.enabled = true;
     this.keys = new Set();
-    this.actions = { sailUp: 0, sailDown: 0, action: 0, map: 0, pause: 0 };
+    this.scheme = 'sea';
+    this.actions = Object.fromEntries(ACTIONS.map((a) => [a, 0]));
+    this.stick = { x: 0, y: 0 };   // touch joystick, -1..1 (y up = forward)
+    this.runButton = false;
     this.look = { dx: 0, dy: 0, zoom: 0 };
     this.tiller = 0;
     this.spyButton = false;
@@ -54,14 +71,25 @@ export class Input {
   clearHeld() {
     this.keys.clear();
     this.spyButton = false;
+    this.runButton = false;
     this.setTiller(0);
+    this.setStick(0, 0);
+  }
+
+  /** Switch bindings: 'sea' | 'land' | 'menu'. Also swaps the touch controls. */
+  setScheme(name) {
+    if (!KEYMAPS[name] || name === this.scheme) return;
+    this.scheme = name;
+    this.clearHeld();
+    for (const a of ACTIONS) if (!ALWAYS.has(a)) this.actions[a] = 0;
+    document.body.classList.toggle('scheme-land', name === 'land');
   }
 
   onKeyDown(e) {
     const t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
     if (PREVENT.has(e.code)) e.preventDefault();
-    const act = ACTION_KEYS[e.code];
+    const act = KEYMAPS[this.scheme][e.code];
     if (!this.enabled) {
       if (act && ALWAYS.has(act) && !e.repeat) this.actions[act]++;
       return;
@@ -74,23 +102,54 @@ export class Input {
 
   get steer() {
     let k = 0;
-    if (this.enabled) {
+    if (this.enabled && this.scheme === 'sea') {
       if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) k += 1;
       if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) k -= 1;
     }
-    const v = k + (this.enabled ? this.tiller : 0);
+    const v = k + (this.enabled && this.scheme === 'sea' ? this.tiller : 0);
     return v < -1 ? -1 : v > 1 ? 1 : v;
   }
 
   get spyHeld() {
-    if (!this.enabled) return false;
+    if (!this.enabled || this.scheme !== 'sea') return false;
     return this.spyButton || this.keys.has('KeyZ') || this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+  }
+
+  /**
+   * On-foot movement intent, before camera rotation: x = right, y = forward,
+   * length 0..1. Keyboard gives full-strength diagonals normalised to 1;
+   * the touch stick is analogue.
+   */
+  get move() {
+    const out = { x: 0, y: 0 };
+    if (!this.enabled || this.scheme !== 'land') return out;
+    const K = this.keys;
+    if (K.has('KeyD') || K.has('ArrowRight')) out.x += 1;
+    if (K.has('KeyA') || K.has('ArrowLeft')) out.x -= 1;
+    if (K.has('KeyW') || K.has('ArrowUp')) out.y += 1;
+    if (K.has('KeyS') || K.has('ArrowDown')) out.y -= 1;
+    out.x += this.stick.x; out.y += this.stick.y;
+    const len = Math.hypot(out.x, out.y);
+    if (len > 1) { out.x /= len; out.y /= len; }
+    return out;
+  }
+
+  /** Held run (Shift on keyboard, or the stick pushed to its rim on touch). */
+  get run() {
+    if (!this.enabled || this.scheme !== 'land') return false;
+    return this.runButton || this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ||
+      Math.hypot(this.stick.x, this.stick.y) > 0.92;
+  }
+
+  /** Held jump (for variable jump height); the jump action is the edge. */
+  get jumpHeld() {
+    return this.enabled && this.scheme === 'land' && (this.keys.has('Space') || this.jumpButton === true);
   }
 
   consumeActions() {
     const a = this.actions;
-    const out = { sailUp: a.sailUp, sailDown: a.sailDown, action: a.action, map: a.map, pause: a.pause };
-    a.sailUp = a.sailDown = a.action = a.map = a.pause = 0;
+    const out = { ...a };
+    for (const k of ACTIONS) a[k] = 0;
     return out;
   }
 
@@ -174,6 +233,50 @@ export class Input {
     tap('btnSailUp', 'sailUp');
     tap('btnSailDown', 'sailDown');
     tap('btnAction', 'action');
+
+    // On-foot joystick: drag anywhere inside the base, knob follows the finger
+    const base = document.getElementById('stick');
+    this.stickKnob = document.getElementById('stickKnob');
+    if (base) {
+      let active = null;
+      const setFrom = (e) => {
+        const r = base.getBoundingClientRect();
+        const R = r.width / 2 - 14;
+        const dx = (e.clientX - (r.left + r.width / 2)) / R, dy = -(e.clientY - (r.top + r.height / 2)) / R;
+        const len = Math.hypot(dx, dy);
+        if (len < 1e-6) { this.setStick(0, 0); return; }
+        const ux = dx / len, uy = dy / len, knob = Math.min(1, len);
+        // small dead zone so a resting thumb doesn't creep
+        const dz = 0.12, mag = knob < dz ? 0 : (knob - dz) / (1 - dz);
+        this.setStick(ux * mag, uy * mag, ux * knob, uy * knob);
+      };
+      base.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        this.markTouch();
+        active = e.pointerId;
+        try { base.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+        setFrom(e);
+      });
+      base.addEventListener('pointermove', (e) => { if (e.pointerId === active) setFrom(e); });
+      const end = (e) => { if (e.pointerId === active) { active = null; this.setStick(0, 0); } };
+      base.addEventListener('pointerup', end);
+      base.addEventListener('pointercancel', end);
+      base.addEventListener('lostpointercapture', end);
+    }
+    const jump = document.getElementById('btnJump');
+    if (jump) {
+      const on = (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (this.enabled && this.scheme === 'land') this.actions.jump++;
+        this.jumpButton = true; jump.classList.add('held');
+        try { jump.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+      };
+      const off = () => { this.jumpButton = false; jump.classList.remove('held'); };
+      jump.addEventListener('pointerdown', on);
+      jump.addEventListener('pointerup', off);
+      jump.addEventListener('pointercancel', off);
+      jump.addEventListener('lostpointercapture', off);
+    }
     const spy = document.getElementById('btnSpy');
     if (spy) {
       const on = (e) => { e.preventDefault(); e.stopPropagation(); this.spyButton = true; spy.classList.add('held'); try { spy.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ } };
@@ -182,6 +285,18 @@ export class Input {
       spy.addEventListener('pointerup', off);
       spy.addEventListener('pointercancel', off);
       spy.addEventListener('lostpointercapture', off);
+    }
+  }
+
+  /** x, y are the (dead-zoned) values; kx, ky place the knob (defaults to x, y). */
+  setStick(x, y, kx = x, ky = y) {
+    this.stick.x = x; this.stick.y = y;
+    if (this.stickKnob) {
+      const base = this.stickKnob.parentElement;
+      const R = base ? base.clientWidth / 2 - 14 : 50;
+      const len = Math.min(1, Math.hypot(kx, ky));
+      const a = Math.atan2(ky, kx);
+      this.stickKnob.style.transform = `translate(${Math.cos(a) * len * R}px, ${-Math.sin(a) * len * R}px)`;
     }
   }
 

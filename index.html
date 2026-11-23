@@ -83,6 +83,9 @@
         <button id="btnSailDown" aria-label="Lower sail"><span data-icon="chevDown"></span></button>
       </div>
       <button id="btnAction" class="hidden" aria-label="Action"><span data-icon="anchor"></span><span id="btnActionLabel"></span></button>
+      <!-- On foot (body.scheme-land) -->
+      <div id="stick" aria-hidden="true"><div id="stickKnob"></div></div>
+      <button id="btnJump" aria-label="Jump"><span data-icon="chevUp"></span></button>
     </div>
   </div>
 
@@ -124,9 +127,49 @@
           <button id="btnRepair" class="btn">Repair</button>
         </div>
       </div>
-      <h3 class="sectionTitle">Shipwright</h3>
-      <div id="upgradeGrid" class="grid"></div>
+      <div class="tabs" id="portTabs" role="tablist">
+        <button class="tab on" data-tab="shipwright" role="tab"><span class="ico" data-icon="hull"></span> Shipwright</button>
+        <button class="tab" data-tab="tailor" role="tab"><span class="ico" data-icon="needle"></span> Tailor</button>
+      </div>
+      <div class="tabPane" id="paneShipwright">
+        <div id="upgradeGrid" class="grid"></div>
+      </div>
+      <div class="tabPane hidden" id="paneTailor">
+        <div class="tailorIntro">
+          <p>Change your look any time. Your outfit is free to change; new pieces cost gold.</p>
+          <button id="btnWardrobe" class="btn primary"><span class="ico" data-icon="needle"></span> Try on &amp; change outfit</button>
+        </div>
+        <h3 class="sectionTitle">In stock</h3>
+        <div id="tailorGrid" class="grid"></div>
+      </div>
       <div class="sheetFoot"><button id="btnSetSail" class="btn primary big"><span class="ico" data-icon="sail"></span> Set Sail</button></div>
+    </div>
+  </div>
+
+  <div id="creatorScreen" class="hidden">
+    <div class="creatorStage">
+      <div class="creatorStageTools">
+        <button id="creatorFaceBtn" class="iconBtn" aria-label="Zoom to face"><span data-icon="face"></span></button>
+      </div>
+      <div class="creatorHint">Drag to turn</div>
+    </div>
+    <div id="creatorPanel" class="sheet">
+      <div class="creatorHead">
+        <div>
+          <div class="eyebrow" id="creatorEyebrow">A new voyage</div>
+          <h2 id="creatorTitle">Create your captain</h2>
+        </div>
+        <div class="goldBig wardrobeOnly"><span class="ico" data-icon="coin"></span><span id="creatorGold">0</span></div>
+      </div>
+      <label class="nameField"><span>Name</span><input id="creatorName" type="text" maxlength="18" autocomplete="off" spellcheck="false" placeholder="Captain"></label>
+      <div class="tabs" id="creatorTabs" role="tablist"></div>
+      <div id="creatorMsg" class="hidden" role="status"></div>
+      <div id="creatorBody"></div>
+      <div class="creatorFoot">
+        <button id="creatorRandom" class="btn"><span class="ico" data-icon="dice"></span> Random</button>
+        <button id="creatorCancel" class="btn">Cancel</button>
+        <button id="creatorDone" class="btn primary big">Set sail!</button>
+      </div>
     </div>
   </div>
 
