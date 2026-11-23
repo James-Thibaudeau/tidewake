@@ -17,6 +17,80 @@ Decisions already made:
 
 ---
 
+## Status
+
+Updated 2026-11-23. The phase sections below are the original plan; this
+section records what has shipped and what's left. Keep it current when a
+pull request merges.
+
+### Done
+
+- [x] **Phase 0, foundations:** save v2 migration, game events, scene
+  switching, sea/land input schemes with a touch joystick, articulated
+  explorer rig ([#5](https://github.com/James-Thibaudeau/tidewake/pull/5)).
+- [x] **Phase 1, character customization:** creator on new voyages, port
+  Tailor tab, 37 outfit styles ([#5](https://github.com/James-Thibaudeau/tidewake/pull/5)).
+  - Extra: six face shapes, with oval the default
+    ([#6](https://github.com/James-Thibaudeau/tidewake/pull/6)).
+- [x] **Phase 2a, quest boards:** chart, deliver and salvage quests, HUD
+  tracker, map markers, journal (`J`)
+  ([#7](https://github.com/James-Thibaudeau/tidewake/pull/7)).
+- [x] **Phase 2b, main story:** grandfather's wreck near Port Haven,
+  prologue and epilogue cards, Journals I–VII at beach camps, the letters,
+  Grandpa's scarf and helmet ([#8](https://github.com/James-Thibaudeau/tidewake/pull/8)).
+  - Extra: "Found!" pop-up for story finds
+    ([#9](https://github.com/James-Thibaudeau/tidewake/pull/9)).
+- [x] **Phase 3, going ashore (core):** grandfather's anchor quest (Oak
+  hull), temperate island levels with a difficulty curve by distance from
+  Port Haven, coins, caches, a cosmetic chest per island, lantern
+  checkpoints, a carried lantern at night
+  ([#11](https://github.com/James-Thibaudeau/tidewake/pull/11)).
+- [x] Fix: the seam through the "d" in the title logo
+  ([#10](https://github.com/James-Thibaudeau/tidewake/pull/10)).
+
+### Next up
+
+- [ ] **The wreck as the first walkable level** (left over from Phase 3; see
+  *Later phases* under the main story). A short, safe walk across the
+  beached hull to grandfather's cabin, teaching movement and jumping.
+- [ ] **Phase 4, ashore content and fetch quests:**
+  - [ ] Tropical islands (suggested first)
+  - [ ] Cold, volcanic and rocky islands
+  - [ ] Landmark levels; move Journals III–VII from the beach camps into
+    them, each with a unique cosmetic (makes the fur hood, flower crown,
+    gold circlet and shell necklace findable)
+  - [ ] Retrieve quests, including "Find the lost map fragment"
+  - [ ] Harmless obstacles (crabs, gulls)
+- [ ] **Phase 5, polish:**
+  - [ ] Sound: footsteps by surface, jump and land, coins, chest fanfare,
+    biome ambience, an on-foot music variant
+  - [ ] Tutorial hints for the quest board and the Tailor (the first
+    landing hint already exists)
+  - [ ] Phones: joystick dead zone, bigger buttons, less decor on Low
+  - [ ] Performance pass, including cleanup when leaving an island
+  - [x] README controls for going ashore (done in #11)
+
+### Known issues
+
+From Phase 1 (outfits):
+- [ ] The poncho's hem clips the arms when they hang loose.
+- [ ] Curly hair pokes through the flower crown and circlet.
+- [ ] Grandpa's helmet looks only a little different from the normal pith
+  helmet.
+- [ ] The ponytail sticks out sideways instead of hanging.
+- [ ] Freckles are hard to see from the sailing camera.
+
+From Phase 3 (ashore):
+- [ ] The compass shows the ship's heading while you're on foot.
+- [ ] Water in the moat rises and falls with the ocean swell.
+- [ ] Rock faces fade into the grass with a soft band instead of a crisp
+  edge.
+- [ ] Platforms against a cliff can leave a small gap to the rock.
+- [ ] Large easy islands can still have up to 20 small hops in total (never
+  more than 4 in a row).
+
+---
+
 ## How the codebase fits (what we build on)
 
 | Area | Today | What changes |
