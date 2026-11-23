@@ -78,6 +78,8 @@ From Phase 1 (outfits):
 - [x] Grandpa's helmet looks only a little different from the normal pith
   helmet.
 - [x] The ponytail sticks out sideways instead of hanging.
+- [x] The scarf tail hangs inside the back of every top (worst on the long
+  coat and poncho), and pokes out through the chest while running.
 - [ ] Freckles are hard to see from the sailing camera.
 
 From Phase 3 (ashore):
