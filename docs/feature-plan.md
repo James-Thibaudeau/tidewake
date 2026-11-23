@@ -328,11 +328,35 @@ that the chart, the spyglass and actually exploring all matter.
 
 ## Phase 3: Going ashore (core loop, one biome)
 
+### Unlocking it: grandfather's anchor
+
+You can't go ashore until your ship carries an anchor, and the anchor is his.
+
+1. **Trigger:** buying the **Oak Planking** hull (hull tier 1, 120 gold).
+   The shipwright says something like *"A hull this sound can carry a proper
+   anchor. Your grandfather's ship had the finest in the harbor, and it'll
+   still be on the bottom by the wreck."* Saves that already own hull 1 or
+   better get the quest the next time they dock.
+2. **Quest:** "Grandfather's anchor". It works like the main story: always
+   tracked, takes no side-quest slot, and can't be abandoned. It runs
+   alongside whatever journal chapter you're on.
+3. **Salvage:** a marked spot on the seabed beside the wreck, using the same
+   haul interaction as salvage quests. If you're shipwrecked while carrying
+   it, it sinks back to that spot.
+4. **Fitting:** dock at any port and the shipwright fits it for free. A
+   "Found!" pop-up shows the anchor and explains how to go ashore.
+5. **On the boat:** the anchor hangs at the bow on every hull tier. It drops
+   on its chain when you go ashore and is hauled back up when you return.
+6. **Before you have it:** slowing near an island's coast shows a hint instead
+   of the action: *"You'll need an anchor to go ashore."*
+
+Save: `story.flags.anchor = 'quest' | 'aboard' | 'fitted'`.
+
 ### Landing flow
 
-1. Sailing slowly near any non-reef, non-port island's coast (within ~40u of
-   the shore and slower than 6 kn) shows the prompt **Drop anchor & go
-   ashore**.
+1. Once the anchor is fitted, sailing slowly near any non-reef, non-port
+   island's coast (within ~40u of the shore and slower than 6 kn) shows the
+   prompt **Drop anchor & go ashore**.
 2. The boat anchors: sails are furled, the boat is pinned in place, and it
    **can't be damaged while anchored**. The game saves the voyage.
 3. The screen fades. `Ashore.enter(I)` builds the level, moves the sky, ocean
@@ -395,7 +419,8 @@ Phase 3 ships **temperate** only, to prove the loop end to end. Other islands
 show the prompt but say *"Too treacherous to land (coming soon)"*. Another
 option is to allow only temperate islands at first.
 
-**Done when:** you can land on any temperate island, platform to its summit,
+**Done when:** buying the Oak hull starts the anchor quest, hauling and
+fitting it unlocks landing, and you can land on any temperate island, platform to its summit,
 collect coins and a cosmetic chest, return to the ship and bank the coins. It
 should run at 60fps on desktop and stay playable on a phone with the touch
 stick.

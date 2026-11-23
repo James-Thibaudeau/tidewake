@@ -382,6 +382,8 @@ body.scheme-land #btnAction { right: calc(var(--sar) + 104px); }
 .controls { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; font-size: 14px; align-items: center; }
 .controls kbd { font-size: 12px; line-height: 18px; margin-right: 2px; }
 .controls .k { white-space: nowrap; text-align: right; }
+.controls .ctlSub { grid-column: 1 / -1; font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold); opacity: 0.9; margin-top: 6px; }
+.controls .ctlSub:first-child { margin-top: 0; }
 .tips { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.5; opacity: 0.9; }
 #btnReset { margin-top: 18px; align-self: center; font-size: 14px; }
 
@@ -680,3 +682,14 @@ body.creator-open #hud, body.creator-open #spyOverlay, body.creator-open #vignet
 .foundText kbd { font-size: 11px; }
 .foundFoot { display: flex; gap: 8px; justify-content: center; align-items: center; margin-top: 16px; flex-wrap: wrap; }
 .foundFoot .btn.big { padding: 10px 22px; }
+
+/* ------------------------------------------------------------- ashore */
+body.ashore #windDial, body.ashore #sailGauge, body.ashore #rowCargo { display: none; }
+#btnReturnShip { display: none; margin-top: 8px; }
+body.ashore #btnReturnShip { display: inline-flex; }
+#ashorePanel { width: 170px; padding: 6px 10px 7px; display: flex; flex-direction: column; gap: 3px; border-color: rgba(255, 213, 74, 0.7); }
+#ashorePanel .apHead { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--gold); }
+#ashorePanel .apRow { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; }
+#ashorePanel .apRow small { font-size: 11px; font-weight: 400; opacity: 0.8; margin-left: auto; }
+#ashorePanel .apLeft { font-size: 12px; font-weight: 400; opacity: 0.85; }
+#ashorePanel .ico { width: 16px; height: 16px; flex: none; }

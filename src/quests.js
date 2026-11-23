@@ -63,6 +63,13 @@ const siteBeamMat = new THREE.ShaderMaterial({
 });
 const siteBeamGeo = new THREE.CylinderGeometry(2.6, 1.0, 80, 14, 1, true).translate(0, 39, 0);
 
+/** A salvage beam on its own (the story's anchor spot uses one too). */
+export function siteBeam() {
+  const beam = new THREE.Mesh(siteBeamGeo, siteBeamMat);
+  beam.frustumCulled = false;
+  return beam;
+}
+
 function buildSiteMesh() {
   const g = new THREE.Group();
   const beam = new THREE.Mesh(siteBeamGeo, siteBeamMat);
@@ -246,14 +253,13 @@ export class QuestSystem {
   }
 
   pin(id) { this.Q.pinned = id; }
-  /** The main story's current step (never takes a side-quest slot). */
-  get story() { return this.game.story?.quest() || null; }
-  /** Everything worth tracking: the story first, then side quests. */
-  get tracked() { const s = this.story; return s ? [s, ...this.active] : [...this.active]; }
+  /** Story-track steps (main story, grandfather's anchor): never take a side-quest slot. */
+  get storyQuests() { return this.game.story?.quests() || []; }
+  /** Everything worth tracking: story steps first, then side quests. */
+  get tracked() { return [...this.storyQuests, ...this.active]; }
   get pinned() {
-    const id = this.Q.pinned, s = this.story;
-    if (id === 'story' && s) return s;
-    return this.active.find((q) => q.id === id) || s || this.active[0] || null;
+    const id = this.Q.pinned, list = this.tracked;
+    return list.find((q) => q.id === id) || list[0] || null;
   }
 
   /** Quest items aboard (mirrored into state.hold for the save). */
@@ -360,7 +366,7 @@ export class QuestSystem {
    * area rather than an exact spot.
    */
   target(q) {
-    if (q.type === 'story') return this.game.story.target();
+    if (q.type === 'story') return this.game.story.target(q.id);
     const b = this.game.boat.pos;
     const nearestPort = () => {
       let best = null, bd = Infinity;

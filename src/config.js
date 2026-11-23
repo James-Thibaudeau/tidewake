@@ -95,3 +95,21 @@ export function upgradeValue(levels, key) {
   const u = UPGRADES.find((u) => u.key === key);
   return u.tiers[Math.min(levels[key] || 0, u.tiers.length - 1)].value;
 }
+
+// On-foot movement (going ashore). The controller uses these, and level
+// builders must keep every required jump inside `design` (with margin).
+export const ASHORE = {
+  radius: 0.32,          // capsule radius (m)
+  height: 1.7,           // capsule height, feet to head
+  stepUp: 0.35,          // ledges this high are walked up without jumping
+  slopeMax: 0.75,        // steepest walkable ground (radians, ~43°)
+  walk: 4.3, run: 7.0,   // top speeds (m/s)
+  accel: 45, airAccel: 14, friction: 24,
+  gravity: 30,
+  jumpVel: 9.6,          // apex ≈ 1.53 m, a little snappier than floaty
+  jumpCut: 0.45,         // releasing jump early multiplies upward speed by this
+  coyote: 0.1, buffer: 0.12,
+  maxFall: 32,
+  // Level design limits for *required* moves (comfortable, not frame-perfect)
+  design: { jumpUp: 1.15, gapWalk: 1.9, gapRun: 3.4, safeDrop: 6 },
+};

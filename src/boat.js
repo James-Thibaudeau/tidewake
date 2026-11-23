@@ -515,9 +515,46 @@ export class Boat {
     this.buildLanterns();
     this.buildNest();
 
+    this.buildAnchor();
+
     // The explorer
     this.explorer = new Explorer();
     this.group.add(this.explorer.root);
+  }
+
+  /** Grandfather's anchor, hung at the starboard bow once it's fitted. */
+  buildAnchor() {
+    const IRON = '#3c434c', IRON2 = '#5b6570';
+    const P = [
+      part(new THREE.CylinderGeometry(0.045, 0.05, 0.9, 6), IRON),                            // shank
+      part(new THREE.TorusGeometry(0.09, 0.025, 4, 10), IRON2, { y: 0.52 }),                   // ring
+      part(new THREE.CylinderGeometry(0.032, 0.032, 0.62, 5), '#6b4a2b', { y: 0.36, rz: Math.PI / 2 }), // wooden stock
+      part(new THREE.TorusGeometry(0.28, 0.045, 5, 12, Math.PI), IRON, { y: -0.2, rz: Math.PI }), // arms
+      part(new THREE.SphereGeometry(0.07, 6, 4), IRON2, { y: -0.47 }),                         // crown
+    ];
+    for (const s of [-1, 1]) P.push(part(new THREE.ConeGeometry(0.09, 0.2, 4), IRON2, { x: s * 0.28, y: -0.13, rz: s * -0.25 }));
+    const anchor = decoMesh(P, true);
+    anchor.position.set(0.98, 0.42, 2.85);
+    anchor.rotation.set(0.12, 0.3, 0.22);
+    anchor.scale.setScalar(1.7); // big enough to read from the chase camera
+    // the rope from the cathead to the ring
+    const rope = decoMesh([ropePart(V3(0.6, 1.2, 3.15), V3(0.98, 1.3, 2.95), 0.05, 0.025)]);
+    this.anchorStowed = new THREE.Group();
+    this.anchorStowed.add(anchor, rope);
+    // dropped: a chain running from the bow down into the water
+    const chain = decoMesh([ropePart(V3(0.62, 1.05, 3.35), V3(1.0, -1.8, 5.0), 0.25, 0.035, '#4a525c')]);
+    this.anchorDown = chain;
+    this.anchorStowed.visible = false;
+    this.anchorDown.visible = false;
+    this.model.add(this.anchorStowed, this.anchorDown);
+    this.anchorState = 'none';
+  }
+
+  /** 'none' (no anchor yet) | 'stowed' (at the bow) | 'down' (dropped, chain in the water). */
+  setAnchor(state) {
+    this.anchorState = state;
+    this.anchorStowed.visible = state === 'stowed';
+    this.anchorDown.visible = state === 'down';
   }
 
   buildHullTiers() {

@@ -111,7 +111,8 @@ export class UI {
       'tailorGrid', 'btnWardrobe', 'creatorScreen', 'questTracker', 'qtTitle', 'qtArrow', 'qtLabel', 'qtDist', 'compassQuest',
       'btnJournal', 'paneQuests', 'questCount', 'questOffers', 'questBadge', 'journalScreen', 'journalBody', 'journalClose',
       'journalTabs', 'journalTitle', 'storyCards', 'storyArt', 'storyTitle', 'storyText', 'storyDots', 'storySkip', 'storyNext',
-      'foundScreen', 'foundEyebrow', 'foundTitle', 'foundItems', 'foundMain', 'foundLater'];
+      'foundScreen', 'foundEyebrow', 'foundTitle', 'foundItems', 'foundMain', 'foundLater',
+      'ashorePanel', 'apName', 'apGold', 'apLeft'];
     this.el = {};
     for (const id of ids) this.el[id] = $(id);
     this.notches = [...document.querySelectorAll('#sailGauge .notches span')];
@@ -192,6 +193,7 @@ export class UI {
     this.on('btnSetSail', () => g.setSail?.());
     this.on('btnRepair', () => { g.repair?.(); this.refreshPort(); });
     this.on('btnResume', () => g.setPaused?.(false));
+    this.on('btnReturnShip', () => { g.setPaused?.(false); g.ashore?.leave(); });
     this.on('setSound', () => { g.setSetting?.('sound', !g.settings?.sound); this.refreshSettings(); });
     this.on('setMusic', () => { g.setSetting?.('music', !g.settings?.music); this.refreshSettings(); });
     this.on('setQuality', () => { g.setSetting?.('quality', g.settings?.quality === 'low' ? 'high' : 'low'); this.refreshSettings(); });
@@ -280,18 +282,31 @@ export class UI {
   buildControlsHelp() {
     const el = this.el.controlsHelp;
     if (!el) return;
-    const rows = [
+    const sea = [
       ['<kbd>W</kbd><kbd>S</kbd> / <kbd>&uarr;</kbd><kbd>&darr;</kbd>', 'Raise / lower sail', 'Sail buttons ▲ ▼'],
       ['<kbd>A</kbd><kbd>D</kbd> / <kbd>&larr;</kbd><kbd>&rarr;</kbd>', 'Steer', 'Drag the tiller'],
-      ['<kbd>E</kbd> / <kbd>Space</kbd>', 'Dock, haul treasure', 'Gold action button'],
+      ['<kbd>E</kbd> / <kbd>Space</kbd>', 'Dock, haul treasure, go ashore', 'Gold action button'],
+      ['Hold <kbd>Z</kbd> / <kbd>Shift</kbd>', 'Spyglass (once found)', 'Spyglass button'],
+    ];
+    const foot = [
+      ['<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows', 'Walk', 'Joystick'],
+      ['Hold <kbd>Shift</kbd>', 'Run', 'Push the joystick to its edge'],
+      ['<kbd>Space</kbd>', 'Jump (hold for higher)', 'Jump button ▲'],
+      ['<kbd>E</kbd>', 'Open chests, row back to the ship', 'Gold action button'],
+    ];
+    const both = [
       ['Drag &middot; Wheel', 'Look around &middot; Zoom', 'Drag &middot; Pinch'],
-      ['Hold <kbd>Z</kbd> / <kbd>Shift</kbd>', 'Spyglass (once upgraded)', 'Spyglass button'],
       ['<kbd>M</kbd>', 'Sea chart', 'Map button'],
       ['<kbd>J</kbd>', 'Journal &amp; quests', 'Journal button'],
       ['<kbd>Esc</kbd>', 'Pause', 'Pause button'],
     ];
-    el.innerHTML = rows.map(([k, what, t]) =>
-      `<div class="k">${this.touch ? t : k}</div><div>${what}</div>`).join('');
+    const rows = (list) => list.map(([k, what, t]) => `<div class="k">${this.touch ? t : k}</div><div>${what}</div>`).join('');
+    const group = (title, list) => `<div class="ctlSub">${title}</div>${rows(list)}`;
+    // the section you're using right now comes first
+    const ashore = document.body.classList.contains('ashore');
+    el.innerHTML = ashore
+      ? group('On foot', foot) + group('Sailing', sea) + group('Anywhere', both)
+      : group('Sailing', sea) + group('On foot', foot) + group('Anywhere', both);
     if (this.el.titleHint) {
       this.el.titleHint.innerHTML = this.touch
         ? 'Drag the tiller to steer &middot; ▲▼ raise and lower the sail &middot; drag to look, pinch to zoom'
@@ -1037,11 +1052,11 @@ export class UI {
     if (q.type === 'story') {
       const pinned = Qs.pinned?.id === q.id;
       return `<div class="card qCard storyQ${pinned ? ' pinned' : ''}">
-        <div class="giver">${this.avatar(q.giver)}<span><b>Main story</b> · Grandfather's Journals</span></div>
+        <div class="giver">${this.avatar(q.giver)}<span><b>${esc(q.giver.role)}</b> · ${esc(q.giver.label || "Grandfather's Journals")}</span></div>
         <div class="qTitle">${esc(q.title)}</div>
         <div class="qText">${esc(q.text)}</div>
         <div class="qStatus">${esc(Qs.status(q))}</div>
-        <div class="row2"><button class="btn" data-pin="story" ${pinned ? 'disabled' : ''}>${pinned ? 'Tracking' : 'Track'}</button></div></div>`;
+        <div class="row2"><button class="btn" data-pin="${q.id}" ${pinned ? 'disabled' : ''}>${pinned ? 'Tracking' : 'Track'}</button></div></div>`;
     }
     if (mode === 'offer') {
       const can = Qs.canAccept();
@@ -1097,7 +1112,8 @@ export class UI {
     if (tab === 'story') { this.el.journalBody.innerHTML = this.renderStoryPages(); return; }
     const Qs = this.game.quests;
     let html = '';
-    if (Qs.story) html += `<h3 class="sectionTitle">Main story</h3><div class="grid">${this.questCard(Qs.story, 'active')}</div>`;
+    const sq = Qs.storyQuests;
+    if (sq.length) html += `<h3 class="sectionTitle">Main story</h3><div class="grid">${sq.map((q) => this.questCard(q, 'active')).join('')}</div>`;
     html += `<h3 class="sectionTitle">Active (${Qs.active.length}/${MAX_ACTIVE})</h3>`;
     html += Qs.active.length
       ? `<div class="grid">${Qs.active.map((q) => this.questCard(q, 'active')).join('')}</div>`
@@ -1132,6 +1148,21 @@ export class UI {
         ${p.clue ? `<p class="clue">${esc(p.clue)}</p>` : ''}</div>`;
     }
     return `<div class="jStory"><div class="jList">${list}</div>${page}</div>`;
+  }
+
+  // ------------------------------------------------------------ ashore
+  /** Island panel while ashore (name = null hides it). */
+  setAshore(name, gold = 0, left = {}) {
+    const el = this.el.ashorePanel;
+    if (!el) return;
+    el.classList.toggle('hidden', !name);
+    if (!name) return;
+    this.el.apName.textContent = name;
+    this.el.apGold.textContent = fmt(gold);
+    const bits = [];
+    bits.push(left.coins ? `${left.coins} coin${left.coins === 1 ? '' : 's'} left` : 'All coins found');
+    if (left.chest) bits.push('a chest is hidden here');
+    this.el.apLeft.textContent = bits.join(' · ');
   }
 
   // ------------------------------------------------------------ found!

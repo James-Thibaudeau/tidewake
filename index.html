@@ -31,6 +31,11 @@
         <div class="hullLabel"><span class="ico" data-icon="hull"></span><span>Hull</span><span id="hullText">100</span></div>
         <div class="bar"><div id="hullBar"></div></div>
       </div>
+      <div class="panel hidden" id="ashorePanel">
+        <div class="apHead"><span class="ico" data-icon="anchor"></span><span id="apName"></span></div>
+        <div class="apRow"><span class="ico" data-icon="coin"></span><span id="apGold">0</span><small>found here</small></div>
+        <div class="apRow apLeft" id="apLeft"></div>
+      </div>
       <button class="panel hidden" id="questTracker" aria-label="Open the journal">
         <div class="qtHead"><span class="ico" data-icon="scroll"></span><span id="qtTitle"></span></div>
         <div class="qtRow"><span id="qtArrow" class="qtArrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l7.5 18-7.5-4.2-7.5 4.2z" fill="currentColor" stroke="#0b1830" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span id="qtLabel"></span><span id="qtDist"></span></div>
@@ -241,6 +246,7 @@
     <div class="sheet pause">
       <h2>Paused</h2>
       <button id="btnResume" class="btn primary big">Resume</button>
+      <button id="btnReturnShip" class="btn big">Return to ship</button>
       <div class="settings">
         <button id="setSound" class="toggle">Sound: On</button>
         <button id="setMusic" class="toggle">Music: On</button>
