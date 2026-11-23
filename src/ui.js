@@ -2,6 +2,7 @@
 // screens. Reads game state; calls game methods for actions.
 import { UPGRADES, MAP_RES, MAP_CELL, WORLD_HALF } from './config.js';
 import { STYLES, owns } from './cosmetics.js';
+import { MAX_ACTIVE, fmtDist } from './quests.js';
 import { bearingDeg } from './util.js';
 
 const $ = (id) => document.getElementById(id);
@@ -38,6 +39,7 @@ export const ICONS = {
   chevRight: S(`<path d="M9 5l7 7-7 7" ${STROKE} stroke-width="3"/>`),
   needle: S(`<path d="M19.5 3.5L6 17" ${STROKE} stroke-width="2.6"/><ellipse cx="18" cy="5" rx="1.1" ry="2.2" transform="rotate(45 18 5)" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 17c-2 1-3.5 2.5-3 4 1.5.5 3-1 4-3" ${STROKE}/><path d="M17 6c-4 0-9 3-11 8" fill="none" stroke="#ff6b5b" stroke-width="1.8" stroke-linecap="round"/>`),
   face: S(`<circle cx="12" cy="12" r="9" ${STROKE}/><circle cx="9" cy="11" r="1.4" fill="currentColor"/><circle cx="15" cy="11" r="1.4" fill="currentColor"/><path d="M8.5 15c2 2 5 2 7 0" ${STROKE}/>`),
+  scroll: S(`<path d="M6 4h11a3 3 0 0 1 0 6h-1v8a3 3 0 0 1-3 3H6a3 3 0 0 1 0-6h1V7a3 3 0 0 1 3-3" ${STROKE}/><path d="M10 9h4M10 13h4" ${STROKE}/>`),
   dice: S(`<rect x="3.5" y="3.5" width="17" height="17" rx="4" ${STROKE}/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"/>`),
 };
 
@@ -56,7 +58,8 @@ export class UI {
       'portScreen', 'portName', 'portGold', 'portHull', 'btnRepair', 'upgradeGrid', 'btnSetSail', 'mapScreen', 'mapCanvas',
       'mapStats', 'pauseScreen', 'setSound', 'setMusic', 'setQuality', 'controlsHelp', 'wreckScreen', 'wreckText',
       'btnRespawn', 'confirm', 'confirmText', 'confirmYes', 'confirmNo', 'portTabs', 'paneShipwright', 'paneTailor',
-      'tailorGrid', 'btnWardrobe', 'creatorScreen'];
+      'tailorGrid', 'btnWardrobe', 'creatorScreen', 'questTracker', 'qtTitle', 'qtArrow', 'qtLabel', 'qtDist', 'compassQuest',
+      'btnJournal', 'paneQuests', 'questCount', 'questOffers', 'questBadge', 'journalScreen', 'journalBody', 'journalClose'];
     this.el = {};
     for (const id of ids) this.el[id] = $(id);
     this.notches = [...document.querySelectorAll('#sailGauge .notches span')];
@@ -80,7 +83,7 @@ export class UI {
       if (this.map.open) this.resizeMap();
     });
     // Keep UI interactions from leaking to the 3D view
-    for (const id of ['portScreen', 'pauseScreen', 'wreckScreen', 'confirm', 'title', 'creatorScreen']) {
+    for (const id of ['portScreen', 'pauseScreen', 'wreckScreen', 'confirm', 'title', 'creatorScreen', 'journalScreen']) {
       const e = this.el[id];
       if (e) e.addEventListener('wheel', (ev) => ev.stopPropagation(), { passive: true });
     }
@@ -161,6 +164,27 @@ export class UI {
       this.setPortTab(b.dataset.tab);
     });
     this.on('btnWardrobe', () => g.openWardrobe?.());
+    // Quests: board, tracker, journal
+    this.el.questOffers?.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-accept]');
+      if (!b || b.disabled) return;
+      this.click();
+      g.quests?.accept(b.dataset.accept, this.portIsland);
+      this.refreshPort();
+    });
+    this.on('btnJournal', () => this.toggleJournal());
+    this.on('questTracker', () => this.openJournal());
+    this.on('journalClose', () => this.closeJournal());
+    this.el.journalBody?.addEventListener('click', async (e) => {
+      const b = e.target.closest('button[data-pin], button[data-abandon]');
+      if (!b) return;
+      this.click();
+      if (b.dataset.pin) { g.quests?.pin(b.dataset.pin); this.renderJournal(); return; }
+      const q = g.quests?.active.find((x) => x.id === b.dataset.abandon);
+      if (!q) return;
+      const ok = await this.confirmBox(`Abandon "${q.title}"?${q.type === 'deliver' ? ' The parcel stays with you; nobody will pay for it.' : ''}`, 'Abandon');
+      if (ok) { g.quests.abandon(q.id); this.renderJournal(); }
+    });
     this.el.tailorGrid?.addEventListener('click', async (e) => {
       const b = e.target.closest('button[data-buy]');
       if (!b || b.disabled) return;
@@ -191,6 +215,7 @@ export class UI {
       ['Drag &middot; Wheel', 'Look around &middot; Zoom', 'Drag &middot; Pinch'],
       ['Hold <kbd>Z</kbd> / <kbd>Shift</kbd>', 'Spyglass (once upgraded)', 'Spyglass button'],
       ['<kbd>M</kbd>', 'Sea chart', 'Map button'],
+      ['<kbd>J</kbd>', 'Journal &amp; quests', 'Journal button'],
       ['<kbd>Esc</kbd>', 'Pause', 'Pause button'],
     ];
     el.innerHTML = rows.map(([k, what, t]) =>
@@ -343,6 +368,8 @@ export class UI {
       const spyOn = (st.upgrades?.spyglass || 0) > 0;
       if (spyOn !== this.last.spy) { this.el.btnSpy?.classList.toggle('hidden', !spyOn); this.last.spy = spyOn; }
     }
+
+    this.updateQuestTracker();
 
     // minimap
     this.timers.mini -= dt;
@@ -517,6 +544,7 @@ export class UI {
         this.drawAnchor(g, X(px), Y(pz), Math.max(5, Sz / 22), I.id === game.state.savePort);
       }
     }
+    this.drawQuestMarkers(g, X, Y, k, Math.max(6, Sz / 16), R, R, R);
     // boat arrow
     g.translate(R, R);
     g.rotate((bearingDeg(b.heading) * Math.PI) / 180);
@@ -816,6 +844,7 @@ export class UI {
       }
     }
 
+    this.drawQuestMarkers(g, X, Y, z, 14 * dpr);
     // ship
     const b = game.boat;
     if (b) {
@@ -889,7 +918,144 @@ export class UI {
     this.portTab = tab;
     this.el.portTabs?.querySelectorAll('button[data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
     this.el.paneShipwright?.classList.toggle('hidden', tab !== 'shipwright');
+    this.el.paneQuests?.classList.toggle('hidden', tab !== 'quests');
     this.el.paneTailor?.classList.toggle('hidden', tab !== 'tailor');
+  }
+
+  // ------------------------------------------------------------ quests
+  avatar(giver) {
+    const hue = [...giver.name].reduce((h, c) => h + c.charCodeAt(0) * 37, 0) % 360;
+    return `<span class="avatar" style="background:hsl(${hue} 70% 72%)">${esc(giver.name[0])}</span>`;
+  }
+
+  questCard(q, mode) {
+    const g = this.game, Qs = g.quests;
+    const cos = q.reward.cosmetic ? STYLES.find((s) => s.id === q.reward.cosmetic) : null;
+    const meta = [`<span class="gold">${ICONS.coin.replace('<svg', '<svg class="ico" style="width:13px;height:13px;vertical-align:-2px"')} ${fmt(q.reward.gold)}</span>`];
+    if (q.type === 'deliver' && q.days) meta.push(`<span>+${fmt(q.bonus)} within ${q.days} day${q.days === 1 ? '' : 's'}</span>`);
+    if (cos) meta.push(`<span class="cos">+ ${esc(cos.name)}</span>`);
+    if (q.dist) meta.push(`<span>${fmtDist(q.dist)}</span>`);
+    let foot = '';
+    if (mode === 'offer') {
+      const can = Qs.canAccept();
+      foot = `<button class="btn${can ? ' primary' : ''}" data-accept="${q.id}" ${can ? '' : 'disabled'}>${can ? 'Accept' : `${MAX_ACTIVE} quests already`}</button>`;
+    } else {
+      const pinned = Qs.pinned?.id === q.id;
+      foot = `<div class="qStatus">${esc(Qs.status(q))}</div>
+        <div class="row2"><button class="btn" data-pin="${q.id}" ${pinned ? 'disabled' : ''}>${pinned ? 'Tracking' : 'Track'}</button>
+        <button class="btn danger" data-abandon="${q.id}">Abandon</button></div>`;
+    }
+    const from = g.world.islands[q.from];
+    return `<div class="card qCard${mode !== 'offer' && Qs.pinned?.id === q.id ? ' pinned' : ''}">
+      <div class="giver">${this.avatar(q.giver)}<span><b>${esc(q.giver.name)}</b> · ${esc(q.giver.role)}${mode !== 'offer' && from ? `, ${esc(from.name)}` : ''}</span></div>
+      <div class="qTitle">${esc(q.title)}</div>
+      <div class="qText">${esc(q.text)}</div>
+      <div class="qMeta">${meta.join('')}</div>
+      ${foot}</div>`;
+  }
+
+  refreshQuests() {
+    const g = this.game, Qs = g.quests, port = this.portIsland;
+    if (!Qs || !port || !this.el.questOffers) return;
+    const offers = Qs.board(port);
+    const n = Qs.active.length;
+    this.el.questCount.innerHTML = `Active quests: <b>${n}/${MAX_ACTIVE}</b>${n ? ' · open the journal (<kbd>J</kbd>) to track or abandon them' : ''}. Rewards are paid when you dock.`;
+    this.el.questOffers.innerHTML = offers.length
+      ? offers.map((o) => this.questCard(o, 'offer')).join('')
+      : '<div class="qEmpty">No work posted today. Check back tomorrow.</div>';
+    const badge = this.el.questBadge;
+    if (badge) { badge.textContent = offers.length; badge.classList.toggle('hidden', !offers.length || !Qs.canAccept()); }
+  }
+
+  // ------------------------------------------------------------ journal
+  get isJournalOpen() { return !!this.journalOpen; }
+  openJournal() {
+    if (this.journalOpen || !this.game.quests) return;
+    this.journalOpen = true;
+    this.renderJournal();
+    this.el.journalScreen?.classList.remove('hidden');
+  }
+  closeJournal() { this.journalOpen = false; this.el.journalScreen?.classList.add('hidden'); }
+  toggleJournal() { if (this.journalOpen) this.closeJournal(); else this.openJournal(); }
+
+  renderJournal() {
+    const Qs = this.game.quests;
+    let html = `<h3 class="sectionTitle">Active (${Qs.active.length}/${MAX_ACTIVE})</h3>`;
+    html += Qs.active.length
+      ? `<div class="grid">${Qs.active.map((q) => this.questCard(q, 'active')).join('')}</div>`
+      : '<div class="qEmpty">No quests yet. Quest boards are posted in every port.</div>';
+    const done = (this.game.state.stats?.quests || 0);
+    html += `<h3 class="sectionTitle">Completed</h3><div class="qEmpty">${done ? `${done} quest${done === 1 ? '' : 's'} completed.` : 'None yet.'}</div>`;
+    this.el.journalBody.innerHTML = html;
+  }
+
+  // ------------------------------------------------------------ tracker
+  updateQuestTracker() {
+    const g = this.game, Qs = g.quests, b = g.boat;
+    const q = Qs && (g.mode === 'sailing' || g.mode === 'docked' || g.mode === 'docking') ? Qs.pinned : null;
+    const tr = this.el.questTracker, cq = this.el.compassQuest;
+    if (!q) {
+      if (this.last.qt !== null) { tr?.classList.add('hidden'); cq?.classList.add('hidden'); this.last.qt = null; }
+      return;
+    }
+    const t = Qs.target(q);
+    const dx = t.x - b.pos.x, dz = t.z - b.pos.z;
+    const d = Math.hypot(dx, dz);
+    const inside = t.r && d < t.r;
+    const key = `${q.id}|${t.label}`;
+    if (this.last.qt !== key) {
+      this.last.qt = key;
+      tr.classList.remove('hidden');
+      this.el.qtTitle.textContent = q.title;
+      this.el.qtLabel.textContent = t.label;
+    }
+    const distTxt = inside ? 'In the area' : fmtDist(t.r ? d - t.r : d);
+    if (this.el.qtDist.textContent !== distTxt) this.el.qtDist.textContent = distTxt;
+    // arrow relative to the ship's heading; the compass pin by bearing
+    const brg = bearingDeg(Math.atan2(dx, dz)), head = bearingDeg(b.heading);
+    let rel = ((brg - head) % 360 + 540) % 360 - 180;
+    this.el.qtArrow.style.transform = `rotate(${rel.toFixed(1)}deg)`;
+    this.el.qtArrow.style.opacity = inside ? 0.35 : 1;
+    if (cq) {
+      if (!this.compassW) this.compassW = this.el.compass?.clientWidth || 0; // measured while hidden at boot
+      const w = this.compassW || 300, half = w / 2 - 10;
+      const x = clampN(rel * PX_PER_DEG, -half, half);
+      cq.classList.remove('hidden');
+      cq.classList.toggle('edge', Math.abs(rel * PX_PER_DEG) > half);
+      cq.style.left = `${w / 2 + x}px`;
+    }
+  }
+
+  /** Quest markers on a map canvas. X/Y project world → canvas; `scale` px per world unit. */
+  drawQuestMarkers(g, X, Y, scale, size, clipR = null, cx = 0, cy = 0) {
+    const Qs = this.game.quests;
+    if (!Qs || !Qs.active.length) return;
+    const pinned = Qs.pinned;
+    const pulse = 0.65 + 0.35 * Math.sin(performance.now() / 300);
+    for (const q of Qs.active) {
+      const t = Qs.target(q);
+      const on = q === pinned;
+      let x = X(t.x), y = Y(t.z);
+      g.save();
+      if (t.r) {
+        g.beginPath(); g.arc(x, y, t.r * scale, 0, TAU);
+        g.fillStyle = `rgba(111,240,255,${on ? 0.16 : 0.08})`; g.fill();
+        g.setLineDash([size * 0.7, size * 0.5]);
+        g.strokeStyle = `rgba(30,150,170,${on ? 0.95 : 0.5})`; g.lineWidth = Math.max(1.5, size / 5); g.stroke();
+        g.setLineDash([]);
+      }
+      // clamp to the rim of a round minimap so off-screen targets still show a direction
+      if (clipR) {
+        const vx = x - cx, vy = y - cy, l = Math.hypot(vx, vy), lim = clipR - size * 1.1;
+        if (l > lim) { x = cx + (vx / l) * lim; y = cy + (vy / l) * lim; }
+      }
+      const s = size * (on ? 1 : 0.75);
+      g.translate(x, y); g.rotate(Math.PI / 4);
+      g.fillStyle = on ? `rgba(111,240,255,${pulse})` : 'rgba(111,240,255,0.6)';
+      g.fillRect(-s / 2, -s / 2, s, s);
+      g.strokeStyle = '#0b1830'; g.lineWidth = Math.max(1.2, size / 6); g.strokeRect(-s / 2, -s / 2, s, s);
+      g.restore();
+    }
   }
 
   refreshTailor() {
@@ -914,6 +1080,7 @@ export class UI {
     if (!st || !this.el.upgradeGrid) return;
     this.el.portGold.textContent = fmt(st.banked);
     this.refreshTailor();
+    this.refreshQuests();
     const maxH = (b && b.maxHealth) || 100;
     this.el.portHull.textContent = `Hull ${Math.ceil(st.health || 0)}/${maxH}`;
     const cost = g.repairCost ? g.repairCost() : 0;

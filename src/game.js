@@ -63,7 +63,7 @@ export class Game {
       stats: { distance: 0, treasures: 0, wrecks: 0, discoveries: 1 }, tutorial: 0,
       // v2: character, quests, story, ashore progress and quest cargo
       profile: normalizeProfile(null), wardrobe: [],
-      quests: { active: [], done: [], boards: {} },
+      quests: { active: [], done: [], boards: {}, pinned: null },
       story: { chapter: 0, journals: [], flags: {}, seenCards: [] },
       ashore: {}, hold: [],
     };
@@ -431,7 +431,11 @@ export class Game {
     this.audio.play('treasure');
     this.ui.banner(`${I.treasure.value} gold`, 'Treasure hauled aboard!');
     this.events.emit('haul', I);
-    // chest rises beside the boat
+    this.spawnChestRise();
+  }
+
+  /** A chest rises out of the water beside the boat and spins away. */
+  spawnChestRise() {
     const chest = propMesh('chest');
     const r = new THREE.Vector2(-Math.cos(this.boat.heading), Math.sin(this.boat.heading));
     chest.position.set(this.boat.pos.x + r.x * 4, -2, this.boat.pos.z + r.y * 4);
@@ -488,11 +492,13 @@ export class Game {
     }
     const acts = this.input.consumeActions();
     if (acts.pause && this.mode !== 'title') {
-      if (this.ui.isMapOpen) this.ui.closeMap();
+      if (this.ui.isJournalOpen) this.ui.closeJournal();
+      else if (this.ui.isMapOpen) this.ui.closeMap();
       else if (this.mode !== 'wrecked') this.setPaused(!this.paused);
     }
     if (acts.map && !this.paused) this.toggleMap();
-    const frozen = this.paused || this.ui.isMapOpen;
+    if (acts.journal && !this.paused && !this.ui.isMapOpen && this.mode !== 'title') this.ui.toggleJournal();
+    const frozen = this.paused || this.ui.isMapOpen || this.ui.isJournalOpen;
     if (frozen) { this.input.consumeLook(); return; }
 
     this.elapsed += dt;
@@ -554,6 +560,7 @@ export class Game {
     this.pointOfSail = pointOfSailName(boat.relWind);
     if (this.mode !== 'title') this.updateFlotsam(dt);
     this.updateEffects(dt);
+    if (this.mode !== 'title') this.quests?.update(dt, this.elapsed);
 
     this.updateCamera(dt);
     this.env.update(dt, s.dayT, w.p, this.camera, w.wind, this.elapsed);
@@ -625,6 +632,13 @@ export class Game {
           else prompt = 'Slow down to dock';
           break;
         }
+      }
+    }
+    if (!action && this.quests) {
+      const q = this.quests.salvageNear(b.x, b.z);
+      if (q) {
+        if (Math.abs(boat.speed) < 7) { prompt = `Haul up the ${q.item.toLowerCase()}`; action = () => this.quests.haul(q); }
+        else prompt = 'Slow down to haul up the salvage';
       }
     }
     if (!action) {

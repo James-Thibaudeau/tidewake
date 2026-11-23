@@ -14,6 +14,7 @@ Built with [three.js](https://threejs.org/) as plain ES modules. There's no buil
 | Look around / zoom | Drag mouse / wheel | Drag / pinch |
 | Spyglass (once upgraded) | Hold `Z` or `Shift` | Spyglass button |
 | Sea chart | `M` | Map button |
+| Journal (quests) | `J` | Journal button |
 | Pause | `Esc` | Pause button |
 
 ### Sailing tips
@@ -24,6 +25,7 @@ Built with [three.js](https://threejs.org/) as plain ES modules. There's no buil
 - **Bank your gold.** Gold in your hold is lost if you're shipwrecked. Docking at a port banks your cargo and saves your progress. Ports are your save points.
 - Glowing golden beams mark sunken treasure. Sail over one slowly and haul it up.
 - Spend banked gold at any port's shipwright: sails, hull, rudder, keel, lantern and spyglass. Every tier changes how the ship looks.
+- Every port has a **Quest Board**: chart rumoured islands, carry parcels between ports and salvage wrecks (cyan beams). Up to three at a time; rewards are paid when you dock. A parcel or salvage aboard sinks with your ship, just like gold.
 - Every new voyage starts with the character creator. Restyle any time for free at a port's **Tailor** tab, where new hats, coats and boots are sold. Rarer pieces are hidden on the islands.
 - With a spyglass, hold `Z` / `Shift` (or the spyglass button) to look through it from the explorer's eyes; drag to pan. Islands you spot through it are charted from afar.
 
@@ -53,6 +55,7 @@ src/
   main.js         bootstrap: renderer, scene, main loop
   game.js         game state & rules: sailing, docking, discovery, treasure, shipwrecks
   events.js       tiny event emitter (dock, discover, haul, wreck…) for quests and story
+  quests.js       quest boards: offer generation, tracking, hand-in, salvage sites
   cosmetics.js    wardrobe catalogue: palettes, styles, unlock sources, appearance profile
   creator.js      character creator / port wardrobe (studio scene + panel)
   world.js        procedural islands, terrain height, island streaming
