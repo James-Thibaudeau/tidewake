@@ -73,11 +73,11 @@ pull request merges.
 ### Known issues
 
 From Phase 1 (outfits):
-- [ ] The poncho's hem clips the arms when they hang loose.
-- [ ] Curly hair pokes through the flower crown and circlet.
-- [ ] Grandpa's helmet looks only a little different from the normal pith
+- [x] The poncho's hem clips the arms when they hang loose.
+- [x] Curly hair pokes through the flower crown and circlet.
+- [x] Grandpa's helmet looks only a little different from the normal pith
   helmet.
-- [ ] The ponytail sticks out sideways instead of hanging.
+- [x] The ponytail sticks out sideways instead of hanging.
 - [ ] Freckles are hard to see from the sailing camera.
 
 From Phase 3 (ashore):
