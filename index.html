@@ -11,7 +11,7 @@
   <title>Tidewake</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script type="importmap">
   {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
@@ -201,9 +201,26 @@
       <div class="sheetHead">
         <div class="eyebrow"><span class="ico" data-icon="scroll"></span> Captain's journal</div>
         <h2 id="journalTitle">Quests</h2>
+        <div class="tabs" id="journalTabs" role="tablist">
+          <button class="tab on" data-jtab="quests" role="tab"><span class="ico" data-icon="scroll"></span> Quests</button>
+          <button class="tab" data-jtab="story" role="tab"><span class="ico" data-icon="book"></span> Grandfather's Journals</button>
+        </div>
       </div>
       <div id="journalBody"></div>
       <div class="sheetFoot"><button id="journalClose" class="btn primary">Close <kbd>J</kbd></button></div>
+    </div>
+  </div>
+
+  <div id="storyCards" class="screen hidden" role="dialog" aria-live="polite">
+    <div class="storyCard">
+      <div class="storyArt" id="storyArt"></div>
+      <div class="storyTitle" id="storyTitle"></div>
+      <p class="storyText" id="storyText"></p>
+      <div class="storyFoot">
+        <button id="storySkip" class="btn">Skip</button>
+        <div class="storyDots" id="storyDots"></div>
+        <button id="storyNext" class="btn primary">Next</button>
+      </div>
     </div>
   </div>
 

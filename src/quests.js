@@ -246,7 +246,15 @@ export class QuestSystem {
   }
 
   pin(id) { this.Q.pinned = id; }
-  get pinned() { return this.active.find((q) => q.id === this.Q.pinned) || this.active[0] || null; }
+  /** The main story's current step (never takes a side-quest slot). */
+  get story() { return this.game.story?.quest() || null; }
+  /** Everything worth tracking: the story first, then side quests. */
+  get tracked() { const s = this.story; return s ? [s, ...this.active] : [...this.active]; }
+  get pinned() {
+    const id = this.Q.pinned, s = this.story;
+    if (id === 'story' && s) return s;
+    return this.active.find((q) => q.id === id) || s || this.active[0] || null;
+  }
 
   /** Quest items aboard (mirrored into state.hold for the save). */
   syncHold() {
@@ -352,6 +360,7 @@ export class QuestSystem {
    * area rather than an exact spot.
    */
   target(q) {
+    if (q.type === 'story') return this.game.story.target();
     const b = this.game.boat.pos;
     const nearestPort = () => {
       let best = null, bd = Infinity;

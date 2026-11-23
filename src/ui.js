@@ -3,6 +3,10 @@
 import { UPGRADES, MAP_RES, MAP_CELL, WORLD_HALF } from './config.js';
 import { STYLES, owns } from './cosmetics.js';
 import { MAX_ACTIVE, fmtDist } from './quests.js';
+import { PROLOGUE, EPILOGUE, JOURNALS, LETTERS, LINES } from './story-text.js';
+
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+const fillVars = (s, vars) => s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] ?? m));
 import { bearingDeg } from './util.js';
 
 const $ = (id) => document.getElementById(id);
@@ -40,7 +44,50 @@ export const ICONS = {
   needle: S(`<path d="M19.5 3.5L6 17" ${STROKE} stroke-width="2.6"/><ellipse cx="18" cy="5" rx="1.1" ry="2.2" transform="rotate(45 18 5)" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 17c-2 1-3.5 2.5-3 4 1.5.5 3-1 4-3" ${STROKE}/><path d="M17 6c-4 0-9 3-11 8" fill="none" stroke="#ff6b5b" stroke-width="1.8" stroke-linecap="round"/>`),
   face: S(`<circle cx="12" cy="12" r="9" ${STROKE}/><circle cx="9" cy="11" r="1.4" fill="currentColor"/><circle cx="15" cy="11" r="1.4" fill="currentColor"/><path d="M8.5 15c2 2 5 2 7 0" ${STROKE}/>`),
   scroll: S(`<path d="M6 4h11a3 3 0 0 1 0 6h-1v8a3 3 0 0 1-3 3H6a3 3 0 0 1 0-6h1V7a3 3 0 0 1 3-3" ${STROKE}/><path d="M10 9h4M10 13h4" ${STROKE}/>`),
+  book: S(`<path d="M4 5.5C7 4 9.5 4 12 6c2.5-2 5-2 8-.5V19c-3-1.5-5.5-1.5-8 .5-2.5-2-5-2-8-.5z" ${STROKE}/><path d="M12 6v13.5" ${STROKE}/>`),
   dice: S(`<rect x="3.5" y="3.5" width="17" height="17" rx="4" ${STROKE}/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"/>`),
+};
+
+// ------------------------------------------------------------ story art
+// Little painted scenes for the story cards (320×170, flat shapes, ink lines).
+const INK = 'stroke="#2a1d12" stroke-width="2.5" stroke-linejoin="round"';
+const sky = (a, b, sea = '#3f86c9', sea2 = '#2c6aa8') => `<defs><linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs>
+  <rect width="320" height="170" fill="url(#sk)"/><rect y="110" width="320" height="60" fill="${sea}"/>
+  <path d="M0 122 Q20 118 40 122 T80 122 T120 122 T160 122 T200 122 T240 122 T280 122 T320 122 V170 H0Z" fill="${sea2}" opacity=".55"/>
+  <path d="M30 140 q10 -4 20 0 M120 150 q10 -4 20 0 M230 136 q10 -4 20 0 M270 156 q10 -4 20 0" stroke="#fff" stroke-width="2" fill="none" opacity=".6" stroke-linecap="round"/>`;
+const smallBoat = (x, y, s = 1, patch = true) => `<g transform="translate(${x} ${y}) scale(${s})">
+  <path d="M-26 0 H26 L18 12 H-18 Z" fill="#a8693a" ${INK}/><path d="M0 0 V-46" ${INK}/>
+  <path d="M2 -44 L30 -6 H2 Z" fill="#fff4dc" ${INK}/>${patch ? '<rect x="9" y="-22" width="8" height="7" fill="#e0b070" stroke="#2a1d12" stroke-width="1.5"/>' : ''}
+  <path d="M0 -46 l9 3 -9 3" fill="#c8322b" stroke="#2a1d12" stroke-width="1.5"/></g>`;
+const rocks = (x) => `<g transform="translate(${x} 0)"><path d="M0 116 L6 52 L30 44 L40 116 Z" fill="#8f877d" ${INK}/><path d="M6 52 L30 44 L28 54 L8 58 Z" fill="#6fae55" ${INK}/>
+  <path d="M34 116 L40 76 L60 72 L66 116 Z" fill="#7d766d" ${INK}/><path d="M40 76 L60 72 L59 79 L41 81Z" fill="#6fae55" stroke="#2a1d12" stroke-width="2"/></g>`;
+const STORY_ART = {
+  harbor: () => sky('#ffe3b0', '#9fd0ee') + `<circle cx="258" cy="40" r="18" fill="#ffd54a" ${INK}/>
+    <path d="M0 112 Q50 60 120 70 T200 112 Z" fill="#6cc24a" ${INK}/><path d="M60 80 h22 v14 h-22z M100 74 h18 v12 h-18z" fill="#ead7b0" ${INK}/>
+    <path d="M56 80 l15 -12 15 12 M97 74 l12 -10 12 10" fill="#c2573f" ${INK}/>
+    <path d="M150 112 H300 V118 H150 Z" fill="#9b7650" ${INK}/><path d="M170 118v14 M210 118v14 M250 118v14 M290 118v14" ${INK}/>
+    ${smallBoat(255, 112, 0.8)}<path d="M150 40 q6 -5 12 0 q6 -5 12 0 M190 26 q5 -4 10 0 q5 -4 10 0" stroke="#2a1d12" stroke-width="2" fill="none"/>`,
+  boat: () => sky('#bfe4ff', '#e8f6ff') + `<circle cx="60" cy="38" r="14" fill="#ffe27a" ${INK}/>${smallBoat(165, 116, 1.4)}
+    <path d="M110 30 q16 -10 32 0 q12 -8 24 0 q-28 6 -56 0" fill="#fff" stroke="#2a1d12" stroke-width="2"/>`,
+  wreck: () => sky('#d9e8f2', '#a9c9dd', '#4a7fae', '#3a6b96') + rocks(190) + `
+    <g transform="translate(150 112) rotate(-14)"><path d="M-70 -6 H40 L60 -26 L56 0 Q-10 22 -70 4 Z" fill="#6a4527" ${INK}/>
+    <path d="M-60 -6 H36" ${INK}/><path d="M-30 -6 V-34 L-26 -40" fill="none" ${INK}/><path d="M-26 -40 l12 4 -12 4z" fill="#c8322b" stroke="#2a1d12" stroke-width="1.5"/>
+    <path d="M-50 -6 v-10 M-40 -6 v-12" stroke="#7a5333" stroke-width="3"/></g>
+    <path d="M40 150 h22 M70 156 h14" stroke="#9a7046" stroke-width="5" stroke-linecap="round"/>`,
+  letters: () => `<rect width="320" height="170" fill="#e9d9b4"/><rect x="12" y="12" width="296" height="146" rx="8" fill="#f4e8cc" stroke="#b09060" stroke-width="2"/>
+    <g transform="rotate(-6 150 90)"><rect x="70" y="52" width="130" height="78" fill="#fffaf0" ${INK}/><path d="M70 52 L135 96 L200 52" fill="none" ${INK}/></g>
+    <g transform="rotate(4 170 100)"><rect x="96" y="66" width="130" height="78" fill="#fff6e6" ${INK}/><path d="M96 66 L161 110 L226 66" fill="none" ${INK}/>
+    <path d="M161 66 V144 M96 105 H226" stroke="#c8322b" stroke-width="4"/><circle cx="161" cy="105" r="7" fill="#b3261e" ${INK}/></g>
+    <path d="M232 124 q22 -40 40 -10 q10 18 -10 26" fill="none" stroke="#c8322b" stroke-width="9" stroke-linecap="round"/>
+    <g transform="translate(52 120)"><path d="M0 0 v-28" stroke="#4a7a3a" stroke-width="2.5"/><circle cy="-32" r="7" fill="#f2a6c0" ${INK}/><circle cy="-32" r="2.5" fill="#ffd54a"/></g>`,
+  sunset: () => sky('#5a3c7a', '#ff9a5a', '#3a4f8a', '#2c3c70') + `<circle cx="160" cy="112" r="34" fill="#ffcf6a" ${INK}/>
+    <rect y="112" width="320" height="58" fill="#3a4f8a"/><path d="M128 124 h64 M138 134 h44 M148 144 h24" stroke="#ffcf6a" stroke-width="4" stroke-linecap="round"/>
+    ${smallBoat(70, 120, 0.7, false)}`,
+  home: () => sky('#ffb877', '#ffe6b8') + `<path d="M0 112 Q90 84 200 96 T320 112 Z" fill="#6cc24a" ${INK}/>
+    <rect x="96" y="56" width="92" height="48" fill="#ead7b0" ${INK}/><path d="M86 60 L142 22 L198 60 Z" fill="#c2573f" ${INK}/>
+    <rect x="112" y="70" width="20" height="18" fill="#ffd54a" ${INK}/><path d="M122 70 v18 M112 79 h20" stroke="#2a1d12" stroke-width="1.5"/>
+    <rect x="150" y="74" width="18" height="30" fill="#7a4a24" ${INK}/><path d="M90 104 H194 V110 H90Z" fill="#9b7650" ${INK}/>
+    <path d="M160 22 v-12 h10 v18" fill="#8f877d" ${INK}/><path d="M166 6 q6 -6 0 -10" stroke="#fff" stroke-width="3" fill="none" opacity=".7"/>`,
 };
 
 const POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -59,7 +106,8 @@ export class UI {
       'mapStats', 'pauseScreen', 'setSound', 'setMusic', 'setQuality', 'controlsHelp', 'wreckScreen', 'wreckText',
       'btnRespawn', 'confirm', 'confirmText', 'confirmYes', 'confirmNo', 'portTabs', 'paneShipwright', 'paneTailor',
       'tailorGrid', 'btnWardrobe', 'creatorScreen', 'questTracker', 'qtTitle', 'qtArrow', 'qtLabel', 'qtDist', 'compassQuest',
-      'btnJournal', 'paneQuests', 'questCount', 'questOffers', 'questBadge', 'journalScreen', 'journalBody', 'journalClose'];
+      'btnJournal', 'paneQuests', 'questCount', 'questOffers', 'questBadge', 'journalScreen', 'journalBody', 'journalClose',
+      'journalTabs', 'journalTitle', 'storyCards', 'storyArt', 'storyTitle', 'storyText', 'storyDots', 'storySkip', 'storyNext'];
     this.el = {};
     for (const id of ids) this.el[id] = $(id);
     this.notches = [...document.querySelectorAll('#sailGauge .notches span')];
@@ -175,7 +223,24 @@ export class UI {
     this.on('btnJournal', () => this.toggleJournal());
     this.on('questTracker', () => this.openJournal());
     this.on('journalClose', () => this.closeJournal());
+    this.el.journalTabs?.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-jtab]');
+      if (!b) return;
+      this.click();
+      this.journalTab = b.dataset.jtab;
+      this.renderJournal();
+    });
+    // story cards: buttons, tap anywhere on the card, or Space / Enter / E / →
+    this.on('storyNext', () => this.storyStep(1));
+    this.on('storySkip', () => this.storyStep(Infinity));
+    this.el.storyCards?.addEventListener('click', (e) => { if (!e.target.closest('button')) { this.click(); this.storyStep(1); } });
+    window.addEventListener('keydown', (e) => {
+      if (!this.storyCardsOpen || e.repeat) return;
+      if (['Space', 'Enter', 'NumpadEnter', 'KeyE', 'ArrowRight'].includes(e.code)) { e.preventDefault(); this.click(); this.storyStep(1); }
+    });
     this.el.journalBody?.addEventListener('click', async (e) => {
+      const page = e.target.closest('button[data-page]');
+      if (page) { if (!page.classList.contains('missing')) { this.click(); this.journalPage = page.dataset.page; this.renderJournal(); } return; }
       const b = e.target.closest('button[data-pin], button[data-abandon]');
       if (!b) return;
       this.click();
@@ -529,6 +594,8 @@ export class UI {
       this.islandPath(g, I, X, Y, 0.72);
       g.fillStyle = I.biome === 'cold' ? '#dfe8ee' : I.biome === 'volcanic' ? '#6e5a50' : '#6cc24a'; g.fill();
     }
+    const Wk = game.world.wreck;
+    if (Wk && Math.abs(Wk.x - bx) < MINI_RANGE + 50 && Math.abs(Wk.z - bz) < MINI_RANGE + 50) this.drawWreck(g, X(Wk.x), Y(Wk.z), Math.max(5, Sz / 22));
     // treasure glints & ports
     const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 250);
     for (const I of game.world.islands) {
@@ -586,6 +653,22 @@ export class UI {
     g.moveTo(-s * 0.35, -s * 0.08); g.lineTo(s * 0.35, -s * 0.08);
     g.moveTo(-s * 0.55, s * 0.2); g.quadraticCurveTo(-s * 0.45, s * 0.62, 0, s * 0.62); g.quadraticCurveTo(s * 0.45, s * 0.62, s * 0.55, s * 0.2);
     g.stroke();
+    g.restore();
+  }
+
+  /** Grandfather's wreck: a little broken hull on its rocks (always on the chart). */
+  drawWreck(g, x, y, s) {
+    g.save();
+    g.translate(x, y);
+    g.lineJoin = 'round'; g.lineWidth = Math.max(1.2, s / 6); g.strokeStyle = '#0b1830';
+    g.fillStyle = '#9a938a';
+    g.beginPath(); g.arc(s * 0.7, -s * 0.35, s * 0.45, 0, TAU); g.fill(); g.stroke();
+    g.rotate(-0.35);
+    g.beginPath(); g.moveTo(-s, -s * 0.15); g.lineTo(s * 0.7, -s * 0.15); g.lineTo(s * 0.45, s * 0.4); g.lineTo(-s * 0.75, s * 0.4); g.closePath();
+    g.fillStyle = '#7a4a24'; g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(-s * 0.15, -s * 0.15); g.lineTo(-s * 0.05, -s * 0.95); g.stroke();
+    g.fillStyle = '#c8322b';
+    g.beginPath(); g.moveTo(-s * 0.05, -s * 0.95); g.lineTo(s * 0.4, -s * 0.8); g.lineTo(-s * 0.08, -s * 0.65); g.closePath(); g.fill();
     g.restore();
   }
 
@@ -844,6 +927,14 @@ export class UI {
       }
     }
 
+    const Wk = world.wreck;
+    if (Wk) {
+      this.drawWreck(g, X(Wk.x), Y(Wk.z), 10 * dpr);
+      const ty = Y(Wk.z) - 14 * dpr;
+      g.lineWidth = 4 * dpr; g.strokeStyle = 'rgba(255,248,231,0.9)'; g.lineJoin = 'round';
+      g.strokeText(Wk.name, X(Wk.x), ty);
+      g.fillStyle = '#6a2a14'; g.fillText(Wk.name, X(Wk.x), ty);
+    }
     this.drawQuestMarkers(g, X, Y, z, 14 * dpr);
     // ship
     const b = game.boat;
@@ -936,6 +1027,15 @@ export class UI {
     if (cos) meta.push(`<span class="cos">+ ${esc(cos.name)}</span>`);
     if (q.dist) meta.push(`<span>${fmtDist(q.dist)}</span>`);
     let foot = '';
+    if (q.type === 'story') {
+      const pinned = Qs.pinned?.id === q.id;
+      return `<div class="card qCard storyQ${pinned ? ' pinned' : ''}">
+        <div class="giver">${this.avatar(q.giver)}<span><b>Main story</b> · Grandfather's Journals</span></div>
+        <div class="qTitle">${esc(q.title)}</div>
+        <div class="qText">${esc(q.text)}</div>
+        <div class="qStatus">${esc(Qs.status(q))}</div>
+        <div class="row2"><button class="btn" data-pin="story" ${pinned ? 'disabled' : ''}>${pinned ? 'Tracking' : 'Track'}</button></div></div>`;
+    }
     if (mode === 'offer') {
       const can = Qs.canAccept();
       foot = `<button class="btn${can ? ' primary' : ''}" data-accept="${q.id}" ${can ? '' : 'disabled'}>${can ? 'Accept' : `${MAX_ACTIVE} quests already`}</button>`;
@@ -969,24 +1069,102 @@ export class UI {
 
   // ------------------------------------------------------------ journal
   get isJournalOpen() { return !!this.journalOpen; }
-  openJournal() {
-    if (this.journalOpen || !this.game.quests) return;
+  /** tab: 'quests' | 'story'; page: a journal id ('I'..'VII') or 'letters'. */
+  openJournal(tab, page) {
+    if (!this.game.quests) return;
+    if (tab) this.journalTab = tab;
+    if (page) this.journalPage = page;
     this.journalOpen = true;
     this.renderJournal();
     this.el.journalScreen?.classList.remove('hidden');
+    const sheet = this.el.journalScreen?.querySelector('.sheet');
+    if (sheet) sheet.scrollTop = 0;
   }
   closeJournal() { this.journalOpen = false; this.el.journalScreen?.classList.add('hidden'); }
   toggleJournal() { if (this.journalOpen) this.closeJournal(); else this.openJournal(); }
 
   renderJournal() {
+    const tab = this.journalTab || 'quests';
+    this.el.journalTabs?.querySelectorAll('button[data-jtab]').forEach((b) => b.classList.toggle('on', b.dataset.jtab === tab));
+    this.el.journalTitle.textContent = tab === 'story' ? "Grandfather's Journals" : 'Quests';
+    if (tab === 'story') { this.el.journalBody.innerHTML = this.renderStoryPages(); return; }
     const Qs = this.game.quests;
-    let html = `<h3 class="sectionTitle">Active (${Qs.active.length}/${MAX_ACTIVE})</h3>`;
+    let html = '';
+    if (Qs.story) html += `<h3 class="sectionTitle">Main story</h3><div class="grid">${this.questCard(Qs.story, 'active')}</div>`;
+    html += `<h3 class="sectionTitle">Active (${Qs.active.length}/${MAX_ACTIVE})</h3>`;
     html += Qs.active.length
       ? `<div class="grid">${Qs.active.map((q) => this.questCard(q, 'active')).join('')}</div>`
       : '<div class="qEmpty">No quests yet. Quest boards are posted in every port.</div>';
     const done = (this.game.state.stats?.quests || 0);
     html += `<h3 class="sectionTitle">Completed</h3><div class="qEmpty">${done ? `${done} quest${done === 1 ? '' : 's'} completed.` : 'None yet.'}</div>`;
     this.el.journalBody.innerHTML = html;
+  }
+
+  renderStoryPages() {
+    const story = this.game.story, S = story?.S;
+    if (!S) return '';
+    const found = new Set(S.journals);
+    const pages = [...ROMAN.map((id) => ({ id, j: JOURNALS.find((x) => x.id === id) })), { id: 'letters', j: LETTERS }];
+    const have = (id) => (id === 'letters' ? !!S.flags.letters : found.has(id));
+    let cur = this.journalPage;
+    if (!cur || !have(cur)) cur = [...pages].reverse().find((p) => have(p.id))?.id || null;
+    this.journalPage = cur;
+    const list = pages.map((p) => {
+      const ok = have(p.id);
+      const label = p.id === 'letters' ? (ok ? esc(p.j.title) : 'A sealed chest…') : `<span class="num">${p.id}</span>${ok ? esc(p.j.title) : 'Not yet found'}`;
+      return `<button data-page="${p.id}" class="${ok ? '' : 'missing'}${p.id === cur ? ' on' : ''}">${label}</button>`;
+    }).join('');
+    let page;
+    if (!cur) page = '<div class="jPage torn">His first journal is still aboard the wreck, just past the point.</div>';
+    else {
+      const p = pages.find((x) => x.id === cur).j;
+      const paras = p.body.split('\n\n');
+      const sign = cur === 'letters' ? '' : paras.pop();
+      page = `<div class="jPage"><div class="jNo">${cur === 'letters' ? 'From the chest under the bunk' : `Journal ${cur}`}</div><h3>${esc(p.title)}</h3>
+        ${paras.map((x) => `<p>${esc(x)}</p>`).join('')}${sign ? `<p class="sign">${esc(sign)}</p>` : ''}
+        ${p.clue ? `<p class="clue">${esc(p.clue)}</p>` : ''}</div>`;
+    }
+    return `<div class="jStory"><div class="jList">${list}</div>${page}</div>`;
+  }
+
+  // ------------------------------------------------------------ story cards
+  get isStoryOpen() { return !!this.storyCardsOpen; }
+
+  /** Show the prologue or epilogue. Resolves when the player has read (or skipped) them. */
+  showStoryCards(kind) {
+    const cards = kind === 'epilogue' ? EPILOGUE : PROLOGUE;
+    this.storyDeck = cards;
+    this.storyIndex = 0;
+    this.storyCardsOpen = true;
+    this.setPrompt(null);
+    this.el.storyCards.classList.remove('hidden');
+    this.renderStoryCard();
+    return new Promise((resolve) => { this.storyResolve = resolve; });
+  }
+
+  storyStep(n) {
+    if (!this.storyCardsOpen) return;
+    this.storyIndex += n;
+    if (this.storyIndex >= this.storyDeck.length) {
+      this.storyCardsOpen = false;
+      this.el.storyCards.classList.add('hidden');
+      this.game.input?.consumeActions(); // the key that closed the cards shouldn't also dock or search
+      const r = this.storyResolve; this.storyResolve = null;
+      r?.();
+      return;
+    }
+    this.renderStoryCard();
+  }
+
+  renderStoryCard() {
+    const c = this.storyDeck[this.storyIndex], vars = { captain: this.game.state.profile?.name || 'Captain' };
+    this.el.storyArt.innerHTML = `<svg viewBox="0 0 320 170" aria-hidden="true">${(STORY_ART[c.art] || STORY_ART.boat)()}</svg>`;
+    this.el.storyTitle.textContent = c.title ? fillVars(c.title, vars) : '';
+    this.el.storyText.textContent = fillVars(c.text, vars);
+    this.el.storyDots.innerHTML = this.storyDeck.map((_, i) => `<i class="${i === this.storyIndex ? 'on' : ''}"></i>`).join('');
+    const last = this.storyIndex === this.storyDeck.length - 1;
+    this.el.storyNext.textContent = last ? (this.storyDeck === PROLOGUE ? 'Set sail' : 'Onward') : 'Next';
+    this.el.storySkip.classList.toggle('hidden', last);
   }
 
   // ------------------------------------------------------------ tracker
@@ -1029,11 +1207,13 @@ export class UI {
   /** Quest markers on a map canvas. X/Y project world → canvas; `scale` px per world unit. */
   drawQuestMarkers(g, X, Y, scale, size, clipR = null, cx = 0, cy = 0) {
     const Qs = this.game.quests;
-    if (!Qs || !Qs.active.length) return;
+    const list = Qs ? Qs.tracked : [];
+    if (!list.length) return;
     const pinned = Qs.pinned;
     const pulse = 0.65 + 0.35 * Math.sin(performance.now() / 300);
-    for (const q of Qs.active) {
+    for (const q of list) {
       const t = Qs.target(q);
+      if (!t) continue;
       const on = q === pinned;
       let x = X(t.x), y = Y(t.z);
       g.save();
@@ -1095,9 +1275,11 @@ export class UI {
       const cur = u.tiers[lvl], next = u.tiers[lvl + 1];
       const pips = u.tiers.map((_, i) => `<span class="pip${i <= lvl ? ' on' : ''}"></span>`).join('');
       const afford = next && st.banked >= next.cost;
-      const btn = next
-        ? `<button class="btn${afford ? ' primary' : ''}" data-key="${u.key}" ${afford ? '' : 'disabled'}>Buy <span class="ico">${ICONS.coin}</span> ${fmt(next.cost)}</button>`
-        : '<button class="btn" disabled>Fully upgraded</button>';
+      const found = u.key === 'spyglass' && lvl === 0; // the first spyglass is grandfather's, not for sale
+      const btn = found ? `<button class="btn" disabled>${esc(LINES.shipwrightSpyglass)}</button>`
+        : next
+          ? `<button class="btn${afford ? ' primary' : ''}" data-key="${u.key}" ${afford ? '' : 'disabled'}>Buy <span class="ico">${ICONS.coin}</span> ${fmt(next.cost)}</button>`
+          : '<button class="btn" disabled>Fully upgraded</button>';
       return `<div class="card${next ? '' : ' maxed'}">
         <div class="cardHead"><div class="cardIcon">${ICONS[u.icon] || ''}</div>
           <div><div class="cardName">${esc(u.name)}</div><div class="cardStat">${esc(u.stat)}</div></div>
