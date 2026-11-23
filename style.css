@@ -635,3 +635,40 @@ body.creator-open #hud, body.creator-open #spyOverlay, body.creator-open #vignet
 .qCard.storyQ { border-color: #ffb36b; }
 .qCard.storyQ .qStatus { color: #ffd09a; }
 @media (max-width: 600px) { .jStory { grid-template-columns: 1fr; } .jList { flex-direction: row; flex-wrap: wrap; } .jPage { font-size: 20px; } }
+
+/* ------------------------------------------------------------- found! */
+#foundScreen { z-index: 41; background: rgba(6, 16, 34, 0.62); }
+.foundCard {
+  position: relative; width: min(460px, 100%); max-height: 100%; overflow: hidden auto; text-align: center;
+  background: linear-gradient(180deg, rgba(24, 52, 92, 0.98), rgba(12, 28, 54, 0.98)); border: 3px solid var(--gold);
+  border-radius: 22px; padding: 22px 20px 16px; box-shadow: 0 6px 0 rgba(0, 0, 0, 0.4), 0 0 60px rgba(255, 213, 74, 0.35);
+  animation: foundPop 0.45s cubic-bezier(.2, 1.4, .4, 1);
+}
+@keyframes foundPop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.foundRays {
+  position: absolute; left: 50%; top: -120px; width: 360px; height: 360px; margin-left: -180px; pointer-events: none; opacity: 0.35;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 213, 74, 0.55) 0 8deg, transparent 8deg 22deg);
+  -webkit-mask: radial-gradient(circle, #000 20%, transparent 65%); mask: radial-gradient(circle, #000 20%, transparent 65%);
+  animation: spin 18s linear infinite;
+}
+.foundCard > *:not(.foundRays) { position: relative; }
+.foundCard .eyebrow { justify-content: center; }
+.foundCard h2 { font-size: 30px; margin: 4px 0 12px; }
+#foundItems { display: flex; flex-direction: column; gap: 10px; text-align: left; }
+.foundItem {
+  display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 16px;
+  background: rgba(255, 248, 231, 0.07); border: 2px solid rgba(244, 213, 141, 0.45);
+  animation: foundItemIn 0.4s ease-out both;
+}
+.foundItem:nth-child(2) { animation-delay: 0.12s; } .foundItem:nth-child(3) { animation-delay: 0.24s; }
+@keyframes foundItemIn { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+.foundIcon {
+  width: 56px; height: 56px; flex: none; border-radius: 14px; padding: 10px; color: var(--ink);
+  background: radial-gradient(circle at 35% 30%, #ffe48a, #e0a93a); border: 2px solid var(--ink); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.foundIcon svg { width: 100%; height: 100%; display: block; }
+.foundName { font-weight: 700; font-size: 18px; line-height: 1.2; }
+.foundText { font-size: 13.5px; opacity: 0.88; line-height: 1.35; margin-top: 2px; }
+.foundText kbd { font-size: 11px; }
+.foundFoot { display: flex; gap: 8px; justify-content: center; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+.foundFoot .btn.big { padding: 10px 22px; }

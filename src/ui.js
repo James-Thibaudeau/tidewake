@@ -45,6 +45,9 @@ export const ICONS = {
   face: S(`<circle cx="12" cy="12" r="9" ${STROKE}/><circle cx="9" cy="11" r="1.4" fill="currentColor"/><circle cx="15" cy="11" r="1.4" fill="currentColor"/><path d="M8.5 15c2 2 5 2 7 0" ${STROKE}/>`),
   scroll: S(`<path d="M6 4h11a3 3 0 0 1 0 6h-1v8a3 3 0 0 1-3 3H6a3 3 0 0 1 0-6h1V7a3 3 0 0 1 3-3" ${STROKE}/><path d="M10 9h4M10 13h4" ${STROKE}/>`),
   book: S(`<path d="M4 5.5C7 4 9.5 4 12 6c2.5-2 5-2 8-.5V19c-3-1.5-5.5-1.5-8 .5-2.5-2-5-2-8-.5z" ${STROKE}/><path d="M12 6v13.5" ${STROKE}/>`),
+  letters: S(`<rect x="3" y="6" width="18" height="13" rx="1.5" ${STROKE}/><path d="M3.5 7l8.5 6.5L20.5 7" ${STROKE}/><path d="M12 13.5V19" stroke="#c8322b" stroke-width="2.2"/>`),
+  scarf: S(`<path d="M5 6c3 2.5 11 2.5 14 0l-1.5 4c-3.5 2-7.5 2-11 0z" fill="#c8322b" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 10.5l2.5 9 2.5-1-1.5-8.5" fill="#c8322b" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>`),
+  helmet: S(`<path d="M5 15a7 7 0 0 1 14 0z" fill="#e6cf92" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M2 15.5h20c0 1.6-4.5 2.5-10 2.5S2 17.1 2 15.5z" fill="#e6cf92" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M5.4 12.6h13.2" stroke="#c8322b" stroke-width="2"/><circle cx="12" cy="7.4" r="1.1" fill="currentColor"/>`),
   dice: S(`<rect x="3.5" y="3.5" width="17" height="17" rx="4" ${STROKE}/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"/>`),
 };
 
@@ -107,7 +110,8 @@ export class UI {
       'btnRespawn', 'confirm', 'confirmText', 'confirmYes', 'confirmNo', 'portTabs', 'paneShipwright', 'paneTailor',
       'tailorGrid', 'btnWardrobe', 'creatorScreen', 'questTracker', 'qtTitle', 'qtArrow', 'qtLabel', 'qtDist', 'compassQuest',
       'btnJournal', 'paneQuests', 'questCount', 'questOffers', 'questBadge', 'journalScreen', 'journalBody', 'journalClose',
-      'journalTabs', 'journalTitle', 'storyCards', 'storyArt', 'storyTitle', 'storyText', 'storyDots', 'storySkip', 'storyNext'];
+      'journalTabs', 'journalTitle', 'storyCards', 'storyArt', 'storyTitle', 'storyText', 'storyDots', 'storySkip', 'storyNext',
+      'foundScreen', 'foundEyebrow', 'foundTitle', 'foundItems', 'foundMain', 'foundLater'];
     this.el = {};
     for (const id of ids) this.el[id] = $(id);
     this.notches = [...document.querySelectorAll('#sailGauge .notches span')];
@@ -231,10 +235,13 @@ export class UI {
       this.renderJournal();
     });
     // story cards: buttons, tap anywhere on the card, or Space / Enter / E / →
+    this.on('foundMain', () => this.closeFound('main'));
+    this.on('foundLater', () => this.closeFound('later'));
     this.on('storyNext', () => this.storyStep(1));
     this.on('storySkip', () => this.storyStep(Infinity));
     this.el.storyCards?.addEventListener('click', (e) => { if (!e.target.closest('button')) { this.click(); this.storyStep(1); } });
     window.addEventListener('keydown', (e) => {
+      if (this.foundOpen && !e.repeat && ['Space', 'Enter', 'NumpadEnter', 'KeyE'].includes(e.code)) { e.preventDefault(); this.click(); this.closeFound('main'); return; }
       if (!this.storyCardsOpen || e.repeat) return;
       if (['Space', 'Enter', 'NumpadEnter', 'KeyE', 'ArrowRight'].includes(e.code)) { e.preventDefault(); this.click(); this.storyStep(1); }
     });
@@ -1125,6 +1132,38 @@ export class UI {
         ${p.clue ? `<p class="clue">${esc(p.clue)}</p>` : ''}</div>`;
     }
     return `<div class="jStory"><div class="jList">${list}</div>${page}</div>`;
+  }
+
+  // ------------------------------------------------------------ found!
+  get isFoundOpen() { return !!this.foundOpen; }
+
+  /**
+   * A celebratory pop-up for things the player finds.
+   * opts: { eyebrow, title, items: [{ icon, name, text (may contain <kbd>) }], main, later }
+   * Resolves 'main' or 'later' (Esc, the Later button).
+   */
+  showFound({ eyebrow = '', title = 'You found something!', items = [], main = 'Wonderful!', later = null }) {
+    this.foundOpen = true;
+    this.setPrompt(null);
+    this.el.foundEyebrow.textContent = eyebrow;
+    this.el.foundTitle.textContent = title;
+    this.el.foundItems.innerHTML = items.map((it) => `<div class="foundItem">
+      <div class="foundIcon">${ICONS[it.icon] || ICONS.star}</div>
+      <div><div class="foundName">${esc(it.name)}</div><div class="foundText">${it.text || ''}</div></div></div>`).join('');
+    this.el.foundMain.textContent = main;
+    this.el.foundLater.textContent = later || '';
+    this.el.foundLater.classList.toggle('hidden', !later);
+    this.el.foundScreen.classList.remove('hidden');
+    return new Promise((resolve) => { this.foundResolve = resolve; });
+  }
+
+  closeFound(choice) {
+    if (!this.foundOpen) return;
+    this.foundOpen = false;
+    this.el.foundScreen.classList.add('hidden');
+    this.game.input?.consumeActions(); // the key that closed it shouldn't also act in the game
+    const r = this.foundResolve; this.foundResolve = null;
+    r?.(choice);
   }
 
   // ------------------------------------------------------------ story cards

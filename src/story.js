@@ -148,35 +148,53 @@ export class Story {
     await this.game.ui.showStoryCards('prologue');
   }
 
-  findJournal(id) {
+  async findJournal(id) {
     const g = this.game, S = this.S, st = g.state;
     if (this.has(id)) return;
+    const n = ROMAN.indexOf(id) + 1;
     S.journals.push(id);
-    S.chapter = ROMAN.indexOf(id) + 2;
-    g.audio.play('treasure');
-    g.ui.banner(JOURNALS.find((j) => j.id === id).title, fill(LINES.journalFound, { n: id }));
+    S.chapter = n + 1;
+    let spyglass = false;
     if (id === 'I' && (st.upgrades.spyglass || 0) < 1) {
+      spyglass = true;
       st.upgrades.spyglass = 1;
       g.applyUpgrades();
       // upgrades normally save only when banked at a port; a story find is kept at once
       g.saveData.upgrades = { ...(g.saveData.upgrades || st.upgrades), spyglass: Math.max(1, g.saveData.upgrades?.spyglass || 0) };
-      g.ui.toast(LINES.spyglassFound, 'gold');
     }
     g.events.emit('story:journal', id);
     g.saveVoyage();
     this.syncCamps();
-    g.ui.openJournal('story', id);
+    g.audio.play('treasure');
+
+    const j = JOURNALS.find((x) => x.id === id);
+    const items = [{ icon: 'book', name: `Journal ${id}: ${j.title}`,
+      text: id === 'I' ? 'His very first journal, still in the chart table drawer.'
+        : id === 'VII' ? 'The last of his journals. All seven are yours.'
+        : `${n} of 7 journals found. His clue points the way to the next.` }];
+    if (spyglass) {
+      items.push({ icon: 'spyglass', name: 'Brass Spyglass',
+        text: g.ui.touch ? 'Tap the spyglass button to look far out to sea. Islands you spot are charted from afar.'
+          : 'Hold <kbd>Z</kbd> or <kbd>Shift</kbd> to look through it. Islands you spot are charted from afar.' });
+    }
+    const where = id === 'I' ? "Grandfather's wreck" : `${this.world.islands[this.camps[id].island].name} · grandfather's camp`;
+    const choice = await g.ui.showFound({ eyebrow: where, title: spyglass ? 'You found his journal and spyglass!' : 'You found his journal!',
+      items, main: 'Read the journal', later: 'Later' });
+    if (choice === 'main') g.ui.openJournal('story', id);
+    else g.ui.toast('Read it any time in your journal (J)', 'info');
   }
 
-  openChest() {
+  async openChest() {
     const g = this.game, S = this.S;
     S.chapter = 9;
     S.flags.letters = true;
-    g.audio.play('treasure');
-    g.ui.toast(LINES.chestFound, 'gold');
     g.events.emit('story:chest');
     g.saveVoyage();
-    g.ui.openJournal('story', 'letters');
+    g.audio.play('treasure');
+    const choice = await g.ui.showFound({ eyebrow: 'The chest under the bunk', title: 'Letters never sent',
+      items: [{ icon: 'letters', name: 'A bundle of letters', text: 'Tied with sailcloth string, with something soft folded at the bottom. Bring them home to Grandma.' }],
+      main: 'Read the letters', later: 'Later' });
+    if (choice === 'main') g.ui.openJournal('story', 'letters');
   }
 
   async onDock(port) {
@@ -196,7 +214,12 @@ export class Story {
     await null; // let the dock finish opening the port sheet, then hide it for the epilogue
     g.ui.closePort();
     await g.ui.showStoryCards('epilogue');
-    g.ui.banner('Wayfarer', LINES.storyComplete);
+    await g.ui.showFound({ eyebrow: LINES.storyComplete, title: "Grandpa's gifts",
+      items: [
+        { icon: 'scarf', name: "Grandpa's scarf", text: "You're wearing it. Find it in the Tailor's wardrobe any time." },
+        { icon: 'helmet', name: "Grandpa's helmet", text: 'Weathered, a little dented, and now yours.' },
+        { icon: 'star', name: 'Title: Wayfarer', text: 'For bringing the old captain home.' },
+      ], main: 'Onward' });
     g.ui.openPort(port);
   }
 
