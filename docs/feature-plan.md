@@ -54,8 +54,8 @@ pull request merges.
   *Later phases* under the main story). A short, safe walk across the
   beached hull to grandfather's cabin, teaching movement and jumping.
 - [ ] **Phase 4, ashore content and fetch quests:**
-  - [ ] Tropical islands (suggested first)
-  - [ ] Cold, volcanic and rocky islands
+  - [ ] Rocky islands first, then tropical, volcanic and cold, in the order
+    of the anchor refits (Phase 6)
   - [ ] Landmark levels; move Journals III–VII from the beach camps into
     them, each with a unique cosmetic (makes the fur hood, flower crown,
     gold circlet and shell necklace findable)
@@ -69,6 +69,15 @@ pull request merges.
   - [ ] Phones: joystick dead zone, bigger buttons, less decor on Low
   - [ ] Performance pass, including cleanup when leaving an island
   - [x] README controls for going ashore (done in #11)
+
+### Ideas (planned, not started)
+
+- [ ] **Phase 6, anchor refits:** refit grandfather's anchor tier by tier
+  to unlock each biome. Ships alongside the Phase 4 biomes.
+- [ ] **Phase 7, a living sea:** random ocean events (whales, dolphins, a
+  ghost ship at night…), a Sightings log, and report quests.
+- [ ] **Phase 8, the rival captain:** Captain Sable's story told through
+  races at sea and on land, ending with a kraken rescue.
 
 ### Known issues
 
@@ -338,11 +347,11 @@ chart quests. The tone moves from bravado, to a few cracks, to longing.
 | Prologue | Port Haven | New voyage, after the creator | Short parchment story cards. Grandma, or an old harbormaster who sailed with your grandfather, hands over the boat. *"Your grandfather's wreck is just past the point. Go and pay your respects."* This replaces the first tutorial toasts: sailing to the wreck **is** the tutorial for sails, steering and wind. |
 | I | Grandfather's wreck, a hand-placed wreck on rocks near Port Haven | None | Search the wreck → **Journal I + Brass Spyglass** (spyglass tier 1, free). Grand, boastful tone: the thrill of the open sea. Admits he left "the rest of my scribblings" across the isles. Clue to II. |
 | II | A nearby island camp (temperate) | Base boat | First voyages, naming islands. A throwaway line about missing his wife's cooking. |
-| III | The Elder Grove | Sails 1 | He's carved his family's initials into the great tree, and plays it off as a joke. |
-| IV | Archway Isle | Rudder 1 | A near-death squall. He writes a letter home and then doesn't send it. |
-| V | Sunken Temple Isle | Hull 1–2 | Treasure, fame, his proudest discovery. Ends on *"and no one to show it to."* |
-| VI | Mount Cinderhorn | Keel 2 | He counts the birthdays he's missed, including the year his grandchild was born. |
-| VII | Frostspire, at the far north | Hull/Keel 3, storms | The coldest, loneliest entry. He decides the adventure isn't worth what it cost. *"I am going home."* |
+| III | The Elder Grove | Sails 1 (+ Anchor 0 once ashore) | He's carved his family's initials into the great tree, and plays it off as a joke. |
+| IV | Archway Isle | Rudder 1 (+ Anchor 1) | A near-death squall. He writes a letter home and then doesn't send it. |
+| V | Sunken Temple Isle | Hull 1–2 (+ Anchor 2) | Treasure, fame, his proudest discovery. Ends on *"and no one to show it to."* |
+| VI | Mount Cinderhorn | Keel 2 (+ Anchor 3) | He counts the birthdays he's missed, including the year his grandchild was born. |
+| VII | Frostspire, at the far north | Hull/Keel 3, storms (+ Anchor 4) | The coldest, loneliest entry. He decides the adventure isn't worth what it cost. *"I am going home."* |
 | Epilogue: "The Letter Home" | Back to the wreck, then Port Haven | All journals | The wreck now has a newly searchable sea chest (story flag). Inside are the unsent letters and a gift for the family. A **deliver** quest takes them to Grandma in Port Haven. Closing story cards end on the realisation that he was almost home. **Reward:** his red scarf and pith helmet (unique cosmetics) and the title *Wayfarer*. Free roam continues afterwards. |
 
 The exact clue locations for II–VII are seeded, but they're fixed per world
@@ -543,6 +552,234 @@ stick.
 
 ---
 
+## Phase 6: Anchor refits (biome gates)
+
+Grandfather's anchor is the key to going ashore, so it also becomes the key
+to each new biome. Instead of the shipwright selling new anchors, they
+**refit grandfather's anchor** a piece at a time. That keeps the story thread:
+by the end it is still his anchor, just one that has been everywhere.
+
+This replaces the Phase 3 placeholder (*"too treacherous to land on (yet)"*).
+When a biome ships in Phase 4, it ships with its refit, so the two phases
+interleave: each Phase 4 biome PR adds one refit tier.
+
+### Tiers
+
+The order follows the main story: each refit opens the biome of the next
+journal's landmark, so the refits and the journals move outward together.
+The upgrade each tier needs matches that chapter's soft gate.
+
+| Tier | Refit | Unlocks | Next journal | Shipwright needs | Small perk |
+| --- | --- | --- | --- | --- | --- |
+| 0 | Grandfather's anchor (as found) | Temperate | III, The Elder Grove | The anchor quest (done) | — |
+| 1 | Grapnel arms | Rocky | IV, Archway Isle | Gold + Rudder 1 + a fitting from a temperate vault | Landing range grows from ~40u to ~55u from shore |
+| 2 | Coral flukes | Tropical | V, Sunken Temple Isle | Gold + Hull 2 + a fitting from a rocky vault | Drop anchor at up to 8 kn instead of 6 |
+| 3 | Tempered chain | Volcanic | VI, Mount Cinderhorn | Gold + Keel 2 + a fitting from a tropical vault | Anchor holds in storms (see *Sea time while ashore* under Risks) |
+| 4 | Ice spikes | Cold | VII, Frostspire | Gold + Hull 3 + a fitting from a volcanic vault | Anchor art becomes gilded, a visible trophy |
+
+- **The loop:** exploring a biome turns up the fitting that opens the next
+  one. The fitting spawns in the vault of the nearest island of the right
+  biome only while the refit quest is active, using the Phase 4 retrieve
+  mechanic. It is **never lost** in a wreck, like story items.
+- **Refit quest:** works like the anchor quest. It is always tracked, takes
+  no side-quest slot, and puts a search circle on the chart. The shipwright
+  explains it when you can afford the hull or keel the tier needs.
+- **On the boat:** each tier changes the anchor model at the bow, so you can
+  see your progress.
+- **Locked biomes** show *"Your anchor won't grip bare rock. Ask the
+  shipwright."* (wording per biome) instead of the generic line.
+- **Save:** `upgrades.anchor = 0–4`. `story.flags.anchor` stays as the
+  original quest flag.
+
+**Interplay with the main story:** Phase 4 moves journals III–VII into
+landmark levels, so refit tiers become story gates too. That is deliberate:
+finding a journal and refitting the anchor are the two halves of each
+chapter. Difficulty still rises within a biome by distance from Port Haven,
+so Archway Isle, the first rocky level most players reach, should be tuned
+gentler than the rocky islands further out.
+
+**Done when:** each landable biome needs its refit, refits are fitted at any
+port, the anchor model changes per tier, and an old save with anchor `fitted`
+starts at tier 0.
+
+---
+
+## Phase 7: A living sea (random ocean events)
+
+The ocean should feel inhabited between islands. A small **event director**
+rolls for an encounter every few minutes of sailing and places it ahead of
+the ship, close enough to see but not in your path.
+
+### Event director (`src/sea-events.js`)
+
+- **Rolls** about every 3–6 minutes of sailing time, never while docking, in
+  a race or during the rival's scenes. There's a cooldown so two events never
+  overlap.
+- **Weighting** by region (latitude, like `biomeFor`), time of day, weather
+  and story progress. Rare events have a pity timer so everyone sees them
+  eventually.
+- **Placement:** 150–300u away, off the bow quarter, and never on an
+  island. Events last 30–120 seconds, then dive, sail off or fade.
+- **Seeded RNG of its own**, so it never touches the world's `rng()` stream
+  (same rule as the wreck and camps).
+- **"Witnessed"** means it came within ~80u, or you held it in the spyglass
+  for 2 seconds. Better spyglasses can witness events from further away,
+  which gives spyglass upgrades a second job.
+- Emits `game.emit('sighting', { kind, x, z, day })` for quests and the log.
+
+### Events
+
+| Event | Where and when | What happens | Interaction |
+| --- | --- | --- | --- |
+| **Whale** | Temperate and cold, any weather but storms | Spout visible from far away, then a slow breach with a big splash | Sail alongside slowly to stay with it; it sounds with a tail-flip |
+| **Dolphin pod** | Tropical and temperate, clear or breezy | 4–8 dolphins leaping in arcs | Sail fast (>12 kn) and they ride your bow wave, giving a small speed boost while they stay |
+| **Ghost ship** | Any region, **night only**, likelier in fog, rare | A pale, see-through ship with green lanterns sails silently past | Follow it and it leads you somewhere (a hidden salvage spot); it fades at dawn or if you get too close |
+| **Sea turtles** | Tropical, daytime | A slow line of turtles surfacing | Sail slowly through them without touching any |
+| **Glowing bloom** | Warm waters, night | The sea glows blue around you, and your wake glows too | Visual only, a reward for sailing at night |
+| **Waterspout** | Storms | A spinning column that drifts across the sea | A hazard to steer around; hull damage if you sail into it |
+| **Iceberg calving** | Cold | A berg sheds a slab and leaves new floating ice | Visual, plus a short-lived collision hazard |
+| **Message in a bottle** | Anywhere, uncommon | A glinting bottle bobbing on the swell | Haul it up: lore, a treasure hint, or a report quest |
+
+Start with **whale, dolphins and ghost ship**. The rest can follow one at a
+time.
+
+### Sightings log
+
+- A third Journal tab, **Sightings**, with a card per event kind: a drawing,
+  how many times you've seen it and where you first did. Unseen kinds show as
+  silhouettes with a hint (*"Seen on foggy nights"*).
+- Milestones give cosmetics, e.g. a whale-tail pendant for five whales, or a
+  lantern hat for the ghost ship.
+
+### Report quests (new quest type `report`)
+
+Seeing an event can start a quest to tell someone about it:
+
+- **On first sighting** of a kind, or on any sighting a port has asked for,
+  you get *"Report the whale sighting to the Cartographer at [port]. They're
+  charting the migration."* Each event kind has a giver role that cares:
+  - Cartographer: whales, turtles (migration routes)
+  - Harbormaster: waterspouts, icebergs (hazard warnings)
+  - Old Salt: the ghost ship (*"So she's sailing again…"*)
+  - Merchant: dolphins (good luck for a trade run, so they pay for the news)
+- **Which port:** the nearest port with that giver, so the reward depends on
+  sailing there rather than on luck.
+- **Stale news:** a report expires after a few in-game days. It takes no side
+  quest slot, so it never crowds out board work.
+- **Bounties:** boards can also post *"Sighting wanted: whales in the northern
+  waters"*. While one is active, the director weights that event up in that
+  area, and the map shows a search circle.
+- **Hand-in** happens on docking, like other quests.
+
+### Ghost ship side chain (later)
+
+The ghost ship is a natural fit for the *"small authored side chains"* idea
+in Phase 2. Seeing it three times unlocks a short chain: follow it to a hidden
+cove, find the captain's log ashore, and learn why it can't make port. It can
+use the same story engine as the journals.
+
+### Ambient life
+
+Cheap, always-on touches that don't count as events: gulls that follow the
+boat near land, fish jumping in calm water, and seabirds circling over reefs.
+
+**Done when:** whales, dolphins and the ghost ship appear with the right
+weighting, the Sightings tab records them, a first sighting starts a report
+quest that pays out at the right port, and events never stack up or appear
+inside islands.
+
+---
+
+## Phase 8: The rival captain
+
+A rival captain who keeps turning up, challenges you to races at sea and on
+land, and has a story of their own that you piece together one encounter at
+a time. It ends with you saving them from a kraken.
+
+### Who they are (draft, open to change)
+
+- **Captain Sable** (working name). About your age, sails alone in a fast
+  sloop with **crimson sails**, so you can recognise them from a long way off.
+- **The link to your story:** Sable's grandmother was your grandfather's
+  great rival. The two of them raced each other across the isles for decades.
+  Sable grew up on those stories and was raised to beat "the old captain's
+  line". Now that the old captain is gone, you are the next best thing.
+- **The mirror:** your grandfather learned too late that fame wasn't worth
+  what it cost. Sable is still in the middle of that mistake: no crew, no
+  home port (they sold the family house to buy the sloop), and nothing but
+  the next win. The rival story is the same lesson as the journals, seen from
+  the outside, and this time you get to change the ending.
+- **The tie-in:** one of the unsent letters in the epilogue sea chest is
+  addressed to Sable's grandmother. Delivering it to Sable is what opens the
+  final chapter.
+
+Sable follows the main story's rules: the grandparents are never named (to
+Sable, he's "your grandfather" or "the old captain"), and nothing assumes
+the player's gender.
+
+### Encounters
+
+Encounters are gated like journals, by story chapter and upgrades, so Sable
+keeps pace with you. **The story moves on whether you win or lose.** Winning
+gives gold and a different line of dialogue, and the final chapter remembers
+your record.
+
+| # | Name | Where | Challenge | What you learn |
+| --- | --- | --- | --- | --- |
+| 1 | Crossed bows | Off Port Haven, after Journal I | Sable cuts across your bow and dares you to a short race to the point | Sable knows exactly who your grandfather was |
+| 2 | Open water | Between two mid-range ports | A buoy race through 3 checkpoints, where reading the wind matters | The two grandparents raced each other for decades |
+| 3 | King of the hill | A temperate island, ashore | Race Sable to the summit | Sable sails alone, with no crew |
+| 4 | Fog run | Fog, rocky waters | A race through fog using the compass and spyglass | Sable sold their family home to buy the sloop |
+| 5 | Relic scramble | A tropical island, ashore | First to find 3 relics on the level | Sable has never once been back to their home port |
+| 6 | Dismasted | After a storm, far out | No race: Sable's mast is down, and you tow them to port | Sable admits they don't know what they'd do if they stopped |
+| Finale | The deep | A hand-placed deep-water trench | Rescue Sable from a kraken | — |
+
+### The kraken (finale)
+
+- **Trigger:** you've delivered the letter to Sable, and Sable has sailed
+  off to the trench to prove something one last time. At dusk a distress
+  flare goes up on the horizon, and the HUD tracks it.
+- **No combat**, matching the rest of the game. The kraken is a set piece to
+  survive, not a boss to beat:
+  1. Tentacles rise around the trench. Each one is telegraphed by a dark
+     shadow and bubbles a couple of seconds before it slams down. Steer
+     through the gaps to reach Sable's ship.
+  2. Come alongside and throw a line, using the haul interaction.
+  3. Tow Sable out towards the shallows, where the kraken can't follow.
+     Towing makes you slower, so the last stretch is the tense part.
+  4. Optional: your lantern or a flare makes nearby tentacles flinch away,
+     a nod to the ashore lantern.
+- **Failure** sends you back to the edge of the trench with no hold loss.
+  It's a story beat, not a punishment.
+- **Ending:** story cards on the deck in the shallows. Sable reads the
+  letter properly at last.
+- **Reward:** Sable's crimson sail colour for your ship, a cosmetic (their
+  hat), and a title. Afterwards Sable is a friend: they turn up at ports with
+  a friendly line, and you can ask for a rematch on any race for gold.
+
+### How it works
+
+- **Delivery:** an encounter is a special event from the Phase 7 director,
+  with top priority once its conditions are met. Ports also spread rumours
+  (*"Crimson sails were seen off Archway Isle"*) that put a search circle on
+  the chart. If you miss Sable, they turn up again later.
+- **Sea races** (`src/race.js`): buoy checkpoints, a countdown, and a
+  rival boat that uses the same boat physics with a simple steering AI
+  that respects the wind. Rubber-banding is gentle. This needs `boat.js` to
+  support a second, AI-controlled boat with its own livery.
+- **Land races:** Sable follows the level's main route at a set pace and
+  takes canned jump arcs, so they don't need the full character controller.
+  Sable reuses the explorer rig with a fixed profile.
+- **Dialogue:** hails appear as a banner when the ships are close, and
+  bigger moments use story cards.
+- **Save:** `rival: { chapter, wins, losses, flags }`.
+
+**Done when:** all six encounters and the kraken finale can be played in
+order, losing never blocks the story, the letter hand-off opens the finale,
+and Sable stays on as a friend afterwards.
+
+---
+
 ## File plan
 
 ```
@@ -565,6 +802,11 @@ src/
   input.js             (P0) movement layer, schemes, touch joystick
   game.js              (all) new modes, event emits, wiring
   ui.js / index.html / style.css   (all) port tabs, creator, tracker, journal, ashore HUD
+  sea-events.js        (P7) event director, event actors, sightings
+  race.js              (P8) checkpoints, countdown, AI rival boat
+  rival.js             (P8) rival chapters, conditions, ashore pacer
+  rival-text.js        (P8) Sable's dialogue and story cards
+  kraken.js            (P8) finale set piece
 ```
 
 ## Delivery
@@ -581,6 +823,9 @@ One feature branch and PR per phase, matching how the repo already works
 | P3 | `feature/ashore-core` | P0, and P1's articulated explorer |
 | P4 | `feature/ashore-biomes-retrieve` | P2, P3 |
 | P5 | `feature/ashore-polish` | P4 |
+| P6 | One refit per Phase 4 biome PR | P3, and that biome's Phase 4 work |
+| P7 | `feature/living-sea` | P2a (report quests) |
+| P8 | `feature/rival-captain` | P3, P7 (encounters come through the director), the epilogue letters, and the rival's text written and approved |
 
 **Verification each phase:** there's no test suite, so each PR is checked in
 the browser preview (`tidewake-dev` in `.claude/launch.json`):
@@ -606,4 +851,16 @@ the browser preview (`tidewake-dev` in `.claude/launch.json`):
   scope here. Ports stay menus.
 - **Sea time while ashore:** the day/night clock keeps running. Weather keeps
   changing too, but the anchored ship is safe. If that feels too safe, a
-  storm could later drag the anchor and give you a timer.
+  storm could later drag the anchor and give you a timer. (Refit 3 could
+  then be the fix: the anchor holds in storms.)
+- **Refit order (decided 2026-11-23):** refits follow the story (rocky →
+  tropical → volcanic → cold), so each one unlocks the next journal. The
+  cost is that rocky, with its sheer ledges, comes before the gentler
+  tropical biome, so the early rocky levels need tuning down.
+- **Rival name and look:** "Sable" is a working name. Their look,
+  pronouns and the grandmother backstory are still to be decided.
+- **AI boats:** `boat.js` assumes one player boat. Races and the kraken tow
+  need a second boat that can be driven by AI, which is the biggest
+  technical risk in Phase 8.
+- **Event frequency:** too many events make them wallpaper. Start rare,
+  then tune from playtests.
