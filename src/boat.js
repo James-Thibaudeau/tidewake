@@ -1,7 +1,7 @@
 // The player's sailboat: model (with tiered visual upgrades), sailing physics,
 // collisions, wake particles, and the explorer at the helm.
 import * as THREE from 'three';
-import { toon, toonGradient, outlineMaterial } from './toon.js';
+import { toon, toonGradient, toonMaterial, outlineMaterial, glowBoost } from './toon.js';
 import { waveHeight } from './waves.js';
 import { clamp, damp, smoothstep, wrapAngle, lerp, TAU } from './util.js';
 import { WORLD_HALF } from './config.js';
@@ -302,7 +302,7 @@ function makeFlag(w, h, tri, color) {
   return { mesh, geo, mat, base: Float32Array.from(geo.attributes.position.array), w };
 }
 
-const decoMat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonGradient(), side: THREE.DoubleSide });
+const decoMat = toonMaterial({ vertexColors: true, gradientMap: toonGradient(), side: THREE.DoubleSide });
 const thinInk = outlineMaterial(0.025, 0x1b2233);
 
 function decoMesh(parts, outline = false) {
@@ -326,7 +326,7 @@ function coilPart(x, y, z, r = 0.2, color = ROPE) {
   for (let k = 0; k < 3; k++) parts.push(part(new THREE.TorusGeometry(r - k * 0.035, 0.028, 4, 14), color, { x, y: y + k * 0.045, z, rx: Math.PI / 2 }));
   return parts;
 }
-const ropeMat = new THREE.MeshToonMaterial({ color: ROPE, gradientMap: toonGradient() });
+const ropeMat = toonMaterial({ color: ROPE, gradientMap: toonGradient() });
 function segMesh(r = 0.022) {
   const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 1, 5).translate(0, 0.5, 0), ropeMat);
   m.frustumCulled = false;
@@ -473,20 +473,20 @@ export class Boat {
       idx.push(a, b, c, b, d, c);
     }
     this.sailGeo.setIndex(idx);
-    this.sailMat = new THREE.MeshToonMaterial({ map: sailTexture(0), gradientMap: toonGradient(), side: THREE.DoubleSide });
+    this.sailMat = toonMaterial({ map: sailTexture(0), gradientMap: toonGradient(), side: THREE.DoubleSide });
     this.sail = new THREE.Mesh(this.sailGeo, this.sailMat);
     this.sail.frustumCulled = false;
     this.boom.add(this.sail);
 
     // Jib: luff along the forestay, tack at the bow (or bowsprit), clew sheeted to leeward
     this.jibGeo = this.makeSailGrid(JIB_U, JIB_V, true);
-    this.jibMat = new THREE.MeshToonMaterial({ map: sailTexture(1), gradientMap: toonGradient(), side: THREE.DoubleSide });
+    this.jibMat = toonMaterial({ map: sailTexture(1), gradientMap: toonGradient(), side: THREE.DoubleSide });
     this.jib = new THREE.Mesh(this.jibGeo, this.jibMat);
     this.jib.frustumCulled = false;
     g.add(this.jib);
     // Gaff topsail above the main (sail tiers 4-5): lives on the boom so it swings with it
     this.topGeo = this.makeSailGrid(TOP_U, TOP_V, false);
-    this.topMat = new THREE.MeshToonMaterial({ map: sailTexture(4), gradientMap: toonGradient(), side: THREE.DoubleSide });
+    this.topMat = toonMaterial({ map: sailTexture(4), gradientMap: toonGradient(), side: THREE.DoubleSide });
     this.topsail = new THREE.Mesh(this.topGeo, this.topMat);
     this.topsail.frustumCulled = false;
     this.boom.add(this.topsail);
@@ -1369,7 +1369,7 @@ export class Boat {
     const Lt = this.activeLantern;
     this.light.intensity = night * 14 * (0.9 + Math.sin(t * 7) * 0.05) * (this.levels.lantern === 0 ? 0.7 : 1);
     this.light.distance = this.lanternRange || 30;
-    const glowK = 0.75 + night * 0.25;
+    const glowK = (0.75 + night * 0.25) * glowBoost.value;
     Lt.glowMat.color.set(Lt.color).multiplyScalar(glowK).offsetHSL(0, 0, night * 0.08);
     const animLamp = (E) => {
       if (E.halo) {

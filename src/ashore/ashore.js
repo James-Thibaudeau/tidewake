@@ -6,6 +6,7 @@
 //
 // state.ashore[islandId] = { visited, coins: [id], caches: [id], chest: bool }
 import * as THREE from 'three';
+import { toonMaterial, glowBoost } from '../toon.js';
 import { ASHORE } from '../config.js';
 import { edgeFactor } from '../world.js';
 import { propMesh, part, merge, propMaterial, thinOutline } from '../props.js';
@@ -21,7 +22,7 @@ const LAND_SPEED = 5;                        // boat speed (m/s) below which you
 // ------------------------------------------------------------- pickup art
 let coinGeo = null, pileGeo = null, postGeo = null, handGeo = null;
 const handGlow = new THREE.MeshBasicMaterial({ color: '#ffd98a' });
-const coinMat = new THREE.MeshToonMaterial({ color: '#ffd54a', emissive: '#6a4a00', emissiveIntensity: 0.35 });
+const coinMat = toonMaterial({ color: '#ffd54a', emissive: '#6a4a00', emissiveIntensity: 0.35 });
 const glowOff = new THREE.MeshBasicMaterial({ color: '#6b5a3a' });
 const glowOn = new THREE.MeshBasicMaterial({ color: '#ffe8a0' });
 function pickupGeometry() {
@@ -53,6 +54,7 @@ function pickupGeometry() {
 export class Ashore {
   constructor(game) {
     this.game = game;
+    glowOn.color.set('#ffe8a0').multiplyScalar(glowBoost.value);
     this.scene = new THREE.Scene();
     this.active = false;
     this.island = null;

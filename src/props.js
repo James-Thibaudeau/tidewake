@@ -2,10 +2,10 @@
 // it can be drawn with a single shared toon material (and instanced).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { toonGradient, outlineMaterial } from './toon.js';
+import { toonGradient, toonMaterial, outlineMaterial } from './toon.js';
 import { hash2 } from './util.js';
 
-export const propMaterial = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonGradient() });
+export const propMaterial = toonMaterial({ vertexColors: true, gradientMap: toonGradient() });
 export const propOutline = outlineMaterial(0.07);
 export const thinOutline = outlineMaterial(0.035);
 

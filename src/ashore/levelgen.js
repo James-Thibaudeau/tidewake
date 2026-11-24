@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PROPS, propMaterial, propOutline, thinOutline } from '../props.js';
-import { toonGradient } from '../toon.js';
+import { toonGradient, toonMaterial } from '../toon.js';
 import { mulberry32, noise2, TAU, clamp } from '../util.js';
 import { cyl } from './shapes.js';
 import { layoutLevel, validateLayout, LIMITS, MODULE_TYPES } from './modules.js';
@@ -84,7 +84,7 @@ function buildTerrain(T, pal, seed) {
   g.setIndex(idx);
   g.computeVertexNormals();
   g.computeBoundingSphere();
-  const mat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonGradient() });
+  const mat = toonMaterial({ vertexColors: true, gradientMap: toonGradient() }, { rim: false });
   const m = new THREE.Mesh(g, mat);
   m.name = 'terrain';
   return m;

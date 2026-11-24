@@ -32,6 +32,7 @@ uniform vec3 uHorizon;
 uniform vec3 uSunDir;
 uniform vec3 uMoonDir;
 uniform vec3 uSunCol;
+uniform float uSunHDR; // >1 lets the disc feed the bloom pass (fx.js)
 uniform vec3 uGold1;
 uniform vec3 uGold2;
 uniform vec3 uGold3;
@@ -71,7 +72,7 @@ void main() {
   float wide = 0.05 + uGolden * 0.3;
   float sunGlow = exp(-sa * sa / 0.004) * 0.45 + exp(-sa * sa / wide) * (0.18 + uGolden * 0.35);
   col += uSunCol * sunGlow * vis * (1.0 - uNight);
-  col = mix(col, uSunCol * 1.35 + 0.18, (1.0 - smoothstep(0.050, 0.057, sa)) * vis);
+  col = mix(col, (uSunCol * 1.35 + 0.18) * uSunHDR, (1.0 - smoothstep(0.050, 0.057, sa)) * vis);
   // moon with a crescent bite and a gentle falloff glow
   float md = dot(d, uMoonDir);
   float ma = sqrt(max(0.0, 2.0 * (1.0 - md)));
@@ -195,7 +196,7 @@ export class Environment {
     this.uniforms = {
       uTop: { value: new THREE.Color() }, uHorizon: { value: new THREE.Color() },
       uSunDir: { value: new THREE.Vector3() }, uMoonDir: { value: new THREE.Vector3() },
-      uSunCol: { value: new THREE.Color() },
+      uSunCol: { value: new THREE.Color() }, uSunHDR: { value: 1 },
       uGold1: { value: PAL.gold1.clone() }, uGold2: { value: PAL.gold2.clone() }, uGold3: { value: PAL.gold3.clone() },
       uCloudLit: { value: new THREE.Color() }, uCloudShade: { value: new THREE.Color() },
       uGolden: { value: 0 }, uNight: { value: 0 }, uOvercast: { value: 0 }, uCover: { value: 0 },

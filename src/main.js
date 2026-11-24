@@ -16,6 +16,7 @@ import { QuestSystem } from './quests.js';
 import { Story } from './story.js';
 import { Ashore } from './ashore/ashore.js';
 import { loadSettings } from './save.js';
+import { FX, fxFlags } from './fx.js';
 
 // Yield so the loading text can paint (setTimeout keeps working in background tabs).
 const nextFrame = () => new Promise((r) => setTimeout(r, 30));
@@ -27,7 +28,9 @@ async function boot() {
   const canvas = document.getElementById('game');
   let renderer;
   try {
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: !low && !isTouch, powerPreference: 'high-performance' });
+    // with post-processing on, SMAA replaces the canvas's own MSAA
+    const post = fxFlags(settings.quality).post;
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: !post && !low && !isTouch, powerPreference: 'high-performance' });
   } catch (e) {
     loadingText('Sorry, your browser does not support WebGL.');
     return;
@@ -37,6 +40,7 @@ async function boot() {
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 6000);
+  const fx = new FX(renderer, scene, camera, settings.quality);
 
   loadingText('Charting the isles…');
   await nextFrame();
@@ -53,7 +57,7 @@ async function boot() {
   audio.setSound(settings.sound);
   audio.setMusic(settings.music);
 
-  const game = new Game({ renderer, scene, camera, world, streamer, ocean, env, weather, boat, input, audio });
+  const game = new Game({ renderer, scene, camera, world, streamer, ocean, env, weather, boat, input, audio, fx });
   const ui = new UI(game);
   game.ui = ui;
   game.creator = new Creator(game);
@@ -74,6 +78,7 @@ async function boot() {
   const resize = () => {
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h);
+    fx.setSize(w, h);
     for (const cam of new Set([camera, game.view.camera])) {
       cam.aspect = w / h;
       cam.updateProjectionMatrix();
@@ -87,22 +92,26 @@ async function boot() {
   window.addEventListener('beforeunload', () => { if (game.mode === 'sailing' || game.mode === 'ashore') game.saveVoyage(); });
 
   let lastW = -1, lastH = -1;
-  const clock = new THREE.Clock();
+  const timer = new THREE.Timer();
+  timer.connect(document);
   // Warm up shaders with one frame before revealing
   game.update(0.016);
-  renderer.render(scene, camera);
+  fx.update(game, game.view);
+  fx.render(game.view, 0.016);
   ui.hideLoading();
   ui.showTitle(game.hasSave());
 
-  renderer.setAnimationLoop(() => {
-    const dt = Math.min(clock.getDelta(), 0.05);
+  renderer.setAnimationLoop((now) => {
+    timer.update(now);
+    const dt = Math.min(timer.getDelta(), 0.05);
     // Catch size changes that never fired a resize event (hidden tabs, iframes)
     if (window.innerWidth !== lastW || window.innerHeight !== lastH) {
       lastW = window.innerWidth; lastH = window.innerHeight;
       resize();
     }
     game.update(dt);
-    renderer.render(game.view.scene, game.view.camera);
+    fx.update(game, game.view);
+    fx.render(game.view, dt);
   });
   window.tidewake = game; // handy for debugging in the console
 }
