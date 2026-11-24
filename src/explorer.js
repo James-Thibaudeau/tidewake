@@ -7,14 +7,14 @@
 // comes from an appearance profile and can be swapped at any time with
 // setAppearance(). Style geometry lives in outfits.js.
 import * as THREE from 'three';
-import { toonGradient, outlineMaterial } from './toon.js';
+import { toonGradient, toonMaterial, outlineMaterial } from './toon.js';
 import { clamp, damp, wrapAngle } from './util.js';
 import { normalizeProfile, DEFAULT_PROFILE } from './cosmetics.js';
 import { part, mergeParts, buildOutfit, backRadius, faceParams, acquireFace, releaseFace, faceGeometry, HIP_Y, KNEE_Y, HC, BONES } from './outfits.js';
 
 export { part, mergeParts };
 
-export const charMaterial = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonGradient() });
+export const charMaterial = toonMaterial({ vertexColors: true, gradientMap: toonGradient() });
 const inkOutline = outlineMaterial(0.022, 0x1a1420);
 
 function inked(geo, parent, mat = charMaterial) {
@@ -140,7 +140,7 @@ export class Explorer {
     // (its shape follows the head shape; see setAppearance)
     const faceGeo = faceGeometry('round');
     this.faceShape = 'round';
-    this.faceMat = new THREE.MeshToonMaterial({
+    this.faceMat = toonMaterial({
       gradientMap: toonGradient(), transparent: true, depthWrite: false,
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
     });

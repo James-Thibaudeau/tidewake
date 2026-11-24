@@ -32,6 +32,7 @@ uniform vec3 uHorizon;
 uniform vec3 uSunDir;
 uniform vec3 uMoonDir;
 uniform vec3 uSunCol;
+uniform float uSunHDR; // >1 lets the disc feed the bloom pass (fx.js)
 uniform vec3 uGold1;
 uniform vec3 uGold2;
 uniform vec3 uGold3;
@@ -56,7 +57,9 @@ void main() {
   // with height (orange → pink → purple), plus a pink anti-solar belt.
   vec3 sh = normalize(vec3(uSunDir.x, 0.0, uSunDir.z) + vec3(1e-5, 0.0, 0.0));
   vec3 dh = normalize(vec3(d.x, 0.0, d.z) + vec3(1e-5, 0.0, 0.0));
-  float azc = dot(sh, dh) * 0.5 + 0.5;
+  // clamped: rounding can push it a hair below 0 facing away from the sun,
+  // and pow() of a negative is NaN (a black speck that bloom spreads into blocks)
+  float azc = clamp(dot(sh, dh) * 0.5 + 0.5, 0.0, 1.0);
   vec3 ramp = mix(uGold1, uGold2, smoothstep(0.0, 0.22, yp));
   ramp = mix(ramp, uGold3, smoothstep(0.18, 0.6, yp));
   float side = pow(azc, 2.2);
@@ -71,7 +74,7 @@ void main() {
   float wide = 0.05 + uGolden * 0.3;
   float sunGlow = exp(-sa * sa / 0.004) * 0.45 + exp(-sa * sa / wide) * (0.18 + uGolden * 0.35);
   col += uSunCol * sunGlow * vis * (1.0 - uNight);
-  col = mix(col, uSunCol * 1.35 + 0.18, (1.0 - smoothstep(0.050, 0.057, sa)) * vis);
+  col = mix(col, (uSunCol * 1.35 + 0.18) * uSunHDR, (1.0 - smoothstep(0.050, 0.057, sa)) * vis);
   // moon with a crescent bite and a gentle falloff glow
   float md = dot(d, uMoonDir);
   float ma = sqrt(max(0.0, 2.0 * (1.0 - md)));
@@ -195,7 +198,7 @@ export class Environment {
     this.uniforms = {
       uTop: { value: new THREE.Color() }, uHorizon: { value: new THREE.Color() },
       uSunDir: { value: new THREE.Vector3() }, uMoonDir: { value: new THREE.Vector3() },
-      uSunCol: { value: new THREE.Color() },
+      uSunCol: { value: new THREE.Color() }, uSunHDR: { value: 1 },
       uGold1: { value: PAL.gold1.clone() }, uGold2: { value: PAL.gold2.clone() }, uGold3: { value: PAL.gold3.clone() },
       uCloudLit: { value: new THREE.Color() }, uCloudShade: { value: new THREE.Color() },
       uGolden: { value: 0 }, uNight: { value: 0 }, uOvercast: { value: 0 }, uCover: { value: 0 },

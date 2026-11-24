@@ -47,6 +47,14 @@ pull request merges.
   ([#11](https://github.com/James-Thibaudeau/tidewake/pull/11)).
 - [x] Fix: the seam through the "d" in the title logo
   ([#10](https://github.com/James-Thibaudeau/tidewake/pull/10)).
+- [x] **Visual upgrade:** three.js r187; post-processing (ink edges, bloom,
+  colour grade, SMAA); cascaded cel shadows; a rim light on toon materials.
+  On High quality only, still no build step
+  ([#17](https://github.com/James-Thibaudeau/tidewake/pull/17)).
+  - Fix: black flashing blocks on the title and while turning the camera.
+    The sky shader made stray NaN pixels (`pow` of a value rounded just
+    below zero), which bloom blurred into large black areas. The sky is
+    fixed, and a guard pass now scrubs NaN/Inf before bloom.
 
 ### Next up
 
@@ -69,6 +77,25 @@ pull request merges.
   - [ ] Phones: joystick dead zone, bigger buttons, less decor on Low
   - [ ] Performance pass, including cleanup when leaving an island
   - [x] README controls for going ashore (done in #11)
+- [ ] **Visual effects follow-ups** (after #17; `src/fx.js`, `src/toon.js`):
+  - [ ] Test High quality on real phones (touch uses 2 shadow cascades,
+    1024 maps, medium SMAA). Phones default to Low, which has no effects;
+    decide whether High on touch should drop edges or shadows.
+  - [ ] Measure frame time on desktop with effects on and off. The in-app
+    browser was throttled during the prototype, so there's no real number yet.
+  - [ ] Shadows on the ocean: the boat and cliffs cast none on the water
+    (the custom water shader needs the shadow chunks and the cel band).
+  - [ ] Shadows stop at 220 m (140 m on touch); check whether the cut-off
+    line shows while sailing and tune `maxFar` or the fade.
+  - [ ] Ink edges: check storm swells for stray lines on wave crests, and
+    thin the lines in the creator close-up, which read heavy.
+  - [ ] Rim light: check hair, hats and coats from all angles, and under
+    moonlight; consider a per-material strength.
+  - [ ] Sunset sun disc reads near-white (neutral tone mapping compresses
+    it); tune `uSunHDR` or the grade if it should stay gold.
+  - [ ] An "Effects" switch in the pause menu, separate from Quality.
+  - [ ] Ashore lantern glow takes its bloom boost once at start-up, so
+    `tidewake.fx.setEnabled()` doesn't change it (debug toggle only).
 
 ### Ideas (planned, not started)
 

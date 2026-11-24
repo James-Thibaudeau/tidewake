@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { WORLD_HALF } from './config.js';
 import { mulberry32, noise2, fbm2, clamp, smoothstep, TAU, headingOf } from './util.js';
 import { PROPS, propMaterial, propOutline, thinOutline, part, merge, propMesh } from './props.js';
-import { toonGradient } from './toon.js';
+import { toonGradient, toonMaterial } from './toon.js';
 import { WAVE_GLSL, waveUniforms } from './waves.js';
 
 const PREFIX = ['Gull', 'Coral', 'Ember', 'Whale', 'Mist', 'Thorn', 'Kelp', 'Sable', 'Amber', 'Moss',
@@ -360,8 +360,7 @@ vec3 terrainDetail(vec3 wp, float m, float dist) {
 }
 `;
 
-const terrainMaterial = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: toonGradient() });
-terrainMaterial.onBeforeCompile = (shader) => {
+const terrainMaterial = toonMaterial({ vertexColors: true, gradientMap: toonGradient() }, { rim: false, cacheKey: 'tidewake-terrain', onBeforeCompile: (shader) => {
   shader.uniforms.uTime = waveUniforms.uTime;
   shader.vertexShader = shader.vertexShader
     .replace('#include <common>', '#include <common>\nattribute float aMat;\nvarying float vMat;\nvarying vec3 vWPos;')
@@ -370,8 +369,7 @@ terrainMaterial.onBeforeCompile = (shader) => {
     .replace('#include <common>', '#include <common>\nuniform float uTime;\nvarying float vMat;\nvarying vec3 vWPos;\n' + TERRAIN_DETAIL_GLSL)
     .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= terrainDetail(vWPos, floor(vMat + 0.5), length(cameraPosition - vWPos));')
     .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\nif (vMat > 3.5) totalEmissiveRadiance += vec3(1.0, 0.32, 0.05) * (0.55 + 0.25 * sin(uTime * 2.0 + vWPos.x * 0.2));');
-};
-terrainMaterial.customProgramCacheKey = () => 'tidewake-terrain';
+} });
 
 export const ringUniforms = { uLight: { value: new THREE.Color(1, 1, 1) } };
 
@@ -459,7 +457,10 @@ const beaconMat = new THREE.ShaderMaterial({
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
   fragmentShader: `uniform float uTime; varying vec2 vUv;
     void main(){ float a = pow(1.0 - vUv.y, 1.6) * (0.5 + 0.22 * sin(uTime * 3.0 + vUv.y * 14.0 + vUv.x * 12.566));
-      gl_FragColor = vec4(1.0, 0.82, 0.3, a); }`,
+      // colours are sRGB: decode, so they match with or without the linear post pipeline
+      gl_FragColor = vec4(sRGBTransferEOTF(vec4(1.0, 0.82, 0.3, 1.0)).rgb, a);
+      #include <colorspace_fragment>
+    }`,
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
 });
 const beaconGeo = new THREE.CylinderGeometry(2.4, 1.0, 70, 14, 1, true).translate(0, 34, 0);
@@ -495,7 +496,8 @@ const beamMat = new THREE.ShaderMaterial({
       float l = clamp(vL, 0.0, 1.0);
       float along = pow(1.0 - l, 1.8) * smoothstep(0.0, 0.08, l);
       float a = edge * along * uIntensity * 0.4;
-      gl_FragColor = vec4(1.0, 0.93, 0.72, a);
+      gl_FragColor = vec4(sRGBTransferEOTF(vec4(1.0, 0.93, 0.72, 1.0)).rgb, a);
+      #include <colorspace_fragment>
     }`,
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
 });
@@ -747,7 +749,7 @@ export class IslandStreamer {
       group.add(o);
     } else if (I.landmark === 'volcano') {
       const geo = new THREE.IcosahedronGeometry(1, 1);
-      const mat = new THREE.MeshToonMaterial({ color: 0x8d8a8a, gradientMap: toonGradient() });
+      const mat = toonMaterial({ color: 0x8d8a8a, gradientMap: toonGradient() });
       const top = islandHeight(I, I.x + I.r * 0.2, I.z);
       for (let k = 0; k < 9; k++) {
         const m = new THREE.Mesh(geo, mat);

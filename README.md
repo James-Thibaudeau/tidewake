@@ -2,7 +2,7 @@
 
 A cel-shaded, open-world sailing game that runs in the browser. Explore an archipelago of more than 100 procedurally placed islands, chart the seas, haul up sunken treasure and upgrade your little boat. There's no combat, but the sea is dangerous: rocks, reefs and storms can wreck your ship and send you back to your last port.
 
-Built with [three.js](https://threejs.org/) as plain ES modules. There's no build step, so it runs straight from GitHub Pages on desktop and mobile.
+Built with [three.js](https://threejs.org/) as plain ES modules, plus [postprocessing](https://github.com/pmndrs/postprocessing) and [three-custom-shader-material](https://github.com/FarazzShaikh/THREE-CustomShaderMaterial), all loaded from a CDN through the import map. There's no build step, so it runs straight from GitHub Pages on desktop and mobile.
 
 ## How to play
 
@@ -50,6 +50,8 @@ python3 -m http.server 8000
 
 Then open http://localhost:8000.
 
+Visual effects run on the High quality setting. To compare, add `?fx=0` to the URL to turn them all off, or pick some with `?fx=edges,bloom,grade,smaa,shadows,rim`. In the console, `tidewake.fx.setEnabled(false)` flips them at runtime.
+
 ## Deploy to GitHub Pages
 
 1. Push this folder to a GitHub repository (it already includes `.nojekyll`).
@@ -60,7 +62,7 @@ Then open http://localhost:8000.
 ## Project structure
 
 ```
-index.html        page shell, HUD markup, import map (three.js from CDN)
+index.html        page shell, HUD markup, import map (three.js and libraries from CDN)
 style.css         all UI styling
 src/
   main.js         bootstrap: renderer, scene, main loop
@@ -81,7 +83,8 @@ src/
   sky.js          sky dome, sun/moon/stars, clouds, lighting
   weather.js      weather states, wind, rain, lightning, wind streaks
   waves.js        shared CPU/GPU wave function
-  toon.js         cel-shading gradient and outline materials
+  toon.js         cel-shading gradient, rim-lit toon material, outline materials
+  fx.js           post-processing (ink edges, bloom, grade, SMAA) and cascaded cel shadows
   ui.js           HUD, minimap, sea chart, port/pause/wreck screens
   input.js        keyboard, mouse and touch controls
   audio.js        procedural WebAudio sound and music

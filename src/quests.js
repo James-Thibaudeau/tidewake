@@ -14,6 +14,7 @@
 //   salvage: active (haul at the site) → ready (item aboard) → done at any port
 //            a wreck while ready drops the item back at the site
 import * as THREE from 'three';
+import { toonMaterial } from './toon.js';
 import { WORLD_HALF, WORLD_SEED } from './config.js';
 import { mulberry32, headingOf, bearingDeg, TAU, clamp } from './util.js';
 import { waveHeight, waveUniforms } from './waves.js';
@@ -58,7 +59,10 @@ const siteBeamMat = new THREE.ShaderMaterial({
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
   fragmentShader: `uniform float uTime; varying vec2 vUv;
     void main(){ float a = pow(1.0 - vUv.y, 1.5) * (0.5 + 0.22 * sin(uTime * 2.4 + vUv.y * 12.0 + vUv.x * 12.566));
-      gl_FragColor = vec4(0.45, 0.95, 1.0, a); }`,
+      // colours are sRGB: decode, so they match with or without the linear post pipeline
+      gl_FragColor = vec4(sRGBTransferEOTF(vec4(0.45, 0.95, 1.0, 1.0)).rgb, a);
+      #include <colorspace_fragment>
+    }`,
   transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
 });
 const siteBeamGeo = new THREE.CylinderGeometry(2.6, 1.0, 80, 14, 1, true).translate(0, 39, 0);
@@ -77,7 +81,7 @@ function buildSiteMesh() {
   g.add(beam);
   // floating wreckage: a broken spar, a barrel and a crate
   const debris = new THREE.Group();
-  const spar = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 7, 8), new THREE.MeshToonMaterial({ color: '#7a5230' }));
+  const spar = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 7, 8), toonMaterial({ color: '#7a5230' }));
   spar.rotation.set(Math.PI / 2, 0, 0.4);
   spar.userData.own = true;
   const barrel = propMesh('barrel'); barrel.position.set(2.2, 0, 1.2); barrel.rotation.set(1.3, 0.4, 0);
