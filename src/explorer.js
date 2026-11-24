@@ -131,7 +131,7 @@ export class Explorer {
 
     // ---- head (big chibi head; hair and hat come from the outfit)
     const head = new THREE.Group();
-    head.position.y = 0.58;
+    head.position.y = 0.6;
     torso.add(head);
     this.head = head;
     look.head = lookGroup(head);

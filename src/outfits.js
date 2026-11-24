@@ -285,7 +285,7 @@ function buildTorso(B, p, c) {
     part(cyl(0.245, 0.245, 0.055, 16), BELT, { y: 0.11 }),
     part(box(0.085, 0.065, 0.03), BUCKLE, { y: 0.11, z: 0.245 }),
     part(box(0.045, 0.03, 0.035), BELT, { y: 0.11, z: 0.25 }),
-    part(cyl(0.06, 0.07, 0.09, 10), c.skin, { y: 0.56 }),
+    part(cyl(0.058, 0.07, 0.12, 10), c.skin, { y: 0.575 }),
   );
 
   if (top === 'vest') {
@@ -518,39 +518,77 @@ function buildExtra(B, p, c) {
 }
 
 // ------------------------------------------------------------- head shape
-// The head starts as a sphere; a smooth deformation field reshapes the lower
-// half into a jaw and chin. The cranium (above the brow) is left alone, so
-// hair and hats keep fitting every shape. The same field is applied to the
-// skin, side hair, hoods and the face decal, so everything stays attached.
-//   w: overall width, jaw: taper toward the chin, chin: lengthen the front of
-//   the lower face, cheek: fullness at cheek height, flat: square off the chin
+// The head starts as a sphere; a smooth deformation field reshapes it. The
+// same field is applied to everything on the head bone (skin, hair, hats, the
+// face decal), so everything stays attached.
+// Every shape shares a squat, wide "mochi" skull: a slightly lower, wider
+// crown, cheeks that stay full low down, and a short lower face whose broad
+// jaw ends in a clear ledge above the neck instead of melting into it. The
+// round underside behind the jaw is drawn up into the nape, and a small nose
+// is sculpted into the front so the profile has depth.
+//   w: face width, jaw: how far the jaw tapers in toward the chin, pow: how
+//   late the taper starts (higher = fuller cheeks, sharper chin), chin:
+//   lengthen (or, negative, shorten) the front of the lower face, cheek:
+//   fullness at cheek height, flat: square off the chin, nose: nose height
+const MOCHI = { cx: 1.06, cy: 0.88, w: 1.1, jaw: 0.3, pow: 3.5, chin: -0.15, cheek: 0.05, cheekY: -0.19, flat: 0.3, nose: 0.05 };
 export const HEAD_SHAPE_PARAMS = {
-  round: { w: 1, jaw: 0, chin: 0, cheek: 0, flat: 0 },
-  oval: { w: 0.91, jaw: 0.34, chin: 0.22, cheek: 0.012, flat: 0.15 },
-  heart: { w: 0.97, jaw: 0.56, chin: 0.2, cheek: 0.01, flat: 0 },
-  square: { w: 0.93, jaw: 0.16, chin: 0.15, cheek: 0, flat: 0.6 },
-  long: { w: 0.86, jaw: 0.36, chin: 0.38, cheek: 0, flat: 0 },
-  soft: { w: 0.96, jaw: 0.24, chin: 0.1, cheek: 0.035, flat: 0 },
+  oval: { ...MOCHI },
+  round: { ...MOCHI, w: 1.13, jaw: 0.22, pow: 3, chin: -0.18, cheek: 0.07, flat: 0.2 },
+  heart: { ...MOCHI, w: 1.1, jaw: 0.46, pow: 2.4, chin: -0.08, cheek: 0.035, flat: 0.04 },
+  square: { ...MOCHI, w: 1.08, jaw: 0.18, pow: 3.2, chin: -0.12, cheek: 0.03, flat: 0.85 },
+  long: { ...MOCHI, cy: 0.94, cx: 1.02, w: 1.03, jaw: 0.36, pow: 3, chin: 0.03, cheek: 0.03, flat: 0.3 },
+  soft: { ...MOCHI, w: 1.12, jaw: 0.3, pow: 2.8, chin: -0.13, cheek: 0.065, cheekY: -0.16, flat: 0.4 },
 };
 
 const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
+// The face decal is a sphere cap this wide and tall (radians), centred on the
+// front of the head. The painted nose sits 0.7 of the way down the texture,
+// and the sculpted nose tip lines up with it.
+const FACE_PHI = 2.0, FACE_THETA = 1.45;
+const NOSE_Y = -0.32 * 0.964 * Math.sin(0.2 * FACE_THETA);
+
+// Optional whole-head terms (they also reshape whatever sits on the skull,
+// but fade out past it, so hat brims keep their size):
+//   cx / cy: cranium width / height, bz: push the back of the skull out,
+//   side: flatten the sides of the head, ff: flatten the face plane,
+//   j0: where (0 brow → 1 chin) the jaw starts to taper, giving it a corner,
+//   cheekY: the height of the cheek fullness
+const hasWhole = (P) => !!(P.cx || P.cy || P.bz || P.side || P.ff);
+
 /** Map a point in head space (origin at the head centre) to its shaped position. */
 function shapePoint(P, x, y, z, out) {
-  const t = sstep(0.03, -0.3, y);          // 0 at the brow, 1 at the bottom of the head
+  const t = sstep(0.03, -0.31, y);         // 0 at the brow, 1 at the bottom of the head
   const front = sstep(-0.12, 0.22, z);     // the chin is at the front
-  // every term fades to identity at the brow (y = 0.04), so there's no seam
-  let kx = 1 - (1 - P.w) * sstep(0.04, -0.1, y);
-  kx *= 1 - P.jaw * Math.pow(t, 1.4);
+  const back = 1 - sstep(-0.22, 0.04, z);  // the nape is at the back
+  // whole-head terms act on the skull and what's close to it, not hat brims
+  const near = 1 - sstep(0.4, 0.5, Math.hypot(x, y, z));
+  // every lower-face term fades to identity at the brow (y = 0.04), so there's no seam
+  const crW = 1 + ((P.cx ?? 1) - 1) * near;
+  let kx = crW + ((P.w ?? 1) - crW) * sstep(0.04, -0.08, y);
+  const j0 = P.j0 || 0;
+  kx *= 1 - P.jaw * Math.pow(Math.max(0, (t - j0) / (1 - j0)), P.pow);
+  if (P.side) kx *= 1 - P.side * near * Math.min(1, Math.abs(x) / 0.32) ** 4;
   // cheeks: a soft band around cheek height
-  const band = Math.exp(-(((y + 0.1) / 0.09) ** 2)) * sstep(0.04, -0.02, y);
+  const cy0 = P.cheekY ?? -0.1;
+  const band = Math.exp(-(((y - cy0) / 0.09) ** 2)) * sstep(0.04, -0.02, y);
   const r = Math.hypot(x, z) || 1;
   const cheek = P.cheek * band * sstep(-0.05, 0.15, z);
   let ny = y * (1 + P.chin * t * front);
   if (P.flat) ny += P.flat * 0.06 * t * t * front;      // lift and flatten the chin line
+  ny += 0.07 * t * t * back;                            // tuck the underside into the nape
+  if (P.cy) ny *= 1 + (P.cy - 1) * near * sstep(-0.02, 0.12, y);
+  let kz = (1 + P.chin * 0.3 * t * front) * (1 - 0.22 * t * back);
+  if (P.bz) kz *= 1 + P.bz * near * back * (1 - t);
+  if (P.ff) kz *= 1 - P.ff * near * front * (1 - 0.6 * t);
   out.x = x * kx + (x / r) * cheek;
   out.y = ny;
-  out.z = z * (1 + P.chin * 0.25 * t * front) + (z / r) * cheek * 0.5;
+  out.z = z * kz + (z / r) * cheek * 0.5;
+  if (P.nose) {
+    // a small nose: a long, gentle bridge above the tip, a short drop below it
+    const dy = y - NOSE_Y, s = dy > 0 ? 0.065 : 0.02;
+    out.z += P.nose * Math.exp(-((x / (dy > 0 ? 0.026 : 0.032)) ** 2) - (dy / s) ** 2) * sstep(0.2, 0.28, z);
+  }
   return out;
 }
 
@@ -563,14 +601,14 @@ const _J = new THREE.Matrix3();
  * field's Jacobian, by finite differences) so cel-shading traces the jaw.
  */
 export function shapeHeadGeometry(geo, shape, cy = HC) {
-  const P = HEAD_SHAPE_PARAMS[shape];
-  if (!P || shape === 'round') return geo;
+  const P = HEAD_SHAPE_PARAMS[shape] || HEAD_SHAPE_PARAMS.oval;
   const pos = geo.attributes.position, nor = geo.attributes.normal;
   const e = 1e-3;
   const col = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  const whole = hasWhole(P), follow = P.nf ?? NORMAL_FOLLOW;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), y = pos.getY(i) - cy, z = pos.getZ(i);
-    if (y > 0.04) continue; // untouched above the brow
+    if (y > 0.04 && !whole) continue; // untouched above the brow
     shapePoint(P, x, y, z, _a);
     if (nor) {
       // Jacobian columns: d(out)/dx, d(out)/dy, d(out)/dz
@@ -584,7 +622,7 @@ export function shapeHeadGeometry(geo, shape, cy = HC) {
       // Keep most of the sphere's shading: fully deformed normals tip the
       // jaw into the cel-shade band and read as a beard shadow. Drawn anime
       // faces stay lit down to the chin.
-      _n.lerp(_b.set(nx, ny, nz), 1 - NORMAL_FOLLOW).normalize();
+      _n.lerp(_b.set(nx, ny, nz), 1 - follow).normalize();
       nor.setXYZ(i, _n.x, _n.y, _n.z);
     }
     pos.setXYZ(i, _a.x, _a.y + cy, _a.z);
@@ -597,7 +635,8 @@ export function shapeHeadGeometry(geo, shape, cy = HC) {
 
 /** The face decal: a sphere cap just in front of the skin, shaped to match. */
 export function faceGeometry(shape) {
-  const g = new THREE.SphereGeometry(0.32, 24, 16, PI / 2 - 0.75, 1.5, PI / 2 - 0.55, 1.1);
+  // fine enough to follow the nose
+  const g = new THREE.SphereGeometry(0.32, 56, 40, PI / 2 - FACE_PHI / 2, FACE_PHI, PI / 2 - FACE_THETA / 2, FACE_THETA);
   g.scale(1.014, 0.964, 0.984);
   g.translate(0, HC, 0);
   return shapeHeadGeometry(g, shape);
@@ -608,9 +647,11 @@ function buildHead(B, p, c) {
   const H = B.head;
   const first = H.length;
   H.push(
-    part(sph(0.32, 24, 18), c.skin, { y: HC, sy: 0.95, sz: 0.97 }),
-    part(sph(0.06, 8, 6), c.skinShade, { x: 0.31, y: HC - 0.02, sx: 0.6 }),
-    part(sph(0.06, 8, 6), c.skinShade, { x: -0.31, y: HC - 0.02, sx: 0.6 }),
+    // fine enough for the jaw line and the nose to stay smooth
+    part(sph(0.32, 64, 44), c.skin, { y: HC, sy: 0.95, sz: 0.97 }),
+    // ears: small upright ovals, tipped back a little
+    part(sph(0.055, 10, 8), c.skinShade, { x: 0.305, y: HC - 0.03, z: -0.01, sx: 0.5, sy: 1.25, sz: 0.8, rx: -0.25 }),
+    part(sph(0.055, 10, 8), c.skinShade, { x: -0.305, y: HC - 0.03, z: -0.01, sx: 0.5, sy: 1.25, sz: 0.8, rx: -0.25 }),
   );
   const hat = p.hat.style;
   const fit = hat === 'none' || BANDS[hat] ? 'none' : hat === 'furHood' ? 'hood' : 'hat';
@@ -621,86 +662,206 @@ function buildHead(B, p, c) {
 }
 
 // ------------------------------------------------------------------- hair
+// Hair is built from locks: tapered, flattened ribbons swept along a smooth
+// curve, broad side lying along the head, so they read as the chunky layered
+// strands of drawn anime hair rather than cones poking out of a ball.
+
+/** A head-space point from (azimuth from the front toward +x, elevation, distance from the head centre). */
+const sp = (az, el, r) => new THREE.Vector3(r * Math.cos(el) * Math.sin(az), HC + r * Math.sin(el), r * Math.cos(el) * Math.cos(az));
+
+const _C = new THREE.Vector3(), _T = new THREE.Vector3(), _O = new THREE.Vector3(), _S = new THREE.Vector3(), _U = new THREE.Vector3();
+/**
+ * A lock along the curve through `pts` (head-space Vector3s, root first).
+ * w / th: half-width / half-thickness at the root. bulge swells the middle;
+ * blunt > 0 leaves a squared-off end that wide (as a fraction of the root);
+ * curl rolls the cross-section so the lock cups round the head.
+ */
+function lock(col, pts, w, th, { bulge = 0.3, blunt = 0, seg = 9, sides = 8, curl = 0.25 } = {}) {
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal');
+  const pos = [], idx = [];
+  _C.set(0, HC, 0);
+  const rings = blunt ? seg + 1 : seg;
+  for (let i = 0; i < rings; i++) {
+    const t = i / seg;
+    curve.getPoint(t, _T); const P = _T.clone();
+    curve.getTangent(t, _T);
+    _O.subVectors(P, _C).normalize();
+    _S.crossVectors(_T, _O);
+    if (_S.lengthSq() < 1e-6) _S.set(1, 0, 0);
+    _S.normalize();
+    _U.crossVectors(_S, _T).normalize(); // away from the head
+    const f = (blunt + (1 - blunt) * Math.pow(1 - t, 0.85)) * (1 + bulge * Math.sin(PI * t));
+    for (let k = 0; k < sides; k++) {
+      const a = (k / sides) * TAU, ca = Math.cos(a), sa = Math.sin(a);
+      // cupped: the edges of the ribbon bend in toward the head
+      const u = sa * th * f - curl * w * f * ca * ca;
+      pos.push(P.x + _S.x * ca * w * f + _U.x * u, P.y + _S.y * ca * w * f + _U.y * u, P.z + _S.z * ca * w * f + _U.z * u);
+    }
+  }
+  for (let i = 0; i < rings - 1; i++) {
+    for (let k = 0; k < sides; k++) {
+      const a = i * sides + k, b = i * sides + (k + 1) % sides, c2 = a + sides, d = b + sides;
+      idx.push(a, c2, b, b, c2, d);
+    }
+  }
+  // root cap (inside the scalp) and the tip
+  const root = pos.length / 3;
+  curve.getPoint(0, _T); pos.push(_T.x, _T.y, _T.z);
+  for (let k = 0; k < sides; k++) idx.push(root, k, (k + 1) % sides);
+  const tip = pos.length / 3, last = (rings - 1) * sides;
+  curve.getPoint(1, _T);
+  pos.push(_T.x, _T.y, _T.z);
+  for (let k = 0; k < sides; k++) idx.push(tip, last + (k + 1) % sides, last + k);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return part(g, col);
+}
+/** Push head-space point `p` out to at least `r` from the head centre. */
+function outside(p, r) {
+  _O.set(0, HC, 0);
+  const d = p.distanceTo(_O);
+  if (d < r) p.sub(_O).multiplyScalar(r / d).add(_O);
+  return p;
+}
+/** A lock through (az, el, r) points. */
+const lockS = (col, pts, w, th, o) => lock(col, pts.map(([a, e, r]) => sp(a, e, r)), w, th, o);
+
 function hairCap(H, c) {
   // tilted so the fringe sits high on the forehead
-  const cap = part(sph(0.338, 20, 12, 0, TAU, 0, 1.55), c.hair, { rx: -0.28 });
+  const cap = part(sph(0.338, 22, 14, 0, TAU, 0, 1.55), c.hair, { rx: -0.28 });
   cap.translate(0, HC + 0.012, -0.012);
   H.push(cap);
 }
-function spikyFringe(H, c) {
-  const fringe = [[-0.2, 0.08, -0.25], [-0.1, 0.03, -0.08], [0.0, 0.05, 0.05], [0.1, 0.03, 0.12], [0.2, 0.08, 0.28]];
-  for (const [x, lift, rz] of fringe) {
-    H.push(part(cone(0.075, 0.24, 5), c.hair, { x, y: HC + 0.05 + lift, z: 0.29 - Math.abs(x) * 0.25, rx: PI - 0.35, rz }));
-  }
+/**
+ * Bangs swept across the forehead toward one side, longest at the temples
+ * so the eyes stay clear.
+ */
+function sweptFringe(H, c, side = 1) {
+  const locks = [
+    // az at the root, how far it sweeps, tip elevation, width
+    [-0.62, 0.05, -0.02, 0.075],
+    [-0.34, 0.2, 0.14, 0.085],
+    [-0.08, 0.26, 0.2, 0.09],
+    [0.2, 0.24, 0.15, 0.085],
+    [0.46, 0.16, 0.05, 0.075],
+    [0.7, 0.06, -0.06, 0.065],
+  ];
+  locks.forEach(([az, sw, tipEl, w], i) => {
+    const a = az * side, s = sw * side;
+    H.push(lockS(i % 3 === 1 ? c.hair2 : c.hair, [
+      [a - s * 0.7, 1.15, 0.31], [a - s * 0.3, 0.85, 0.35], [a + s * 0.15, 0.55, 0.362], [a + s * 0.6, 0.3, 0.362], [a + s, tipEl, 0.348],
+    ], w, 0.026, { bulge: 0.35 }));
+  });
 }
-/** Locks framing the face, plus (unless the hair is pulled back) tufts swept out over the ears. */
+/**
+ * Long locks hanging in front of the ears to the jaw, framing the face, plus
+ * (unless the hair is pulled back) a lock swept back over each ear.
+ */
 function sideLocks(H, c, swept = true) {
   for (const s of [-1, 1]) {
-    H.push(part(cone(0.07, 0.26, 5), c.hair, { x: s * 0.3, y: HC - 0.05, z: 0.06, rz: s * -0.25 + PI, rx: -0.1 }));
-    if (swept) H.push(part(cone(0.06, 0.2, 5), c.hair2, { x: s * 0.32, y: HC + 0.02, z: -0.1, rz: s * -(PI / 2 + 0.5) }));
+    H.push(lockS(c.hair, [[s * 0.95, 0.6, 0.33], [s * 1.12, 0.3, 0.352], [s * 1.18, -0.05, 0.352], [s * 1.1, -0.42, 0.33], [s * 0.98, -0.62, 0.315]], 0.07, 0.03, { bulge: 0.25 }));
+    if (swept) H.push(lockS(c.hair2, [[s * 1.3, 0.55, 0.33], [s * 1.6, 0.3, 0.36], [s * 1.85, 0.05, 0.37], [s * 2.05, -0.12, 0.4]], 0.075, 0.028));
+  }
+}
+/** A darker under-layer down the back of the head, so the nape doesn't show between the locks. */
+function nape(H, c) {
+  H.push(part(sph(0.336, 20, 8, PI * 1.5 - 1.45, 2.9, PI / 2 - 0.2, 1.05), c.hair2, { y: HC + 0.005, sy: 0.96 }));
+}
+/** A layer of locks round the back of the head, `from` radians either side of the front. */
+function backLocks(H, c, { n = 7, from = 1.45, top = 0.42, low = -0.42, flick = 0.05, w = 0.1, alt = true } = {}) {
+  for (let i = 0; i < n; i++) {
+    const az = from + (i / (n - 1)) * (TAU - 2 * from);
+    // the middle of the back hangs lowest, down over the nape
+    const k = (i % 2 ? 0.88 : 1) * (1 + 0.35 * Math.cos(az - PI) ** 2);
+    H.push(lockS(alt && i % 2 ? c.hair2 : c.hair, [
+      [az, top + 0.2, 0.32], [az, top, 0.348], [az, (top + low * k) / 2, 0.36], [az, low * k, 0.35 + flick * 0.5], [az * 1.02, low * k - 0.12, 0.345 + flick],
+    ], w, 0.032, { bulge: 0.25 }));
   }
 }
 
 const HAIR = {
-  spiky(H, c, fit) {
+  spiky(H, c, fit, band) {
     hairCap(H, c);
-    spikyFringe(H, c);
+    sweptFringe(H, c);
     sideLocks(H, c);
     if (fit === 'hood') return;
-    const tufts = [[-0.2, 0.12], [0, 0.18], [0.2, 0.1], [-0.12, -0.02], [0.12, -0.04], [0, 0.04]];
-    for (const [x, y] of tufts) {
-      H.push(part(cone(0.085, 0.3, 5), (x + y) % 0.2 > 0.05 ? c.hair2 : c.hair,
-        { x, y: HC + y, z: -0.27, rx: -PI / 2 - 0.35 + y, rz: x * 1.4 }));
-    }
-    // a cheeky ahoge poking out the back
-    H.push(part(cone(0.04, 0.22, 4), c.hair, { x: 0.05, y: HC + 0.34, z: -0.22, rx: -0.9, rz: -0.3 }));
-    if (fit === 'none') {
-      // bare head: spikes all over the crown
-      for (const [x, z, rz, rx] of [[-0.14, 0.08, 0.5, 0.3], [0.13, 0.06, -0.5, 0.25], [0, 0.0, 0, -0.1], [-0.18, -0.12, 0.7, -0.4], [0.17, -0.13, -0.7, -0.45]]) {
-        H.push(part(cone(0.09, 0.26, 5), rx > 0.2 ? c.hair : c.hair2, { x, y: HC + 0.3, z, rz, rx }));
-      }
-    }
+    // a layer round the back down to the nape, the tips flicked out
+    nape(H, c);
+    backLocks(H, c, { top: fit === 'hat' ? 0.18 : 0.4, low: -0.5, flick: 0.06 });
+    if (fit !== 'none') return;
+    // bare head: big locks swept back over the crown, hugging it, their tips
+    // kicking out behind (kept above a circlet or flower crown)
+    // Combed back: each lock keeps to its own side (constant x) over the top.
+    const lift = band ? 0.12 : 0;
+    const back = (x, th, r) => { const R = Math.sqrt(r * r - x * x); return new THREE.Vector3(x, HC + R * Math.sin(th), R * Math.cos(th)); };
+    const crown = [[-0.19, 0.01], [-0.065, 0.03], [0.065, 0.025], [0.19, 0.01], [-0.27, 0], [0.27, 0]];
+    crown.forEach(([x, up], i) => {
+      const side = Math.abs(x) > 0.25, t0 = side ? 0.7 : 0.95;
+      H.push(lock(i % 2 ? c.hair2 : c.hair, [
+        back(x * 0.9, t0, 0.3), back(x, t0 + 0.32, 0.355 + up), back(x * 1.05, 1.75 + lift, 0.365 + up),
+        back(x * 1.12, 2.2 + lift, 0.365 + up), back(x * 1.2, 2.5 + lift * 0.5, 0.385 + up),
+      ], side ? 0.085 : 0.095, 0.034, { bulge: 0.35 }));
+    });
+    // a cheeky ahoge on top
+    H.push(lockS(c.hair, [[0.1, 1.35, 0.33], [0.12, 1.5, 0.39], [0.25, 1.55, 0.44], [0.42, 1.42, 0.46]], 0.03, 0.016, { bulge: 0.4 }));
   },
   bob(H, c, fit) {
     hairCap(H, c);
-    // straight bangs
-    for (let i = 0; i < 6; i++) {
-      const x = -0.2 + i * 0.08;
-      H.push(part(cone(0.062, 0.17, 5), i % 2 ? c.hair2 : c.hair, { x, y: HC + 0.13 + Math.abs(x) * 0.15, z: 0.3 - Math.abs(x) * 0.3, rx: PI - 0.2 }));
+    // blunt bangs, cut straight across just above the brows
+    for (let i = 0; i < 7; i++) {
+      const az = -0.66 + i * 0.22;
+      H.push(lockS(i === 2 || i === 5 ? c.hair2 : c.hair, [[az * 0.8, 1.1, 0.31], [az, 0.7, 0.352], [az * 1.03, 0.36, 0.362], [az * 1.05, 0.14 - Math.abs(az) * 0.1 + (i % 2) * 0.03, 0.352]],
+        0.085, 0.026, { blunt: 0.55, bulge: 0.15, curl: 0.15 }));
     }
     if (fit === 'hood') return;
-    // curtain down to the jaw, open at the face
-    H.push(part(sph(0.352, 20, 10, PI / 2 + 1.0, TAU - 2.0, 0.85, 1.3), c.hair, { y: HC, sx: 1.04 }));
-    // a highlight band round the back only (open at the face)
-    H.push(part(sph(0.356, 20, 2, PI / 2 + 1.1, TAU - 2.2, 1.45, 0.12), c.hair2, { y: HC, sx: 1.04 }));
+    // a curtain of broad locks down to the jaw, hugging the head and turned
+    // under at the ends; the front ones frame the face
+    nape(H, c);
+    const top = fit === 'hat' ? 0.2 : 0.5;
+    for (let i = 0; i < 13; i++) {
+      const az = 0.98 + (i / 12) * (TAU - 1.96);
+      const end = -0.5 - (i % 2) * 0.07 - Math.cos(az - PI) ** 2 * 0.06;
+      H.push(lockS(i % 4 === 2 ? c.hair2 : c.hair, [[az, top + 0.3, 0.31], [az, top, 0.342], [az, 0.05, 0.352], [az, end + 0.14, 0.352], [az * 1.01, end, 0.338]],
+        0.12, 0.03, { blunt: 0.45, bulge: 0.1, curl: 0.35 }));
+    }
   },
   ponytail(H, c, fit) {
     hairCap(H, c);
-    spikyFringe(H, c);
+    sweptFringe(H, c, -1);
     sideLocks(H, c, false);
     if (fit === 'hood') return;
-    // Tied at the back of the head and hanging straight down behind it: a
-    // full lock just below the tie that tapers to a slightly flicked tip.
+    // Tied at the back of the head and hanging down behind it: a bundle of
+    // locks that swells below the tie and tapers to flicked tips.
     // (Under a hat the tie drops below the brim and the tail is shorter.)
     const hat = fit === 'hat';
     const tieY = hat ? HC : HC + 0.1, tieZ = -Math.sqrt(0.34 ** 2 - (tieY - HC) ** 2) - 0.02;
     const len = hat ? 0.85 : 1;
-    const top = tieY - 0.15 * len, tip = tieY - 0.31 * len;
+    // the hair drawn back to the tie, from the crown and up from the nape
+    nape(H, c);
+    const tie = new THREE.Vector3(0, tieY, tieZ + 0.03);
+    for (let i = 0; i < 7; i++) {
+      const az = 1.55 + (i / 6) * (TAU - 3.1);
+      const root = sp(az, -0.62, 0.33), mid = sp((az + PI) / 2, -0.15, 0.352);
+      H.push(lock(i % 2 ? c.hair2 : c.hair, [root, mid, outside(mid.clone().lerp(tie, 0.55), 0.35), tie], 0.09, 0.026, { bulge: 0.15, curl: 0.3 }));
+    }
     H.push(
-      part(sph(0.072, 10, 8), c.hair, { y: tieY + 0.01, z: tieZ + 0.02 }),
-      part(tor(0.046, 0.018, 5, 10), c.hair2, { y: tieY - 0.02, z: tieZ - 0.03, rx: PI / 2 - 0.35 }),
-      // the lock: fuller at the top, close to the head and neck
-      part(sph(0.085, 10, 8), c.hair, { y: top, z: tieZ - 0.06, sx: 0.95, sy: 1.7, sz: 0.85, rx: 0.12 }),
-      part(cone(0.07, 0.16 * len, 7), c.hair, { y: tip, z: tieZ - 0.075, rx: PI - 0.12 }),
-      // a darker underside strand and the flicked tip
-      part(cone(0.04, 0.12 * len, 5), c.hair2, { x: 0.02, y: tip - 0.02, z: tieZ - 0.055, rx: PI + 0.08, rz: -0.15 }),
+      part(sph(0.06, 10, 8), c.hair, { y: tieY + 0.01, z: tieZ + 0.02 }),
+      part(tor(0.046, 0.018, 5, 10), c.hair2, { y: tieY - 0.005, z: tieZ - 0.03, rx: PI / 2 - 0.35 }),
     );
+    const v = (x, dy, dz) => new THREE.Vector3(x, tieY + dy * len, tieZ + dz);
+    for (const [x, col, w, flick] of [[0, c.hair, 0.075, 0.04], [0.035, c.hair2, 0.05, 0.08], [-0.035, c.hair, 0.05, -0.02]]) {
+      H.push(lock(col, [v(x * 0.4, 0.01, -0.02), v(x, -0.06, -0.09), v(x * 1.2, -0.2, -0.1), v(x * 1.4 + flick * 0.5, -0.33, -0.06), v(x * 1.5 + flick, -0.42, -0.08 + Math.abs(flick))],
+        w, w * 0.75, { bulge: 0.5, curl: 0 }));
+    }
   },
   buns(H, c, fit) {
     hairCap(H, c);
-    spikyFringe(H, c);
+    sweptFringe(H, c);
     sideLocks(H, c);
     if (fit === 'hood') return;
+    nape(H, c);
     for (const s of [-1, 1]) {
       const [x, y, z, r] = fit === 'hat' ? [s * 0.28, HC + 0.08, -0.2, 0.085] : [s * 0.2, HC + 0.3, -0.06, 0.1];
       H.push(
@@ -717,6 +878,7 @@ const HAIR = {
   },
   curly(H, c, fit, band) {
     hairCap(H, c);
+    if (fit !== 'hood') nape(H, c);
     // Under a circlet or flower crown the curls part round the band, so it
     // sits on the hair (in a groove) rather than buried in it.
     const clear = (x, y, z, r) => !band || Math.abs(bandHeight(band, x, y, z)) > r + band.clear;
