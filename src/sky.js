@@ -57,7 +57,9 @@ void main() {
   // with height (orange → pink → purple), plus a pink anti-solar belt.
   vec3 sh = normalize(vec3(uSunDir.x, 0.0, uSunDir.z) + vec3(1e-5, 0.0, 0.0));
   vec3 dh = normalize(vec3(d.x, 0.0, d.z) + vec3(1e-5, 0.0, 0.0));
-  float azc = dot(sh, dh) * 0.5 + 0.5;
+  // clamped: rounding can push it a hair below 0 facing away from the sun,
+  // and pow() of a negative is NaN (a black speck that bloom spreads into blocks)
+  float azc = clamp(dot(sh, dh) * 0.5 + 0.5, 0.0, 1.0);
   vec3 ramp = mix(uGold1, uGold2, smoothstep(0.0, 0.22, yp));
   ramp = mix(ramp, uGold3, smoothstep(0.18, 0.6, yp));
   float side = pow(azc, 2.2);

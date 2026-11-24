@@ -51,6 +51,10 @@ pull request merges.
   colour grade, SMAA); cascaded cel shadows; a rim light on toon materials.
   On High quality only, still no build step
   ([#17](https://github.com/James-Thibaudeau/tidewake/pull/17)).
+  - Fix: black flashing blocks on the title and while turning the camera.
+    The sky shader made stray NaN pixels (`pow` of a value rounded just
+    below zero), which bloom blurred into large black areas. The sky is
+    fixed, and a guard pass now scrubs NaN/Inf before bloom.
 
 ### Next up
 

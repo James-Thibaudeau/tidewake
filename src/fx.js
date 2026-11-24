@@ -87,6 +87,26 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor)
   outputColor = vec4(c, inputColor.a);
 }`;
 
+// ------------------------------------------------------------ guard
+// One NaN/Inf pixel from any shader is invisible on a plain canvas, but the
+// bloom blur spreads it into big black blocks across the screen. Scrub the
+// scene buffer before anything reads it (its own pass: bloom samples the
+// render pass output directly, not the effects merged ahead of it).
+// NaN/Inf are tested on the raw bits (all-ones exponent): GPU compilers may
+// fold isnan()/isinf() away under fast math.
+const GUARD_FRAG = /* glsl */ `
+bool badFloat(const in float x) { return (floatBitsToUint(x) & 0x7f800000u) == 0x7f800000u; }
+void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
+  vec4 c = inputColor;
+  bool bad = badFloat(c.r) || badFloat(c.g) || badFloat(c.b) || badFloat(c.a);
+  outputColor = bad ? vec4(0.0, 0.0, 0.0, 1.0) : min(c, vec4(64.0));
+}`;
+
+class GuardEffect extends Effect {
+  // SRC, not the default NORMAL blend: mix(nan, x, 1.0) is still NaN
+  constructor() { super('GuardEffect', GUARD_FRAG, { blendFunction: BlendFunction.SRC }); }
+}
+
 class GradeEffect extends Effect {
   constructor() {
     super('GradeEffect', GRADE_FRAG, {
@@ -174,6 +194,7 @@ export class FX {
     const composer = new EffectComposer(this.renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
     this.renderPass = new RenderPass(scene, camera);
     composer.addPass(this.renderPass);
+    if (f.bloom) composer.addPass(new EffectPass(camera, new GuardEffect()));
     const effects = [];
     if (f.edges) {
       this.edges = new EdgeEffect();
