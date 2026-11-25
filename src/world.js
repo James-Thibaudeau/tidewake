@@ -7,6 +7,7 @@ import { PROPS, propMaterial, propOutline, thinOutline, part, merge, propMesh } 
 import { toonGradient, toonMaterial } from './toon.js';
 import { WAVE_GLSL, waveUniforms } from './waves.js';
 import { buildWreckModel, WRECK_STACKS, WRECK_SOLID, WRECK_MOORING } from './ashore/wreck.js';
+import { buildElderTree } from './elder-tree.js';
 
 const PREFIX = ['Gull', 'Coral', 'Ember', 'Whale', 'Mist', 'Thorn', 'Kelp', 'Sable', 'Amber', 'Moss',
   'Drift', 'Shell', 'Pebble', 'Storm', 'Sun', 'Moon', 'Star', 'Otter', 'Heron', 'Crab', 'Pelican',
@@ -509,6 +510,7 @@ export class IslandStreamer {
     this.quality = quality;
     this.lamps = [];
     this.smoke = [];
+    this.anims = []; // { owner, update(time, night) }
   }
 
   update(px, pz, budget = 1) {
@@ -537,6 +539,7 @@ export class IslandStreamer {
     });
     this.lamps = this.lamps.filter((l) => l.owner !== F);
     this.smoke = this.smoke.filter((l) => l.owner !== F);
+    this.anims = this.anims.filter((l) => l.owner !== F);
     this.built.delete(F);
   }
 
@@ -721,8 +724,8 @@ export class IslandStreamer {
 
   buildLandmark(I, group, exclusions) {
     if (I.landmark === 'grove') {
-      this.placeOnGround(I, group, 'bigTree', 0, 0, 0.3, 9);
-      exclusions.push([0, 0, 45]);
+      this.buildGrove(I, group);
+      exclusions.push([0, 0, 80]);
     } else if (I.landmark === 'ruins') {
       for (let k = 0; k < 10; k++) {
         const a = (k / 10) * TAU;
@@ -754,6 +757,51 @@ export class IslandStreamer {
         group.add(m);
         this.smoke.push({ owner: I, mesh: m });
       }
+    }
+  }
+
+  /** The Elder Tree on the hilltop, facing Port Haven, in a ring of old giants. */
+  buildGrove(I, group) {
+    const H = this.world.home;
+    const ry = Math.atan2(H.x - I.x, H.z - I.z); // tree space +z towards home
+    const cr = Math.cos(ry), sr = Math.sin(ry);
+    const base = islandHeight(I, I.x, I.z);
+    const S = 1.25; // the model is authored a little small; this is the size that dominates the skyline
+    const ground = (x, z) => (islandHeight(I, I.x + (x * cr + z * sr) * S, I.z + (-x * sr + z * cr) * S) - base) / S;
+    const T = buildElderTree({ ground, glowMap: glowTexture() });
+    T.group.position.y = base;
+    T.group.rotation.y = ry;
+    T.group.scale.setScalar(S);
+    for (const o of T.outlines) o.userData.lod = 'outline';
+    group.add(T.group);
+    this.anims.push({ owner: I, update: T.update });
+    // the old giants round it: the grove's ordinary trees, grown huge
+    const rng = mulberry32(I.seed * 7 + 11);
+    const buckets = {};
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    for (let n = 0, placed = 0; n < 200 && placed < 30; n++) {
+      const a = rng() * TAU, d = 88 + rng() * 105;
+      const lx = Math.cos(a) * d, lz = Math.sin(a) * d;
+      const h = islandHeight(I, I.x + lx, I.z + lz);
+      if (h < 4 || d > I.r * edgeFactor(I, a) * 0.75) continue;
+      const slope = Math.abs(islandHeight(I, I.x + lx + 3, I.z + lz) - h) + Math.abs(islandHeight(I, I.x + lx, I.z + lz + 3) - h);
+      if (slope > 3.5) continue;
+      const roll = rng(), type = roll < 0.55 ? 'roundTree' : roll < 0.82 ? 'pine' : 'birch';
+      const s = 2.6 + rng() * 1.9;
+      q.setFromAxisAngle(up, rng() * TAU);
+      m.compose(v.set(lx, h - 0.4, lz), q, sc.set(s, s * (0.9 + rng() * 0.25), s));
+      (buckets[type] ||= []).push(m.clone());
+      placed++;
+    }
+    for (const [type, mats] of Object.entries(buckets)) {
+      const mesh = new THREE.InstancedMesh(PROPS[type], propMaterial, mats.length);
+      mats.forEach((mm, i) => mesh.setMatrixAt(i, mm));
+      mesh.computeBoundingSphere();
+      const ol = new THREE.InstancedMesh(PROPS[type], propOutline, mats.length);
+      ol.instanceMatrix = mesh.instanceMatrix;
+      ol.boundingSphere = mesh.boundingSphere;
+      ol.userData.lod = 'outline';
+      group.add(mesh, ol);
     }
   }
 
@@ -887,6 +935,7 @@ export class IslandStreamer {
       L.beam.visible = night > 0.2;
       L.beam.rotation.y = time * 0.6;
     }
+    for (const A of this.anims) A.update(time, night);
     for (const S of this.smoke) {
       const b = S.mesh.userData.base;
       const t = (time * 0.08 + b.k / 9) % 1;
