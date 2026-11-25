@@ -26,8 +26,8 @@ const TABS = [
 // free part of the screen should show: the whole body, or a face close-up.
 const FOV = 30;
 const FRAMES = {
-  body: { span: 3.0, y: 0.98 },
-  face: { span: 1.75, y: 1.5 },
+  body: { span: 3.0, y: 1.0 },
+  face: { span: 1.3, y: 1.6 },
 };
 
 export class Creator {

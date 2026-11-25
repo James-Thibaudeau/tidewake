@@ -85,6 +85,19 @@ pull request merges.
     (harbor talk on the Quest Board, a search circle, the Redwing appears when
     you get close). The Phase 7 director can take that over later.
 
+- [x] **Character revamp** (not in the original plan): the explorer has
+  roughly real proportions, about four and a half heads tall, with a smaller
+  head on a neck, a tapered torso, longer legs and ankle joints. On foot the
+  legs are solved from where the feet go (a stride that matches ground
+  speed, heel strike and toe-off), the hips bob and sway, the shoulders turn
+  against them, jumps have rise, apex and fall poses, and landings sink on a
+  spring. At the helm the feet stay flat on the deck and the knees give.
+  Every outfit is refitted through one body-shape field in `outfits.js`
+  ([#PRNUM](https://github.com/James-Thibaudeau/tidewake/pull/PRNUM)).
+  - Not yet done: playing it by hand on a real phone, and a pass over
+    Sable's foot races with the new stride.
+  - The poncho now reads narrow (more of a serape); widen it if it bothers.
+
 ### Next up
 
 - [ ] **Phase 4, ashore content and fetch quests:**
