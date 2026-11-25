@@ -99,6 +99,23 @@ Notes:
 - **Performance:** a profile pass covering draw calls per module, outline
   cost and geometry disposal when you leave an island.
 - **README:** controls table for ashore, plus new tips.
+- **Water improvements** (`src/ocean.js`, `src/waves.js`, `WAVE_DEFS` in
+  `src/config.js`). The sea used to tile into a checkerboard. The first pass
+  fades wave colouring with distance and varies it by region (shader only).
+  Two ideas are left:
+  - **Bigger features to read.** Soft cloud shadows drifting with the wind,
+    darker gust bands running downwind, and a subtle tint for deeper and
+    shallower water, so the eye has something larger than one wave. Shader
+    only; the boat's motion doesn't change. Cloud shadows should follow the
+    weather's cloud cover and fade at night.
+  - **Retune the wave set.** The two biggest waves cross at about 63°,
+    which makes an egg-crate, and rows of crests still show a few hundred
+    metres out. Use more waves, with directions within about 40° of each
+    other and wavelengths that aren't simple multiples, for long rolling
+    crests. `waveHeight` runs on the CPU and the GPU from the same table, so
+    this changes how the boat rides: re-check handling, storm swell, shore
+    foam and the kraken. Each extra wave costs shader time (the ocean
+    samples the waves five times a pixel), so measure on Low.
 
 ---
 
