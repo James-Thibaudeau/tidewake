@@ -286,9 +286,16 @@ Updated 2026-11-25.
       - `node tools/check.mjs archway`: the layout's limits, and the test
         climber from the cove over the arch (56 s, 35 jumps) and up the
         stack (11 s more, 13 jumps); 3 hops need a second try.
-      - Looked at in the preview (sea view, the traverse's camera, the arch,
-        the stack). Not done: an art pass on the ledges (they look like
-        planks), gulls ashore, a play by hand, a look on a phone.
+      - The rock (`archway-art.js`): ledges are shelves of rock growing out
+        of the wall, deep where they meet it and thin at the lip, with turf
+        in patches; the sea stacks are lumpy banded columns; rock is
+        coloured a face at a time (`bandFaces`), so bands stay level and
+        crisp, and the terrain's cliffs, whose faces are too tall to band,
+        take tones that vary along the cliff instead. The handline's pins sit
+        on the rock.
+      - Looked at in the preview, at desktop and phone sizes (sea view, the
+        traverse's camera, the arch, the stack). Not done: gulls ashore, a
+        play by hand.
   - [ ] 4.6 Tropical islands and 4.7 the Sunken Temple
   - [ ] 4.8 Volcanic islands (with the steam-vent launch) and 4.9 Mount
     Cinderhorn

@@ -20,7 +20,7 @@ import { toonGradient, toonMaterial } from '../toon.js';
 import { mulberry32, noise2, TAU } from '../util.js';
 import { rowboatParts } from './pieces.js';
 import { buildArchwayLayout, archwayGround, ARCHWAY } from './archway-layout.js';
-import { C, strata, pieceArt, archBody, stackBody, campParts, cairnParts, handlineParts, caveParts } from './archway-art.js';
+import { C, bandFaces, pieceArt, archBody, stackBody, campParts, cairnParts, handlineParts, caveParts } from './archway-art.js';
 
 function merged(parts) {
   const g = mergeGeometries(parts);
@@ -50,7 +50,6 @@ function terrainMesh() {
     const slope = Math.hypot(hx, hz) / (2 * S);
     const nz = noise2(x * 0.17, z * 0.17, 6);
     if (h < -0.4) tmp.copy(cs.seabed);
-    else if (slope > 1.6) tmp.set(h < 1.2 ? C.wet : strata(h, x, z));
     else if (tags[k] === 'sand' || h < 0.5) tmp.copy(nz > 0.1 ? cs.shingle2 : cs.shingle);
     else if (slope > 0.7) tmp.copy(cs.scree).lerp(cs.grass2, 0.25);
     else tmp.copy(nz > 0.05 ? cs.grass2 : cs.grass);
@@ -63,11 +62,14 @@ function terrainMesh() {
     if (hs[a] < -5 && hs[b] < -5 && hs[c] < -5 && hs[d] < -5) continue;
     idx.push(a, c, b, b, c, d);
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  g.setIndex(idx);
-  g.computeVertexNormals();
+  const ix = new THREE.BufferGeometry();
+  ix.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  ix.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  ix.setIndex(idx);
+  ix.computeVertexNormals();
+  // smooth shading, but the cliffs coloured a face at a time so their bands stay crisp
+  const g = bandFaces(ix.toNonIndexed(), { flat: 0.5, keepFlat: true, fluted: true });
+  ix.dispose();
   g.computeBoundingSphere();
   terrainMat ||= toonMaterial({ vertexColors: true, gradientMap: toonGradient() }, { rim: false });
   const m = new THREE.Mesh(g, terrainMat);
@@ -132,9 +134,12 @@ function trailParts(L) {
   const pins = [];
   for (const n of L.route) {
     if (n.piece?.kind !== 'ledge') continue;
-    const y = n.y + 1.15, into = (y + 1) / 5 + 0.1;
-    if (n.piece.a != null) { const a = n.piece.a; pins.push([Math.cos(a) * (A.bay + into), y, Math.sin(a) * (A.bay + into)]); }
-    else pins.push([-(A.mouth + into), y, n.z]);
+    const y = n.y + 1.15, a = n.piece.a;
+    const at = (d) => (a != null ? [Math.cos(a) * (A.bay - 0.3 + d), Math.sin(a) * (A.bay - 0.3 + d)] : [-(A.mouth - 1 + d), n.z]);
+    let d = 0;
+    while (d < 6 && archwayGround(...at(d)).h < y) d += 0.1;
+    const [px, pz] = at(Math.max(0, d - 0.15));
+    pins.push([px, y, pz]);
   }
   // only between neighbours: no rope across an inlet
   let run = [];

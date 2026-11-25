@@ -9,7 +9,7 @@ import { part, jitter } from '../props.js';
 import { mulberry32, noise2, lerp, TAU } from '../util.js';
 
 export const C = {
-  rock: '#9b9389', rock2: '#7f776f', band: '#b39a78', wet: '#4f4944', top: '#b4ada2', turf: '#86ab55', turf2: '#76984b',
+  rock: '#8f877e', rock2: '#746c65', band: '#a48d72', wet: '#4f4944', top: '#b4ada2', turf: '#86ab55', turf2: '#76984b',
   shingle: '#cfc6b2', shingle2: '#b8ae9a', grass: '#86ab55', grass2: '#76984b', scree: '#a39a8d', seabed: '#a2967f',
   rope: '#d9c08a', iron: '#3b3f45', plank: '#b98a52', plank2: '#8f6a3e', chalk: '#f2efe6', ash: '#3a3330', ember: '#c4582c',
   cave: '#1f1a17', guano: '#e9e5da',
@@ -27,35 +27,91 @@ export const box = (x, y, z, sx = 1, sy = 1, sz = 1) => new THREE.BoxGeometry(x,
 /** Strata: warm and dark bands up a rock face, by height. */
 export function strata(y, x = 0, z = 0) {
   const n = noise2(x * 0.13, z * 0.13, 21);
-  const band = Math.floor((y + 40 + n * 0.6) / 1.9) % 3;
-  return band === 1 ? C.band : band === 2 ? C.rock2 : C.rock;
+  const band = Math.floor((y + 40 + n * 0.6) / 1.5) % 4;
+  return band === 1 ? C.band : band === 3 ? C.rock2 : C.rock;
 }
 
-/** A rough slab of rock: jittered, pale on top, its sides banded. */
-function slab(p, len, depth, thick, seed, topColor = C.top) {
-  const g = jitter(box(len, thick, depth, Math.max(2, Math.round(len)), 1, 2), 0.16, seed);
-  return placed(g, topColor, p, { y: p.top - thick / 2 - 0.02, c2: strata(p.top - 1, p.cx, p.cz), split: 0.78, soft: 0.03 });
-}
-
-/** A column of rock from the sea floor up to `top`, banded all the way. */
-function column(x, z, r, y0, top, seed, cap = C.top) {
-  const P = [], rng = mulberry32(seed);
-  for (let y = y0; y < top - 0.01;) {
-    const h = Math.min(top - y, 1.6 + rng() * 0.8), last = y + h >= top - 0.01;
-    const g = jitter(new THREE.CylinderGeometry(r * (0.96 + rng() * 0.08), r * (1 + rng() * 0.06), h, 9, 1), 0.12 * r, seed + y * 7);
-    P.push(part(g, last ? cap : strata(y + h / 2, x, z), { x, y: y + h / 2, z, ry: rng() * TAU, c2: last ? strata(y, x, z) : null, split: 0.8 }));
-    y += h;
+/**
+ * Colour a (non-indexed) rock geometry a face at a time: faces that look up
+ * get `top` (or turf in patches), steep ones a band of strata by the height
+ * of their row (the middle of their lowest and highest corners, which the two
+ * halves of a quad share, so bands run level), wet near the water. A whole
+ * face takes one colour, so the bands stay crisp. `fluted`: steep faces
+ * take a tone that varies along the cliff instead (for terrain, whose faces
+ * are too tall to band).
+ */
+export function bandFaces(g, { flat = 0.6, top = C.top, turf = 0, seed = 0, keepFlat = false, fluted = false } = {}) {
+  const p = g.attributes.position, col = g.attributes.color, c = new THREE.Color();
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), d = new THREE.Vector3();
+  for (let i = 0; i < p.count; i += 3) {
+    a.set(p.getX(i), p.getY(i), p.getZ(i));
+    b.set(p.getX(i + 1), p.getY(i + 1), p.getZ(i + 1)).sub(a);
+    d.set(p.getX(i + 2), p.getY(i + 2), p.getZ(i + 2)).sub(a);
+    const n = b.cross(d).normalize();
+    const cx = a.x + (b.x + d.x) / 3, cz = a.z + (b.z + d.z) / 3;
+    const ys = [p.getY(i), p.getY(i + 1), p.getY(i + 2)], cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    if (n.y > flat) {
+      if (keepFlat) continue;
+      c.set(turf && noise2(cx * 0.6, cz * 0.6, seed + 3) > 1 - turf * 2 ? C.turf : top);
+    }
+    else if (Math.max(...ys) < 1.4) c.set(C.wet);
+    else if (fluted) { const f = noise2(cx * 0.35, cz * 0.35, seed + 7); c.set(f > 0.25 ? C.rock2 : f < -0.3 ? C.band : C.rock); }
+    else c.set(strata(cy, cx, cz));
+    for (let k = 0; k < 3; k++) col.setXYZ(i + k, c.r, c.g, c.b);
   }
-  return P;
+  return g;
+}
+
+/**
+ * A shelf of rock growing out of a wall (on the piece's local -z, or +z with
+ * wall: 1): an uneven top with ragged edges, and an underside that tapers back
+ * into the rock, deep at the wall and thin at the lip. It reaches `into`
+ * metres further into the wall than the piece's collider, so it always meets
+ * the cliff.
+ */
+function shelfRock(p, seed, { deep = 2.8, lip = 0.9, into = 1.2, turf = 0.25, wall = -1 } = {}) {
+  const hx = p.hx, hz = p.hz + into / 2;
+  const g = box(hx * 2, 1, hz * 2, Math.max(3, Math.round(hx * 2.6)), 2, 4);
+  const q = g.attributes.position;
+  for (let i = 0; i < q.count; i++) {
+    const x = q.getX(i), y = q.getY(i), z = q.getZ(i);
+    const t = Math.min(1, Math.max(0, (z + hz) / (2 * hz))); // 0 at the wall, 1 at the lip
+    const n = noise2(x * 0.9 + seed, z * 0.9, 41), m = noise2(x * 1.7, z * 1.7 + seed, 43);
+    const nx = x * (1 + 0.1 * m * (Math.abs(x) > hx - 0.01 ? 1 : 0));
+    const nz = z + (t > 0.99 ? 0.28 * n : 0) - into / 2;
+    const ny = y > 0 ? 0.05 * m : -lerp(deep, lip, t ** 2.2) * (1 - 0.35 * (Math.abs(x) / hx) ** 2) + 0.15 * n;
+    q.setXYZ(i, nx, ny, nz);
+  }
+  // a wall on +z: the same shelf turned half round
+  const out = placed(g, C.top, wall > 0 ? { ...p, rot: p.rot + Math.PI } : p, { y: p.top });
+  out.computeVertexNormals();
+  return bandFaces(out, { turf, seed });
+}
+
+/** A column of rock from the sea floor up to `top`: lumpy, banded, its cap pale. */
+function column(x, z, r, y0, top, seed) {
+  const h = top - y0, rows = Math.max(2, Math.round(h / 1.1));
+  const g = new THREE.CylinderGeometry(r, r * 1.08, h, 11, rows, false);
+  const q = g.attributes.position;
+  for (let i = 0; i < q.count; i++) {
+    const px = q.getX(i), py = q.getY(i), pz = q.getZ(i), a = Math.atan2(pz, px), rr = Math.hypot(px, pz);
+    if (rr < 0.01) continue;
+    // ledges of harder rock stick out a little at some heights, and the whole face is lumpy
+    const k = 1 + 0.1 * noise2(Math.cos(a) * 2 + seed, py * 0.35 + Math.sin(a) * 2, 51) + 0.06 * Math.sin((py + seed) * 1.9);
+    q.setXYZ(i, px * k, py, pz * k);
+  }
+  const out = part(g, C.top, { x, y: y0 + h / 2, z, ry: seed });
+  out.computeVertexNormals();
+  return [bandFaces(out, { flat: 0.75, turf: 0.15, seed })];
 }
 
 /** The art for one walkable piece. */
 export function pieceArt(p, i) {
   switch (p.kind) {
-    case 'ledge': return [slab(p, p.hx * 2, p.hz * 2, 0.8, 90 + i)];
+    case 'ledge': return [shelfRock(p, 90 + i)];
     case 'span': {
-      // a little arch of rock over an inlet: the slab, and a curve of stones under it
-      const P = [slab(p, p.hx * 2, p.hz * 2, 0.9, 140 + i)];
+      // a little arch of rock over an inlet: the deck, and a curve of stones under it
+      const P = [shelfRock(p, 140 + i, { deep: 1.2, lip: 0.8, into: 0, turf: 0.35 })];
       for (let k = 0; k <= 6; k++) {
         const t = k / 6, lx = lerp(-p.hx + 0.5, p.hx - 0.5, t), drop = 0.9 + 3.2 * (1 - Math.sin(t * Math.PI));
         P.push(placed(jitter(new THREE.DodecahedronGeometry(0.75, 0), 0.2, 300 + i * 9 + k), strata(p.top - drop, p.cx, p.cz), p, { x: lx, y: p.top - drop, s: 1.1 }));
@@ -63,7 +119,7 @@ export function pieceArt(p, i) {
       return P;
     }
     case 'stack': return column(p.cx, p.cz, p.r, -6, p.top, 400 + i);
-    case 'shelf': return [slab(p, p.hx * 2, p.hz * 2, 0.6, 500 + i)];
+    case 'shelf': return [shelfRock(p, 500 + i, { deep: 1.6, lip: 0.4, into: 0.6, turf: 0.1, wall: 1 })];
     case 'top': {
       const g = jitter(new THREE.CylinderGeometry(p.r, p.r * 0.96, 0.5, 14, 1), 0.12, 600);
       return [part(g, C.turf, { x: p.cx, y: p.top - 0.25, z: p.cz, c2: C.top, split: 0.7 })];
@@ -120,7 +176,7 @@ export function archBody(L, A) {
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.setIndex(idx);
   g.computeVertexNormals();
-  P.push(g.toNonIndexed());
+  P.push(bandFaces(g.toNonIndexed(), { flat: 0.7 }));
   for (const s of L.steps) {
     const ax = Math.abs(s.cx);
     // rubble along both edges of the walk
