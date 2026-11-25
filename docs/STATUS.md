@@ -184,7 +184,8 @@ Updated 2026-11-25.
       hoot on real speakers were checked by hand (2026-11-25).
     - Not yet done: the pacing check. Chapter III now needs the Oak hull
       (120 gold) and the anchor quest as well as Sails 1.
-  - [x] 4.3 Anchor refits (Phase 6), `src/refits.js`. The system is in, but
+  - [x] 4.3 Anchor refits (Phase 6), `src/refits.js`
+    ([#35](https://github.com/James-Thibaudeau/tidewake/pull/35)). The system is in, but
     no new biome yet, so in normal play nothing changes: the shipwright's
     Anchor card says "Nothing more to fit yet" and other biomes still say
     "too treacherous to land on (yet)".
