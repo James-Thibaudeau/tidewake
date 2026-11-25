@@ -300,7 +300,7 @@ export class UI {
       ['<kbd>W</kbd><kbd>S</kbd> / <kbd>&uarr;</kbd><kbd>&darr;</kbd>', 'Raise / lower sail', 'Sail buttons ▲ ▼'],
       ['<kbd>A</kbd><kbd>D</kbd> / <kbd>&larr;</kbd><kbd>&rarr;</kbd>', 'Steer', 'Drag the tiller'],
       ['<kbd>E</kbd> / <kbd>Space</kbd>', 'Dock, haul treasure, go ashore', 'Gold action button'],
-      ['Hold <kbd>Z</kbd> / <kbd>Shift</kbd>', 'Spyglass (once found)', 'Spyglass button'],
+      ['Hold <kbd>Z</kbd>', 'Spyglass (once found)', 'Spyglass button'],
     ];
     const foot = [
       ['<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows', 'Walk', 'Joystick'],

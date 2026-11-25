@@ -273,7 +273,7 @@ export class Story {
     if (spyglass) {
       items.push({ icon: 'spyglass', name: 'Brass Spyglass',
         text: g.ui.touch ? 'Tap the spyglass button to look far out to sea. Islands you spot are charted from afar.'
-          : 'Hold <kbd>Z</kbd> or <kbd>Shift</kbd> to look through it. Islands you spot are charted from afar.' });
+          : 'Hold <kbd>Z</kbd> to look through it. Islands you spot are charted from afar.' });
     }
     const where = id === 'I' ? "Grandfather's wreck" : `${this.world.islands[this.camps[id].island].name} · grandfather's camp`;
     const choice = await g.ui.showFound({ eyebrow: where, title: spyglass ? 'You found his journal and spyglass!' : 'You found his journal!',
