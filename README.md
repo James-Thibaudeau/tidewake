@@ -61,6 +61,14 @@ In the browser console, `tidewake.debug.help()` lists helpers for jumping around
 
 Visual effects run on the High quality setting. To compare, add `?fx=0` to the URL to turn them all off, or pick some with `?fx=edges,bloom,grade,smaa,shadows,rim`. In the console, `tidewake.fx.setEnabled(false)` flips them at runtime.
 
+## Look at the art
+
+`gallery.html` shows one piece of the game's art at a time, without playing
+to it: `http://localhost:8767/gallery.html?show=outfit&top=coat&view=back`.
+Pick things from the menus, drag to turn, scroll to zoom. The "sheet" menu
+draws a contact sheet, such as every top with every bag from behind; click
+it to close. Everything is in the URL, so a view can be reloaded or linked.
+
 ## Deploy to GitHub Pages
 
 1. Push this folder to a GitHub repository (it already includes `.nojekyll`).
@@ -72,6 +80,7 @@ Visual effects run on the High quality setting. To compare, add `?fx=0` to the U
 
 ```
 index.html        page shell, HUD markup, import map (three.js and libraries from CDN)
+gallery.html      look-dev gallery: a page for looking at the art (not part of the game)
 style.css         all UI styling
 src/
   main.js         bootstrap: renderer, scene, main loop
@@ -118,9 +127,11 @@ src/
   config.js       tuning constants and upgrade catalogue
   util.js         math and noise helpers
   debug.js        console helpers for testing (tidewake.debug)
+  gallery/        the look-dev gallery: main.js (the page: scene, cameras, lighting, window.gallery),
+                  subjects.js (what it can show), presets.js (poses, lights, views), sheets.js (contact sheets)
 tools/
   serve.py        static dev server, caching off
-  check.mjs       quick checks in Node: syntax, imports, text keys, element ids, saves, ashore layouts, the grove climb
+  check.mjs       quick checks in Node: syntax, imports, text keys, element ids, the gallery, saves, ashore layouts, the grove climb
 docs/
   STATUS.md       what has shipped, what's next, known issues
   feature-plan.md designs for phases not built yet; shipped-plans.md keeps the designs of built ones

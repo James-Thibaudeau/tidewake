@@ -93,6 +93,16 @@ Updated 2026-11-25.
   - Still open: thighs come through a skirt or coat front at a run (the
     cloth is rigid).
 
+- [x] **Look-dev gallery** (tooling, not a game feature): `gallery.html`
+  shows one piece of the art at a time (an outfit, a ship tier, a prop, a
+  landmark, a level or one of its pieces) from fixed cameras under fixed
+  light, and draws contact sheets such as every top with every bag from
+  behind. Driven from the URL or from `window.gallery`. No game file changed.
+  How to use it is in `CLAUDE.md`; the design is in
+  [shipped-plans.md](shipped-plans.md).
+  - Not yet done: live sliders, and before/after in one image (see
+    [feature-plan.md](feature-plan.md)).
+
 ## Next up
 
 - [ ] **Phase 4, ashore content and fetch quests:**

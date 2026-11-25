@@ -1,6 +1,7 @@
 # Tidewake: plans that have shipped
 
-The original designs for phases that are now built (0-3 and 8), kept for
+The original designs for phases that are now built (0-3 and 8, and the
+look-dev gallery), kept for
 reference: the reasoning behind the data model, the story and its writing
 rules, and the ashore level rules. The code is the source of truth where the
 two disagree. Current state is in [STATUS.md](STATUS.md); designs for work
@@ -12,6 +13,7 @@ Contents: [How the codebase fitted](#how-the-codebase-fits-what-we-build-on) ·
 [Phase 2, quests and the main story](#phase-2-quest-system-sea-only-quest-types) ·
 [Phase 3, going ashore](#phase-3-going-ashore-core-loop-one-biome) ·
 [Phase 8, the rival captain](#phase-8-the-rival-captain) ·
+[The look-dev gallery](#tooling-the-look-dev-gallery) ·
 [File plan](#file-plan)
 
 ---
@@ -517,6 +519,64 @@ your record.
 **Done when:** all six encounters and the kraken finale can be played in
 order, losing never blocks the story, the letter hand-off opens the finale,
 and Sable stays on as a friend afterwards.
+
+---
+
+## Tooling: the look-dev gallery
+
+Not a game feature: a page for looking at the art. Proposed and built
+2026-11-25.
+
+**Why.** Every shape and colour is numbers in code, and the only way to see
+one was to play to it: start a voyage, get to the place, take a screenshot
+from wherever the camera is. `tools/check.mjs` answers in a second for
+logic; nothing did that for looks. Outfits showed the cost most: 37 styles on
+one body, each fix checked against the few combinations someone thought to
+try, so `outfits.js` needed four fit passes.
+
+**What was built.** A separate `gallery.html` beside `index.html`, with its
+code in `src/gallery/`. It imports the game's modules and builds its own
+small scene, so the game is untouched (no game file changed) and there is
+still no build step.
+
+- **One subject at a time,** picked in the URL so a view can be linked and
+  reloaded: `?show=outfit&top=coat&extra=satchel`, `?show=ship&tier=4`,
+  `?show=prop&id=camp`, `?show=grove&kind=fungus`.
+  - Subjects: `outfit` (the explorer), `ship` (by upgrade tier, or the
+    Redwing), `prop`, `tree` (the Elder Tree), `wreck`, `grove` (the level,
+    or one piece), `level` (a generated island by biome and seed, or one
+    piece).
+- **Fixed cameras:** `front`, `quarter`, `side`, `back`, `rear` and `top`
+  frame the subject; `sail` and `foot` are the game's own lens and distance
+  (small details vanish there); `face`, `helm` and `bow` are close-ups.
+- **Lighting presets:** `noon`, `sunset`, `night`, `overcast`. They set a
+  time of day and a weather and let `sky.js` do the rest, so the gallery
+  can't drift from the game's look. The ocean and the effects (`?fx=`) are
+  the game's own too.
+- **Poses** for the explorer: `stand`, `walk`, `run`, `jump`, `fall`;
+  `phase` holds a stride at one point. The helm pose is seen on a ship.
+- **Contact sheets:** `?sheet=tops-back` and the like draw a grid into one
+  image, such as every top with every bag from behind. A sheet takes the
+  parameters already in the URL, so it can be narrowed (`&bottom=skirt`).
+- **Console helpers** on `window.gallery`, in the style of `tidewake.debug`:
+  `show()`, `set()`, `view()`, `light()`, `sheet()`, `step()`, `frame()`,
+  `state()`, `list()`. They work in a hidden preview tab.
+- **Mistakes are reported, not guessed:** an unknown style, view or
+  parameter shows as a warning in the caption and in `state()`.
+
+**Decisions.**
+- Subjects are built by the game's own builders (`Explorer`, `Boat`,
+  `propMesh`, `generateLevel`…), never copies. None of them needed a `Game`:
+  `fx.update` is handed a small stand-in for the fields it reads.
+- Every show starts from time zero with the same sky, and the explorer's
+  idle glances are turned off, so two screenshots of the same URL match and
+  a before/after pair shows only the change.
+- `tools/check.mjs gallery` checks that the page's import map matches the
+  game's, that the game never imports the gallery, and that every sheet asks
+  for styles, views, lights and poses that exist.
+
+What is left (live sliders, a shot list, before/after in one image) is in
+[feature-plan.md](feature-plan.md).
 
 ---
 

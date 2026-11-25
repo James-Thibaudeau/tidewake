@@ -29,7 +29,8 @@ the summit, and the Elder Grove (its limits, and the climber from the beach
 to the crown). One group at a time:
 `node tools/check.mjs imports`.
 
-It can't see rendering or behaviour. For those, use the browser.
+It can't see rendering or behaviour. For those, use the browser: the game
+for behaviour, the gallery for looks.
 
 ## Test in the browser
 
@@ -58,6 +59,38 @@ tidewake.debug.restoreSave()              // when you're done: real save back, r
   it puts the save back and reloads to the title. Skip it and the test voyage
   is written over the real save when the tab closes.
 - Visual effects: `?fx=0` turns them all off, `?fx=edges,bloom` picks some.
+
+## Look at the art
+
+For how something looks, use the gallery, not the game: `gallery.html` on the
+same dev server shows one subject at a time from fixed cameras under fixed
+light, and it never touches the save.
+
+```js
+gallery.help()                             // everything below, and the other parameters
+gallery.list()                             // subjects, views, lights, sheets, this subject's parameters
+gallery.show({ show: 'outfit', top: 'coat', extra: 'satchel', view: 'back' })
+gallery.set({ light: 'sunset' })           // change some parameters, keep the rest
+gallery.show({ show: 'ship', tier: 4, view: 'sail' })   // the game's own lens and distance
+await gallery.sheet('tops-back')           // contact sheet: every top with every bag, from behind
+gallery.frame()                            // draw before a screenshot when the tab is hidden
+```
+
+- Subjects: `outfit`, `ship`, `prop`, `tree`, `wreck`, `grove`, `level`. The
+  same parameters work in the URL: `gallery.html?show=ship&tier=4&light=night`.
+- **After changing how something looks, take the contact sheet that covers
+  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`…, or
+  `views` / `lights` / `distance` for the subject showing) and read every
+  cell, not only the one you were fixing. A sheet takes the parameters
+  already showing, so `gallery.set({ bottom: 'skirt' })` first narrows it.
+- The same URL always draws the same picture, so a screenshot before and one
+  after show only your change. Take the "before" first.
+- `state()` and `sheet()` return `warnings` for anything not understood (an
+  unknown style, a misspelt parameter). Check it is empty.
+- Sheets are big; use the screenshot zoom to read cells and labels.
+- New art that the gallery can't show yet gets a subject in
+  `src/gallery/subjects.js`; a new combination worth checking gets a sheet
+  in `src/gallery/sheets.js`.
 
 ## How the code is wired
 
