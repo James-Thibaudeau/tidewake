@@ -14,6 +14,18 @@ export { validateLayout, LIMITS, MODULE_TYPES };
 
 const PALETTE = {
   temperate: { sand: '#ecd9a0', wet: '#c9b27a', grass: '#6cc24a', grass2: '#58b043', rock: '#8f877d', rock2: '#7d756b', seabed: '#b9a77a' },
+  // rocky: grey shingle, thin turf broken by scree, darker banded walls
+  rocky: { sand: '#cfc6b2', wet: '#a99f8c', grass: '#86ab55', grass2: '#76984b', scree: '#a39a8d', rock: '#8a8178', rock2: '#6a625a', seabed: '#a2967f' },
+};
+
+// What grows (or lies about) on each biome's land. density scales the tree
+// and bush counts; seaStacks stand offshore; boulders: spacing at the foot of
+// cliff 1 and the mesa.
+const TREES = [['roundTree', 0.36], ['pine', 0.24], ['birch', 0.14], ['fruitTree', 0.08], ['bush', 0.1], ['berryBush', 0.05], ['flower', 0.03]];
+const DECOR = {
+  temperate: { trees: TREES, density: 1, tufts: 1, flowers: 1, boulders: [4.5, 4], seaStacks: 0 },
+  rocky: { trees: [['pine', 0.36], ['rock', 0.3], ['bush', 0.2], ['deadTree', 0.07], ['birch', 0.04], ['flower', 0.03]],
+    density: 0.5, tufts: 0.55, flowers: 0.3, boulders: [3.2, 3], seaStacks: 16 },
 };
 
 // ----------------------------------------------------------------- terrain
@@ -61,6 +73,7 @@ function buildTerrain(T, pal, seed) {
       else if (cliff) tmp.copy(C.rock).lerp(C.rock2, 0.5 + 0.5 * Math.sin(h * 1.7 + n * 2)); // strata
       else if (h < 0.35) tmp.copy(C.wet);
       else if (T.groundTag(x, z) === 'sand') tmp.copy(C.sand);
+      else if (C.scree && n < -0.12) tmp.copy(C.scree);
       else tmp.copy(n > 0.1 ? C.grass2 : C.grass);
       const v = 1 + noise2(x * 0.4, z * 0.4, 9) * 0.035;
       col[kk * 3] = tmp.r * v; col[kk * 3 + 1] = tmp.g * v; col[kk * 3 + 2] = tmp.b * v;
@@ -91,11 +104,10 @@ function buildTerrain(T, pal, seed) {
 }
 
 // ------------------------------------------------------------------ decor
-const TREES = [['roundTree', 0.36], ['pine', 0.24], ['birch', 0.14], ['fruitTree', 0.08], ['bush', 0.1], ['berryBush', 0.05], ['flower', 0.03]];
-const TALL = new Set(['roundTree', 'pine', 'birch', 'fruitTree']);
+const TALL = new Set(['roundTree', 'pine', 'birch', 'fruitTree', 'deadTree']);
 
 function buildDecor(L, group, colliders, quality, seed) {
-  const { T, keepOut, walks } = L;
+  const { T, keepOut, walks } = L, D = DECOR[L.biome] || DECOR.temperate;
   const rng = mulberry32(seed * 31 + 17);
   const low = quality === 'low';
   const buckets = {};
@@ -140,17 +152,17 @@ function buildDecor(L, group, colliders, quality, seed) {
   const meadowIn = (a) => T.R1(a) + 2.5, meadowOut = (a) => T.moatIn(a) - 1.0;
   const terIn = (a) => T.R2(a) + 2.5, terOut = (a) => T.R1(a) - T.W1 - 1.5;
   const meadowArea = Math.PI * ((T.Sm - T.MW - T.BANK) ** 2 - (T.S1 + 2.5) ** 2);
-  scatter(Math.round(clamp(meadowArea / 45, 20, 90) * k), meadowIn, meadowOut, TREES, 0.85, 0.4);
+  scatter(Math.round(clamp(meadowArea / 45, 20, 90) * k * D.density), meadowIn, meadowOut, D.trees, 0.85, 0.4);
   const terraceArea = Math.PI * ((T.S1 - T.W1 - 1.5) ** 2 - (T.S2 + 2.5) ** 2);
-  scatter(Math.round(clamp(terraceArea / 60, 10, 50) * k), terIn, terOut, TREES, 0.78, 0.4);
+  scatter(Math.round(clamp(terraceArea / 60, 10, 50) * k * D.density), terIn, terOut, D.trees, 0.78, 0.4);
   scatter(Math.round(10 * k), c(1.2), (a) => T.R2(a) - T.W2 - 1.2, [['flower', 0.6], ['bush', 0.25], ['rock', 0.15]], 0.5, 0.2);
   // beach: rocks and bushes; flowers along the outer moat bank
   scatter(Math.round(10 * k), (a) => T.moatOut(a) + 0.5, (a) => T.Rs(a) - 1, [['rock', 0.6], ['bush', 0.4]], 0.6, 0.3);
-  scatter(Math.round(10 * k), (a) => T.moatOut(a) - 1.2, (a) => T.moatOut(a) + 0.8, [['flower', 1]], 0.5, 0.2);
+  scatter(Math.round(10 * k * D.flowers), (a) => T.moatOut(a) - 1.2, (a) => T.moatOut(a) + 0.8, [['flower', 1]], 0.5, 0.2);
   if (!low) {
     scatter(40, (a) => T.Rb(a) - 2, (a) => T.Rs(a) - 0.6, [['pebble', 1]], 1, 0.1);
-    scatter(130, meadowIn, (a) => T.moatIn(a) - 0.6, [['grassTuft', 1]], 1, 0.1);
-    scatter(80, (a) => T.R2(a) + 1.5, (a) => T.R1(a) - T.W1 - 0.8, [['grassTuft', 1]], 1, 0.1);
+    scatter(Math.round(130 * D.tufts), meadowIn, (a) => T.moatIn(a) - 0.6, [['grassTuft', 1]], 1, 0.1);
+    scatter(Math.round(80 * D.tufts), (a) => T.R2(a) + 1.5, (a) => T.R1(a) - T.W1 - 0.8, [['grassTuft', 1]], 1, 0.1);
     scatter(16, c(0.8), (a) => T.R2(a) - T.W2 - 0.6, [['grassTuft', 1]], 1, 0.1);
   }
   // boulders tumbled against the foot of each rock face break up the rings
@@ -169,8 +181,8 @@ function buildDecor(L, group, colliders, quality, seed) {
       colliders.push(cyl(p.x, p.z, 0.8 * s, h - 1, h + s * 1.1, 'stone'));
     }
   };
-  boulders(T.R1, 4.5);
-  boulders(T.R2, 4);
+  boulders(T.R1, D.boulders[0]);
+  boulders(T.R2, D.boulders[1]);
   // a couple of barrels and a crate by the rowboat
   const bt = L.rowboat;
   for (const [type, dx, dz] of [['barrel', -2.2, 1.6], ['crate', -2.6, -1.8], ['barrel', -1.4, 2.4]]) {
@@ -178,8 +190,24 @@ function buildDecor(L, group, colliders, quality, seed) {
     const x = bt.x + dx * c - dz * s, z = bt.z + dx * s + dz * c;
     put(type, x, z, 0.55 + rng() * 0.1, type === 'barrel' && dz > 2 ? 1.4 : 0);
   }
+  // natural rock arches over the path (their colliders are in the layout)
+  for (const A of L.arches || []) {
+    e.set(0, A.rot, 0); q.setFromEuler(e);
+    v.set(A.x, A.y, A.z); sc.set(A.s, A.s, A.s);
+    (buckets.arch ||= []).push(m.compose(v, q, sc).clone());
+  }
+  // sea stacks standing off the shore, in water too deep to wade
+  for (let n = 0, placed = 0; n < D.seaStacks * 5 && placed < D.seaStacks; n++) {
+    const a = rng() * TAU, p = T.at(T.Rs(a) + 7 + rng() * 26, a);
+    if (T.heightAt(p.x, p.z) > -3) continue;
+    const w = 1.6 + rng() * 2.6, hgt = 4 + rng() * 11;
+    e.set((rng() - 0.5) * 0.12, rng() * TAU, (rng() - 0.5) * 0.12); q.setFromEuler(e);
+    v.set(p.x, -4, p.z); sc.set(w, hgt + 4, w);
+    (buckets.seaStack ||= []).push(m.compose(v, q, sc).clone());
+    placed++;
+  }
 
-  const grass = new THREE.Color(PALETTE.temperate.grass);
+  const grass = new THREE.Color((PALETTE[L.biome] || PALETTE.temperate).grass);
   const tint = new THREE.Color();
   const made = [];
   for (const [type, mats] of Object.entries(buckets)) {

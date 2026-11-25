@@ -192,12 +192,17 @@ export class CharacterController {
     p.x = bx; p.y = by; p.z = bz;
   }
 
-  /** Move down up to `dist` looking for walkable ground; snaps there if found. */
+  /**
+   * Move down up to `dist` looking for walkable ground; snaps there if found.
+   * Only straight down: if settling would push you sideways (onto the top edge
+   * of a deck or ledge you're walking down to), don't snap, and let the step
+   * fall normally. Snapping there carried you back up the slope every tick.
+   */
   snapDown(dist) {
     const p = this.pos;
     const trial = { x: p.x, y: p.y, z: p.z };
     const res = moveCapsule(this.level, trial, { x: 0, y: -dist, z: 0 }, this.opts, this._probe);
-    if (res.grounded && res.normalY >= this.opts.cosSlope) {
+    if (res.grounded && res.normalY >= this.opts.cosSlope && Math.hypot(trial.x - p.x, trial.z - p.z) < 0.02) {
       p.x = trial.x; p.y = trial.y; p.z = trial.z;
       this.groundTag = res.tag; this.groundNormalY = res.normalY;
       this.grounded = true;

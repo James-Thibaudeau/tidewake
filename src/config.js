@@ -108,7 +108,7 @@ export const REFITS = [
 ];
 // Biomes that have ashore levels. Each Phase 4 biome PR adds its own; a
 // refit is only offered once its biome is here.
-export const ASHORE_BIOMES = new Set(['temperate']);
+export const ASHORE_BIOMES = new Set(['temperate', 'rocky']);
 export const LAND_RANGE = 46; // how close to the shore the boat must be to land (before the grapnel)
 export const LAND_SPEED = 5;  // boat speed (m/s) below which you can drop anchor (before the coral flukes)
 

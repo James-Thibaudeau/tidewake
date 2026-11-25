@@ -2,7 +2,7 @@
 // Fast checks that need no browser and no dependencies:
 //
 //   node tools/check.mjs            everything (about a second)
-//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | save | layout | grove
+//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | save | layout | climb | grove
 //   node tools/check.mjs layout 500 layouts for 500 synthetic islands (default 150)
 //
 // Run it after every change. It catches the mistakes that otherwise only show
@@ -269,26 +269,58 @@ const checks = {
     return { errors, note: `${Object.keys(cases).length} saves` };
   },
 
-  // Ashore layouts validate for islands across the whole difficulty range.
+  // Ashore layouts validate for islands across the whole difficulty range, in
+  // every biome that has levels (`count` islands each).
   async layout(count = 150) {
     const errors = [];
     const { layoutLevel } = await load('ashore/modules.js');
     const { mulberry32 } = await load('util.js');
-    const rng = mulberry32(20261125);
-    const tiers = {};
+    const { ASHORE_BIOMES } = await load('config.js');
+    const notes = [];
     let retries = 0;
-    for (let i = 0; i < count; i++) {
-      const a = rng() * Math.PI * 2, dist = 300 + rng() * 6500;
-      const I = { id: i + 1, seed: Math.floor(rng() * 100000), x: Math.cos(a) * dist, z: Math.sin(a) * dist, r: 60 + rng() * 160, biome: 'temperate', landmark: null };
-      const what = `island seed ${I.seed} (r ${I.r.toFixed(0)}, ${dist.toFixed(0)} m out)`;
-      let L;
-      try { L = layoutLevel(I, { landingAngle: rng() * Math.PI * 2 }); }
-      catch (e) { errors.push(`${what}: threw ${e.message}`); continue; }
-      tiers[L.tier] = (tiers[L.tier] || 0) + 1;
-      retries += L.attempt;
-      if (!L.validation.ok) errors.push(`${what}, ${L.tier}: ${L.validation.errors.slice(0, 3).join('; ')}`);
+    for (const biome of ASHORE_BIOMES) {
+      const rng = mulberry32(20261125);
+      const tiers = {};
+      for (let i = 0; i < count; i++) {
+        const a = rng() * Math.PI * 2, dist = 300 + rng() * 6500;
+        const I = { id: i + 1, seed: Math.floor(rng() * 100000), x: Math.cos(a) * dist, z: Math.sin(a) * dist, r: 60 + rng() * 160, biome, landmark: null };
+        const what = `${biome} island seed ${I.seed} (r ${I.r.toFixed(0)}, ${dist.toFixed(0)} m out)`;
+        let L;
+        try { L = layoutLevel(I, { landingAngle: rng() * Math.PI * 2 }); }
+        catch (e) { errors.push(`${what}: threw ${e.message}`); continue; }
+        tiers[L.tier] = (tiers[L.tier] || 0) + 1;
+        retries += L.attempt;
+        if (!L.validation.ok) errors.push(`${what}, ${L.tier}: ${L.validation.errors.slice(0, 3).join('; ')}`);
+      }
+      notes.push(`${biome} ${Object.entries(tiers).map(([t, n]) => `${n} ${t}`).join(' ')}`);
     }
-    return { errors, note: `${count} islands (${Object.entries(tiers).map(([t, n]) => `${n} ${t}`).join(', ')}; ${retries} re-rolls)` };
+    return { errors, note: `${count} islands per biome (${notes.join('; ')}; ${retries} re-rolls)` };
+  },
+
+  // A test climber walks generated levels from the beach to the summit, on
+  // islands of every tier in every biome that has levels (`count` per biome).
+  async climb(count = 12) {
+    const errors = [];
+    const { layoutLevel, routeStats } = await load('ashore/modules.js');
+    const { mulberry32 } = await load('util.js');
+    const { ASHORE_BIOMES } = await load('config.js');
+    const climber = await testClimber();
+    const notes = [];
+    for (const biome of ASHORE_BIOMES) {
+      const rng = mulberry32(4401);
+      let secs = 0, jumps = 0;
+      for (let i = 0; i < count; i++) {
+        // spread evenly out from Port Haven, so every tier gets climbed
+        const a = rng() * Math.PI * 2, dist = 400 + (i + rng()) * (6400 / count);
+        const I = { id: i + 1, seed: Math.floor(rng() * 100000), x: Math.cos(a) * dist, z: Math.sin(a) * dist, r: 60 + rng() * 160, biome, landmark: null };
+        const L = layoutLevel(I, { landingAngle: rng() * Math.PI * 2 });
+        const level = { ...L, groundAt: L.T.groundAt, groundTag: L.T.groundTag, waterY: 0 };
+        secs += climber(level, generatedRoute(L), `${biome} seed ${I.seed} (${L.tier}) main`, errors, 3);
+        jumps += routeStats(L).jumps;
+      }
+      notes.push(`${biome} ${Math.round(secs / count)} s, ${Math.round(jumps / count)} jumps`);
+    }
+    return { errors, note: `${count} islands per biome to the summit, on average ${notes.join('; ')}; ${climber.stats.retries} hops needed a second try` };
   },
 
   // The Elder Grove: the layout keeps its design limits, and a test climber
@@ -301,30 +333,8 @@ const checks = {
     const L = buildGroveLayout();
     const v = validateGrove(L);
     const errors = [...v.errors];
-    const climb = (nodes, label) => {
-      const ctl = new CharacterController(L, ASHORE);
-      ctl.teleport(nodes[0].x, nodes[0].y + 0.05, nodes[0].z, 0);
-      let t = 0;
-      for (let i = 1; i < nodes.length; i++) {
-        const A = nodes[i - 1], B = nodes[i], run = footGap(nodeFoot(A), nodeFoot(B)) > 1.5;
-        let held = 0;
-        for (let k = 0; ; k++) {
-          const p = ctl.pos, dx = B.x - p.x, dz = B.z - p.z, d = Math.hypot(dx, dz) || 1;
-          if (ctl.grounded && d < 0.7 && Math.abs(p.y - B.y) < 0.25) break;
-          const what = `${label}[${i}] ${A.piece?.kind || 'ground'}→${B.piece?.kind || 'ground'}`;
-          if (k > 60 * 25) { errors.push(`${what}: the climber got stuck at ${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`); return t; }
-          if (p.y < Math.min(A.y, B.y) - 2.5) { errors.push(`${what}: the climber fell (to ${p.y.toFixed(1)} m)`); return t; }
-          // jump at a ledge too high to step onto, or where the footing ends
-          const ahead = supportAt(L, p.x + (dx / d) * 0.5, p.z + (dz / d) * 0.5, p.y + 0.4);
-          const wall = B.piece && B.y > p.y + ASHORE.stepUp && footGap(B.piece.foot, [[p.x, p.z]]) < 0.75;
-          const jump = ctl.grounded && (wall || ahead < p.y - 0.5);
-          if (jump) held = 30;
-          ctl.update(1 / 60, { wishX: dx / d, wishZ: dz / d, run, jumpPressed: jump, jumpHeld: held-- > 0 });
-          t += 1 / 60;
-        }
-      }
-      return t;
-    };
+    const climber = await testClimber();
+    const climb = (nodes, label) => climber(L, nodes, label, errors);
     // Holding the stick along a ledge must carry you up its little steps without
     // steering: the risers meet you at a slant, and you must not slide off them.
     const R = L.route;
@@ -348,6 +358,77 @@ const checks = {
     return { errors, note: `${s.pieces} pieces, ${s.coins} coins; to the owl bough in ${main.toFixed(0)} s (${s.jumps} jumps), the crown in ${crown.toFixed(0)} s more (${s.crownJumps} jumps)` };
   },
 };
+
+/**
+ * A test climber: the real controller, steered by a simple pilot from node to
+ * node of a route. It walks, runs at wide gaps, and jumps at a ledge too high
+ * to step onto or where the footing ends. Returns
+ * (level, nodes, label, errors, tries = 1) => seconds taken; problems go into
+ * `errors`. With tries > 1 a missed hop is tried again from its start at the
+ * other pace (walk ↔ run), as a player would; stats.retries counts them.
+ * `level` needs groundAt, colliders and pieces (with footprints).
+ */
+async function testClimber() {
+  const { footGap, nodeFoot, supportAt } = await load('ashore/grove-layout.js');
+  const { CharacterController } = await load('ashore/controller.js');
+  const { ASHORE } = await load('config.js');
+  const climb = (L, nodes, label, errors, tries = 1) => {
+    const ctl = new CharacterController(L, ASHORE);
+    ctl.teleport(nodes[0].x, nodes[0].y + 0.05, nodes[0].z, 0);
+    let t = 0;
+    for (let i = 1; i < nodes.length; i++) {
+      const A = nodes[i - 1], B = nodes[i], wide = footGap(nodeFoot(A), nodeFoot(B)) > 1.5;
+      const what = `${label}[${i}] ${A.piece?.kind || 'ground'}→${B.piece?.kind || 'ground'}`;
+      let problem = null;
+      for (let attempt = 0; attempt < tries; attempt++) {
+        if (attempt) { climb.stats.retries++; ctl.teleport(A.x, A.y + 0.05, A.z, 0); }
+        const run = attempt % 2 ? !wide : wide;
+        problem = null;
+        let held = 0;
+        for (let k = 0; ; k++) {
+          const p = ctl.pos, dx = B.x - p.x, dz = B.z - p.z, d = Math.hypot(dx, dz) || 1;
+          // a spot on the ground counts if you're on something just above it (a bridge's end, say)
+          if (ctl.grounded && d < 0.7 && p.y - B.y > -0.25 && p.y - B.y < (B.piece ? 0.25 : 0.6)) break;
+          if (k > 60 * 25) { problem = `the climber got stuck at ${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`; break; }
+          if (p.y < Math.min(A.y, B.y) - 2.5) { problem = `the climber fell (to ${p.y.toFixed(1)} m)`; break; }
+          // the footing ends if both looks ahead find nothing near (one alone may fall in a seam between joined steps)
+          const ahead = Math.max(...[0.45, 0.65].map((s) => supportAt(L, p.x + (dx / d) * s, p.z + (dz / d) * s, p.y + 0.4)));
+          const wall = B.y > p.y + ASHORE.stepUp && (B.piece ? footGap(B.piece.foot, [[p.x, p.z]]) < 0.75 : d < 1.2);
+          const jump = ctl.grounded && (wall || ahead < p.y - 0.5);
+          if (jump) held = 30;
+          ctl.update(1 / 60, { wishX: dx / d, wishZ: dz / d, run, jumpPressed: jump, jumpHeld: held-- > 0 });
+          t += 1 / 60;
+        }
+        if (!problem) break;
+      }
+      if (problem) { errors.push(`${what}: ${problem}`); return t; }
+    }
+    return t;
+  };
+  climb.stats = { retries: 0 };
+  return climb;
+}
+
+/**
+ * A generated layout's main route as climber nodes: a walked stretch follows
+ * its walk polyline (a straight line across the meadow could cut through
+ * the cliff), and the summit is the end.
+ */
+function generatedRoute(L) {
+  const out = [];
+  const same = (a, x, z) => Math.hypot(a[0] - x, a[1] - z) < 0.05;
+  for (const n of L.route) {
+    const prev = out[out.length - 1];
+    if (prev && n.type === 'ground' && n.edge === 'walk' && prev.type === 'ground') {
+      const w = L.walks.find((line) => same(line[line.length - 1], n.x, n.z));
+      if (w) for (const [x, z] of w.slice(1, -1)) out.push({ type: 'ground', x, z, y: L.T.groundAt(x, z) });
+    }
+    out.push(n);
+  }
+  const last = L.walks[L.walks.length - 1];
+  for (const [x, z] of last) out.push({ type: 'ground', x, z, y: L.T.groundAt(x, z) });
+  return out;
+}
 
 // --------------------------------------------------------------------- main
 const [only, arg] = process.argv.slice(2);
