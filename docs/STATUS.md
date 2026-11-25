@@ -147,7 +147,8 @@ Updated 2026-11-25.
       until you are past the trunk's reach), a look on Low quality and on a
       phone.
     - The pool is a still disc on the grass, not real water.
-  - [x] 4.2 The grove's story. Journal III has moved off the beach and up
+  - [x] 4.2 The grove's story
+    ([#34](https://github.com/James-Thibaudeau/tidewake/pull/34)). Journal III has moved off the beach and up
     the tree: chapter III's step is "Go ashore at the Elder Grove", there is
     no search from the sea, and the anchor is needed (without one the step
     says so). Saves that already hold Journal III keep it.
