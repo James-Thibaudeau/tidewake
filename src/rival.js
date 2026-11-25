@@ -656,12 +656,16 @@ export class Rival {
   }
 
   // ------------------------------------------------------------- interaction
-  /** The sailing prompt, when Sable has something for you. */
+  /**
+   * The sailing prompt, when Sable has something for you. `hail` marks the race
+   * challenge: she sails alongside until you answer, so it gives way to anything
+   * else you can do right where you are.
+   */
   interaction(x, z, speed) {
     const act = this.act;
     if (!act) return null;
     if (act.type === 'approach' && act.hailed && dist(this.redwing.pos, { x, z }) < 130) {
-      return { prompt: act.enc.prompt, action: () => this.startRace(act.enc) };
+      return { prompt: act.enc.prompt, action: () => this.startRace(act.enc), hail: true };
     }
     if (act.type === 'adrift' && dist(this.redwing.pos, { x, z }) < 24) {
       if (Math.abs(speed) >= 8) return { prompt: 'Slow down to throw a line' };

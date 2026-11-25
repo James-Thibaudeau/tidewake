@@ -436,3 +436,13 @@ General:
   ([#26](https://github.com/James-Thibaudeau/tidewake/pull/26)).
 - [ ] Large easy islands can still have up to 20 small hops in total (never
   more than 4 in a row).
+- [x] Near a shore you could land on, a treasure beam a couple of ship
+  lengths ahead looked like it was under the bow, but the prompt said
+  "Drop anchor & go ashore", so pressing E landed you instead of hauling.
+  Slowed within 40 m of a beam you now get "Sail onto the treasure to haul
+  it up" until you're close enough to haul.
+- [x] While Sable was hailing you ("Race Sable…") she sails alongside, and
+  her prompt blocked hauling treasure, docking and landing until you
+  answered. Her challenge now gives way to whatever spot you're at
+  (treasure, salvage, a dock, a story spot, or slowing by a shore to land)
+  and comes back when you move on.
