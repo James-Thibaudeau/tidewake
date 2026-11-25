@@ -170,6 +170,20 @@ Updated 2026-11-25.
     - A level can now carry its own life (`level.update`), a journal spot
       (`spots.journal`) and a chest with its own cosmetic (`chest.cosmetic`),
       ready for the other four landmarks.
+    - The tree looks its age (`src/ashore/grove-art.js`). The trunk's bark
+      is split by deep furrows into long plates, each a slightly different
+      brown, with moss patches low down, lichen, burls, stacks of bracket
+      fungus, moss cushions and climbing vines. Boughs, the log, stumps,
+      roots and the root arches are in bark too. The fungus steps are banded
+      brackets with a neck into the trunk; ledges, boughs and leaf mats have
+      patchy moss, tufts, ferns, small mushrooms and blossoms. No collider or
+      walking surface moved. Furrows follow the mesh's own columns and each
+      quad is one flat colour, which is what keeps them crisp.
+    - Fix: grandfather's tent was upside down (its ridge in the sand), here
+      and at every camp at sea.
+    - Not yet done: frame time with the new art. The level's own meshes are
+      about 175k triangles with outlines on High; Low drops the small
+      growth and uses a coarser trunk, and hasn't been looked at.
     - Not yet done: a play by hand from the beach to the crown with the owl
       (it was driven from the console), a listen to the hoot on real
       speakers, and the pacing check: chapter III now needs the Oak hull

@@ -1,8 +1,9 @@
 // The Elder Grove as a walkable level: the first landmark level, hand-built
 // like the wreck. grove-layout.js decides where everything stands (and is
-// checked in Node); this file draws it: the ground, the great trunk with its
-// spiral of bark ledges, shelf fungus and pegs, the roots, the boughs and
-// leaf mats, the old wood round it, and the pool under the diving branch.
+// checked in Node); this file assembles it: the ground, the great tree, the
+// old wood round it, and the pool under the diving branch. The bark, moss and
+// fungus themselves (the trunk, every limb and everything you climb on) are
+// made in grove-art.js.
 //
 // It is built at a scale that plays well, not at the sea view's scale
 // (elder-tree.js), but keeps its landmarks: arching roots, the owl hollow,
@@ -25,37 +26,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { part, propMaterial, thinOutline, PROPS } from '../props.js';
 import { toonGradient, toonMaterial } from '../toon.js';
 import { mulberry32, noise2, lerp, TAU } from '../util.js';
-import { pieceParts, rowboatParts } from './pieces.js';
+import { rowboatParts } from './pieces.js';
 import { buildGroveLayout, groveGround, streamZ, GROVE } from './grove-layout.js';
 import { buildGroveLife } from './grove-life.js';
+import { C, box, placed, rod, trunkParts, trunkLifeParts, archParts, pieceArt } from './grove-art.js';
 
-const C = {
-  bark: '#6e4c30', bark2: '#553a25', furrow: '#38241a', root: '#654429', heart: '#b08a5a',
-  moss: '#6c8d3c', moss2: '#86a84a', hang: '#869a52',
-  leafD: '#2b6634', leafM: '#45973f', leafL: '#73c052',
-  fungus: '#ead9b0', fungus2: '#c98a4a', iron: '#4a4a52', plank: '#b98a52',
-  hollow: '#1c120a', water: '#5fb3d4', stone: '#8f877d',
-  grass: '#5fae48', grass2: '#4f9a40', shade: '#467f3a', sand: '#e6d7a8', sand2: '#d9c894', path: '#b59a6c',
-  bed: '#7d7559', wet: '#5d6a4a',
-  blaze: '#a37c54', cut: '#d9b98a', paper: '#efe3c4', leather: '#5b3a26',
-};
-const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
-
-/** A part in a piece's own frame: local transform, then the piece's turn and place. */
-function placed(geo, color, p, t = {}) {
-  const g = part(geo, color, t);
-  g.rotateY(p.rot || 0);
-  g.translate(p.cx, 0, p.cz);
-  return g;
-}
-/** A rod from a to b ([x, y, z] each), r0 thick at a and r1 at b. */
-function rod(a, b, r0, r1, color, segs = 6) {
-  const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
-  const g = new THREE.CylinderGeometry(r1, r0, d.length(), segs, 1);
-  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()));
-  g.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
-  return part(g, color);
-}
 function merged(parts) {
   const g = mergeGeometries(parts);
   for (const p of parts) p.dispose();
@@ -106,36 +81,8 @@ function terrainMesh() {
 }
 
 // ---------------------------------------------------------------- the tree
-/** The fluted trunk: ridges stay inside the collider's radius, furrows cut in. */
-function trunkParts() {
-  const R = GROVE.trunkR, y0 = -1, y1 = GROVE.trunkTop, H = y1 - y0;
-  const geo = new THREE.CylinderGeometry(R, R, H, 56, 14, true).toNonIndexed();
-  geo.translate(0, y0 + H / 2, 0);
-  const p = geo.attributes.position, depth = new Float32Array(p.count);
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), th = Math.atan2(z, x);
-    const d = 0.5 + 0.5 * Math.sin(th * 13 + Math.sin(y * 0.21) * 1.6); // 0 on a ridge, 1 in a furrow
-    const flare = Math.max(0, 3.4 - y) * 0.3;                             // spreading into the roots
-    const r = R - 0.02 - 0.34 * d + flare;
-    p.setXYZ(i, Math.cos(th) * r, y, Math.sin(th) * r);
-    depth[i] = d;
-  }
-  geo.computeVertexNormals();
-  const g = part(geo, C.bark);
-  const col = g.attributes.color, a = new THREE.Color(C.bark), b = new THREE.Color(C.furrow), m = new THREE.Color(C.moss), t = new THREE.Color();
-  for (let i = 0; i < col.count; i++) {
-    const y = g.attributes.position.getY(i);
-    t.copy(a).lerp(b, depth[i] * 0.8);
-    // moss creeps up from the roots, and sits in the furrows higher up
-    t.lerp(m, Math.max(0, 1 - (y - 3) / 5) * 0.5 + (depth[i] > 0.8 ? 0.12 : 0));
-    col.setXYZ(i, t.r, t.g, t.b);
-  }
-  // the broken top, under the leaf nest
-  return [g, part(new THREE.CircleGeometry(R - 0.1, 28), C.heart, { rx: -Math.PI / 2, y: y1 })];
-}
-
-function treeParts(L) {
-  const P = [...trunkParts()];
+function treeParts(L, low) {
+  const P = [...trunkParts(low), ...trunkLifeParts(L, low)];
   const H = GROVE.hill;
   // buttress roots: tall at the trunk, sloping down to the ground
   for (const b of L.buttresses) {
@@ -149,14 +96,15 @@ function treeParts(L) {
     }
     geo.computeVertexNormals();
     const r = (b.r0 + b.r1) / 2;
-    P.push(placed(geo, C.root, { cx: Math.cos(b.a) * r, cz: Math.sin(b.a) * r, rot: -b.a }, { y: h / 2 - 0.4, c2: C.bark2, split: 0.3 }));
+    const at = { cx: Math.cos(b.a) * r, cz: Math.sin(b.a) * r, rot: -b.a };
+    P.push(placed(geo, C.root, at, { y: h / 2 - 0.4, c2: C.bark2, split: 0.3 }));
+    // moss along its back (local x runs out from the trunk)
+    for (const t of [0.12, 0.4, 0.7]) {
+      P.push(placed(new THREE.SphereGeometry(0.5, 6, 4), t > 0.3 ? C.moss : C.moss2, at, { x: -len / 2 + t * len, y: b.top - (h - H) * 0.75 * t * t, sx: 1.5, sy: 0.3, sz: (b.half / 0.5) * (1 - 0.45 * t) }));
+    }
   }
   // arching roots, mossy on top
-  for (const A of L.arches) {
-    const at = { cx: A.x, cz: A.z, rot: A.rot };
-    P.push(placed(new THREE.TorusGeometry(A.R, A.tube, 7, 16, Math.PI), C.root, at, { y: H - 0.5, c2: C.bark2, split: 0.25 }));
-    P.push(placed(new THREE.TorusGeometry(A.R + 0.06, A.tube * 0.8, 5, 8, 1.3), C.moss, at, { y: H - 0.5, rz: (Math.PI - 1.3) / 2 }));
-  }
+  for (const A of L.arches) P.push(...archParts(A, H));
   // the owl hollow: a dark opening above the landing, with a rim of bark
   const ha = L.hollow.a, hx = Math.cos(ha), hz = Math.sin(ha);
   const hollow = { cx: hx * (GROVE.trunkR - 0.25), cz: hz * (GROVE.trunkR - 0.25), rot: -ha - Math.PI / 2 };
@@ -185,7 +133,7 @@ function treeParts(L) {
   }
   // knots of wood for the owl to sit on, up the spiral
   for (const p of L.perches) {
-    if (p.stub) P.push(rod([Math.cos(p.a) * 6.6, p.y - 0.3, Math.sin(p.a) * 6.6], [Math.cos(p.a) * (p.r + 0.35), p.y - 0.1, Math.sin(p.a) * (p.r + 0.35)], 0.2, 0.11, C.bark2));
+    if (p.stub) P.push(rod([Math.cos(p.a) * 6.3, p.y - 0.3, Math.sin(p.a) * 6.3], [Math.cos(p.a) * (p.r + 0.35), p.y - 0.1, Math.sin(p.a) * (p.r + 0.35)], 0.2, 0.11, C.bark2));
   }
   P.push(...carvingParts(L));
   // the aerial root from the diving branch down to the pool
@@ -251,54 +199,6 @@ function noteParts(L) {
     placed(box(0.34, 0.42, 0.03), C.paper, at, { x: 0.02, y: c.y + 1.4, z: 1.83, rz: 0.06 }),
     placed(box(0.05, 0.05, 0.05), C.iron, at, { x: 0.02, y: c.y + 1.55, z: 1.85 }),
   ];
-}
-
-// -------------------------------------------------------------- the pieces
-function pieceArt(p) {
-  const P = [], w = p.hx * 2, d = p.hz * 2;
-  switch (p.kind) {
-    case 'bark': case 'landing':
-      P.push(placed(box(w, p.thick, d), C.bark, p, { y: p.top - p.thick / 2, c2: C.bark2, split: 0.5 }));
-      P.push(placed(box(w * 0.98, 0.08, d * 0.82), p.kind === 'landing' ? C.moss2 : C.moss, p, { y: p.top, z: -d * 0.06 }));
-      break;
-    case 'fungus':
-      P.push(placed(new THREE.CylinderGeometry(p.r, p.r * 0.7, p.thick, 14), C.fungus, p, { y: p.top - p.thick / 2, c2: C.fungus2, split: 0.6 }));
-      break;
-    case 'peg':
-      P.push(placed(box(w, 0.1, d), C.plank, p, { y: p.top - 0.05 }));
-      for (const s of [-1, 1]) P.push(placed(box(0.1, 0.1, d + 0.4), C.iron, p, { x: s * 0.3, y: p.top - 0.15, z: 0.2 }));
-      break;
-    case 'mat': case 'platform':
-      P.push(...pieceParts({ kind: 'disc', cx: p.cx, cz: p.cz, top: p.top, r: p.r, trunk: 0 }));
-      if (p.hang) {
-        // hung from the bough above on a pair of aerial roots
-        for (const s of [-0.5, 0.5]) P.push(rod([p.hang[0] + s, p.hang[1], p.hang[2] - s], [p.cx + s * 2, p.top - 0.2, p.cz - s * 2], 0.13, 0.09, C.hang, 5));
-      } else if (p.a != null) P.push(rod([Math.cos(p.a) * 6.5, p.top - 1.6, Math.sin(p.a) * 6.5], [p.cx, p.top - 0.3, p.cz], 0.42, 0.2, C.bark2));
-      break;
-    case 'bough': case 'branch': {
-      // a limb flattened on top like a deck: thick at the trunk, thinner at the tip
-      const lim = new THREE.CylinderGeometry(p.hz * 0.72, p.hz * 1.05, w, 10).rotateZ(-Math.PI / 2);
-      P.push(placed(lim, C.bark, p, { y: p.top - p.hz * 0.74, sy: 0.7, c2: C.bark2, split: 0.45 }));
-      P.push(placed(box(w, 0.4, d * 0.9), C.bark, p, { y: p.top - 0.2 }));
-      P.push(placed(box(w * 0.99, 0.07, d * 0.72), p.kind === 'branch' ? C.plank : C.moss, p, { y: p.top }));
-      break;
-    }
-    case 'log':
-      P.push(placed(new THREE.CylinderGeometry(p.hz * 1.15, p.hz * 1.2, w, 12).rotateZ(Math.PI / 2), C.bark, p, { y: p.top - p.hz * 0.82, sy: 0.72, c2: C.bark2, split: 0.4 }));
-      P.push(placed(box(w * 0.96, 0.07, d * 0.8), C.moss, p, { y: p.top }));
-      for (const s of [-1, 1]) P.push(placed(new THREE.CylinderGeometry(p.hz, p.hz, 0.05, 12).rotateZ(Math.PI / 2), C.heart, p, { x: s * (w / 2 + 0.02), y: p.top - p.hz * 0.82, sy: 0.72 }));
-      break;
-    case 'stump':
-      P.push(placed(new THREE.CylinderGeometry(p.r, p.r * 1.2, p.thick, 10), C.bark, p, { y: p.top - p.thick / 2, c2: C.bark2, split: 0.5 }));
-      P.push(placed(new THREE.CylinderGeometry(p.r * 0.86, p.r * 0.86, 0.05, 10), C.heart, p, { y: p.top }));
-      break;
-    case 'root':
-      P.push(placed(new THREE.CylinderGeometry(0.62, 0.7, w + 1.5, 9).rotateZ(Math.PI / 2), C.root, p, { y: p.top - 0.6, c2: C.bark2, split: 0.4 }));
-      P.push(placed(box(w * 0.9, 0.07, d * 0.7), C.moss, p, { y: p.top }));
-      break;
-    default: break;
-  }
-  return P;
 }
 
 // ------------------------------------------------------------------- decor
@@ -375,9 +275,10 @@ export function buildGroveLevel(I, opts = {}) {
   group.add(terrain);
   own.push(terrain.geometry);
 
-  const tree = merged(treeParts(L));
+  const low = opts.quality === 'low';
+  const tree = merged(treeParts(L, low));
   const parts = [];
-  for (const p of L.pieces) parts.push(...pieceArt(p));
+  for (const [i, p] of L.pieces.entries()) parts.push(...pieceArt(p, i, low));
   parts.push(...rowboatParts(L.rowboat), ...noteParts(L));
   const walk = merged(parts);
   own.push(tree, walk);

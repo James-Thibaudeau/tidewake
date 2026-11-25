@@ -87,8 +87,8 @@ src/
   kraken.js       the finale set piece
   ashore/         going ashore: ashore.js (visit flow, pickups), levelgen.js + modules.js +
                   pieces.js (island levels), wreck.js (grandfather's wreck, hand-built),
-                  grove.js + grove-layout.js (the Elder Grove, hand-built) + grove-life.js
-                  (its owl guide and fireflies),
+                  grove.js + grove-layout.js (the Elder Grove, hand-built) + grove-art.js
+                  (its bark, moss and fungus) + grove-life.js (its owl guide and fireflies),
                   controller.js + collide.js (movement), camera.js, pacer.js (races on foot),
                   shapes.js (the collider shapes they all share)
   cosmetics.js    wardrobe catalogue: palettes, styles, unlock sources, appearance profile

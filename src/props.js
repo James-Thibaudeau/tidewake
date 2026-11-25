@@ -299,7 +299,7 @@ function camp() {
   const CANVAS = '#e3d3ad', CANVAS2 = '#cdb98c', POLE = '#5b3c22', RED = '#c8322b', STONE = '#9a938a', STONE2 = '#7f786f';
   const P = [];
   // A-frame tent: a 3-sided prism lying along z
-  P.push(part(new THREE.CylinderGeometry(1.6, 1.6, 3.4, 3, 1), CANVAS, { rx: Math.PI / 2, rz: Math.PI, y: 0.8, sy: 1 }));
+  P.push(part(new THREE.CylinderGeometry(1.6, 1.6, 3.4, 3, 1), CANVAS, { rx: -Math.PI / 2, y: 0.8 })); // ridge up: the corner at +z turns to +y
   P.push(part(new THREE.BoxGeometry(0.9, 1.2, 0.05), '#4a3423', { y: 0.6, z: 1.72 }));        // dark doorway
   P.push(part(new THREE.BoxGeometry(0.1, 2.3, 0.1), POLE, { y: 1.15, z: 1.75 }));
   P.push(part(new THREE.BoxGeometry(0.1, 2.3, 0.1), POLE, { y: 1.15, z: -1.75 }));
