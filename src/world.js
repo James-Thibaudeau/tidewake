@@ -2,12 +2,13 @@
 // streamer that builds/destroys island meshes around the player.
 import * as THREE from 'three';
 import { WORLD_HALF } from './config.js';
-import { mulberry32, noise2, fbm2, clamp, smoothstep, TAU, headingOf } from './util.js';
+import { mulberry32, noise2, fbm2, clamp, smoothstep, lerp, TAU, headingOf } from './util.js';
 import { PROPS, propMaterial, propOutline, thinOutline, part, merge, propMesh } from './props.js';
 import { toonGradient, toonMaterial } from './toon.js';
 import { WAVE_GLSL, waveUniforms } from './waves.js';
 import { buildWreckModel, WRECK_STACKS, WRECK_SOLID, WRECK_MOORING } from './ashore/wreck.js';
 import { buildElderTree } from './elder-tree.js';
+import { buildSeaArch, ARCH } from './sea-arch.js';
 
 const PREFIX = ['Gull', 'Coral', 'Ember', 'Whale', 'Mist', 'Thorn', 'Kelp', 'Sable', 'Amber', 'Moss',
   'Drift', 'Shell', 'Pebble', 'Storm', 'Sun', 'Moon', 'Star', 'Otter', 'Heron', 'Crab', 'Pelican',
@@ -35,9 +36,51 @@ export const BIOMES = {
 
 export function edgeFactor(I, ang) {
   const c = Math.cos(ang), s = Math.sin(ang);
-  return 0.84 + 0.24 * noise2(c * 1.1 + I.ox, s * 1.1 + I.oz, I.seed) +
+  const f = 0.84 + 0.24 * noise2(c * 1.1 + I.ox, s * 1.1 + I.oz, I.seed) +
     0.1 * noise2(c * 2.7 + I.oz, s * 2.7 + I.ox, I.seed + 5);
+  if (!I.bay) return f;
+  // the two arms reach out either side of the bay's mouth
+  const off = Math.abs(Math.atan2(Math.sin(ang - I.bay.a), Math.cos(ang - I.bay.a)));
+  return Math.max(f, lerp(f, 1.02, 1 - smoothstep(0.3, 0.8, off)));
 }
+
+/**
+ * A bay carved into an island (Archway Isle): a round harbour inside the
+ * island, open to the sea through a narrow mouth where the arch stands, so
+ * the island is a U. `a`: the way the mouth faces (atan2(z, x)).
+ */
+const BAY = { at: 0.5, r: 0.36 }; // the bay's centre and radius, as fractions of the island's
+function bayFor(I, a) {
+  const dx = Math.cos(a), dz = Math.sin(a), c = BAY.at * I.r;
+  return { a, dx, dz, x: I.x + dx * c, z: I.z + dz * c, r: BAY.r * I.r, half: 16, len: I.r * 1.6 };
+}
+/** Signed distance to a bay's water (negative inside the bay or its mouth). */
+function baySdf(B, x, z) {
+  const px = x - B.x, pz = z - B.z;
+  const t = clamp(px * B.dx + pz * B.dz, 0, B.len);
+  return Math.min(Math.hypot(px, pz) - B.r, Math.hypot(px - B.dx * t, pz - B.dz * t) - B.half);
+}
+/**
+ * The chart's coastline round a bay: in along one side of the mouth, round
+ * the far shore and out along the other (the way the coast runs, anticlockwise).
+ */
+function bayCoast(I) {
+  const B = I.bay, px = -B.dz, pz = B.dx, w = B.half, out = I.r * edgeFactor(I, B.a) - BAY.at * I.r;
+  const inner = Math.sqrt(B.r * B.r - w * w);
+  const at = (d, s) => [B.x + B.dx * d + px * w * s, B.z + B.dz * d + pz * w * s];
+  const pts = [at(out, -1), at(inner, -1)];
+  const a1 = Math.atan2(B.dz * inner - pz * w, B.dx * inner - px * w), a2 = Math.atan2(B.dz * inner + pz * w, B.dx * inner + px * w);
+  let end = a2;
+  while (end > a1) end -= TAU;
+  for (let k = 1; k < 24; k++) {
+    const a = lerp(a1, end, k / 24);
+    pts.push([B.x + Math.cos(a) * B.r, B.z + Math.sin(a) * B.r]);
+  }
+  pts.push(at(inner, 1), at(out, 1));
+  return pts;
+}
+/** Is (x, z) in the island's bay (or its mouth)? */
+export const inBay = (I, x, z) => !!I.bay && baySdf(I.bay, x, z) < 0;
 
 export function islandHeight(I, x, z) {
   const dx = x - I.x, dz = z - I.z;
@@ -46,10 +89,21 @@ export function islandHeight(I, x, z) {
   const d = Math.sqrt(d2);
   const edge = I.r * edgeFactor(I, Math.atan2(dz, dx));
   const s = 1 - d / edge;
-  if (s <= 0) return Math.max(-40, s * I.slopeOut);
-  let h = I.peak * Math.pow(s, I.exp) + 1.3 * smoothstep(0, 0.1, s);
-  h += fbm2(x * I.nf, z * I.nf, 4, I.seed) * I.rough * smoothstep(0.06, 0.35, s);
-  if (I.crater) h -= smoothstep(0.8, 0.92, s) * I.peak * 0.3;
+  let h;
+  if (s <= 0) h = Math.max(-40, s * I.slopeOut);
+  else {
+    h = I.peak * Math.pow(s, I.exp) + 1.3 * smoothstep(0, 0.1, s);
+    h += fbm2(x * I.nf, z * I.nf, 4, I.seed) * I.rough * smoothstep(0.06, 0.35, s);
+    if (I.crater) h -= smoothstep(0.8, 0.92, s) * I.peak * 0.3;
+  }
+  if (I.bay) {
+    // sheer cliffs round the bay, except a shingle beach at its head with a
+    // low basin rising behind it
+    const B = I.bay, sd = baySdf(B, x, z), px = x - B.x, pz = z - B.z;
+    const head = smoothstep(0.55, 0.85, -(px * B.dx + pz * B.dz) / Math.max(1, Math.hypot(px, pz)));
+    const cliff = sd * 3.5, beach = sd < 22 ? sd * 0.45 : 9.9 + (sd - 22) * 2.5;
+    h = Math.min(h, Math.max(-7, lerp(cliff, beach, head)));
+  }
   return h;
 }
 
@@ -111,6 +165,7 @@ export class World {
       };
       I.bound2 = I.bound * I.bound;
       if (o.dockAngle != null) I.dockAngle = o.dockAngle;
+      if (o.bay != null) I.bay = bayFor(I, o.bay); // facing south, towards the Elder Grove and Port Haven
       this.islands.push(I);
       return I;
     };
@@ -121,7 +176,7 @@ export class World {
     add({ x: -900, z: -6000, r: 300, biome: 'cold', landmark: 'frost', name: 'Frostspire', peak: 300, exp: 2.4 });
     add({ x: -5300, z: 700, r: 260, biome: 'temperate', landmark: 'grove', name: 'The Elder Grove', peak: 40, exp: 1.2 });
     add({ x: 2300, z: 5500, r: 220, biome: 'tropical', landmark: 'ruins', name: 'Sunken Temple Isle', peak: 22, exp: 0.9 });
-    add({ x: -3800, z: -3300, r: 180, biome: 'rocky', landmark: 'arch', name: 'Archway Isle', peak: 60, exp: 1.4 });
+    add({ x: -3800, z: -3300, r: 180, biome: 'rocky', landmark: 'arch', name: 'Archway Isle', peak: 60, exp: 1.4, bay: Math.PI / 2 });
     const ports = [[3300, 1100, 'Saltmarsh Harbor'], [-2900, 2400, 'Lanternfall'], [1300, -3300, 'Northwatch'],
       [-4600, -1100, 'Driftwood Landing'], [4600, -3900, 'Coralgate'], [-1700, 5000, 'Brightwater'],
       [5900, 5600, 'Windrest'], [-5700, -5500, 'Frostharbor']];
@@ -216,8 +271,10 @@ export class World {
     I.coast = [];
     for (let k = 0; k < 72; k++) {
       const a = (k / 72) * TAU;
+      if (I.bay && Math.abs(Math.atan2(Math.sin(a - I.bay.a), Math.cos(a - I.bay.a))) < 0.12) continue;
       const re = I.r * edgeFactor(I, a);
       I.coast.push([I.x + Math.cos(a) * re, I.z + Math.sin(a) * re]);
+      if (I.bay && Math.abs(Math.atan2(Math.sin(a + TAU / 72 - I.bay.a), Math.cos(a + TAU / 72 - I.bay.a))) < 0.12) I.coast.push(...bayCoast(I));
     }
     I.discoverValue = I.landmark ? 100 : 15 + Math.round(I.r / 8);
     const marchOut = (a, depth, extra = 0) => {
@@ -249,6 +306,7 @@ export class World {
     I.treasureAngle = ta;
     // Sea stacks
     const avoid = (a) => (I.port && Math.abs(Math.atan2(Math.sin(a - I.dockAngle), Math.cos(a - I.dockAngle))) < 0.7) ||
+      (I.bay && Math.abs(Math.atan2(Math.sin(a - I.bay.a), Math.cos(a - I.bay.a))) < 0.8) ||
       Math.abs(Math.atan2(Math.sin(a - ta), Math.cos(a - ta))) < 0.35;
     if (I.id !== 0 && (rng() < 0.45 || I.landmark === 'frost')) {
       const base = rng() * TAU;
@@ -261,14 +319,19 @@ export class World {
         I.rocks.push({ x: I.x + Math.cos(a) * d, z: I.z + Math.sin(a) * d, r, h: 5 + rng() * 22, type: I.biome === 'cold' ? 'ice' : 'stack' });
       }
     }
-    if (I.landmark === 'arch') {
-      const a = I.treasureAngle + 0.9;
-      const d = I.r * edgeFactor(I, a) + 30;
-      I.archPos = { x: I.x + Math.cos(a) * d, z: I.z + Math.sin(a) * d, rot: -a };
-      // Arch legs as collision rocks (arch spans ±18 units along its local x)
-      const lx = Math.cos(-a), lz = -Math.sin(-a);
+    if (I.landmark === 'arch' && I.bay) {
+      // The arch spans the bay's mouth, its legs on the tips of the two arms:
+      // out along the mouth until the land beside it runs out, then back a little
+      const B = I.bay, off = ARCH.legX * ARCH.scale, px = -B.dz, pz = B.dx;
+      const land = (d) => Math.max(...[-1, 1].map((s) => islandHeight(I, B.x + B.dx * d + px * off * s, B.z + B.dz * d + pz * off * s)));
+      let d = B.r + 4;
+      while (d < B.len && land(d) > 1) d += 2;
+      d -= 8;
+      // local x across the mouth, local +z into the bay
+      I.archPos = { x: B.x + B.dx * d, z: B.z + B.dz * d, rot: Math.atan2(-B.dx, -B.dz) };
+      // the legs as collision rocks (sea-arch.js: they stand at ±ARCH.legX along its local x)
       for (const s of [-1, 1]) {
-        I.rocks.push({ x: I.archPos.x + lx * 18 * s, z: I.archPos.z + lz * 18 * s, r: 6, h: 0, type: 'hidden' });
+        I.rocks.push({ x: I.archPos.x + px * off * s, z: I.archPos.z + pz * off * s, r: 6 * ARCH.scale, h: 0, type: 'hidden' });
       }
     }
   }
@@ -742,11 +805,7 @@ export class IslandStreamer {
         group.add(o);
       }
     } else if (I.landmark === 'arch' && I.archPos) {
-      const o = propMesh('arch');
-      o.position.set(I.archPos.x - I.x, -3, I.archPos.z - I.z);
-      o.rotation.y = I.archPos.rot;
-      o.scale.setScalar(3);
-      group.add(o);
+      this.buildArch(I, group);
     } else if (I.landmark === 'volcano') {
       const geo = new THREE.IcosahedronGeometry(1, 1);
       const mat = toonMaterial({ color: 0x8d8a8a, gradientMap: toonGradient() });
@@ -758,6 +817,19 @@ export class IslandStreamer {
         this.smoke.push({ owner: I, mesh: m });
       }
     }
+  }
+
+  /** The great arch standing off Archway Isle (sea-arch.js), with its surf, gulls and crabs. */
+  buildArch(I, group) {
+    const P = I.archPos, S = ARCH.scale, cr = Math.cos(P.rot) * S, sr = Math.sin(P.rot) * S;
+    const A = buildSeaArch({ world: (x, z) => [P.x + x * cr + z * sr, P.z - x * sr + z * cr] });
+    A.group.position.set(P.x - I.x, 0, P.z - I.z);
+    A.group.rotation.y = P.rot;
+    A.group.scale.setScalar(S);
+    for (const o of A.outlines) o.userData.lod = 'outline';
+    A.crabs.userData.lod = 'detail';
+    group.add(A.group);
+    this.anims.push({ owner: I, update: A.update });
   }
 
   /** The Elder Tree on the hilltop, facing Port Haven, in a ring of old giants. */

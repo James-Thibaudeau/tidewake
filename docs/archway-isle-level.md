@@ -13,12 +13,10 @@ Status: **draft** (2026-11-25). Open questions and decisions are at the end.
 ## What we're building on
 
 - **The island** (`src/world.js`): rocky, at (-3800, -3300), about 5 km from
-  Port Haven and north of the Elder Grove, radius 180 and a 60 m peak. The
-  arch stands about 30 m off the shore, a little round from the treasure
-  side. Its legs are two hidden collision rocks 18 m either side of the
-  middle, so a boat fits through the 24 m channel between them.
-- **The sea view today:** one `arch` prop from `props.js`, ten jittered
-  stones in a half-circle at 3× scale, about 36 m across and 21 m high.
+  Port Haven and north of the Elder Grove, radius 180 and a 60 m peak. It is
+  now a **U round a bay** (see *The island and the bay* below).
+- **The sea view before 4.5:** one `arch` prop from `props.js`, ten jittered
+  stones in a half-circle off the shore, with nothing behind it.
 - **The story** (Journal IV, "The Squall"): Journal III's clue sends you
   north to *"a great stone arch that stands in the open sea like a doorway
   with no house behind it. I intend to sail straight through."* In IV he did:
@@ -30,88 +28,112 @@ Status: **draft** (2026-11-25). Open questions and decisions are at the end.
   Isle and opens once Journal IV is found. Finding IV in the level has to
   open it the same way.
 - **Rocky pieces from 4.4** (`modules.js` `POOLS.rocky`, art in
-  `pieces.js`): sheer ledges, sea stacks, rock arches, the rock spire, grey
-  shingle, thin turf, pines and boulders.
+  `pieces.js`): sheer ledges, sea stacks, rock arches, grey shingle, thin
+  turf, pines and boulders.
 - **From the grove:** a pure layout file checked in Node, lantern
   checkpoints, `fallBack` (a long fall puts you back at the last lantern),
   "Climb down" prompts at high lanterns, and splash respawns from water.
 - **The controller:** jump apex about 1.5 m, walking gap 1.9 m, running gap
   3.4 m, safe drop 6 m (`ASHORE.design`).
 
+## The island and the bay
+
+The island is shaped like a **U round a sheltered bay**, and the great arch
+spans the bay's narrow mouth. The way into the bay is through the arch, so
+sailing through it is how you get in, which is what grandfather did.
+
+- **At sea** (`world.js`, `bayFor`): a round bay carved into the island (its
+  centre half way out, its radius about a third of the island's), opening
+  south towards the Elder Grove and Port Haven through a channel about 32 m
+  wide. The arms reach out either side of the mouth, and the arch stands on
+  their tips. The channel is carved through the offshore shelf as well, so
+  a boat can sail in without running aground, and you can drop anchor and
+  land from inside the bay. The chart draws the bay.
+- **Ashore** the level keeps the U at a size that plays well: a bay about
+  64 m across with sheer banded walls, the cove at its head, and the arch
+  over the mouth. Unlike the grove it doesn't turn to face your ship: the
+  rowboat always comes in at the cove.
+
 ## The idea
 
-The grove is a climb **up**. Archway Isle is a walk **along**: out along the
-sea cliffs, round a headland and over the top of the arch. The drama comes
-from height and the sea underneath you, not from hard jumps. You go where he
-went: up for a look at the weather, then out onto the arch before it blew.
+The grove is a climb **up**. Archway Isle is a walk **along**: round the
+inside of the bay on its cliff wall, out along the mouth, and over the top of
+the arch. The drama comes from height and the water underneath you, not from
+hard jumps. You go where he went: up for a look at the weather, then out
+onto the arch before it blew.
 
 ## Scale
 
-- Level radius about **85 m**: a cove on the landward side, cliffs on the
-  seaward side, and the arch standing off the headland.
-- Cliff top at about **24 m**. The traverse runs along the face between
-  **10 and 18 m** above the surf.
-- The arch keeps the sea view's size: legs **36 m** apart, the keystone
-  **21 m** above the water. Its back is about 3 m wide, narrowing to 2 m at
-  the crown.
-- The seaward stack beyond the arch tops out at about **30 m**.
+- The level is about **150 m** across: the U is about 145 m wide and 150 m
+  from the back of the island to the arms' tips.
+- The bay is **32 m** in radius; the mouth's channel is **20 m** wide and
+  about 35 m long.
+- The cliff tops are **12–16 m** high, rolling, and higher towards the back
+  of the island. The traverse runs along the bay's wall at about **10–13 m**.
+- The arch's legs are **36 m** apart, on the arms' tips at about 12 m; its
+  back rises to the keystone at about **16.5 m**, 10 m clear over the
+  channel. Its back is about 3 m wide, narrowing to 2 m at the crown.
+- The seaward stack outside the mouth tops out at **24 m**.
 
 ## The route
 
 ```
- seaward stack (30 m) ── the chest, your ship framed in the arch (optional, hardest)
-     │  stack hops past the arch's far leg
- the keystone (21 m) ── Journal IV, his mark
-     │  along the arch's back
- the shoulder (16 m) ── lantern
-     │  THE TRAVERSE: ledges round the headland, stack hops over two inlets
- cliff top (24 m) ── lantern, the arch comes into view; storm cave (vault) below
-     │  up the gully on sheer ledges
- shingle cove + rowboat ── spawn, grandfather's camp
+ seaward stack (24 m) ── the chest (optional, hardest)
+     │  stepping stacks off the east arm, then shelves round the stack
+ the keystone (16.5 m) ── Journal IV, his mark
+     │  along the arch's back, over the mouth
+ the shoulder (12 m) ── lantern, on the west arm's tip
+     │  THE TRAVERSE: ledges round the bay's west wall, sea stacks across
+     │  one inlet, a little rock arch over another, then out along the mouth
+ cliff top (15 m) ── lantern, the arch across the bay
+     │  up the gully's terraces
+ shingle cove + rowboat ── spawn, grandfather's camp; the storm cave (vault)
 ```
 
-1. **Shingle cove (spawn).** The rowboat on grey shingle and grandfather's
-   camp: a fire ring and a **weather board**, a plank on a post with his
-   barometer readings chalked on it, falling fast. Pinned to it is the note
-   that sends you inland: *"Glass dropping. Up to the arch for a look. If
-   it's coming, I'm going through first."*
-2. **The gully.** A cleft up from the cove on short sheer ledges. It's
-   easy, a warm-up for the rocky moves. Lantern at the top.
-3. **The cliff top.** Heath, thin turf and wind-bent pines. This is the
-   reveal: the path tops a rise and **the arch is framed out to sea**. Small
-   stone cairns, his trail markers here the way the iron pegs were in the
-   grove, lead off along the cliff edge. A side path drops to the **storm
-   cave**, the vault (see *Vault* below).
-4. **The traverse.** The heart of the level. Off the cliff top and along the
-   seaward face, round the headland toward the arch:
-   - sheer ledges along the face, with **his handline**, a rope bolted into
-     the rock along the hard stretches (it's art and a route marker, not a
-     mechanic);
-   - sea stacks across two inlets, with surf bursting between them;
-   - a short rock arch over the second inlet;
-   - gulls nesting on the ledges (decor only; the critters that move come
-     in 4.12).
+1. **Shingle cove (spawn).** At the head of the bay: the rowboat on grey
+   shingle and grandfather's camp, a fire ring and a **weather board**, a
+   plank on a post with his barometer readings chalked on it, falling fast.
+   Pinned to it is the note that sends you up (4.5b): *"Glass dropping. Up
+   to the arch for a look. If it's coming, I'm going through first."* The
+   **storm cave**, the vault, is a nook in the basin's east wall, a few
+   steps from the beach (see *Vault* below).
+2. **The gully.** Terraces up a cleft in the back wall of the basin behind
+   the cove, alternating a hop and a step. It's easy, a warm-up. Lantern at
+   the top.
+3. **The cliff top.** Heath, thin turf and wind-bent pines, round the back
+   of the bay. This is the reveal: **the arch across the bay, framed in its
+   mouth**. Small stone cairns, his trail markers here the way the iron pegs
+   were in the grove, lead round the cliff edge.
+4. **The traverse.** The heart of the level. Down off the cliff top onto the
+   bay's west wall, then along it and out along the mouth:
+   - sheer ledges along the wall, with **his handline**, a rope pinned into
+     the rock above them (it's art and a route marker, not a mechanic);
+   - four sea stacks across the mouth of the first inlet;
+   - a little rock arch over the second inlet;
+   - then ledges along the channel's wall, rising to the west arm's tip.
 
-   The surf is below the whole way. A miss means a splash, and **a splash
+   The bay is below the whole way. A miss means a splash, and **a splash
    puts you back at the last lantern**, so it costs a stretch, never the
-   level. There are two lanterns along the way.
-5. **The shoulder (checkpoint).** A rock platform at the foot of the arch's
-   landward leg. You climb the leg's back on fallen blocks.
-6. **Over the arch to the keystone.** A walk along the arch's back with the
-   sea 21 m below and the channel between the legs underneath you. There
-   are no jumps up here: the height is the challenge. At the keystone
-   grandfather scratched his official record into the rock: his initials,
+   level. There are two lanterns along the way. The camera hangs out over
+   the water looking straight in at the wall, so left and right run along
+   the ledges.
+5. **The shoulder (checkpoint).** The west arm's tip, where the arch's leg
+   stands.
+6. **Over the arch to the keystone.** A walk up the arch's worn back, the
+   channel 10 m below and the open sea on one side, the bay on the other.
+   There are no jumps up here: the height is the challenge, and rubble along
+   both edges keeps you on unless you jump. At the keystone grandfather
+   scratched his official record into the rock (4.5b): his initials,
    *"SAILED THROUGH"* and an arrow pointing out to sea. **Journal IV** sits
    under a stone beside it in an oilskin pouch. Reading it here, looking out
    where the squall came from, is the payoff.
-7. **The seaward stack (optional).** Past the arch's far leg, a tall sea
-   stack climbed by hops up smaller stacks. These are the hardest jumps in
-   the level. At the top are the **cosmetic chest** and a view back through
-   the arch to your anchored ship.
+7. **The seaward stack (optional).** Off the east arm's tip, three stepping
+   stacks out to a tall stack outside the mouth, then shelves round it to
+   the top. These are the hardest jumps in the level. At the top are the
+   **cosmetic chest** and a view back across the arch into the bay.
 8. **The way down.** You don't walk back. The keystone and stack lanterns
-   offer **"Climb down to the cove"**, like the grove's "Climb down to the
-   roots" (`fallBack.down`). Jumping off the arch is a splash, which puts you
-   back at the shoulder.
+   offer **"Climb down to the cove"** (`fallBack.down`, `from`). Jumping off
+   the arch is a splash, which puts you back at the last lantern.
 
 ## Pickups and rewards
 
@@ -149,9 +171,9 @@ sea-search fallback**:
 
 ## Vault
 
-**The storm cave:** a sea cave under the cliff top, reached by a short side
-path down from the cliff top on wide ledges. It's off the main route but
-gentle, because rocky vaults hold the coral-flukes fitting (refit tier 2),
+**The storm cave:** a nook in the basin's east wall, a few steps from the
+cove, under an overhang of rock. It's off the main route and needs no
+climbing, because rocky vaults hold the coral-flukes fitting (refit tier 2),
 and Archway Isle can be the nearest rocky island for some players. Retrieve
 and refit items spawn here. On a normal visit it holds a gold cache.
 
@@ -178,11 +200,16 @@ from far off and has life in it.
   bands), undercut where the surf hits the legs, fallen blocks round the
   feet, turf and two wind-bent pines on its back, and white streaks on the
   ledges where the seabirds nest.
-- **Movement:** surf that bursts at the legs in time with the waves, spray
-  blowing off it, and gulls circling the crown and settling on the ledges.
+- **Where it stands:** across the bay's mouth, its legs on the tips of the
+  two arms, drawn 1.35× its authored size (`ARCH.scale`) so it holds its own
+  against the island. The legs are hidden collision rocks; the channel
+  between them is about 30 m wide.
+- **Movement:** surf that bursts at the seaward faces of the legs as the
+  waves come through, and gulls circling the crown and sitting on the
+  ledges.
 - **Weather of its own:** a small dark squall cloud with a curtain of rain
-  that sometimes drifts past beyond the arch, in clear weather too. It's a
-  nod to Journal IV and does nothing to the boat.
+  that sometimes drifts past out to sea beyond the arch, in clear weather
+  too. It's a nod to Journal IV and does nothing to the boat.
 - **At night:** grandfather's storm lantern glows on the keystone. Before you
   find Journal IV, it's a light out at sea to steer for.
 - **The channel stays sailable.** The model's legs have to match the two
@@ -234,10 +261,11 @@ not what you expected: the crabs.
 | --- | --- |
 | `src/ashore/archway-layout.js` (new, pure) | Where everything stands: cove, gully, cliff top, traverse, arch, stack, lanterns, vault. Checked in Node like `grove-layout.js` |
 | `src/ashore/archway.js` (new) | `buildArchwayLevel(I, opts)`, assembled like `grove.js`: terrain, cliffs, the arch, colliders, pickups, `hints`, `spots` (`note`, `journal`, `vault`), `syncStory`, `fallBack` |
-| `src/ashore/archway-art.js` (new, if needed) | The strata rock, the handline, the cairns and the weather board. Reuses the rocky art in `pieces.js` where it can |
-| `src/ashore/ashore.js` | `LANDMARK_LEVELS.arch = buildArchwayLevel` |
-| `src/ashore/camera.js` | A **face camera** for the traverse (see *Risks*): `faces: [{ path, out }]` in the level, like `hubs` for trunks |
-| `src/sea-arch.js` (new) | The sea view, with the crabs on the underside. `world.js` uses it in place of `propMesh('arch')`, and exports the channel line between the legs |
+| `src/ashore/archway-art.js` (new) | The banded rock, the arch's body, the stacks, the camp and weather board, the cairns, the handline and the storm cave |
+| `src/ashore/ashore.js` | `LANDMARK_LEVELS.arch = buildArchwayLevel`; the climb-down prompt takes its lanterns and wording from the level (`fallBack.from`, `fallBack.label`); landing from inside a bay |
+| `src/ashore/camera.js` | A **face camera** for the traverse (see *Risks*): `faces: [{ path, base, top, reach }]` in the level, like `hubs` for trunks |
+| `src/world.js` | The bay (`bayFor`, `inBay`): the island's shape, the arch's place across the mouth, the chart's coastline, no sea stacks in the mouth |
+| `src/sea-arch.js` (new) | The sea view, with the crabs on the underside. `world.js` uses it in place of `propMesh('arch')` (4.5b will want the line between the legs for sailing through) |
 | `src/story.js`, `src/story-text.js` | `IN_LEVEL` gains `'IV'`; `STEPS.ashore.IV` (text, noAnchor, where); the note, the keystone mark |
 | `src/quests.js` | The `report` quest type, built small: started by sailing through, the naturalist at the nearest port, hand-in on docking, no slot. Saved in `state.quests` with everything else |
 | `src/story-text.js` (or a new text file) | The crab sighting toast, the quest text and the naturalist's hand-in line |
@@ -275,15 +303,15 @@ The text for 4.5b (see *Open questions*) gets approved before 4.5b is built.
 ## Risks
 
 - **The camera on the traverse.** The trunk camera circles a cylinder from
-  outside. A cliff face is the opposite: the camera has to hang out over the
-  sea looking straight in at the face, so left and right on the stick run
-  along the ledge, and it has to swing round the headland without going into
-  the rock. Prototype it in grey boxes first, as the grove did with the
-  trunk.
+  outside. A cliff face is the opposite: the camera hangs out over the water
+  looking straight in at the wall (`level.faces` in `camera.js`), so left
+  and right on the stick run along the ledges, and it turns smoothly round
+  the bay's curve and the corner into the mouth. It works in the preview;
+  it still needs a play by hand.
 - **Seeing your feet.** On narrow ledges with the face camera, the edge
   under you has to be readable. Keep ledges a flat, lighter colour than the
   face, and check on a phone.
-- **The arch's back.** A 2 m wide walk 21 m up is easy to fall off by
+- **The arch's back.** A 2 m wide walk 16 m up is easy to fall off by
   accident on a stick. Low rubble along its edges catches you, and the walk
   shouldn't need precise steering.
 - **Frame time.** Surf bursts, spray and gulls, both at sea and ashore. Merge
@@ -313,3 +341,6 @@ The text for 4.5b (see *Open questions*) gets approved before 4.5b is built.
 3. **Reporting the crabs pays gold and a crab pin.**
 4. **Two PRs:** 4.5a, the arch and the level; 4.5b, the story and the crabs
    (see *Order of work*).
+5. **The island is a U round a bay**, and the arch spans the bay's mouth
+   (see *The island and the bay*). The traverse runs round the inside of the
+   bay, and the seaward stack stands outside the mouth.

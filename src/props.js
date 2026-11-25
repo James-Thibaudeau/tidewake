@@ -393,17 +393,6 @@ function bigTree() {
   ]);
 }
 
-function arch() {
-  const parts = [];
-  const segs = 9;
-  for (let i = 0; i <= segs; i++) {
-    const a = (i / segs) * Math.PI;
-    const g = jitter(new THREE.DodecahedronGeometry(1, 0), 0.35, i + 20);
-    parts.push(part(g, i % 2 ? '#9a8f86' : '#8a8178', { x: Math.cos(a) * 6, y: Math.sin(a) * 7, s: 2.1 }));
-  }
-  return merge(parts);
-}
-
 export const PROPS = {};
 export function initProps() {
   if (PROPS.palm) return PROPS;
@@ -412,7 +401,7 @@ export function initProps() {
     deadTree: deadTree(), bush: bush(), flower: flower(), birch: birch(), fruitTree: fruitTree(),
     berryBush: berryBush(), grassTuft: grassTuft(), pebble: pebble(), rock: rock(), darkRock: rock('#4d4440', 7),
     snowRock: rock('#c9d3dc', 11), seaStack: seaStack(), hut: hut(), lighthouse: lighthouse(),
-    pillar: pillar(), barrel: barrel(), crate: crate(), chest: chest(), bigTree: bigTree(), arch: arch(),
+    pillar: pillar(), barrel: barrel(), crate: crate(), chest: chest(), bigTree: bigTree(),
     camp: camp(),
   });
   return PROPS;

@@ -261,8 +261,34 @@ Updated 2026-11-25.
       two wide ledges at their joint; a player brushes it and steers round.
     - Not done: Archway Isle (4.5); a look on a phone; a play by hand.
   - [ ] 4.5 Archway Isle, in two PRs: 4.5a the walkable level and the arch
-    at sea, 4.5b the story and the crab report. Design drafted in
+    at sea, 4.5b the story and the crab report. Design in
     [archway-isle-level.md](archway-isle-level.md).
+    - [ ] 4.5a (`feature/archway-isle`, in progress):
+      - The island is a U round a bay (`world.js`, `bayFor`), and the arch
+        spans the mouth, so you sail in through it. The channel is carved
+        through the offshore shelf; you can land from inside the bay
+        (`inBay`); the chart draws the bay.
+      - The arch at sea is new (`sea-arch.js`): banded rock, an undercut
+        waterline, rubble, pines on its back, gulls circling and sitting on
+        the ledges, surf at the legs as the waves come through, a squall that
+        drifts past out to sea now and then, and crabs on the underside. The
+        old `arch` prop is gone.
+      - The walkable level (`archway-layout.js`, `archway.js`,
+        `archway-art.js`): the cove and the storm cave (the vault), the
+        gully's terraces, the cliff top, the traverse round the bay's west
+        wall and out along the mouth, over the arch to the keystone, and the
+        seaward stack (optional) with the chest. No story yet: Journal IV
+        is still at the beach camp, and the chest holds an ordinary piece.
+      - A face camera for cliff faces (`camera.js`, `level.faces`): out over
+        the water, looking in at the rock.
+      - The climb-down prompt takes its lanterns and wording from the level
+        ("Climb down to the cove" from the keystone and the stack).
+      - `node tools/check.mjs archway`: the layout's limits, and the test
+        climber from the cove over the arch (56 s, 35 jumps) and up the
+        stack (11 s more, 13 jumps); 3 hops need a second try.
+      - Looked at in the preview (sea view, the traverse's camera, the arch,
+        the stack). Not done: an art pass on the ledges (they look like
+        planks), gulls ashore, a play by hand, a look on a phone.
   - [ ] 4.6 Tropical islands and 4.7 the Sunken Temple
   - [ ] 4.8 Volcanic islands (with the steam-vent launch) and 4.9 Mount
     Cinderhorn
