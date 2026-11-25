@@ -494,6 +494,7 @@ export class Game {
     saveSettings(this.settings);
     if (k === 'sound') this.audio.setSound(v);
     if (k === 'music') this.audio.setMusic(v);
+    if (k === 'effects') this.fx?.setEnabled(v);
   }
 
   resetSave() { clearSave(); location.reload(); }

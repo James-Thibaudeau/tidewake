@@ -41,6 +41,7 @@ async function boot() {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.5, 6000);
   const fx = new FX(renderer, scene, camera, settings.quality);
+  if (settings.effects === false) fx.setEnabled(false);
 
   loadingText('Charting the isles…');
   await nextFrame();

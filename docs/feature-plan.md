@@ -97,7 +97,8 @@ pull request merges.
     biome ambience, an on-foot music variant
   - [x] Tutorial hints for the quest board and the Tailor: a one-time note
     at the top of each tab ([#25](https://github.com/James-Thibaudeau/tidewake/pull/25))
-  - [ ] Phones: joystick dead zone, bigger buttons, less decor on Low
+  - [ ] Phones: bigger buttons, less decor on Low. The joystick already has
+    a 12% dead zone; tune it on a real phone.
   - [ ] Performance pass, including cleanup when leaving an island
   - [x] README controls for going ashore (done in #11)
 - [ ] **Visual effects follow-ups** (after #17; `src/fx.js`, `src/toon.js`):
@@ -118,9 +119,10 @@ pull request merges.
     moonlight; consider a per-material strength.
   - [x] Sunset sun disc reads near-white (neutral tone mapping compresses
     it): the disc drops its white lift and most of `uSunHDR` in golden hour.
-  - [ ] An "Effects" switch in the pause menu, separate from Quality.
-  - [ ] Ashore lantern glow takes its bloom boost once at start-up, so
-    `tidewake.fx.setEnabled()` doesn't change it (debug toggle only).
+  - [x] An "Effects" switch in the pause menu, separate from Quality
+    ([#26](https://github.com/James-Thibaudeau/tidewake/pull/26)).
+  - [x] Ashore lantern glow takes its bloom boost once at start-up, so
+    `tidewake.fx.setEnabled()` doesn't change it. It now follows the boost.
 
 ### Ideas (planned, not started)
 
@@ -149,6 +151,11 @@ From Phase 3 (ashore):
 - [ ] Rock faces fade into the grass with a soft band instead of a crisp
   edge.
 - [ ] Platforms against a cliff can leave a small gap to the rock.
+
+General:
+- [x] Toasts were drawn under menus such as the port sheet, so messages
+  like "Not enough gold" never showed. They now show above an open menu
+  ([#26](https://github.com/James-Thibaudeau/tidewake/pull/26)).
 - [ ] Large easy islands can still have up to 20 small hops in total (never
   more than 4 in a row).
 
