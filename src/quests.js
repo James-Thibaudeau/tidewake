@@ -6,6 +6,7 @@
 // state.quests = {
 //   active: [quest], done: [questId], pinned: questId|null,
 //   boards: { [portId]: { day, offers: [offer] } },
+//   reports: { [kind]: { state, port, day } },   sightings to report (reports.js)
 // }
 // A quest is an accepted offer plus { state, acceptedDay }.
 //   chart:   active → ready (island discovered) → done at any port
@@ -35,7 +36,8 @@ const FIRST_NAMES = ['Maren', 'Tobin', 'Isolde', 'Bram', 'Wren', 'Corin', 'Delph
   'Saoirse', 'Hollis', 'Ines', 'Jory', 'Kit', 'Nell', 'Ansel', 'Rosalind', 'Teague', 'Vesna', 'Ambrose', 'Calla',
   'Dov', 'Ellery', 'Fenna', 'Gideon', 'Hester', 'Ivo', 'Juno', 'Lark'];
 // (new roles go at the end: givers are drawn in this order, so existing names stay put)
-export const ROLES = { chart: 'Cartographer', deliver: 'Merchant', salvage: 'Old Salt', retrieve: 'Harbormaster' };
+// (the naturalist is on no board: they only turn up to hear a report, reports.js)
+export const ROLES = { chart: 'Cartographer', deliver: 'Merchant', salvage: 'Old Salt', retrieve: 'Harbormaster', report: 'Naturalist' };
 const PARCELS = ['Crate of lamp oil', 'Bundle of sealed letters', 'Barrel of pickled herring', 'Chest of spices',
   'Brass barometer', 'Bolt of sailcloth', 'Jar of wild honey', 'Cask of cider', 'Sack of seed potatoes',
   'Roll of sea charts', 'Box of ship nails', 'Basket of oranges'];
@@ -120,7 +122,7 @@ export class QuestSystem {
     const s = this.game.state;
     if (!s.quests) s.quests = { active: [], done: [], boards: {}, pinned: null };
     const q = s.quests;
-    q.active ||= []; q.done ||= []; q.boards ||= {};
+    q.active ||= []; q.done ||= []; q.boards ||= {}; q.reports ||= {};
     if (q.pinned === undefined) q.pinned = null;
     return q;
   }
@@ -302,8 +304,8 @@ export class QuestSystem {
   }
 
   pin(id) { this.Q.pinned = id; }
-  /** Story-track steps (main story, grandfather's anchor, the rival captain): never take a side-quest slot. */
-  get storyQuests() { return [...(this.game.story?.quests() || []), ...(this.game.refits?.quests() || []), ...(this.game.rival?.quests() || [])]; }
+  /** Story-track steps (main story, grandfather's anchor, the rival captain, sightings to report): never take a side-quest slot. */
+  get storyQuests() { return [...(this.game.story?.quests() || []), ...(this.game.refits?.quests() || []), ...(this.game.rival?.quests() || []), ...(this.game.reports?.quests() || [])]; }
   /** Everything worth tracking: story steps first, then side quests. */
   get tracked() { return [...this.storyQuests, ...this.active]; }
   get pinned() {
@@ -459,6 +461,7 @@ export class QuestSystem {
    * area rather than an exact spot.
    */
   target(q) {
+    if (q.type === 'story' && q.kind) return this.game.reports.target(q); // a sighting to report
     if (q.type === 'story') return q.id === 'rival' ? this.game.rival.target() : q.id === 'refit' ? this.game.refits.target() : this.game.story.target(q.id);
     const b = this.game.boat.pos;
     const nearestPort = () => {

@@ -276,10 +276,56 @@ Updated 2026-11-25.
       islands with railed ledges on the summit rock (temperate too). The
       summit rock's invisible wall bulges into the straight line between
       two wide ledges at their joint; a player brushes it and steers round.
-    - Not done: Archway Isle (4.5); a look on a phone; a play by hand.
-  - [ ] 4.5 Archway Isle, in two PRs: 4.5a the walkable level and the arch
+    - Not done: a look on a phone; a play by hand.
+  - [x] 4.5 Archway Isle, in two PRs: 4.5a the walkable level and the arch
     at sea, 4.5b the story and the crab report. Design in
     [archway-isle-level.md](archway-isle-level.md).
+    - [x] 4.5b, the story and the crabs:
+      - Journal IV has moved off the beach and onto the arch: chapter IV's
+        step is "Go ashore at Archway Isle. He was heading for the arch.",
+        and it needs the grapnel refit (without it, or without an anchor,
+        the step says so). Saves that already hold Journal IV keep it.
+        Finding it opens Sable's fog run as before.
+      - His camp at sea has moved to the head of the bay, where the level
+        has it, and the story's marker points into the bay. The way in is
+        through the arch, so following the story finds the crabs too.
+      - In the cove, a note pinned to his weather board sends you up.
+      - At the keystone: a dark flagstone with "SAILED THROUGH" scratched
+        into it, two initials too worn to read and an arrow out to sea
+        (drawn as a texture, `markTexture` in `archway-art.js`), and
+        Journal IV in an oilskin pouch under a stone beside it. Before the
+        story reaches chapter IV you can only look at the marks; afterwards
+        you can read the journal there.
+      - Grandfather's storm lantern: the keystone's lantern is now an iron
+        crook with a brass lantern hanging out over the seaward edge, and
+        it burns after dark whether you've lit it or not. On the arch at
+        sea there is one too, with a glow that carries at night.
+      - The stack's chest holds the sou'wester, a new hat found nowhere
+        else. A chest opened in 4.5a comes back until you have it.
+      - The first report quest (`src/reports.js`): sail through the arch,
+        either way, and the camera tips up at the crabs on the underside.
+        "The crabs under the arch" joins the story steps (no side-quest
+        slot, never expires) and points at the nearest port, Driftwood
+        Landing, where a naturalist writes them down as "{captain}'s crab"
+        for 120 gold and the crab pin. Saved in `state.quests.reports`.
+        The naturalist is a fifth giver every port has but no board uses.
+      - The crab pin is worn in the bag slot (`extra:crabPin`), high on the
+        chest, so it goes with any scarf but not with a satchel.
+      - A level can now word its own note and journal spot, give a chest's
+        piece its own line, and draw a lantern itself (`post: false`,
+        `burns`, `lamp` on a checkpoint), ready for the other landmarks.
+      - Gallery: new subjects `archway` (the level) and `arch` (the sea
+        view), a `spot` view for one place in a big subject (`at=keystone`),
+        and the sheets `archway-story` and `pins`.
+      - Played in the preview through the real game: the three step texts,
+        sailing through the arch both ways, the hand-in at Driftwood
+        Landing, the note, the journal, the lantern at night, the chest,
+        and a save from before this change. Looked at on a phone-sized
+        screen.
+      - Not yet done: a play by hand, and a review of the new writing
+        (`STEPS.ashore.IV`, the `arch…` lines and `REPORTS` in
+        `story-text.js`), which is a first draft. The pacing check: chapter
+        IV now needs the Balanced Rudder and the grapnel refit.
     - [x] 4.5a ([#39](https://github.com/James-Thibaudeau/tidewake/pull/39)):
       - The island is a U round a bay (`world.js`, `bayFor`), and the arch
         spans the mouth, so you sail in through it. The channel is carved
@@ -294,8 +340,7 @@ Updated 2026-11-25.
         `archway-art.js`): the cove and the storm cave (the vault), the
         gully's terraces, the cliff top, the traverse round the bay's west
         wall and out along the mouth, over the arch to the keystone, and the
-        seaward stack (optional) with the chest. No story yet: Journal IV
-        is still at the beach camp, and the chest holds an ordinary piece.
+        seaward stack (optional) with the chest. (The story came in 4.5b.)
       - A face camera for cliff faces (`camera.js`, `level.faces`): out over
         the water, looking in at the rock.
       - The climb-down prompt takes its lanterns and wording from the level

@@ -28,6 +28,10 @@ import { buildWreckModel } from '../ashore/wreck.js';
 import { buildGroveLevel } from '../ashore/grove.js';
 import { buildGroveLayout } from '../ashore/grove-layout.js';
 import { pieceArt } from '../ashore/grove-art.js';
+import { buildArchwayLevel } from '../ashore/archway.js';
+import { buildArchwayLayout } from '../ashore/archway-layout.js';
+import { pieceArt as archwayPieceArt } from '../ashore/archway-art.js';
+import { buildSeaArch, ARCH } from '../sea-arch.js';
 import { generateLevel } from '../ashore/levelgen.js';
 import { layoutLevel } from '../ashore/modules.js';
 import { pieceParts } from '../ashore/pieces.js';
@@ -203,6 +207,55 @@ function grove(q, stage) {
   };
 }
 
+// Archway Isle: the whole level, or `kind=ledge&n=2` for one of its pieces.
+// `at` picks a place for the `spot` view (the story's places, close up), and
+// `journal=0` shows the keystone after Journal IV has been taken.
+function archway(q, stage) {
+  initProps();
+  const warnings = [];
+  const L = buildArchwayLayout();
+  if (q.kind) {
+    const { holder, geo } = onePiece(L.pieces, q, (p, i) => archwayPieceArt(p, i), warnings);
+    stage.add(holder);
+    return { group: holder, ground: 'floor', warnings, note: holder.userData.note, dispose() { geo.dispose(); } };
+  }
+  const level = buildArchwayLevel({ name: 'Archway Isle' }, { quality: 'high' });
+  level.syncStory({ journal: q.journal !== '0' });
+  stage.add(level.group);
+  const lamp = L.checkpoints.find((c) => c.id === 'keystone');
+  const PLACES = {
+    // as you come to it along the arch's back, from the shoulder
+    keystone: { ...L.spots.journal, span: 4.5, yaw: -Math.PI / 2, pitch: 0.75 },
+    lantern: { x: lamp.x, y: lamp.y + 1.3, z: lamp.z, span: 4, yaw: -0.9, pitch: 0.2 },
+    cove: { x: L.camp.x, y: L.camp.y + 1.1, z: L.camp.z, span: 5 },
+    cave: { x: L.vault.x, y: L.vault.y + 1.5, z: L.vault.z, span: 9 },
+    stack: { x: L.chests[0].x, y: L.chests[0].y + 0.8, z: L.chests[0].z, span: 9 },
+    arch: { x: 0, y: L.summit.y - 4, z: L.summit.z, span: 48 },
+  };
+  let at = q.at || 'keystone';
+  if (!PLACES[at]) { warnings.push(`at=${at} is not a place here (${Object.keys(PLACES).join(', ')})`); at = 'keystone'; }
+  const pos = { x: 0, y: 0, z: 0 };
+  return {
+    group: level.group, ground: 'sea', warnings, spot: PLACES[at], note: q.at ? at : undefined,
+    update(dt, t, env) { level.update(dt, t, { pos, night: env.night, play: () => {} }); },
+    dispose() { level.dispose(); },
+  };
+}
+const ARCHWAY_PLACES = ['keystone', 'lantern', 'cove', 'cave', 'stack', 'arch'];
+
+// The great arch as seen from the sea (sea-arch.js). The `spot` view is the
+// storm lantern on its keystone.
+function arch(q, stage) {
+  initProps();
+  const A = buildSeaArch({ world: (x, z) => [x, z], glowMap: glowTexture() });
+  stage.add(A.group);
+  return {
+    group: A.group, ground: 'sea', warnings: [], spot: { x: 0.8, y: ARCH.crown + 5, z: -3.4, span: 9 },
+    update(dt, t, env) { A.update(t, env.night); },
+    dispose() {}, // its geometry is shared with the game's own arch
+  };
+}
+
 // A generated island level: `biome`, `seed`, `r` (island radius) and `dist`
 // (metres from Port Haven, which sets how hard it is). With `kind=arch&n=0`,
 // one of its pieces on its own.
@@ -223,7 +276,7 @@ function level(q, stage) {
   return { group: lv.group, ground: 'sea', warnings, note: `${lv.layout.biome}, ${lv.layout.tier}`, dispose() { lv.dispose(); } };
 }
 
-export const SUBJECTS = { outfit, ship, prop, tree, wreck, grove, level };
+export const SUBJECTS = { outfit, ship, prop, tree, arch, wreck, grove, archway, level };
 
 // Every parameter a subject reads, so a misspelt one is reported instead of ignored.
 const DRESS = [...SLOTS, ...SLOTS.map((s) => s + 'Color'), 'shirt', 'skin', 'head', 'eyeColor', 'eyeShape', 'blush', 'freckles', 'profile'];
@@ -234,6 +287,8 @@ const PARAMS = {
   tree: [],
   wreck: ['sea'],
   grove: ['kind', 'n'],
+  arch: [],
+  archway: ['kind', 'n', 'at', 'journal'],
   level: ['biome', 'seed', 'r', 'dist', 'kind', 'n'],
 };
 /** The keys in `q` that the subject `show` doesn't read (`also`: the page's own parameters). */
@@ -253,6 +308,7 @@ export function controlsFor(show) {
     case 'ship': return [['tier', TIERS], ['canvas', ['0', '1', '2']], ['anchor', ['none', '0', '1', '2', '3', '4', 'down']], ['livery', ['redwing']], ['crew', ['0']]];
     case 'prop': return [['id', Object.keys(initProps())]];
     case 'grove': return [['kind', [...new Set(buildGroveLayout().pieces.map((p) => p.kind))]], ['n', TIERS]];
+    case 'archway': return [['at', ARCHWAY_PLACES], ['journal', ['0']], ['kind', [...new Set(buildArchwayLayout().pieces.map((p) => p.kind))]], ['n', TIERS]];
     case 'level': return [['biome', [...ASHORE_BIOMES]], ['kind', PIECE_KINDS], ['n', TIERS], ['seed', ['4401', '1121', '77', '31337']]];
     default: return [];
   }

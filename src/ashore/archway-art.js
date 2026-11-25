@@ -14,6 +14,7 @@ export const C = {
   shingle: '#cfc6b2', shingle2: '#b8ae9a', grass: '#86ab55', grass2: '#76984b', scree: '#a39a8d', seabed: '#a2967f',
   rope: '#d9c08a', iron: '#3b3f45', plank: '#b98a52', plank2: '#8f6a3e', chalk: '#f2efe6', ash: '#3a3330', ember: '#c4582c',
   cave: '#1f1a17', guano: '#e9e5da',
+  slate: '#5f5a57', paper: '#efe3c4', leather: '#7a4a24', oilskin: '#5d6b3a',
 };
 
 /** A part placed in a piece's frame: local transform, then the piece's turn, then its centre. */
@@ -191,8 +192,9 @@ export function archBody(L, A) {
   for (const s of L.steps) {
     const ax = Math.abs(s.cx);
     // rubble along both edges of the walk
+    const keystone = Math.abs(s.cx - L.flag.cx) < s.hx + L.flag.hx; // kept clear for his mark
     for (const side of [-1, 1]) {
-      if (rng() < 0.35) continue;
+      if (rng() < 0.35 || keystone) continue;
       P.push(part(jitter(new THREE.DodecahedronGeometry(0.4, 0), 0.12, 1000 + Math.round(s.cx * 13) + side), rng() < 0.5 ? C.rock2 : C.rock,
         { x: s.cx + (rng() - 0.5) * s.hx, y: s.top + 0.12, z: s.cz + side * (s.hz - 0.2), sx: 1 + rng(), sy: 0.55 + rng() * 0.3, ry: rng() * TAU }));
     }
@@ -231,6 +233,141 @@ export function campParts(camp) {
   P.push(placed(box(0.9, 0.62, 0.06), C.plank, at, { y: y + 1.45, z: 0.1 }));
   for (let k = 0; k < 5; k++) P.push(placed(box(0.34 - k * 0.04, 0.035, 0.01), C.chalk, at, { x: -0.18 + k * 0.08, y: y + 1.66 - k * 0.1, z: 0.135, rz: -0.15 }));
   P.push(placed(box(0.04, 0.4, 0.01), C.chalk, at, { x: 0.32, y: y + 1.42, z: 0.135 }));
+  return P;
+}
+
+// --------------------------------------------------------------- the story
+/** The note pinned to the weather board, under the readings. */
+export function noteParts(camp) {
+  const at = { cx: camp.x, cz: camp.z, rot: camp.rot }, y = camp.y;
+  return [
+    placed(box(0.24, 0.3, 0.02), C.paper, at, { x: -0.25, y: y + 1.33, z: 0.145, rz: 0.07 }),
+    placed(box(0.04, 0.04, 0.04), C.iron, at, { x: -0.25, y: y + 1.45, z: 0.155 }),
+  ];
+}
+
+/**
+ * The keystone: the dark flagstone his official record is scratched into
+ * (the scratches themselves are markDecal), and the stone he left his journal under.
+ */
+export function keystoneParts(L) {
+  const F = L.flag, S = L.pouch, P = [];
+  const slab = jitter(box(F.hx * 2, 0.2, F.hz * 2, 3, 1, 2), 0.035, 1610);
+  const q = slab.attributes.position;
+  for (let i = 0; i < q.count; i++) if (q.getY(i) > 0) q.setY(i, 0.1);   // a flat top to write on
+  P.push(part(slab, C.slate, { x: F.cx, y: F.top - 0.1, z: F.cz, c2: C.rock2, split: 0.35 }));
+  P.push(part(jitter(new THREE.DodecahedronGeometry(0.3, 0), 0.07, 1620), C.rock, { x: S.x - 0.14, y: S.y + 0.15, z: S.z + 0.08, sx: 1.15, sy: 0.62, ry: 0.5, c2: C.top, split: 0.55 }));
+  return P;
+}
+
+/** Journal IV in its oilskin pouch, half under the stone (shown while it waits to be found). */
+export function pouchParts(L) {
+  const S = L.pouch, at = { cx: S.x, cz: S.z, rot: 0.55 };
+  return [
+    placed(box(0.4, 0.1, 0.3), C.oilskin, at, { x: 0.16, y: S.y + 0.06, z: -0.1, rz: 0.06 }),
+    placed(box(0.42, 0.03, 0.05), C.rope, at, { x: 0.16, y: S.y + 0.115, z: -0.1, rz: 0.06 }),
+    placed(box(0.2, 0.06, 0.24), C.leather, at, { x: 0.36, y: S.y + 0.065, z: -0.1 }),
+    placed(box(0.17, 0.04, 0.22), C.paper, at, { x: 0.38, y: S.y + 0.065, z: -0.1 }),
+  ];
+}
+
+/**
+ * What he scratched into the flagstone: two initials (worn smooth, so they
+ * stay unread), SAILED THROUGH, and an arrow. Drawn pale on clear, to lie on
+ * the stone. Returns a canvas texture.
+ */
+export function markTexture() {
+  const cv = document.createElement('canvas');
+  cv.width = 512; cv.height = 384;
+  const g = cv.getContext('2d'), rng = mulberry32(1630);
+  g.strokeStyle = g.fillStyle = '#efe9dc';
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  // a scratch: a line drawn two or three times, never quite in the same place
+  const scratch = (pts, w = 5) => {
+    for (let pass = 0; pass < 3; pass++) {
+      g.lineWidth = w * (pass ? 0.45 : 1);
+      g.globalAlpha = pass ? 0.55 : 0.9;
+      g.beginPath();
+      pts.forEach(([x, y], i) => { const px = x + (rng() - 0.5) * 5 * pass, py = y + (rng() - 0.5) * 5 * pass; if (i) g.lineTo(px, py); else g.moveTo(px, py); });
+      g.stroke();
+    }
+  };
+  // letters as strokes on a 4 x 6 grid, cut with a knife: all straight lines
+  const GLYPH = {
+    S: [[[4, 0], [0, 0], [0, 3], [4, 3], [4, 6], [0, 6]]],
+    A: [[[0, 6], [2, 0], [4, 6]], [[1, 3.6], [3, 3.6]]],
+    I: [[[2, 0], [2, 6]]],
+    L: [[[0, 0], [0, 6], [4, 6]]],
+    E: [[[4, 0], [0, 0], [0, 6], [4, 6]], [[0, 3], [3, 3]]],
+    D: [[[0, 0], [0, 6], [2.6, 6], [4, 4.4], [4, 1.6], [2.6, 0], [0, 0]]],
+    T: [[[0, 0], [4, 0]], [[2, 0], [2, 6]]],
+    H: [[[0, 0], [0, 6]], [[4, 0], [4, 6]], [[0, 3], [4, 3]]],
+    R: [[[0, 6], [0, 0], [4, 0], [4, 3], [0, 3]], [[1.6, 3], [4, 6]]],
+    O: [[[0, 0], [4, 0], [4, 6], [0, 6], [0, 0]]],
+    U: [[[0, 0], [0, 6], [4, 6], [4, 0]]],
+    G: [[[4, 0], [0, 0], [0, 6], [4, 6], [4, 3.4], [2.2, 3.4]]],
+  };
+  const word = (text, x0, y0, u) => {
+    let x = x0;
+    for (const ch of text) {
+      const tilt = (rng() - 0.5) * 0.9 * u, lift = (rng() - 0.5) * 0.7 * u;
+      for (const line of GLYPH[ch]) scratch(line.map(([px, py]) => [x + px * u + (py / 6) * tilt, y0 + py * u + lift]), u * 0.62);
+      x += u * 5.6;
+    }
+  };
+  word('SAILED', 104, 112, 9.5);
+  word('THROUGH', 64, 204, 9.5);
+  // the arrow, pointing out to sea (to the left of the words)
+  scratch([[420, 320], [96, 320]], 7);
+  scratch([[146, 290], [96, 320], [146, 350]], 7);
+  // his initials above: gouges the weather has rounded off, too soft to read
+  g.globalAlpha = 0.5;
+  for (const [x, y, w, h, r] of [[196, 50, 14, 46, 0.2], [214, 44, 36, 13, -0.3], [300, 50, 14, 46, -0.15], [320, 62, 30, 13, 0.4]]) {
+    g.save(); g.translate(x, y); g.rotate(r);
+    g.beginPath(); g.ellipse(0, 0, w / 2, h / 2, 0, 0, TAU); g.fill();
+    g.restore();
+  }
+  g.globalAlpha = 1;
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+/** A flat geometry for the mark, lying on the flagstone so it reads the right way up as you walk out from the shoulder. */
+export function markGeometry(F) {
+  const g = new THREE.PlaneGeometry(F.hz * 2 - 0.08, F.hx * 2 - 0.06);
+  g.rotateX(-Math.PI / 2);
+  g.rotateY(-Math.PI / 2);   // the top of the writing towards +x, the arrow out to sea (-z)
+  g.translate(F.cx, F.top + 0.012, F.cz);
+  return g;
+}
+
+/**
+ * Grandfather's storm lantern at a checkpoint `c`: an iron crook driven into
+ * the rock, the lantern hanging from it at c.lamp (where ashore.js puts the
+ * flame), out over the seaward edge of the arch.
+ */
+export function stormLanternParts(c) {
+  const P = [], l = c.lamp, at = (x, y, z) => [c.x + x, c.y + y, c.z + z];
+  const brass = '#b8893a', top = l.y + 0.5;
+  // the crook: up, over and down to the hook
+  P.push(rod(at(0, -0.1, 0), at(0, top, -0.04), 0.045, C.iron));
+  P.push(rod(at(0, top, -0.04), at(0, top + 0.1, l.z * 0.55), 0.04, C.iron));
+  P.push(rod(at(0, top + 0.1, l.z * 0.55), at(0, top - 0.06, l.z), 0.035, C.iron));
+  P.push(rod(at(0, top - 0.06, l.z), at(0, l.y + 0.3, l.z), 0.02, C.iron));
+  P.push(part(new THREE.DodecahedronGeometry(0.16, 0), C.rock2, { x: c.x + 0.08, y: c.y + 0.06, z: c.z + 0.05, sy: 0.6 }));
+  // the lantern: a brass cap and base, four bars and two guard rings round the glass
+  const [x, y, z] = at(l.x, l.y, l.z);
+  P.push(part(new THREE.TorusGeometry(0.05, 0.012, 4, 10), brass, { x, y: y + 0.3, z }));
+  P.push(part(new THREE.ConeGeometry(0.17, 0.13, 8), brass, { x, y: y + 0.22, z }));
+  P.push(part(new THREE.CylinderGeometry(0.1, 0.1, 0.04, 8), C.iron, { x, y: y + 0.15, z }));
+  P.push(part(new THREE.CylinderGeometry(0.15, 0.16, 0.06, 8), brass, { x, y: y - 0.19, z }));
+  for (let k = 0; k < 4; k++) {
+    const a = (k / 4) * TAU + 0.4;
+    P.push(part(box(0.018, 0.32, 0.018), C.iron, { x: x + Math.cos(a) * 0.135, y: y - 0.01, z: z + Math.sin(a) * 0.135 }));
+  }
+  for (const dy of [-0.08, 0.07]) P.push(part(new THREE.TorusGeometry(0.137, 0.009, 4, 12), C.iron, { x, y: y + dy, z, rx: Math.PI / 2 }));
   return P;
 }
 

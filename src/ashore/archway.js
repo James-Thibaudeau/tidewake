@@ -7,8 +7,12 @@
 //
 // Unlike the grove it doesn't turn to face your ship: the cove is always at
 // the head of the bay, where the rowboat comes in.
+// The story lives here too: the note on grandfather's weather board, his mark
+// scratched into the keystone with Journal IV under a stone beside it, and his
+// storm lantern on its crook (the keystone's lantern, which burns after dark).
 // Follows the level contract in shapes.js, plus:
-//   spots: {}                     story interactions (the note and Journal IV come in 4.5b)
+//   spots: { note, journal }      story interactions ({ x, y, z, r } and their wording; journal has the journal's id)
+//   syncStory({ journal })        show the journal while it waits to be found
 //   update(dt, t, { pos, night, play })   the gulls (archway-life.js)
 //   hubs: [{ x, z, orbit, base, top }]   the seaward stack, which the camera circles (camera.js)
 //   faces: [{ path, base, top, reach }]   the traverse's cliff face, which the camera looks in at
@@ -21,8 +25,9 @@ import { toonGradient, toonMaterial } from '../toon.js';
 import { mulberry32, noise2, TAU } from '../util.js';
 import { rowboatParts } from './pieces.js';
 import { buildArchwayLayout, archwayGrid, groundH, ARCHWAY } from './archway-layout.js';
-import { C, bandFaces, pieceArt, archBody, stackBody, campParts, cairnParts, handlineParts, caveParts } from './archway-art.js';
+import { C, bandFaces, pieceArt, archBody, stackBody, campParts, cairnParts, handlineParts, caveParts, noteParts, keystoneParts, pouchParts, stormLanternParts, markTexture, markGeometry } from './archway-art.js';
 import { buildArchwayLife } from './archway-life.js';
+import { LINES } from '../story-text.js';
 
 function merged(parts) {
   const g = mergeGeometries(parts);
@@ -173,6 +178,9 @@ export function buildArchwayLevel(I, opts = {}) {
   const parts = [];
   for (const [i, p] of L.pieces.entries()) parts.push(...pieceArt(p, i));
   parts.push(...rowboatParts(L.rowboat), ...campParts(L.camp), ...trailParts(L));
+  // the story: his note on the weather board, the keystone and his storm lantern
+  const keyLantern = L.checkpoints.find((c) => c.id === 'keystone');
+  parts.push(...noteParts(L.camp), ...keystoneParts(L), ...stormLanternParts(keyLantern));
   const walk = merged(parts);
   own.push(rock, walk);
   for (const [geo, name] of [[rock, 'archway:rock'], [walk, 'archway:pieces']]) {
@@ -180,6 +188,20 @@ export function buildArchwayLevel(I, opts = {}) {
     mesh.name = name;
     group.add(mesh, new THREE.Mesh(geo, thinOutline));
   }
+  // what he scratched into the flagstone
+  const markMap = markTexture(), markGeo = markGeometry(L.flag);
+  const markMat = toonMaterial({ map: markMap, gradientMap: toonGradient(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }, { rim: false });
+  const mark = new THREE.Mesh(markGeo, markMat);
+  mark.name = 'archway:mark';
+  group.add(mark);
+  own.push(markMap, markGeo, markMat);
+  // Journal IV in its pouch under the stone, until it's found
+  const bookGeo = merged(pouchParts(L));
+  own.push(bookGeo);
+  const book = new THREE.Group();
+  book.add(new THREE.Mesh(bookGeo, propMaterial), new THREE.Mesh(bookGeo, thinOutline));
+  book.visible = false;
+  group.add(book);
 
   const colliders = [...L.colliders];
   const decor = buildDecor(L, group, colliders, opts.quality);
@@ -199,11 +221,14 @@ export function buildArchwayLevel(I, opts = {}) {
     checkpoints: L.checkpoints,
     coins: L.coins,
     caches: L.caches,
-    chests: L.chests,
+    chests: L.chests.map((c) => ({ ...c, text: LINES.souwester })),
     summit: L.summit,
     vault: L.vault,
-    spots: L.spots,
-    syncStory() {},
+    spots: {
+      note: { ...L.spots.note, prompt: 'Read the note on the weather board', title: 'A note on the weather board', line: LINES.archNote, text: LINES.archNoteText },
+      journal: { ...L.spots.journal, take: 'Take the journal from under the stone', read: "Read grandfather's journal at the keystone", look: 'Look at the marks in the rock', lookText: LINES.keystone },
+    },
+    syncStory({ journal = false } = {}) { book.visible = journal; },
     update(dt, t, { pos, night, play }) { life.update(dt, t, pos, night, play); },
     hubs: L.hubs,
     faces: L.faces,

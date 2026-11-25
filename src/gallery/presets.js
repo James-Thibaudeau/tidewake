@@ -25,6 +25,7 @@ export const LIGHTS = {
 //   face   a close-up of the explorer's head (outfits only)
 //   helm   a close-up of the explorer at the helm (ships only)
 //   bow    a close-up of the anchor at the bow (ships only)
+//   spot   a close-up of one place in a big subject, chosen with `at` (levels, the sea arch)
 export const VIEWS = {
   front: { kind: 'fit', yaw: 0, pitch: 0.08 },
   quarter: { kind: 'fit', yaw: 0.7, pitch: 0.2 },
@@ -37,5 +38,6 @@ export const VIEWS = {
   face: { kind: 'face', yaw: 0.3, pitch: 0.05 },
   helm: { kind: 'helm', yaw: 0.65, pitch: 0.16 },
   bow: { kind: 'bow', yaw: 0.95, pitch: 0.22 },
+  spot: { kind: 'spot', yaw: 0.6, pitch: 0.5 },
 };
 export const FIT_FOV = 30;

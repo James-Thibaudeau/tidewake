@@ -37,6 +37,7 @@ export const SHEETS = {
   'tops-back': { about: 'Every top with every bag, from behind', tile: PORTRAIT, make: grid('top', ids('top'), 'extra', ids('extra'), { show: 'outfit', view: 'back' }) },
   'tops-side': { about: 'Every top with every bag, from the side', tile: PORTRAIT, make: grid('top', ids('top'), 'extra', ids('extra'), { show: 'outfit', view: 'side' }) },
   'tops-front': { about: 'Every top with every neckwear, from the front', tile: PORTRAIT, make: grid('top', ids('top'), 'neck', ids('neck'), { show: 'outfit', view: 'front' }) },
+  'pins': { about: 'Every top with every bag or pin, from the front', tile: PORTRAIT, make: grid('top', ids('top'), 'extra', ids('extra'), { show: 'outfit', view: 'front' }) },
   'scarves': { about: 'Every top with every neckwear, from behind (the scarf tail)', tile: PORTRAIT, make: grid('top', ids('top'), 'neck', ids('neck'), { show: 'outfit', view: 'rear' }) },
   'bottoms': { about: 'Every top over every bottom', tile: PORTRAIT, make: grid('top', ids('top'), 'bottom', ids('bottom'), { show: 'outfit', view: 'quarter' }) },
   'running': { about: 'Every top over every bottom, mid-stride at a run', tile: PORTRAIT, make: grid('top', ids('top'), 'bottom', ids('bottom'), { show: 'outfit', view: 'quarter', pose: 'run', phase: '0.15' }) },
@@ -46,6 +47,8 @@ export const SHEETS = {
   // ---- ships
   'ships': { about: 'Every upgrade tier, from the bow quarter and the side', tile: LANDSCAPE, make: grid('view', ['quarter', 'side'], 'tier', ['0', '1', '2', '3', '4', '5'], { show: 'ship' }) },
   'anchors': { about: 'Every anchor refit, close on the bow', tile: LANDSCAPE, make: strip('anchor', ['0', '1', '2', '3', '4'], { show: 'ship', view: 'bow', canvas: '0' }) },
+  // ---- places
+  'archway-story': { about: "Archway Isle's story places, close up", tile: LANDSCAPE, make: strip('at', ['cove', 'keystone', 'lantern', 'stack'], { show: 'archway', view: 'spot' }, 2) },
   // ---- anything: the subject already in the URL
   'views': { about: 'The current subject from every fitted camera', tile: SQUARE, make: strip('view', Object.keys(VIEWS).filter((v) => VIEWS[v].kind === 'fit'), {}, 3) },
   'lights': { about: 'The current subject under every light', tile: LANDSCAPE, make: strip('light', Object.keys(LIGHTS), {}, 2) },

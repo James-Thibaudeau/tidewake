@@ -6,7 +6,8 @@ and its own cosmetic, and rebuilds the great arch at sea to the Elder Tree's
 standard. It follows the template set by
 [elder-grove-level.md](elder-grove-level.md).
 
-Status: **draft** (2026-11-25). Open questions and decisions are at the end.
+Status: **built** (4.5a and 4.5b, 2026-11-25). What changed while building
+is under *Decisions*; the one open question is at the end.
 
 ---
 
@@ -327,7 +328,9 @@ The text for 4.5b (see *Open questions*) gets approved before 4.5b is built.
 
 1. **The wording** of the note, the keystone mark, the crab toast and the
    naturalist's lines: these touch the story text, so they need approval
-   like the journals did.
+   like the journals did. 4.5b shipped them as a first draft, using the
+   lines above where this file gave one (`STEPS.ashore.IV`, the `arch…`
+   lines and `REPORTS` in `story-text.js`). They are still to be reviewed.
 
 ## Decisions (2026-11-25)
 
@@ -347,3 +350,24 @@ The text for 4.5b (see *Open questions*) gets approved before 4.5b is built.
 5. **The island is a U round a bay**, and the arch spans the bay's mouth
    (see *The island and the bay*). The traverse runs round the inside of the
    bay, and the seaward stack stands outside the mouth.
+
+Settled while building 4.5b:
+
+6. **The crab pin is worn in the bag slot** (`extra:crabPin`), high on the
+   chest. It goes with any scarf or necklace, but not with a satchel or
+   backpack.
+7. **His camp at sea is at the head of the bay**, as it is in the level, and
+   the chapter IV marker points into the bay. Following the story takes you
+   in through the arch, so most players meet the crabs on the way.
+8. **The storm lantern is the keystone's checkpoint lantern**, not a second
+   lantern beside it: an iron crook the level draws itself, which burns
+   after dark whether you've lit it or not.
+9. **The keystone mark is a flagstone on the arch's back**, written across
+   the walk so it is the right way up as you come out from the shoulder.
+   The initials are worn smooth and stay unread, like the grove's.
+10. **The crab report shows with the story steps** in the journal, the
+    tracker and the chart. It isn't tracked for you when it starts: the
+    story step stays pinned.
+11. **The naturalist** is a fifth quest giver that every port has, with a
+    name of their own, but no board offers their work. The report goes to
+    the port nearest the arch, Driftwood Landing, 2.3 km away.

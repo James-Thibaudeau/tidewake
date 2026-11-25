@@ -10,7 +10,8 @@
 // the seabirds nest. Surf bursts against the legs as the waves come through,
 // gulls circle the crown and sit on the ledges, and now and then a small
 // squall drifts past out beyond it. Under the span, too small to see from
-// outside the channel, a colony of crabs lives upside down.
+// outside the channel, a colony of crabs lives upside down. On the keystone
+// hangs grandfather's storm lantern, which burns after dark.
 //
 // Sea view only. The walkable arch is built with the Archway Isle level.
 // Authored in arch space: sea level at y = 0, the span along x (legs at
@@ -120,6 +121,32 @@ function rubbleAndTop(rng) {
       const r = 1.8 - t * 0.45, ty = y + h * 0.55 + t * 1.05;
       P.push(part(new THREE.ConeGeometry(r, 1.7, 7), t % 2 ? C.pine : C.pine2, { x: x - lean * (ty - y) * 1.1, y: ty, z: 0.6, rz: lean, sx: 1.3, c2: C.pine2, split: 0.4 }));
     }
+  }
+  return P;
+}
+
+// Grandfather's storm lantern, on an iron crook at the keystone, out towards
+// the open sea. Big for a lantern, so it can be made out from a ship below.
+const LAMP = { x: 0.8, y: ARCH.crown + 6.1, z: -3.4 };
+/** An iron bar from a to b. */
+function bar(a, b, r, color) {
+  const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), len = d.length();
+  const g = new THREE.CylinderGeometry(r, r, len, 5).translate(0, len / 2, 0);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()));
+  return part(g, color, { x: a[0], y: a[1], z: a[2] });
+}
+function stormLantern() {
+  const P = [], iron = '#3b3f45', brass = '#b8893a', foot = ARCH.crown + 2.9, top = LAMP.y + 1.5, x = LAMP.x;
+  // the crook: up, over towards the open sea, and down to the hook
+  P.push(bar([x, foot, -2.2], [x, top, -2.25], 0.12, iron));
+  P.push(bar([x, top, -2.25], [x, top + 0.3, -3.0], 0.1, iron));
+  P.push(bar([x, top + 0.3, -3.0], [x, top - 0.15, LAMP.z], 0.09, iron));
+  P.push(bar([x, top - 0.15, LAMP.z], [x, LAMP.y + 0.6, LAMP.z], 0.05, iron));
+  P.push(part(new THREE.ConeGeometry(0.42, 0.34, 8), brass, { x: LAMP.x, y: LAMP.y + 0.48, z: LAMP.z }));
+  P.push(part(new THREE.CylinderGeometry(0.36, 0.4, 0.14, 8), brass, { x: LAMP.x, y: LAMP.y - 0.42, z: LAMP.z }));
+  for (let k = 0; k < 4; k++) {
+    const a = (k / 4) * TAU + 0.4;
+    P.push(part(new THREE.BoxGeometry(0.05, 0.74, 0.05), iron, { x: LAMP.x + Math.cos(a) * 0.33, y: LAMP.y, z: LAMP.z + Math.sin(a) * 0.33 }));
   }
   return P;
 }
@@ -249,7 +276,7 @@ function geometries() {
   gullParts(flyer, { flying: true });
   cache = {
     rock: merge([spanGeometry(), ...rubbleAndTop(rng)]),
-    fine: merge(ledgeGulls(rng)),
+    fine: merge([...ledgeGulls(rng), ...stormLantern()]),
     crabs: crabColony(rng),
     gull: merge(flyer),
     squall: squallGeometry(),
@@ -260,10 +287,11 @@ function geometries() {
 
 /**
  * The arch in arch space. world(x, z): arch space to world x/z, so the surf
- * can follow the real waves at each leg. Returns { group, outlines (meshes
- * to hide when far), crabs (only worth drawing up close), update(time, night) }.
+ * can follow the real waves at each leg. glowMap: a soft dot for the storm
+ * lantern's light. Returns { group, outlines (meshes to hide when far), crabs
+ * (only worth drawing up close), update(time, night) }.
  */
-export function buildSeaArch({ world }) {
+export function buildSeaArch({ world, glowMap }) {
   const G = geometries();
   const group = new THREE.Group();
   group.name = 'seaArch';
@@ -315,10 +343,26 @@ export function buildSeaArch({ world }) {
   group.add(squall);
   const SQUALL = { period: 420, pass: 240, z: -150, y: 78, span: 340 };
 
+  // the storm lantern burns after dark: a flame in the glass, and a glow that
+  // carries, so it is a light out at sea to steer for (no fog on it)
+  const flameMat = new THREE.MeshBasicMaterial({ color: 0x6b5a3a });
+  const flame = new THREE.Mesh(blob(0.26, 1), flameMat);
+  flame.position.set(LAMP.x, LAMP.y, LAMP.z);
+  const glowMat = new THREE.SpriteMaterial({ map: glowMap || null, color: 0xffd98a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  const glow = new THREE.Sprite(glowMat);
+  glow.position.copy(flame.position);
+  glow.visible = false;
+  group.add(flame, glow);
+
   let prev = 0;
   function update(time, night) {
     const dt = clamp(time - prev, 0, 0.1);
     prev = time;
+    const lit = smoothstep(0.25, 0.6, night), flick = 1 + Math.sin(time * 9) * 0.04 + Math.sin(time * 23) * 0.03;
+    flameMat.color.set(lit > 0.5 ? 0xffe8a0 : 0x6b5a3a);
+    glow.visible = lit > 0.01;
+    glowMat.opacity = lit * 0.9;
+    glow.scale.setScalar(11 * flick);
     for (const m of surf) {
       const p = m.userData.p;
       // a burst each time the sea at the leg rises through its mean

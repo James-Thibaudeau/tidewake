@@ -5,8 +5,9 @@
 // state.story = { chapter, journals: [id], flags: {}, seenCards: [id] }
 //   chapter 0   prologue not yet shown
 //   chapter 1   visit the wreck → Journal I + the brass spyglass
-//   chapter 2-7 find Journals II-VII at grandfather's old camps (III is
-//               ashore: up the great tree in the Elder Grove level)
+//   chapter 2-7 find Journals II-VII at grandfather's old camps (III and IV
+//               are ashore: up the great tree in the Elder Grove level, and
+//               at the keystone of the arch on Archway Isle)
 //   chapter 8   back to the wreck: the chest under the bunk
 //   chapter 9   bring the letters home to Grandma in Port Haven
 //   chapter 10  complete (free roam)
@@ -22,7 +23,7 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
 const LANDMARK_FOR = { III: 'grove', IV: 'arch', V: 'ruins', VI: 'volcano', VII: 'frost' };
 // Journals that have moved into their landmark's level. There's no searching
 // for these from the sea: you drop anchor by the camp and go ashore.
-const IN_LEVEL = new Set(['III']);
+const IN_LEVEL = new Set(['III', 'IV']);
 export const FINAL_CHAPTER = 10;
 
 const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] ?? m));
@@ -145,8 +146,23 @@ export class Story {
     for (const [id, lm] of Object.entries(LANDMARK_FOR)) {
       const I = W.islands.find((x) => x.landmark === lm);
       if (I) camps[id] = this.campOn(I, H, rng);
+      if (I?.bay) this.campInBay(camps[id], I);
     }
     return camps;
+  }
+
+  /**
+   * On an island with a bay (Archway Isle) the camp is at the head of the
+   * bay, as it is in the level, and the story points into the bay: the way
+   * in is through the arch. (Moved after campOn, so the camps' RNG, and so
+   * every other camp, stays as it was.)
+   */
+  campInBay(c, I) {
+    const B = I.bay, at = (d) => [B.x - B.dx * d, B.z - B.dz * d];
+    let d = B.r - 6;
+    while (d < B.r + 14 && islandHeight(I, ...at(d)) < 1.6) d += 0.5;
+    const [x, z] = at(d);
+    Object.assign(c, { x, z, y: Math.max(0.4, islandHeight(I, x, z)), heading: headingOf(B.dx, B.dz), search: { x: B.x, z: B.z } });
   }
 
   campOn(I, H, rng) {
@@ -187,7 +203,11 @@ export class Story {
     if (ch === 1) step = STEPS.visitWreck;
     else if (ch <= 7) {
       const id = ROMAN[ch - 1], lv = IN_LEVEL.has(id) && STEPS.ashore[id];
-      step = { title: `Grandfather's Journal ${id}`, text: lv ? (this.canGoAshore ? lv.text : lv.noAnchor) : fill(STEPS.journal.text, { n: id }) };
+      // a journal in a level needs the anchor, and the refit that holds on that island
+      const I = this.camps[id] && this.world.islands[this.camps[id].island];
+      const holds = !I || !this.game.refits || this.game.refits.holds(I);
+      const text = !lv ? fill(STEPS.journal.text, { n: id }) : !this.canGoAshore ? lv.noAnchor : holds ? lv.text : lv.noRefit || lv.noAnchor;
+      step = { title: `Grandfather's Journal ${id}`, text };
     }
     else if (ch === 8) step = STEPS.searchChest;
     else step = STEPS.letterHome;
