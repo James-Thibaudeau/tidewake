@@ -1048,6 +1048,7 @@ export class UI {
     const meta = [`<span class="gold">${ICONS.coin.replace('<svg', '<svg class="ico" style="width:13px;height:13px;vertical-align:-2px"')} ${fmt(q.reward.gold)}</span>`];
     if (q.type === 'deliver' && q.days) meta.push(`<span>+${fmt(q.bonus)} within ${q.days} day${q.days === 1 ? '' : 's'}</span>`);
     if (cos) meta.push(`<span class="cos">+ ${esc(cos.name)}</span>`);
+    if (q.fragment) meta.push('<span class="cos">+ charts a new island</span>');
     if (q.dist) meta.push(`<span>${fmtDist(q.dist)}</span>`);
     let foot = '';
     if (q.type === 'story') {

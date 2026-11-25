@@ -579,6 +579,12 @@ function layoutOnce(I, opts, attempt) {
   for (let i = 0; i < 4; i++) { const a = aTop + (i / 4) * TAU + 0.4; const p = T.at(T.R2(a) * 0.5, a); coinAt(p.x, groundAt(p.x, p.z), p.z, 2); }
   walks.push([[topRim.x, topRim.z], [summit.x + 0.01, summit.z]]);
   keepOut.push([0, 0, 2.5]);
+  // the vault: where a quest item waits (retrieve quests, anchor refits), across
+  // the summit from where you arrive, between two of the summit coins
+  const aV = aTop + 0.4 + Math.PI * 0.75;
+  const vp = T.at(Math.min(2.2, T.R2(aV) * 0.35), aV);
+  const vault = { x: vp.x, y: groundAt(vp.x, vp.z), z: vp.z };
+  keepOut.push([vault.x, vault.z, 1.6]);
 
   // ---- optional branches go in the widest free arc around the mesa
   const used = [aRim, aM, ...arc(() => 1, aRim, aM, 0.05).map(([x, z]) => Math.atan2(z, x)),
@@ -645,7 +651,7 @@ function layoutOnce(I, opts, attempt) {
   coins.forEach((c, i) => { c.id = 'c' + i; });
 
   return { biome, tier, size, diff, dir, a0, T, pieces, colliders, route, branches, walks, modules, coins, caches, chests, checkpoints,
-    keepOut, spawn, exit, rowboat, summit };
+    keepOut, spawn, exit, rowboat, summit, vault };
 }
 
 /** The widest angular gap between the given angles: { mid, width }. */

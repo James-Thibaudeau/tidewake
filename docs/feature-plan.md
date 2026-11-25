@@ -87,7 +87,10 @@ pull request merges.
   - [ ] Landmark levels; move Journals III–VII from the beach camps into
     them, each with a unique cosmetic (makes the fur hood, flower crown,
     gold circlet and shell necklace findable)
-  - [ ] Retrieve quests, including "Find the lost map fragment"
+  - [x] Retrieve quests, including "Find the lost map fragment": offered by
+    Harbormasters (Cartographers for the fragment) once the anchor is fitted.
+    The item waits at the level's vault (on generated islands, by the summit)
+    and goes back to the island if you're wrecked.
   - [ ] Harmless obstacles (crabs, gulls)
 - [ ] **Phase 5, polish:**
   - [ ] Sound: footsteps by surface, jump and land, coins, chest fanfare,

@@ -24,6 +24,8 @@
 //   caches: [{ id, x, y, z, value }],   // gold piles: summit + secret spots
 //   chests: [{ id, x, y, z, yaw }],     // one cosmetic chest per island, off the main route
 //   summit: { x, y, z },                // the top of the route (for the map/hints)
+//   vault: { x, y, z } | null,          // where a quest item waits while a quest targets
+//                                       // this island (generated levels: by the summit)
 //   dispose(),
 // }
 // Positions are where the pickup/marker sits (its base), in level space.
