@@ -147,22 +147,24 @@ function backProfile(p) {
     ring(0.212, 0.188, 0.232);
   } else if (top === 'poncho') {
     shirt();
-    dome(0.52, 0.205, 0.1025);
-    ring(0.52, 0.1, 0.2, 0.35);
+    dome(0.52, 0.214, 0.107);
+    ring(0.52, 0.1, 0.218, 0.35);
     ring(0.205, 0.175, 0.322);
     ring(0.253, 0.227, 0.304);
     ring(0.125, 0.05, 0.36); // hem and tassels
   } else if (top === 'coat') {
     shirt();
     ring(0.49, -0.01, 0.232, 0.268);
-    ring(0.01, -0.25, 0.268, 0.3);
-    ring(-0.225, -0.255, 0.302);
+    ring(0.01, -0.25, 0.268, 0.335);
+    ring(-0.225, -0.255, 0.337);
   }
 
   if (p.extra.style === 'satchel') {
-    // the strap across the back; on the poncho it leans with the panel
-    const R = (CHEST_R[top] ?? 0.232) + 0.011, lean = top === 'poncho' ? 0.355 : 0;
-    ring(0.42, 0.18, R - lean * 0.12, R + lean * 0.12);
+    // the strap lies across the back, on top of whatever is worn
+    for (let i = 0; i < BACK_N; i++) {
+      const y = BACK_TOP - i * BACK_STEP;
+      if (y <= 0.58 && y >= 0.12) r[i] += 0.014;
+    }
   }
   return r;
 }
@@ -192,8 +194,57 @@ export const bodyDepth = (y) => bodyAt(y).kz;
 /** Width factor of the body field at torso height `y` (for things hung at the side). */
 export const bodyWidth = (y) => bodyAt(y).kx;
 
+/**
+ * A flat band lying on the clothes: straps, pocket flaps, lapels. `R(y)` is
+ * the surface radius at each height (see backProfile), `pts` a path of
+ * [angle round the body (0 = front, toward +x), height]; the band is `w` wide
+ * across the path and stands `th` proud. Built round the barrel, so it takes
+ * the body's shape with everything else.
+ */
+function band(col, R, pts, w, th, seg = 6) {
+  const P = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    for (let k = 0; k < seg; k++) {
+      const t = k / seg;
+      P.push([pts[i][0] + (pts[i + 1][0] - pts[i][0]) * t, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * t]);
+    }
+  }
+  P.push(pts[pts.length - 1]);
+  const C = P.map(([a, y]) => new THREE.Vector3(R(y) * Math.sin(a), y, R(y) * Math.cos(a)));
+  const pos = [], idx = [], n = new THREE.Vector3(), t = new THREE.Vector3(), side = new THREE.Vector3();
+  P.forEach(([a], i) => {
+    n.set(Math.sin(a), 0, Math.cos(a));
+    t.subVectors(C[Math.min(i + 1, C.length - 1)], C[Math.max(i - 1, 0)]).normalize();
+    side.crossVectors(n, t).normalize().multiplyScalar(w / 2);
+    // sunk a little into the cloth so no gap shows under the edges
+    for (const [u, v] of [[-1, -0.012], [-1, th], [1, th], [1, -0.012]]) {
+      pos.push(C[i].x + side.x * u + n.x * v, C[i].y + side.y * u, C[i].z + side.z * u + n.z * v);
+    }
+  });
+  for (let i = 0; i < P.length - 1; i++) {
+    for (let k = 0; k < 4; k++) {
+      const a = i * 4 + k, b = i * 4 + (k + 1) % 4;
+      idx.push(a, a + 4, b, b, a + 4, b + 4);
+    }
+  }
+  const e = (P.length - 1) * 4;
+  idx.push(0, 1, 2, 0, 2, 3, e, e + 2, e + 1, e, e + 3, e + 2);
+  let g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g = g.toNonIndexed();
+  g.computeVertexNormals();
+  return part(g, col);
+}
+/** Where a point `off` outside the clothes sits, as a part transform (it faces outward). */
+const onBody = (R, a, y, off = 0) => ({ x: (R(y) + off) * Math.sin(a), y, z: (R(y) + off) * Math.cos(a), ry: a });
+
+/** Mark a torso part as rigid: it is authored on the shaped body and isn't reshaped with the clothes. */
+const rigid = (g) => { g.userData.rigid = true; return g; };
+
 /** Narrow a torso-space part into the body's shape, in place. */
 function shapeBody(geo) {
+  if (geo.userData.rigid) return geo;
   const pos = geo.attributes.position, nor = geo.attributes.normal;
   for (let i = 0; i < pos.count; i++) {
     const { kx, kz } = bodyAt(pos.getY(i));
@@ -216,20 +267,30 @@ export function backRadius(back, y) {
   return Math.max(back[i], back[i + 1]);
 }
 
+/** The clothes' radius at torso height `y`, interpolated (backRadius errs outward; this follows the surface). */
+function surfaceRadius(back, y) {
+  const f = Math.min(BACK_N - 1, Math.max(0, (BACK_TOP - y) / BACK_STEP)), i = Math.min(BACK_N - 2, Math.floor(f));
+  return back[i] + (back[i + 1] - back[i]) * (f - i);
+}
+
 /**
  * profile must already be normalized (see cosmetics.normalizeProfile).
- * Returns { parts: { bone: BufferGeometry[] }, tail }, where tail is
- * { visible, seg2Z, len2, anchor: { y, z }, back } for the scarf tail.
+ * Returns { parts: { bone: BufferGeometry[] }, tail, armOut }, where tail is
+ * { visible, seg2Z, len2, anchor: { y, z }, back } for the scarf tail and
+ * armOut is how much wider (radians) the arms should hang to clear the clothes.
  */
 export function buildOutfit(p) {
   const c = resolve(p);
   const B = Object.fromEntries(BONES.map((k) => [k, []]));
   const tail = { visible: false, seg2Z: 0.21, len2: 0.2, anchor: { y: 0.52, z: -0.1 }, back: null };
+  // the outer surface of the clothes (without bags), for things that lie on them
+  const worn = backProfile({ ...p, extra: { style: 'none' } });
+  const R = (y) => surfaceRadius(worn, y);
   buildLegs(B, p, c);
-  buildTorso(B, p, c);
+  buildTorso(B, p, c, R);
   buildArms(B, p, c);
   buildNeck(B, p, c, tail);
-  buildExtra(B, p, c);
+  buildExtra(B, p, c, R);
   for (const g of B.torso) shapeBody(g);
   if (tail.back) {
     // the scarf tail rides over the shaped back
@@ -242,7 +303,9 @@ export function buildOutfit(p) {
     part(sph(0.058, 10, 6), c.skin, { y: 0.53, sy: 0.6 }),
   );
   buildHead(B, p, c);
-  return { parts: B, tail };
+  // long skirts of cloth at the hip: the arms hang a little wider to clear them
+  const armOut = { coat: 0.09, poncho: 0.04 }[p.top.style] ?? 0;
+  return { parts: B, tail, armOut };
 }
 
 // ------------------------------------------------------------------- legs
@@ -346,7 +409,7 @@ function shirtCollar(T, col) {
   );
 }
 
-function buildTorso(B, p, c) {
+function buildTorso(B, p, c, R) {
   const T = B.torso, top = p.top.style, tc = c.top, sc = c.shirt;
   // hips, belt and neck are always there
   if (p.bottom.style === 'skirt') {
@@ -376,24 +439,26 @@ function buildTorso(B, p, c) {
       part(cyl(0.24, 0.24, 0.025, 16, true, 0.5, TAU - 1.0), tc.dark, { y: 0.145 }),
     );
     shirtCollar(T, sc.base);
+    // a patch pocket on each side, with a buttoned flap
     for (const s of [-1, 1]) {
+      const a = s * 0.78;
       T.push(
-        part(box(0.09, 0.08, 0.025), tc.dark, { x: s * 0.13, y: 0.27, z: 0.218, ry: s * 0.55 }),
-        part(box(0.095, 0.03, 0.03), tc.base, { x: s * 0.13, y: 0.31, z: 0.222, ry: s * 0.55 }),
-        part(sph(0.012, 6, 4), BUCKLE, { x: s * 0.13, y: 0.3, z: 0.24, ry: s * 0.55 }),
+        band(tc.dark, R, [[a - 0.2, 0.255], [a + 0.2, 0.255]], 0.085, 0.008, 4),
+        band(tc.base, R, [[a - 0.22, 0.305], [a + 0.22, 0.305]], 0.036, 0.014, 4),
+        part(sph(0.013, 6, 4), BUCKLE, onBody(R, a, 0.298, 0.014)),
       );
     }
   } else if (top === 'sailor') {
     shirtBody(T, sc.base);
     // stripes around the body
     for (const y of [0.2, 0.27, 0.34, 0.41]) {
-      const r = 0.235 - ((y - 0.13) / 0.38) * 0.03 + 0.002;
-      T.push(part(tor(r, 0.013, 4, 20), tc.base, { y, rx: PI / 2 }));
+      const r = (yy) => 0.235 - ((yy - 0.13) / 0.38) * 0.03 + 0.004;
+      T.push(part(cyl(r(y + 0.013), r(y - 0.013), 0.026, 24, true), tc.base, { y }));
     }
     // the big square collar flap on the back and its front points
     T.push(
-      part(box(0.34, 0.17, 0.022), tc.base, { y: 0.46, z: -0.205, rx: 0.42 }),
-      part(box(0.34, 0.014, 0.024), sc.base, { y: 0.4, z: -0.23, rx: 0.42 }),
+      band(tc.base, R, [[PI - 0.95, 0.45], [PI + 0.95, 0.45]], 0.15, 0.01, 10),
+      band(sc.base, R, [[PI - 0.95, 0.4], [PI + 0.95, 0.4]], 0.014, 0.013, 10),
       part(cone(0.085, 0.14, 3), tc.base, { x: 0.07, y: 0.49, z: 0.15, rx: 1.25, rz: -0.45 }),
       part(cone(0.085, 0.14, 3), tc.base, { x: -0.07, y: 0.49, z: 0.15, rx: 1.25, rz: 0.45 }),
       part(sph(0.035, 8, 6), c.neck.base, { y: 0.44, z: 0.2, sx: 1.6, sz: 0.7 }),
@@ -408,7 +473,7 @@ function buildTorso(B, p, c) {
   } else if (top === 'poncho') {
     shirtBody(T, sc.base);
     T.push(
-      part(sph(0.205, 18, 6, 0, TAU, 0, PI / 2), tc.base, { y: 0.52, sy: 0.5 }),
+      part(sph(0.214, 18, 6, 0, TAU, 0, PI / 2), tc.base, { y: 0.52, sy: 0.5 }),
       part(tor(0.085, 0.02, 5, 14), tc.dark, { y: 0.575, rx: PI / 2 }),
     );
     // A front and a back panel drape from the shoulders to just over the
@@ -417,10 +482,10 @@ function buildTorso(B, p, c) {
     const panel = (r0, r1, h, y, col, a) => part(cyl(r0, r1, h, 9, true, a - PONCHO_HALF, PONCHO_HALF * 2), col, { y });
     for (const a of [0, PI]) {
       T.push(
-        panel(0.2, 0.35, 0.42, 0.31, tc.base, a),
+        panel(0.218, 0.35, 0.42, 0.31, tc.base, a),
         // ...with a lining, or the ink outline would show through the open
         // sides as a solid black inside
-        inward(part(cyl(0.197, 0.347, 0.42, 9, true, a - PONCHO_HALF, PONCHO_HALF * 2), tc.dark, { y: 0.31 })),
+        inward(part(cyl(0.215, 0.347, 0.42, 9, true, a - PONCHO_HALF, PONCHO_HALF * 2), tc.dark, { y: 0.31 })),
         panel(0.318, 0.322, 0.03, 0.19, tc.dark, a),
         panel(0.3, 0.304, 0.026, 0.24, sc.base, a),
         panel(0.352, 0.356, 0.04, 0.105, tc.dark, a),
@@ -436,12 +501,14 @@ function buildTorso(B, p, c) {
     shirtCollar(T, sc.base);
     T.push(
       part(cyl(0.232, 0.268, 0.5, 18, true, 0.45, TAU - 0.9), tc.base, { y: 0.24 }),
-      part(cyl(0.268, 0.3, 0.26, 18, true, 0.9, TAU - 1.8), tc.base, { y: -0.12 }),
-      part(cyl(0.3, 0.302, 0.03, 18, true, 0.9, TAU - 1.8), tc.dark, { y: -0.24 }),
+      // the skirts flare enough to cover a skirt worn underneath
+      part(cyl(0.268, 0.335, 0.26, 18, true, 0.9, TAU - 1.8), tc.base, { y: -0.12 }),
+      part(cyl(0.335, 0.337, 0.03, 18, true, 0.9, TAU - 1.8), tc.dark, { y: -0.24 }),
     );
     for (const s of [-1, 1]) {
-      T.push(part(box(0.075, 0.17, 0.02), tc.dark, { x: s * 0.095, y: 0.41, z: 0.205, ry: s * 0.45, rz: s * 0.25 }));
-      for (const y of [0.2, 0.28, 0.36]) T.push(part(sph(0.016, 6, 4), GOLD, { x: s * 0.115, y, z: 0.235 }));
+      // lapels, and a row of buttons down each front edge
+      T.push(band(tc.dark, R, [[s * 0.5, 0.5], [s * 0.62, 0.33]], 0.07, 0.008, 5));
+      for (const y of [0.2, 0.28, 0.36]) T.push(part(sph(0.017, 6, 4), GOLD, onBody(R, s * 0.66, y, 0.006)));
     }
   }
 }
@@ -512,12 +579,12 @@ function buildNeck(B, p, c, tail) {
       // whatever is worn round the shoulders, so it hangs over the clothes.
       const back = backProfile(p);
       let shoulder = 0;
-      for (let y = 0.44; y <= 0.56; y += BACK_STEP) shoulder = Math.max(shoulder, backRadius(back, y));
+      for (let y = 0.5; y <= 0.6; y += BACK_STEP) shoulder = Math.max(shoulder, backRadius(back, y));
       const ring = 0.17, az = Math.max(ring, shoulder + 0.025);
       tail.back = back;
-      tail.anchor = { y: 0.51, z: -az };
+      tail.anchor = { y: 0.55, z: -az };
       T.push(part(sph(0.06, 10, 8), base, {
-        x: 0.02, y: 0.515, z: -(ring + az) / 2, sx: 1.25, sy: 0.85, sz: Math.max(1, ((az - ring) / 2 + 0.02) / 0.06),
+        x: 0.02, y: 0.555, z: -(ring + az) / 2, sx: 1.1, sy: 0.75, sz: Math.max(1, ((az - ring) / 2 + 0.02) / 0.06),
       }));
     }
     if (grand) {
@@ -564,24 +631,28 @@ function buildNeck(B, p, c, tail) {
 }
 
 // ----------------------------------------------------------------- extras
-function buildExtra(B, p, c) {
+function buildExtra(B, p, c, R) {
   const T = B.torso, st = p.extra.style, ec = c.extra;
-  const R = CHEST_R[p.top.style] ?? 0.232;
+  const top = p.top.style;
   if (st === 'satchel') {
-    const bagX = { coat: 0.31 }[p.top.style] ?? 0.28;
-    // the poncho's panels slope out toward the hem, so the strap leans with them
-    const lean = p.top.style === 'poncho' ? 0.34 : 0;
-    T.push(
-      // strap across the chest (right shoulder → left hip)
-      part(box(0.045, 0.62, 0.02), ec.dark, { y: 0.3, z: R, rz: 0.72, rx: -lean }),
-      part(box(0.045, 0.62, 0.02), ec.dark, { y: 0.3, z: -R, rz: -0.72, rx: lean }),
-      // bag on the left hip
-      part(box(0.08, 0.16, 0.2), ec.base, { x: bagX, y: 0.06, z: 0.02 }),
-      part(box(0.09, 0.07, 0.21), ec.dark, { x: bagX + 0.005, y: 0.12, z: 0.02 }),
-      part(box(0.03, 0.035, 0.035), BUCKLE, { x: bagX + 0.05, y: 0.09, z: 0.02 }),
-    );
+    // One strap from the bag, up across the chest, over the right shoulder
+    // and down the back to the bag again. The bag hangs behind the left hip,
+    // clear of the arm.
+    const bagA = 2.2, bagY = 0.1;
+    T.push(band(ec.dark, R, [
+      [bagA, bagY + 0.03], [1.45, 0.16], [0.5, 0.27], [-0.4, 0.44], [-0.85, 0.552],
+      [-PI / 2, 0.572],
+      [-PI + 0.85, 0.552], [-PI + 0.4, 0.44], [-PI - 0.5, 0.27], [bagA - TAU + 0.5, 0.16], [bagA - TAU, bagY + 0.03],
+    ], 0.042, 0.012, 5));
+    // the bag is a solid thing: placed on the shaped hip, not reshaped with the cloth
+    const r = R(bagY) + 0.006, x = r * Math.sin(bagA) * bodyWidth(bagY), z = r * Math.cos(bagA) * bodyDepth(bagY);
+    T.push(rigid(group([
+      part(box(0.07, 0.15, 0.18), ec.base, { x: 0.035, y: -0.045 }),
+      part(box(0.078, 0.065, 0.19), ec.dark, { x: 0.037, y: 0.01 }),
+      part(box(0.02, 0.032, 0.032), BUCKLE, { x: 0.08, y: -0.02 }),
+    ], { x, y: bagY, z, ry: Math.atan2(x, z) - PI / 2 + 0.25 })));
   } else if (st === 'backpack') {
-    const z = -(R + 0.07);
+    const z = -((CHEST_R[top] ?? 0.232) + 0.07);
     T.push(
       part(box(0.3, 0.3, 0.14), ec.base, { y: 0.3, z }),
       part(box(0.31, 0.11, 0.152), ec.dark, { y: 0.41, z }),
@@ -589,12 +660,18 @@ function buildExtra(B, p, c) {
       part(box(0.03, 0.035, 0.02), BUCKLE, { y: 0.37, z: z - 0.08 }),
       part(cyl(0.055, 0.055, 0.34, 10), '#e8dcc0', { y: 0.5, z, rz: PI / 2 }), // bedroll
     );
-    const poncho = p.top.style === 'poncho';
+    // shoulder straps: up the chest, over the shoulder and down to the pack
+    const X = 0.105;
     for (const s of [-1, 1]) {
-      T.push(
-        part(box(0.04, 0.3, 0.02), ec.dark, { x: s * 0.11, y: 0.33, z: poncho ? 0.252 : R - 0.002, rx: poncho ? -0.34 : 0 }),
-        part(box(0.04, 0.02, 0.37), ec.dark, { x: s * 0.11, y: 0.572, z: -0.01 }),
-      );
+      const front = [], rear = [];
+      for (let y = 0.17; y <= 0.6; y += 0.03) {
+        const r = R(y);
+        if (r < X + 0.015) break;
+        const a = Math.asin(X / r);
+        front.push([s * a, y]);
+        if (y > 0.3) rear.unshift([s * (PI - a), y]);
+      }
+      T.push(band(ec.dark, R, [...front, ...rear], 0.04, 0.012, 2));
     }
   }
 }
