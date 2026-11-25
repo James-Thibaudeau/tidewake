@@ -110,7 +110,7 @@ Updated 2026-11-25.
   - [x] The Elder Tree at sea: a giant, detailed landmark tree with roots,
     an owl hollow, drifting clouds, birds and fireflies
     ([#20](https://github.com/James-Thibaudeau/tidewake/pull/20))
-  Phase 4 is split into thirteen smaller PRs, 4.0 to 4.12: see *Phase 4 in
+  Phase 4 is split into fourteen smaller PRs, 4.0 to 4.12: see *Phase 4 in
   smaller PRs* in [feature-plan.md](feature-plan.md). Every landmark PR also
   rebuilds that landmark's sea view to the Elder Tree's standard.
   - [x] 4.1 The Elder Grove as a walkable level (design in
@@ -271,7 +271,72 @@ Updated 2026-11-25.
       summit rock's invisible wall bulges into the straight line between
       two wide ledges at their joint; a player brushes it and steers round.
     - Not done: Archway Isle (4.5); a look on a phone; a play by hand.
-  - [ ] 4.5 Archway Isle
+  - [ ] 4.5 Archway Isle, in two PRs: 4.5a the walkable level and the arch
+    at sea, 4.5b the story and the crab report. Design in
+    [archway-isle-level.md](archway-isle-level.md).
+    - [x] 4.5a ([#39](https://github.com/James-Thibaudeau/tidewake/pull/39)):
+      - The island is a U round a bay (`world.js`, `bayFor`), and the arch
+        spans the mouth, so you sail in through it. The channel is carved
+        through the offshore shelf; you can land from inside the bay
+        (`inBay`); the chart draws the bay.
+      - The arch at sea is new (`sea-arch.js`): banded rock, an undercut
+        waterline, rubble, pines on its back, gulls circling and sitting on
+        the ledges, surf at the legs as the waves come through, a squall that
+        drifts past out to sea now and then, and crabs on the underside. The
+        old `arch` prop is gone.
+      - The walkable level (`archway-layout.js`, `archway.js`,
+        `archway-art.js`): the cove and the storm cave (the vault), the
+        gully's terraces, the cliff top, the traverse round the bay's west
+        wall and out along the mouth, over the arch to the keystone, and the
+        seaward stack (optional) with the chest. No story yet: Journal IV
+        is still at the beach camp, and the chest holds an ordinary piece.
+      - A face camera for cliff faces (`camera.js`, `level.faces`): out over
+        the water, looking in at the rock.
+      - The climb-down prompt takes its lanterns and wording from the level
+        ("Climb down to the cove" from the keystone and the stack).
+      - `node tools/check.mjs archway`: the layout's limits, and the test
+        climber from the cove over the arch (56 s, 35 jumps) and up the
+        stack (11 s more, 13 jumps); 3 hops need a second try.
+      - The rock (`archway-art.js`): ledges are shelves of rock growing out
+        of the wall, deep where they meet it and thin at the lip, with turf
+        in patches; the sea stacks are lumpy banded columns; rock is
+        coloured a face at a time (`bandFaces`), so bands stay level and
+        crisp, and the terrain's cliffs, whose faces are too tall to band,
+        take tones that vary along the cliff instead. The handline's pins sit
+        on the rock.
+      - Gulls (`archway-life.js`): a few wheel over the bay by day; the rest
+        sit on ledges, the inlet's stacks, the arch's back, the stack's top
+        and the cove, lift off with a cry (`audio` 'gull') when you come
+        within 4.5 m, circle out over the water and come back once you've
+        moved on. Decor only: the gulls that swoop are 4.12.
+      - Played through the real game loop by a scripted pilot steering the
+        stick by the camera (stick → camera → controller, with pickups,
+        lanterns, splashes, prompts, the gulls and the cameras all live):
+        cove to the east arm in 60 s and up the stack in 13 s, no splashes,
+        every lantern lit, the chest opened, back to the ship by the rowboat.
+        It found and fixed: the face camera snapped about 70° in one frame
+        at the corner into the mouth (it now blends the wall's way in and
+        eases round), the shoulder's lantern stood off the path, and the
+        stack's lantern and chest were off to one side of where you arrive.
+      - Looked at in the preview, at desktop and phone sizes. Landing from
+        inside the bay works.
+      - Fixes after a play by hand (2026-11-25):
+        - You sank into the ground on the gully and at the start of the
+          stack. The terrain mesh draws straight lines between grid points
+          1.1 m apart, but you walked on the exact height function, so on
+          sharp changes (the gully's terraces) the drawn ground rose
+          through your feet. Now you walk on the mesh's own triangles
+          (`groundH` in `archway-layout.js`, from the same grid
+          `archway.js` draws), and the gully's terraces are stone steps
+          (pieces) over a floor a step lower.
+        - The arch's rock carried on, flat, past the arms' edges, so by the
+          stack you waded through it. Over the arms it now goes no higher
+          than the ground.
+        - Boulders on the cliff tops and the beach are solid.
+        - The storm cave: the camera was pushed in close by the narrow nook
+          and could end up inside its overhang. The cave is wider and
+          deeper, its lintel high and solid, and the camera looks straight
+          in while you're at it (a `faces` entry).
   - [ ] 4.6 Tropical islands and 4.7 the Sunken Temple
   - [ ] 4.8 Volcanic islands (with the steam-vent launch) and 4.9 Mount
     Cinderhorn

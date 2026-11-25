@@ -12,7 +12,7 @@ dependencies to install.** It deploys from `main` to GitHub Pages as-is.
   also opens with a comment saying what it owns.
 - Designs: `docs/feature-plan.md` (not built yet), `docs/shipped-plans.md`
   (built; reference only, 550 lines, read one section), `docs/rival-captain.md`,
-  `docs/elder-grove-level.md`.
+  `docs/elder-grove-level.md`, `docs/archway-isle-level.md`.
 
 ## Check your work
 
@@ -25,8 +25,9 @@ that every import resolves to a real export and is used, that no helper was
 left behind when code moved between files, text keys (`LINES.x`), element
 ids, save migration, 150 generated ashore layouts per landable biome, a test
 climber (the real controller) that walks 12 generated islands per biome to
-the summit, and the Elder Grove (its limits, and the climber from the beach
-to the crown). One group at a time:
+the summit, the Elder Grove (its limits, and the climber from the beach
+to the crown) and Archway Isle (its limits, and the climber from the cove
+over the arch and up the stack). One group at a time:
 `node tools/check.mjs imports`.
 
 It can't see rendering or behaviour. For those, use the browser: the game
@@ -115,7 +116,7 @@ game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, 
   `src/boat/` (see the header of each core file for the map). Methods are
   called as `this.method()` wherever they live, so grep the method name to
   find it. New methods go in the part file that fits.
-- **Pure modules stay pure**: `ashore/modules.js`, `ashore/grove-layout.js`, `collide.js`,
+- **Pure modules stay pure**: `ashore/modules.js`, `ashore/grove-layout.js`, `ashore/archway-layout.js`, `collide.js`,
   `controller.js`, `shapes.js`, `save.js`, `config.js`, `util.js`,
   `cosmetics.js` and the text files import no three.js and touch no DOM at
   load, so `tools/check.mjs` can run them in Node. Keep it that way.

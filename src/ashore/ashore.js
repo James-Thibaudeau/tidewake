@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 import { toonMaterial, glowBoost } from '../toon.js';
 import { ASHORE, ASHORE_BIOMES } from '../config.js';
-import { edgeFactor } from '../world.js';
+import { edgeFactor, inBay } from '../world.js';
 import { propMesh, part, merge, propMaterial, thinOutline } from '../props.js';
 import { STYLES, owns } from '../cosmetics.js';
 import { siteBeam, MAP_FRAGMENT } from '../quests.js';
@@ -21,12 +21,13 @@ import { LINES } from '../story-text.js';
 import { generateLevel } from './levelgen.js';
 import { buildWreckLevel } from './wreck.js';
 import { buildGroveLevel } from './grove.js';
+import { buildArchwayLevel } from './archway.js';
 import { CharacterController } from './controller.js';
 import { FollowCamera } from './camera.js';
 import { LandRace } from './pacer.js';
 
 // Hand-built levels for landmark islands, by island.landmark; the rest are generated.
-const LANDMARK_LEVELS = { grove: buildGroveLevel };
+const LANDMARK_LEVELS = { grove: buildGroveLevel, arch: buildArchwayLevel };
 
 // ------------------------------------------------------------- pickup art
 let coinGeo = null, pileGeo = null, postGeo = null, handGeo = null, bundleGeo = null, scrollGeo = null, fittingGeo = null;
@@ -106,7 +107,7 @@ export class Ashore {
       const a = Math.atan2(z - I.z, x - I.x);
       const shore = I.r * edgeFactor(I, a);
       const d = Math.hypot(x - I.x, z - I.z);
-      if (d > shore - 5 && d < shore + range) return I;
+      if ((d > shore - 5 && d < shore + range) || inBay(I, x, z)) return I;
     }
     return null;
   }
@@ -495,8 +496,9 @@ export class Ashore {
     const st = g.story;
     // a lit lantern high up a climb: the quick way back down
     const fb = L.fallBack;
-    if (fb?.down && this.splashT <= 0 && this.lanterns.some((c) => c.lit && c.y - fb.down.y > fb.below && Math.hypot(c.x - p.x, c.z - p.z) < 2 && Math.abs(c.y - p.y) < 1.2)) {
-      prompt = 'Climb down to the roots'; action = () => this.climbDown();
+    const high = (c) => (fb.from ? fb.from.includes(c.id) : c.y - fb.down.y > fb.below);
+    if (fb?.down && this.splashT <= 0 && this.lanterns.some((c) => c.lit && high(c) && Math.hypot(c.x - p.x, c.z - p.z) < 2 && Math.abs(c.y - p.y) < 1.2)) {
+      prompt = fb.label || 'Climb down to the roots'; action = () => this.climbDown();
     }
     if (L.spots && st) {
       if (near(L.spots.table)) {

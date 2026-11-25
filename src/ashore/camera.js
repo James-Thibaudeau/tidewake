@@ -8,6 +8,10 @@
 // tree and jumps go across the screen, where gaps are easy to judge. A drag
 // there is kept as an offset from that view until you leave the tree.
 //
+// Along a cliff face (level.faces, e.g. Archway Isle's traverse) it hangs
+// out over the water and looks straight in at the rock, the same way, so left
+// and right run along the ledges.
+//
 // Under a bough or a ledge it ducks: it looks along more level, from below
 // the thing overhead, instead of rising into it.
 import { raycast } from './collide.js';
@@ -38,6 +42,7 @@ export class FollowCamera {
     this.hubOff = 0;       // the view's turn away from "straight at the trunk"
     this.hubManual = false; // the player set that turn by dragging
     this.lead = 0;
+    this.faceIn = 0;       // on a cliff face: the eased way in at the rock
     this.duck = 0;         // 0..1: how far the view has dropped to get under something overhead
     this.solid = null;     // the level minus thin things, for pull-in checks
   }
@@ -65,6 +70,33 @@ export class FollowCamera {
     if (this.level.hubs) return this.level.hubs;
     const b = this.level.layout?.branches;
     return Array.isArray(b) ? b.map((x) => x.tree).filter(Boolean) : [];
+  }
+
+  /**
+   * The cliff face you're on, if any (level.faces: { path: [[x, z]…] along the
+   * rock, the water on its left; base, top; reach }), and the way in at it:
+   * { face, inward } or null. The way in is a blend of every stretch of the
+   * path near you, the nearer the more, so it turns smoothly round corners.
+   */
+  faceAt(p) {
+    let best = null;
+    for (const f of this.level.faces || []) {
+      if (p.y < f.base || p.y > f.top) continue;
+      let sx = 0, sz = 0, dmin = Infinity;
+      for (let i = 1; i < f.path.length; i++) {
+        const [ax, az] = f.path[i - 1], [bx, bz] = f.path[i];
+        const dx = bx - ax, dz = bz - az, l = Math.hypot(dx, dz);
+        const t = Math.max(0, Math.min(1, ((p.x - ax) * dx + (p.z - az) * dz) / (l * l)));
+        const d = Math.hypot(p.x - (ax + dx * t), p.z - (az + dz * t));
+        if (d > f.reach + 3) continue;
+        // the water is on the path's left: inward is to its right, (dz, -dx)
+        const w = 1 / (d + 0.6) ** 3;
+        sx += (dz / l) * w; sz += (-dx / l) * w;
+        dmin = Math.min(dmin, d);
+      }
+      if (dmin <= f.reach && (!best || dmin < best.d)) best = { face: f, d: dmin, inward: Math.atan2(sx, sz) };
+    }
+    return best;
   }
 
   /** Jump straight to a framing behind the character (on arrival, after a respawn). */
@@ -126,6 +158,7 @@ export class FollowCamera {
       const d = Math.hypot(h.x - p.x, h.z - p.z);
       if (d < (h.orbit || 2.5) + 2.2 && p.y > h.base + 0.6 && !(p.y > h.top) && d < hd) { hub = h; hd = d; }
     }
+    const face = hub ? null : this.faceAt(p);
     if (hub && hd > 0.8) {
       const inward = Math.atan2(hub.x - p.x, hub.z - p.z);
       // arriving: start from the view we had and ease round; a drag is kept
@@ -141,6 +174,15 @@ export class FollowCamera {
       this.yaw = inward + this.hubOff + this.lead;
       // stand further back round a big trunk, to see more of the way round
       pitchT = Math.max(pitchT, 0.5); extraT = Math.max(extraT, 1.6 + Math.min(2.4, (hub.orbit || 2.5) * 0.2));
+    } else if (face) {
+      // on a cliff face: out over the water, looking in at the rock; a drag is
+      // kept. The way in eases round the wall's bends rather than snapping.
+      if (this.hub !== face.face) { this.hub = face.face; this.faceIn = face.inward; this.hubOff = wrap(this.yaw - face.inward); this.hubManual = false; }
+      this.faceIn += wrap(face.inward - this.faceIn) * (1 - Math.exp(-4 * dt));
+      if (look.dx) { this.hubOff = wrap(this.yaw - this.faceIn); this.hubManual = true; }
+      else if (!this.hubManual) this.hubOff = damp(this.hubOff, 0, 2.2, dt);
+      this.yaw = this.faceIn + this.hubOff;
+      pitchT = Math.max(pitchT, 0.38); extraT = Math.max(extraT, 2.6);
     } else if (moving && sp > 0.6 && idle > 0.6) {
       this.hub = null;
       // swing in behind the direction of travel
@@ -149,7 +191,7 @@ export class FollowCamera {
       // walking straight at the camera shouldn't spin it round
       if (Math.abs(off) < 2.3) this.yaw += off * (1 - Math.exp(-(0.8 + 2.4 * Math.min(1, sp / 4.5)) * dt));
     }
-    if (!hub) this.hub = null;
+    if (!hub && !face) this.hub = null;
     if (idle > 1.2) this.pitch = damp(this.pitch, pitchT, 1.4, dt);
     this.extra = damp(this.extra, extraT, 1.5, dt);
 

@@ -99,13 +99,16 @@ src/
                   pieces.js (island levels), wreck.js (grandfather's wreck, hand-built),
                   grove.js + grove-layout.js (the Elder Grove, hand-built) + grove-art.js
                   (its bark, moss and fungus) + grove-life.js (its owl guide and fireflies),
+                  archway.js + archway-layout.js + archway-art.js (Archway Isle, hand-built)
+                  + archway-life.js (its gulls),
                   controller.js + collide.js (movement), camera.js, pacer.js (races on foot),
                   shapes.js (the collider shapes they all share)
   cosmetics.js    wardrobe catalogue: palettes, styles, unlock sources, appearance profile
   creator.js      character creator / port wardrobe (studio scene + panel)
-  world.js        procedural islands, terrain height, island streaming
+  world.js        procedural islands, terrain height (and Archway Isle's bay), island streaming
   props.js        low-poly prop library (trees, huts, lighthouse, rocks, chests…)
   elder-tree.js   the Elder Tree landmark, as seen from the sea
+  sea-arch.js     the great arch of Archway Isle, as seen from the sea
   boat.js         the Boat class (the player's boat and the Redwing): sailing physics, collisions
   boat/           the rest of Boat: model.js (hull, mast, sails), fittings.js (helm, keel, lanterns,
                   crow's nest), rig.js (upgrades, rig layout, animation), parts.js (shared textures and helpers)
@@ -131,7 +134,7 @@ src/
                   subjects.js (what it can show), presets.js (poses, lights, views), sheets.js (contact sheets)
 tools/
   serve.py        static dev server, caching off
-  check.mjs       quick checks in Node: syntax, imports, text keys, element ids, the gallery, saves, ashore layouts, the grove climb
+  check.mjs       quick checks in Node: syntax, imports, text keys, element ids, the gallery, saves, ashore layouts, the grove and Archway climbs
 docs/
   STATUS.md       what has shipped, what's next, known issues
   feature-plan.md designs for phases not built yet; shipped-plans.md keeps the designs of built ones

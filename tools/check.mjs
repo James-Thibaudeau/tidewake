@@ -2,7 +2,7 @@
 // Fast checks that need no browser and no dependencies:
 //
 //   node tools/check.mjs            everything (about a second)
-//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | layout | climb | grove
+//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | layout | climb | grove | archway
 //   node tools/check.mjs layout 500 layouts for 500 synthetic islands (default 150)
 //
 // Run it after every change. It catches the mistakes that otherwise only show
@@ -392,6 +392,20 @@ const checks = {
     const crown = climb(L.crown, 'crown');
     const s = v.stats;
     return { errors, note: `${s.pieces} pieces, ${s.coins} coins; to the owl bough in ${main.toFixed(0)} s (${s.jumps} jumps), the crown in ${crown.toFixed(0)} s more (${s.crownJumps} jumps)` };
+  },
+
+  // Archway Isle: the layout keeps its design limits, and a test climber gets
+  // from the cove over the arch, and on up the seaward stack.
+  async archway() {
+    const { buildArchwayLayout, validateArchway } = await load('ashore/archway-layout.js');
+    const L = buildArchwayLayout();
+    const v = validateArchway(L);
+    const errors = [...v.errors];
+    const climber = await testClimber();
+    const main = climber(L, L.route, 'main', errors, 2);
+    const stack = climber(L, L.stack, 'stack', errors, 2);
+    const s = v.stats;
+    return { errors, note: `${s.pieces} pieces, ${s.coins} coins; cove to the east arm in ${main.toFixed(0)} s (${s.jumps} jumps), the stack in ${stack.toFixed(0)} s more (${s.stackJumps} jumps); ${climber.stats.retries} hops needed a second try` };
   },
 };
 
