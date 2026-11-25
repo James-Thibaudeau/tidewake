@@ -19,7 +19,7 @@ Decisions already made:
 
 ## Status
 
-Updated 2026-11-23. The phase sections below are the original plan; this
+Updated 2026-11-24. The phase sections below are the original plan; this
 section records what has shipped and what's left. Keep it current when a
 pull request merges.
 
@@ -65,6 +65,12 @@ pull request merges.
   - Fix: the compass follows the camera on foot, and moat water lies still.
   - Fix: a story find ashore (the spyglass) no longer pulls the explorer
     back to the helm.
+  - Extra: the wreck at sea is the same ship you walk on, larger and far
+    more detailed (two broken masts with a tattered sail, rigging, paintwork,
+    portholes, gulls, a stern lantern), and she's broken in two on a dark
+    reef: the bow is jammed on the rocks, and the stern with the cabin has
+    torn away and rolled over. Ashore, torn planking hangs across the break
+    to the stern ([#19](https://github.com/James-Thibaudeau/tidewake/pull/19)).
 
 ### Next up
 
@@ -436,8 +442,9 @@ that the chart, the spyglass and actually exploring all matter.
 #### Later phases
 
 - **Phase 3:** the wreck becomes the **first ashore level**, a short,
-  safe tutorial walk across the beached hull to the captain's cabin. It
-  teaches moving and jumping right after the sailing tutorial.
+  safe tutorial walk across the broken hull to the captain's cabin in the
+  torn-off stern. It teaches moving and jumping right after the sailing
+  tutorial.
 - **Phase 4:** journals III–VII move from the beach camps into the
   corresponding landmark levels' vaults. The camp stays as the landing spot,
   with a note pointing inland. Journal II stays at a beach camp so early play

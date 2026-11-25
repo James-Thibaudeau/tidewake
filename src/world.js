@@ -6,6 +6,7 @@ import { mulberry32, noise2, fbm2, clamp, smoothstep, TAU, headingOf } from './u
 import { PROPS, propMaterial, propOutline, thinOutline, part, merge, propMesh } from './props.js';
 import { toonGradient, toonMaterial } from './toon.js';
 import { WAVE_GLSL, waveUniforms } from './waves.js';
+import { buildWreckModel, WRECK_STACKS, WRECK_SOLID, WRECK_MOORING } from './ashore/wreck.js';
 
 const PREFIX = ['Gull', 'Coral', 'Ember', 'Whale', 'Mist', 'Thorn', 'Kelp', 'Sable', 'Amber', 'Moss',
   'Drift', 'Shell', 'Pebble', 'Storm', 'Sun', 'Moon', 'Star', 'Otter', 'Heron', 'Crab', 'Pelican',
@@ -196,16 +197,12 @@ export class World {
       if (pts.some((p) => depth(p.x, p.z) > -6)) continue;
       if (this.islands.some((I) => I !== H && Math.hypot(I.x - x, I.z - z) < I.bound + 120)) continue;
       if (this.reefs.some((R) => Math.hypot(R.x - x, R.z - z) < 200)) continue;
+      // the rocks round her bow, then the hull and her shingle bank (ship space:
+      // x across, z towards the bow; see ashore/wreck.js, which shares the layout)
       const rocks = [];
-      const big = P(16, 2);
-      rocks.push({ x: big.x, z: big.z, r: 7, h: 19, type: 'stack' });
-      for (const [k, s, r, h] of [[21, 9, 3.8, 10], [19, -8, 3.4, 7], [26, 1, 3, 6], [10, 11, 2.6, 4], [28, -7, 2.4, 3.5]]) {
-        const p = P(k, s);
-        rocks.push({ x: p.x, z: p.z, r: r + rng() * 0.6, h: h + rng() * 2, type: 'stack' });
-      }
-      // the hull itself blocks the boat too
-      for (const k of [-7, 0.5, 8]) { const p = P(k); rocks.push({ x: p.x, z: p.z, r: 4.4, h: 0, type: 'hidden' }); }
-      const sp = P(-24);
+      for (const R of WRECK_STACKS) { const p = P(R.z, R.x); rocks.push({ x: p.x, z: p.z, r: R.r, h: R.h, type: 'stack' }); }
+      for (const R of WRECK_SOLID) { const p = P(R.z, R.x); rocks.push({ x: p.x, z: p.z, r: R.r, h: 0, type: 'hidden' }); }
+      const sp = P(WRECK_MOORING.z, WRECK_MOORING.x);
       const W = { id: 'wreck', isReef: true, wreck: true, name: "Grandfather's Wreck", x, z, heading: hd,
         bound: 55, rocks, searchPoint: { x: sp.x, z: sp.z } };
       W.bound2 = W.bound * W.bound;
@@ -572,12 +569,12 @@ export class IslandStreamer {
       rec.beacon = beacon;
     }
     if (F.wreck) {
-      // ran aground: bow raised on the rocks, rolled onto her side, half under
-      const ship = propMesh('wreckShip');
-      ship.rotation.set(-0.12, F.heading, 0.4, 'YXZ');
-      ship.position.set(0, -2.0, 0);
-      ship.scale.setScalar(1.5); // a proper explorer's ship, bigger than your first boat
-      group.add(ship);
+      // broken in two on her reef: the same ship you can walk on (see ashore/wreck.js)
+      const M = buildWreckModel({ sea: true });
+      M.group.rotation.y = F.heading;
+      for (const m of [M.terrain, M.ship, M.sternShip]) m.userData.own = true;
+      for (const o of [M.outline, M.sternOutline, ...M.props]) if (o.material === thinOutline) o.userData.lod = 'outline';
+      group.add(M.group);
     }
     this.buildRocks(F, group);
     this.scene.add(group);

@@ -293,49 +293,6 @@ function seaStack() {
   return merge([part(body, '#8a8178', { y: 0.5 }), part(top, '#6fae55', { y: 1.0 })]);
 }
 
-// Grandfather's ship, run aground: a broken hull lying along +z (bow at +z),
-// snapped mast, torn sail and a scrap of red pennant. ~16 long, built
-// upright; the world tilts it against the rocks.
-function wreckShip() {
-  const WOOD = '#6a4527', DARK = '#3b2614', DECK = '#9a7046', RIB = '#7a5333', SAIL = '#e9dcbc', RED = '#c8322b';
-  const P = [];
-  // hull: half-pipe lying along z, open side up
-  const hull = new THREE.CylinderGeometry(2.7, 2.7, 13, 12, 3, true, -Math.PI / 2, Math.PI); // lower half once laid along z
-  P.push(part(jitter(hull.toNonIndexed(), 0.12, 21), WOOD, { rx: Math.PI / 2, sy: 1, sx: 1, sz: 1, y: 2.2, z: -0.5 }));
-  // bow and stern caps
-  P.push(part(jitter(new THREE.ConeGeometry(2.7, 4.2, 12, 1, true, -Math.PI / 2, Math.PI).toNonIndexed(), 0.1, 5), WOOD, { rx: Math.PI / 2, y: 2.2, z: 8.1 }));
-  P.push(part(new THREE.BoxGeometry(5.2, 2.6, 0.35), DARK, { y: 1.4, z: -7.0 }));
-  // keel and gunwales
-  P.push(part(new THREE.BoxGeometry(0.4, 0.5, 15.5), DARK, { y: -0.45, z: 0.5 }));
-  for (const sx of [-1, 1]) P.push(part(new THREE.BoxGeometry(0.35, 0.35, 12.5), DARK, { x: sx * 2.65, y: 2.25, z: -0.6, ry: sx * 0.015 }));
-  // deck planks: the stern half has caved in, leaving gaps
-  for (let i = 0; i < 9; i++) {
-    const z = 5.6 - i * 1.35;
-    if (i === 5 || i === 7) continue; // missing planks
-    const w = i > 5 ? 3.2 + (i % 2) * 0.8 : 4.9;
-    P.push(part(new THREE.BoxGeometry(w, 0.18, 1.25), i % 2 ? DECK : '#8a6238', { x: i > 5 ? (i % 2 ? 0.7 : -0.6) : 0, y: 1.65 - (i > 5 ? 0.25 : 0), z, rz: i > 5 ? (i % 2 ? 0.12 : -0.1) : 0 }));
-  }
-  // exposed ribs where the planks are gone
-  for (const z of [-3.2, -4.6, -6.0]) {
-    for (const sx of [-1, 1]) P.push(part(new THREE.BoxGeometry(0.22, 2.3, 0.28), RIB, { x: sx * 2.25, y: 1.2, z, rz: sx * 0.35 }));
-  }
-  // a breach in the hull side
-  P.push(part(new THREE.BoxGeometry(0.2, 1.3, 2.4), DARK, { x: 2.62, y: 1.2, z: 1.8, ry: 0.02 }));
-  // mast stump with the red pennant, and the snapped top lying across the deck
-  P.push(part(new THREE.CylinderGeometry(0.32, 0.38, 4.4, 8), DARK, { y: 3.7, z: 1.5 }));
-  P.push(part(new THREE.ConeGeometry(0.42, 0.7, 6), '#d9c7a0', { y: 6.0, z: 1.5, rx: 0.5 }));
-  P.push(part(new THREE.BoxGeometry(0.06, 0.8, 1.6), RED, { y: 5.5, z: 2.35, ry: 0.15, rx: 0.1 }));
-  P.push(part(new THREE.CylinderGeometry(0.26, 0.3, 9.5, 8), DARK, { x: -1.2, y: 2.4, z: -1.4, rz: 1.25, ry: 0.5 }));
-  // torn sail draped over the broken mast and the rail
-  P.push(part(jitter(new THREE.BoxGeometry(4.6, 0.08, 3.8, 4, 1, 3).toNonIndexed(), 0.18, 11), SAIL, { x: -2.2, y: 2.3, z: -1.6, rz: 0.55, ry: 0.4 }));
-  P.push(part(jitter(new THREE.BoxGeometry(2.2, 0.08, 1.6, 2, 1, 2).toNonIndexed(), 0.14, 7), SAIL, { x: -3.6, y: 0.6, z: 0.4, rz: 1.25 }));
-  // bowsprit, a barrel and a crate spilled on deck
-  P.push(part(new THREE.CylinderGeometry(0.16, 0.22, 4.5, 6), DARK, { y: 3.0, z: 11.4, rx: 1.2 }));
-  P.push(part(new THREE.CylinderGeometry(0.55, 0.55, 1.2, 8), '#8a5a32', { x: 1.2, y: 2.3, z: 4.2, rz: 1.4 }));
-  P.push(part(new THREE.BoxGeometry(1.1, 1.1, 1.1), '#a07040', { x: -1.0, y: 2.25, z: 5.6, ry: 0.6 }));
-  return merge(P);
-}
-
 // One of grandfather's old beach camps: a weathered tent, a stone cairn and a
 // tall pole with his red pennant, so it can be spotted from the water.
 function camp() {
@@ -456,7 +413,7 @@ export function initProps() {
     berryBush: berryBush(), grassTuft: grassTuft(), pebble: pebble(), rock: rock(), darkRock: rock('#4d4440', 7),
     snowRock: rock('#c9d3dc', 11), seaStack: seaStack(), hut: hut(), lighthouse: lighthouse(),
     pillar: pillar(), barrel: barrel(), crate: crate(), chest: chest(), bigTree: bigTree(), arch: arch(),
-    wreckShip: wreckShip(), camp: camp(),
+    camp: camp(),
   });
   return PROPS;
 }
