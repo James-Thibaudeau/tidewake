@@ -82,7 +82,8 @@ Notes:
 - Which cosmetic goes with which landmark (after the flower crown) is a
   suggestion, to be settled in each landmark's design.
 - Each landmark gets a short design file like
-  [elder-grove-level.md](elder-grove-level.md) before it is built.
+  [elder-grove-level.md](elder-grove-level.md) before it is built. Archway
+  Isle's is drafted: [archway-isle-level.md](archway-isle-level.md).
 - 4.12 can land any time after 4.4; it is last because nothing waits on it.
 
 ---
