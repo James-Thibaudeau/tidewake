@@ -93,7 +93,7 @@ pull request merges.
   against them, jumps have rise, apex and fall poses, and landings sink on a
   spring. At the helm the feet stay flat on the deck and the knees give.
   Every outfit is refitted through one body-shape field in `outfits.js`
-  ([#PRNUM](https://github.com/James-Thibaudeau/tidewake/pull/PRNUM)).
+  ([#30](https://github.com/James-Thibaudeau/tidewake/pull/30)).
   - Not yet done: playing it by hand on a real phone, and a pass over
     Sable's foot races with the new stride.
   - The poncho now reads narrow (more of a serape); widen it if it bothers.
