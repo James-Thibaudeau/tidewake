@@ -37,7 +37,7 @@ export class BoatRig {
     // ashore, like the spyglass, applies upgrades too)
     const aboard = ex.root.parent === this.group;
     if (lv.rudder >= 2) { ex.setControl('wheel'); if (aboard) { ex.root.position.set(0, 1.0 * k, -3.0 * k); ex.root.rotation.y = 0; } }
-    else { ex.setControl('tiller'); if (aboard) { ex.root.position.set(0.42 * k, 1.0 * k, -2.55 * k); ex.root.rotation.y = -0.25; } }
+    else { ex.setControl('tiller'); if (aboard) { ex.root.position.set(0.38 * k, 1.0 * k, -2.55 * k); ex.root.rotation.y = -0.25; } }
     // keel
     this.keelFin.visible = lv.keel >= 1;
     this.keelBulb.visible = lv.keel >= 2;
@@ -288,7 +288,7 @@ export class BoatRig {
       gripL = this._grip2.set(c.x + Math.sin(aL) * R, c.y + Math.cos(aL) * R, c.z).multiplyScalar(K);
       gripR = this._grip.set(c.x + Math.sin(aR) * R, c.y + Math.cos(aR) * R, c.z).multiplyScalar(K);
     } else {
-      const phi = 0.5, L = 1.25;
+      const phi = 0.62, L = 1.25;
       gripR = this._grip.set(Math.sin(tillerYaw) * Math.cos(phi) * L, 1.15 + Math.sin(phi) * L, -3.3 + Math.cos(tillerYaw) * Math.cos(phi) * L).multiplyScalar(K);
     }
     // apparent wind for the scarf

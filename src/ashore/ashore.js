@@ -369,16 +369,15 @@ export class Ashore {
     const light = new THREE.PointLight(0xffc878, 0, 16, 1.5);
     light.position.y = 0.12;
     g.add(flame, light);
-    // at the left hip, just in front of the satchel (root space; the root is scaled)
-    g.position.set(0.34, 0.36, 0.12);
-    g.scale.setScalar(1 / 1.15 * 1.1);
-    ex.root.add(g);
+    // at the left hip, just in front of the satchel (it rides on the pelvis)
+    g.position.set(0.23, -0.06, 0.09);
+    ex.pelvis.add(g);
     this.hand = { group: g, light, flame };
   }
 
   removeHandLantern(ex) {
     if (!this.hand) return;
-    ex.root.remove(this.hand.group);
+    this.hand.group.removeFromParent();
     this.hand = null;
   }
 

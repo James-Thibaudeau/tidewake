@@ -13,7 +13,7 @@ export class BoatFittings {
     this.tiller = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 1.4).translate(0, 0, 0.7), this.woodMat);
     this.tiller.position.set(0, 1.15, -3.3);
     this.tiller.rotation.order = 'YXZ';
-    this.tiller.rotation.x = -0.5;
+    this.tiller.rotation.x = -0.62;
     g.add(this.tiller);
     // visible rudder blade (tier 1+)
     this.rudderBlade = new THREE.Group();
