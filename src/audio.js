@@ -393,6 +393,15 @@ export class SoundSystem {
           this.tone(f * 5.4, t + dt, 0.4, { type: 'sine', vol: 0.015 });
         }
         break;
+      case 'hoot': {
+        // an owl: one short note, then a longer one that falls away
+        const v = Math.min(1, opts.volume ?? 1);
+        for (const [dt, dur] of [[0, 0.24], [0.34, 0.62]]) {
+          this.tone(392, t + dt, dur, { type: 'sine', vol: 0.2 * v, attack: 0.05, glide: 349 });
+          this.tone(784, t + dt, dur * 0.8, { type: 'sine', vol: 0.025 * v, attack: 0.05, glide: 698 });
+        }
+        break;
+      }
       case 'sail':
         this.noise(t, 0.45, { type: 'bandpass', freq: 400, sweep: 1600, q: 1.2, vol: 0.18, attack: 0.05 });
         this.noise(t + 0.12, 0.12, { type: 'bandpass', freq: 900, q: 2, vol: 0.12 });

@@ -5,7 +5,8 @@
 // state.story = { chapter, journals: [id], flags: {}, seenCards: [id] }
 //   chapter 0   prologue not yet shown
 //   chapter 1   visit the wreck → Journal I + the brass spyglass
-//   chapter 2-7 find Journals II-VII at grandfather's old camps
+//   chapter 2-7 find Journals II-VII at grandfather's old camps (III is
+//               ashore: up the great tree in the Elder Grove level)
 //   chapter 8   back to the wreck: the chest under the bunk
 //   chapter 9   bring the letters home to Grandma in Port Haven
 //   chapter 10  complete (free roam)
@@ -19,6 +20,9 @@ import { JOURNALS, STEPS, LINES } from './story-text.js';
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
 // Where journals III-VII were left: the hand-placed landmarks
 const LANDMARK_FOR = { III: 'grove', IV: 'arch', V: 'ruins', VI: 'volcano', VII: 'frost' };
+// Journals that have moved into their landmark's level. There's no searching
+// for these from the sea: you drop anchor by the camp and go ashore.
+const IN_LEVEL = new Set(['III']);
 export const FINAL_CHAPTER = 10;
 
 const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] ?? m));
@@ -119,6 +123,8 @@ export class Story {
   get world() { return this.game.world; }
   get wreck() { return this.world.wreck; }
   has(id) { return this.S.journals.includes(id); }
+  /** Is this journal the one the story is looking for right now? */
+  waiting(id) { return !this.has(id) && this.chapter === ROMAN.indexOf(id) + 1; }
   vars() { return { captain: this.game.state.profile?.name || 'Captain' }; }
 
   // ------------------------------------------------------------- the camps
@@ -179,7 +185,10 @@ export class Story {
     if (ch < 1 || ch >= FINAL_CHAPTER) return null;
     let step;
     if (ch === 1) step = STEPS.visitWreck;
-    else if (ch <= 7) step = { title: `Grandfather's Journal ${ROMAN[ch - 1]}`, text: fill(STEPS.journal.text, { n: ROMAN[ch - 1] }) };
+    else if (ch <= 7) {
+      const id = ROMAN[ch - 1], lv = IN_LEVEL.has(id) && STEPS.ashore[id];
+      step = { title: `Grandfather's Journal ${id}`, text: lv ? (this.canGoAshore ? lv.text : lv.noAnchor) : fill(STEPS.journal.text, { n: id }) };
+    }
     else if (ch === 8) step = STEPS.searchChest;
     else step = STEPS.letterHome;
     return { id: 'story', type: 'story', state: 'active', title: step.title, text: step.text,
@@ -202,12 +211,12 @@ export class Story {
     const ch = this.chapter, W = this.wreck;
     if ((ch === 1 || ch === 8) && W) return { x: W.searchPoint.x, z: W.searchPoint.z, label: ch === 1 ? "Climb aboard grandfather's wreck" : 'Open the chest under his bunk' };
     if (ch >= 2 && ch <= 7) {
-      const c = this.camps[ROMAN[ch - 1]];
+      const id = ROMAN[ch - 1], c = this.camps[id];
       if (!c) return null;
-      const b = this.game.boat.pos;
+      const b = this.game.boat.pos, name = this.world.islands[c.island].name;
       // the search circle until you're inside it; then the camp itself
-      if (Math.hypot(c.hint.x - b.x, c.hint.z - b.z) > c.hint.r) return { x: c.hint.x, z: c.hint.z, r: c.hint.r, label: `Search near ${this.world.islands[c.island].name}` };
-      return { x: c.search.x, z: c.search.z, label: "Look for grandfather's camp" };
+      if (Math.hypot(c.hint.x - b.x, c.hint.z - b.z) > c.hint.r) return { x: c.hint.x, z: c.hint.z, r: c.hint.r, label: `Search near ${name}` };
+      return { x: c.search.x, z: c.search.z, label: IN_LEVEL.has(id) ? `Go ashore at ${name.replace(/^The /, 'the ')}` : "Look for grandfather's camp" };
     }
     if (ch === 9) { const D = this.world.home.dock; return { x: D.x, z: D.z, label: 'Bring the letters to Grandma' }; }
     return null;
@@ -223,7 +232,8 @@ export class Story {
     }
     if (ch >= 2 && ch <= 7) {
       const id = ROMAN[ch - 1], c = this.camps[id];
-      if (c && Math.hypot(c.search.x - x, c.search.z - z) < 26) {
+      // (a journal inside a level is found on foot: Ashore offers the landing)
+      if (c && !IN_LEVEL.has(id) && Math.hypot(c.search.x - x, c.search.z - z) < 26) {
         if (Math.abs(speed) >= 7) return { prompt: 'Slow down to search' };
         return { prompt: "Search grandfather's camp", action: () => this.findJournal(id) };
       }
@@ -275,7 +285,7 @@ export class Story {
         text: g.ui.touch ? 'Tap the spyglass button to look far out to sea. Islands you spot are charted from afar.'
           : 'Hold <kbd>Z</kbd> to look through it. Islands you spot are charted from afar.' });
     }
-    const where = id === 'I' ? "Grandfather's wreck" : `${this.world.islands[this.camps[id].island].name} · grandfather's camp`;
+    const where = id === 'I' ? "Grandfather's wreck" : `${this.world.islands[this.camps[id].island].name} · ${IN_LEVEL.has(id) ? STEPS.ashore[id].where : "grandfather's camp"}`;
     const choice = await g.ui.showFound({ eyebrow: where, title: spyglass ? 'You found his journal and spyglass!' : 'You found his journal!',
       items, main: 'Read the journal', later: 'Later' });
     if (choice === 'main') g.ui.openJournal('story', id);

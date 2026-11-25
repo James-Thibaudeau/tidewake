@@ -5,6 +5,8 @@
 // foot, pickups, lantern checkpoints, splash respawns and per-island saves.
 //
 // state.ashore[islandId] = { visited, coins: [id], caches: [id], chest: bool }
+// A level may carry story spots (level.spots), a chest with a cosmetic of its
+// own (chest.cosmetic) and life of its own (level.update): see wreck.js, grove.js.
 // Quest items (retrieve quests) wait at the level's vault; their state lives
 // in the quest, not here.
 import * as THREE from 'three';
@@ -14,6 +16,7 @@ import { edgeFactor } from '../world.js';
 import { propMesh, part, merge, propMaterial, thinOutline } from '../props.js';
 import { STYLES, owns } from '../cosmetics.js';
 import { siteBeam, MAP_FRAGMENT } from '../quests.js';
+import { LINES } from '../story-text.js';
 import { generateLevel } from './levelgen.js';
 import { buildWreckLevel } from './wreck.js';
 import { buildGroveLevel } from './grove.js';
@@ -240,7 +243,7 @@ export class Ashore {
   // -------------------------------------------------------------- pickups
   buildPickups() {
     pickupGeometry();
-    const L = this.level, P = this.progress(this.island);
+    const g = this.game, L = this.level, P = this.progress(this.island);
     this.coins = L.coins.filter((c) => !P.coins.includes(c.id)).map((c) => ({ ...c, taken: false }));
     this.coinMesh = new THREE.InstancedMesh(coinGeo, coinMat, Math.max(1, this.coins.length));
     this.coinMesh.count = this.coins.length;
@@ -253,7 +256,8 @@ export class Ashore {
       this.scene.add(m);
       return { ...c, mesh: m };
     });
-    this.chests = L.chests.filter(() => !P.chest).map((c) => {
+    // a chest with its own cosmetic stays until you have that piece (it was an ordinary chest once)
+    this.chests = L.chests.filter((c) => !P.chest || (c.cosmetic && !g.state.wardrobe.includes(c.cosmetic))).map((c) => {
       const m = propMesh('chest');
       m.position.set(c.x, c.y, c.z); m.rotation.y = c.yaw || 0; m.scale.setScalar(0.55);
       this.scene.add(m);
@@ -339,6 +343,7 @@ export class Ashore {
     const hs = Math.hypot(ctl.vel.x, ctl.vel.z);
     ex.update(dt, t, { footSpeed: hs, grounded: ctl.grounded, vy: ctl.vel.y, turn, windStrength: g.weather.windStrength * 0.6, windRel: Math.PI });
     this.race?.update(dt, t, acts);
+    L.update?.(dt, t, { pos: ctl.pos, night: g.env.night, play: (name, opts) => g.audio.play(name, opts) });
 
     this.cam.update(dt, ctl, g.input.consumeLook(), hs > 0.3);
     this.updateLights(t);
@@ -360,10 +365,17 @@ export class Ashore {
     }
   }
 
-  /** Show what's still waiting aboard the wreck (his journal, the chest). */
+  /** Show what's still waiting: his journal (aboard the wreck, or where the level keeps one) and the wreck's chest. */
   syncStory() {
-    const st = this.game.story;
-    this.level?.syncStory?.({ journal: st ? !st.has('I') : false, chestOpen: st ? st.chapter >= 9 : false });
+    const st = this.game.story, id = this.level?.spots?.journal?.id;
+    const journal = !st ? false : id ? st.waiting(id) : !st.has('I');
+    this.level?.syncStory?.({ journal, chestOpen: st ? st.chapter >= 9 : false });
+  }
+
+  /** The note on grandfather's tent (the Elder Grove): it sends you inland. */
+  readNote() {
+    return this.game.ui.showFound({ eyebrow: "Grandfather's camp", title: 'A note on the tent pole',
+      items: [{ icon: 'scroll', name: LINES.groveNote, text: LINES.groveNoteText }], main: 'Onward' });
   }
 
   // --------------------------------------------------------------- lights
@@ -472,6 +484,11 @@ export class Ashore {
     if (Math.hypot(L.exit.x - p.x, L.exit.z - p.z) < L.exit.r) { prompt = 'Row back to your ship'; action = () => this.leave(); }
     const near = (s) => s && Math.hypot(s.x - p.x, s.z - p.z) < s.r && Math.abs(s.y - p.y) < 1.2;
     const st = g.story;
+    // a lit lantern high up a climb: the quick way back down
+    const fb = L.fallBack;
+    if (fb?.down && this.splashT <= 0 && this.lanterns.some((c) => c.lit && c.y - fb.down.y > fb.below && Math.hypot(c.x - p.x, c.z - p.z) < 2 && Math.abs(c.y - p.y) < 1.2)) {
+      prompt = 'Climb down to the roots'; action = () => this.climbDown();
+    }
     if (L.spots && st) {
       if (near(L.spots.table)) {
         if (!st.has('I')) { prompt = 'Search the chart table'; action = () => { st.findJournal('I'); this.syncStory(); }; }
@@ -480,12 +497,13 @@ export class Ashore {
         if (st.chapter === 8) { prompt = 'Open the chest under the bunk'; action = () => { st.openChest(); this.syncStory(); }; }
         else if (st.chapter < 8) prompt = 'An old sea chest, locked tight';
         else prompt = 'The chest is empty now';
-      }
-    }
-    // a lit lantern high up a climb: the quick way back down
-    const fb = L.fallBack;
-    if (fb?.down && this.splashT <= 0 && this.lanterns.some((c) => c.lit && c.y - fb.down.y > fb.below && Math.hypot(c.x - p.x, c.z - p.z) < 2 && Math.abs(c.y - p.y) < 1.2)) {
-      prompt = 'Climb down to the roots'; action = () => this.climbDown();
+      } else if (near(L.spots.journal)) {
+        // a journal kept in the level (the grove's carving): take it when the story has reached it
+        const id = L.spots.journal.id;
+        if (st.waiting(id)) { prompt = 'Take the journal from the crack'; action = () => { st.findJournal(id); this.syncStory(); }; }
+        else if (st.has(id)) { prompt = "Read grandfather's journal by his carving"; action = () => g.ui.openJournal('story', id); }
+        else { prompt = 'Look at the carving'; action = () => g.ui.toast(LINES.carving, 'info'); }
+      } else if (near(L.spots.note)) { prompt = 'Read the note on the tent'; action = () => this.readNote(); }
     }
     for (const c of this.chests) {
       if (c.opened || Math.hypot(c.x - p.x, c.z - p.z) > 1.8 || Math.abs(c.y - p.y) > 1.5) continue;
@@ -506,8 +524,13 @@ export class Ashore {
     c.mesh.rotation.x = -0.15;
     g.audio.play('treasure');
     const pool = STYLES.filter((s) => s.source === 'tailor' && !owns(g.state.wardrobe, s.slot, s.style));
+    const own = STYLES.find((s) => s.id === c.cosmetic && !g.state.wardrobe.includes(s.id));
     let item;
-    if (pool.length) {
+    if (own) {
+      // this chest's own piece, found nowhere else
+      g.unlockCosmetic(own.id, 'chest');
+      item = { icon: 'needle', name: own.name, text: LINES.flowerCrown };
+    } else if (pool.length) {
       const s = pool[(this.island.seed >>> 0) % pool.length];
       g.unlockCosmetic(s.id, 'chest');
       item = { icon: 'needle', name: s.name, text: 'Added to your wardrobe. Try it on at any port\'s Tailor.' };

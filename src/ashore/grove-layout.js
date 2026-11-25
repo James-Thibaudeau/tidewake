@@ -12,6 +12,9 @@
 // bark ledges, shelf fungus and grandfather's pegs → the owl hollow (14 m) →
 // fungus steps to the owl bough (18 m) → optional: leaf mats and boughs up
 // to the crown (42 m), then off the diving branch into the pool.
+// The story (4.2): a note at the camp, Journal III in a crack by the carving
+// at the root of the owl bough, the flower crown in the crown's chest, and
+// the owl's perches all the way up.
 import { ASHORE } from '../config.js';
 import { noise2, smoothstep, clamp, lerp, TAU } from '../util.js';
 import { obox, cyl } from './shapes.js';
@@ -136,7 +139,7 @@ export function buildGroveLayout() {
   const rowboat = { x: 0, y: Math.max(0, groveGround(0, shore - 0.6).h), z: shore - 0.6, rot: -Math.PI / 2 };
   const spawn = { x: 1.5, y: groveGround(1.5, shore - 4.5).h, z: shore - 4.5, yaw: Math.PI };
   const exit = { x: rowboat.x, y: rowboat.y, z: rowboat.z, r: 2.8 };
-  const camp = { x: -7, y: groveGround(-7, 77).h, z: 77, r: 1.7 };
+  const camp = { x: -7, y: groveGround(-7, 77).h, z: 77, r: 1.7, rot: 0.9 }; // the tent's door faces the path
   walkTo(spawn.x, spawn.z);
   walkTo(0, 62);
   // a fallen giant across the stream, worn flat on top
@@ -225,7 +228,7 @@ export function buildGroveLayout() {
   const owlBough = add(radial('bough', aB, 6.5, 24, 1.7, G.boughY));
   node(route, owlBough, 8.8, aB);
   for (const r of [12, 15, 18, 21]) coinAt(pol(r, aB), G.boughY);
-  const carving = { ...xz(pol(8.2, aB)), y: G.boughY };
+  const carving = { ...xz(pol(8.4, aB)), y: G.boughY, a: aB };
   // the easy way down from the carving: off the bough's tip onto two broad
   // leaf mats hung from it on aerial roots. They hang beyond the tip, behind
   // the camera that circles the trunk: anything nearer in (a mat, a limb)
@@ -265,6 +268,26 @@ export function buildGroveLayout() {
   const pool = { ...xz(pol(26, aP)), r: 6 }; // wide enough for a step off the tip or a running leap
   pool.y = groveGround(pool.x, pool.z).h;
 
+  // ---- the story: the note on the tent pole, and the journal by the carving
+  const door = [Math.sin(camp.rot), Math.cos(camp.rot)];
+  const note = { id: 'note', x: camp.x + door[0] * 2.5, z: camp.z + door[1] * 2.5, r: 2.1 };
+  note.y = groveGround(note.x, note.z).h;
+  const spots = { note, journal: { id: 'III', ...carving, r: 1.7 } };
+
+  // ---- the owl's perches, in the order of the climb (grove-life.js). `a` keeps
+  // counting round the trunk, so the owl flies the way you climb; `near` is
+  // how close you come before it hoots and flies on; `stub` perches get a knot
+  // of wood to sit on
+  const perches = [];
+  const perch = (pa, r, py, near, extra) => perches.push({ a: pa, r, y: py, near, ...xz(pol(r, pa)), ...extra });
+  perch(GATE, 17, G.hill - 0.5 + arches[0].R + arches[0].tube, 9);          // on the arch over the path
+  for (const rel of [2.1, 4.3, 6.5, 8.7, 10.7]) perch(GATE + rel, 7.45, helix(rel) + 2.7, 6.5, { stub: true });
+  perch(hollowA, 7.05, G.hollowY + 0.7, 4.5);                               // in its hollow
+  perch(aB, 14.5, G.boughY, 4.5);                                           // out along the bough, watching the carving
+  for (const B of boughs.slice(1)) perch(B.a, 15, B.top, 4.5);
+  perch(ca + 5.8 - TAU, 4.2, G.crownY, 3.5);                                     // the crown, across from where you climb on
+  perch(aP, 19, G.crownY, 0);                                               // the diving branch: the way down
+
   // ---- colliders
   const colliders = pieces.map(colliderOf);
   colliders.push(cyl(0, 0, G.trunkR, -2, G.trunkTop, 'wood'));
@@ -301,8 +324,8 @@ export function buildGroveLayout() {
     pieces, colliders, route, crown, groundAt, groundTag: (x, z) => groveGround(x, z).tag, waterY: 0,
     bounds: { r: G.R + 3 }, calm: { x: 0, z: 0, r: 72 },
     spawn, exit, rowboat, camp, checkpoints, coins, caches,
-    chests: [{ id: 'chest', x: 0, y: G.crownY, z: 0, yaw: aP }],
-    summit: { x: 0, y: G.crownY, z: 0 }, vault, carving, hollow: { a: hollowA, y: G.hollowY },
+    chests: [{ id: 'chest', x: 0, y: G.crownY, z: 0, yaw: aP, cosmetic: 'hat:flowerCrown' }],
+    summit: { x: 0, y: G.crownY, z: 0 }, vault, carving, spots, perches, hollow: { a: hollowA, y: G.hollowY },
     hubs: [{ x: 0, z: 0, orbit: 12, base: G.hill + 0.5, top: G.crownY - 1.2 }],
     // a long fall puts you back at your last lantern, except the dive into the pool
     // and a lantern up the tree offers a quick way back down to the gate
@@ -356,9 +379,15 @@ export function validateGrove(L) {
   for (const p of L.pieces) if (p !== L.diving && inside(p.foot, tip[0], tip[1])) errors.push(`the dive is blocked by ${p.id} ${p.kind}`);
   if (Math.hypot(tip[0] - L.pool.x, tip[1] - L.pool.z) > L.pool.r) errors.push('the dive misses the pool');
   if (L.coins.length < 40 || L.coins.length > 70) errors.push(`coins ${L.coins.length} not in 40..70`);
-  for (const c of [...L.coins, ...L.caches, ...L.checkpoints]) {
+  for (const c of [...L.coins, ...L.caches, ...L.checkpoints, ...Object.values(L.spots)]) {
     const s = supportAt(L, c.x, c.z, c.y + 0.05);
     if (Math.abs(s - c.y) > 0.3) errors.push(`${c.id}: floating or buried (${c.y.toFixed(2)} vs ${s.toFixed(2)})`);
+  }
+  // the owl: each perch a short flight on from the last, never much lower, and clear of the trunk
+  for (let i = 0; i < L.perches.length; i++) {
+    const p = L.perches[i], q = L.perches[i - 1];
+    if (p.r < GROVE.trunkR && p.y < GROVE.trunkTop) errors.push(`perch ${i}: inside the trunk`);
+    if (q && (p.y < q.y - 1 || Math.abs(p.a - q.a) > 3.2)) errors.push(`perch ${i}: not a short flight on up from perch ${i - 1}`);
   }
   const stats = { pieces: L.pieces.length, colliders: L.colliders.length, coins: L.coins.length, jumps, crownJumps };
   return { ok: errors.length === 0, errors, stats };

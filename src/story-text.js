@@ -107,6 +107,14 @@ export const JOURNALS = [
 export const STEPS = {
   visitWreck: { title: "Grandfather's wreck", text: "Sail out past the point to your grandfather's wreck, climb aboard and search his cabin." },
   journal: { title: "Grandfather's Journals", text: "Follow Grandpa's clue and find Journal {n}." },
+  // journals that wait inside an island level, by journal id: you go ashore for them
+  ashore: {
+    III: {
+      text: "Go ashore at the Elder Grove and follow Grandpa's trail. He said to look among the roots.",
+      noAnchor: "Grandpa's third journal is ashore at the Elder Grove. You'll need an anchor to land there, and a sounder hull to carry one.",
+      where: 'the carving',
+    },
+  },
   searchChest: { title: 'The chest under the bunk', text: "Return to Grandpa's wreck near Port Haven, climb aboard and open the old chest under his bunk." },
   letterHome: { title: 'The letter home', text: "Bring Grandpa's letters home to Grandma in Port Haven." },
 };
@@ -149,4 +157,8 @@ export const LINES = {
   storyComplete: "Grandfather's Journals: complete",
   spyglassHint: "Grandpa's old spyglass is somewhere in his wreck, just past the point.",
   shipwrightSpyglass: "Find your grandfather's spyglass",
+  groveNote: '"Gone up the big tree. Back for supper."',
+  groveNoteText: 'His handwriting, in a hurry. A worn path runs inland, towards the great tree.',
+  carving: 'A lopsided heart, two sets of initials worn soft by the weather, and a little anchor underneath.',
+  flowerCrown: "Somebody wove it and left it at the top of the oldest tree. Try it on at any port's Tailor.",
 };

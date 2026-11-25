@@ -4,8 +4,10 @@ The first landmark level, and the template for the other four. It moves
 Journal III off the beach camp and into the level, adds the vault that
 retrieve and refit quests need, and gives the grove its unique cosmetic.
 
-Status: **design agreed** (decisions on 2026-11-24, listed at the end).
-Ready to build.
+Status: **built** (the level in 4.1, the story in 4.2; see
+[STATUS.md](STATUS.md)). Decisions of 2026-11-24 are listed at the end. One
+thing went further than this design: the owl starts on the arch over the
+path and guides you up the whole spiral, not only from its hollow.
 
 ---
 

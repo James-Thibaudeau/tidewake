@@ -141,16 +141,53 @@ Updated 2026-11-25.
       Jumping straight to the ground from the hollow or higher does send you
       back up, so every lit lantern from the hollow up offers "Climb down to
       the roots", which sets you down by the root gate.
-    - No story yet: Journal III is still found at the camp from the sea, and
-      the crown chest holds an ordinary tailor piece.
     - Not yet done: a second play by hand with the new camera (a test pilot
       that only holds the stick left and jumps at gaps now reaches the owl
       hollow), walking out along a bough (the tower view faces you there
       until you are past the trunk's reach), a look on Low quality and on a
       phone.
     - The pool is a still disc on the grass, not real water.
-  - [ ] 4.2 The grove's story: the note in the tent, Journal III at the
-    carving, the flower crown, the owl guide, fireflies
+  - [x] 4.2 The grove's story
+    ([#34](https://github.com/James-Thibaudeau/tidewake/pull/34)). Journal III has moved off the beach and up
+    the tree: chapter III's step is "Go ashore at the Elder Grove", there is
+    no search from the sea, and the anchor is needed (without one the step
+    says so). Saves that already hold Journal III keep it.
+    - A note on the tent pole at the camp sends you inland.
+    - At the root of the owl bough, his carving: a heart, two sets of
+      initials too worn to read, a little anchor. Journal III is wedged in a
+      crack beside it once the story has reached chapter III; before that you
+      can only look at the carving, and afterwards you can read the journal
+      there.
+    - The crown's chest holds the flower crown, which is found nowhere else.
+      A chest already opened in 4.1 comes back until you have the crown.
+    - The owl guide (`src/ashore/grove-life.js`): it waits a little ahead,
+      hoots when you come close and flies on, from the arch over the path,
+      up the spiral, through its hollow and the owl bough, to the crown and
+      the diving branch. It never talks, and it starts again on each visit.
+      This is more than the design asked for, which had it start at the
+      hollow.
+    - Fireflies round the roots and the lower trunk at night.
+    - A level can now carry its own life (`level.update`), a journal spot
+      (`spots.journal`) and a chest with its own cosmetic (`chest.cosmetic`),
+      ready for the other four landmarks.
+    - The tree looks its age (`src/ashore/grove-art.js`). The trunk's bark
+      is split by deep furrows into long plates, each a slightly different
+      brown, with moss patches low down, lichen, burls, stacks of bracket
+      fungus, moss cushions and climbing vines. Boughs, the log, stumps,
+      roots and the root arches are in bark too. The fungus steps are banded
+      brackets with a neck into the trunk; ledges, boughs and leaf mats have
+      patchy moss, tufts, ferns, small mushrooms and blossoms. No collider or
+      walking surface moved. Furrows follow the mesh's own columns and each
+      quad is one flat colour, which is what keeps them crisp.
+    - Fix: grandfather's tent was upside down (its ridge in the sand), here
+      and at every camp at sea.
+    - Not yet done: frame time with the new art. The level's own meshes are
+      about 175k triangles with outlines on High; Low drops the small
+      growth and uses a coarser trunk, and hasn't been looked at.
+    - Not yet done: a play by hand from the beach to the crown with the owl
+      (it was driven from the console), a listen to the hoot on real
+      speakers, and the pacing check: chapter III now needs the Oak hull
+      (120 gold) and the anchor quest as well as Sails 1.
   - [ ] 4.3 Anchor refits (Phase 6), then 4.4 rocky islands and 4.5 Archway
     Isle
   - [ ] 4.6 Tropical islands and 4.7 the Sunken Temple
