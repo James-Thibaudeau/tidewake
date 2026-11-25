@@ -76,8 +76,8 @@ pull request merges.
 
 - [ ] **Phase 4, ashore content and fetch quests:**
   - [x] The Elder Tree at sea: a giant, detailed landmark tree with roots,
-    an owl hollow, drifting clouds, birds, fireflies and grandfather's
-    pennant ([#20](https://github.com/James-Thibaudeau/tidewake/pull/20))
+    an owl hollow, drifting clouds, birds and fireflies
+    ([#20](https://github.com/James-Thibaudeau/tidewake/pull/20))
   - [ ] The Elder Grove level, the first landmark level, plus the shared
     vault for retrieve and refit quests. Design agreed in
     [elder-grove-level.md](elder-grove-level.md): Journal III at the

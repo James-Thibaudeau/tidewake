@@ -14,8 +14,7 @@ Ready to build.
 - **The sea view** (`src/elder-tree.js`, this branch): a giant tree on the
   hilltop, about 140 m to the top of the crown, with a skirt of arching root buttresses, an owl
   in a hollow facing Port Haven, moss and aerial roots, clouds drifting through
-  the canopy, birds over the crown, fireflies at night, and grandfather's red
-  pennant lashed to a pole at the very top.
+  the canopy, birds over the crown and fireflies at night.
 - **The story** (Journal III, "The Oldest Tree"): he climbed the biggest tree,
   carved a lopsided heart with their initials "sixty feet up" and added a
   little anchor for the children. Owls. The trees "creak like a ship at
@@ -28,7 +27,7 @@ Ready to build.
 
 The level doesn't have to match the sea model. It's built at a scale that
 plays well, but it keeps the sea view's landmarks: the arching roots, the owl
-hollow, the moss and hanging roots, and the pennant at the top.
+hollow, and the moss and hanging roots.
 
 ## Scale
 
@@ -44,7 +43,7 @@ bigger but still walkable:
 ## The route
 
 ```
- crown (42 m) ── pennant, the chest, the best view
+ crown (42 m) ── the chest, the best view
      │  leaf mats up through the canopy (optional, hardest)
  the carving (18 m) ── Journal III
      │  along the owl bough
@@ -89,9 +88,9 @@ bigger but still walkable:
    is the payoff.
 7. **The crown (optional).** For players who want more: leaf mats and thinner
    branches up through the canopy, the hardest jumps in the level, with clouds
-   drifting through (the same puffs as the sea view). At the top are
-   **grandfather's pennant** and the **cosmetic chest**, plus the best view in
-   the game so far, out over the whole grove to the sea.
+   drifting through (the same puffs as the sea view). At the top are the
+   **cosmetic chest** and the best view in the game so far, out over the
+   whole grove to the sea.
 8. **The way down.** You don't climb back down. An aerial root hangs from the
    crown to a pool by the roots: walk off the edge and splash into it, which
    is safe. From the carving, an easier drop lands on leaf mats. Both lead back

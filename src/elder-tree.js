@@ -5,13 +5,13 @@
 // Built to read from far off: a fluted trunk on a skirt of root buttresses
 // (some arching clear of the ground, "look among the roots"), seven great
 // boughs and their branches under a tiered canopy, moss and aerial roots
-// hanging from the limbs, an owl in a hollow, and his red pennant tied at the
-// very top. It "makes its own weather": a few small clouds drift slowly
-// through the canopy, birds circle the crown, and fireflies come out at night.
+// hanging from the limbs, and an owl in a hollow. It "makes its own
+// weather": a few small clouds drift slowly through the canopy, birds circle
+// the crown, and fireflies come out at night.
 //
 // Sea view only. The walkable Elder Grove level is built at its own scale.
 // Authored in tree space: the base of the trunk at the origin, y up, +z the
-// side that faces Port Haven (the owl hollow and the pennant face that way).
+// side that faces Port Haven (the owl hollow faces that way).
 import * as THREE from 'three';
 import { part, merge, propMaterial } from './props.js';
 import { toonGradient, toonMaterial, outlineMaterial } from './toon.js';
@@ -22,7 +22,6 @@ const C = {
   moss: '#6c8d3c', moss2: '#86a84a', hang: '#869a52', hang2: '#63763a',
   leafD: '#2b6634', leafM: '#45973f', leafL: '#73c052', goldM: '#7fa23a', goldL: '#b9c556',
   hollow: '#1c120a', owl: '#8c6c48', owl2: '#6e5236', owlFace: '#e4d2a8', eye: '#f2c14a', pupil: '#1b1410',
-  red: '#c8322b', pole: '#5b3c22', brass: '#d9b44a',
 };
 
 // ------------------------------------------------------------------ shapes
@@ -203,7 +202,7 @@ function woodAndLeaves(ground) {
   return { wood, leaves, strands };
 }
 
-/** The owl hollow and the owl in it, and grandfather's red pennant on top. */
+/** The owl hollow and the owl in it. */
 function detailParts() {
   const P = [];
   const [hx, hz] = trunkAt(HOLLOW.y);
@@ -221,11 +220,6 @@ function detailParts() {
     P.push(part(new THREE.ConeGeometry(0.2, 0.6, 5), C.owl2, { x: ox + s * 0.5, y: oy + 2.35, z: oz, rz: -s * 0.35 }));
   }
   P.push(part(new THREE.ConeGeometry(0.12, 0.35, 5), C.eye, { x: ox, y: oy + 1.3, z: oz + 0.85, rx: Math.PI / 2 + 0.4 }));
-  // grandfather's pennant, lashed to the very top
-  // (tall enough to fly clear of the canopy seen from sea level)
-  P.push(part(new THREE.CylinderGeometry(0.3, 0.5, 60, 6), C.pole, { x: 0.8, y: 116, z: 0 }));
-  P.push(part(new THREE.BoxGeometry(7.6, 4.2, 0.2), C.red, { x: 4.75, y: 141.4, z: 0, rz: 0.06 })); // broadside to Port Haven
-  P.push(part(new THREE.SphereGeometry(0.7, 8, 6), C.brass, { x: 0.8, y: 146.4, z: 0 }));
   return P;
 }
 
