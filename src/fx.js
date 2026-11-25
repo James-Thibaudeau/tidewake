@@ -331,6 +331,11 @@ export class FX {
     }
 
     if (this.edges) {
+      // the creator is a close-up, where full-weight lines read heavy
+      const studio = view.scene === game.creator?.scene;
+      const pr = this.renderer.getPixelRatio();
+      this.edges.uniforms.get('uThickness').value = Math.max(1, pr * (studio ? 0.5 : 0.75));
+      this.edges.uniforms.get('uStrength').value = studio ? 0.55 : 1;
       const fog = view.scene.fog;
       const far = fog ? Math.min(fog.far * 0.45, 520) : 420;
       this.edges.uniforms.get('uFade').value.set(far * 0.3, far);
