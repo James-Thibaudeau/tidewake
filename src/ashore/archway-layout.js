@@ -31,19 +31,25 @@ export const ARCHWAY_LIMITS = {
   main: { up: 1.05, gap: 1.7, drop: ASHORE.design.safeDrop },
   stack: { up: ASHORE.design.jumpUp, gap: 2.6 },
 };
-const THICK = { ledge: 0.7, stack: 30, step: 1.4, span: 1.2, shelf: 0.6, top: 30, block: 1 };
+const THICK = { ledge: 0.7, stack: 30, step: 1.4, span: 1.2, shelf: 0.6, top: 30, block: 1, tier: 1.3 };
 
 // ------------------------------------------------------------------ ground
 const A = ARCHWAY;
 // two notches in the bay's west wall, crossed on the traverse
 const INLETS = [{ a: 3.42, r: 37.5, w: 6.2 }, { a: 4.0, r: 36.5, w: 5.4 }].map((n) => ({ ...n, x: Math.cos(n.a) * n.r, z: Math.sin(n.a) * n.r }));
-const CAVE = { x: 13.2, z: 41, r: 2.6 };
+const CAVE = { x: 13.8, z: 41, r: 3.2 };
 const BASIN = { half: 10.5, beach: 37, back: 46 };
-// the gully's terraces: [z where the tier starts, its height]
+// the gully's terraces, stone steps: [z where the step starts, its height]. A
+// hop and a step by turns, from the basin to just under the cliff top
 const GULLY = { half: 2.6, tiers: [] };
 {
-  let z = BASIN.back, h = 5.6;
-  for (let i = 0; i < 16; i++) { GULLY.tiers.push([z, h]); z += 1.6; h += i % 2 ? 0.3 : 0.9; }
+  let z = BASIN.back, h = basinH(BASIN.back) + 0.75;
+  for (let i = 0; ; i++) {
+    GULLY.tiers.push([z, h]);
+    z += 1.6;
+    if (plateau(0, z + 0.9) - h <= 0.95) break;   // a hop from the last step to the cliff top
+    h += i % 2 ? 0.3 : 0.9;
+  }
   GULLY.top = z;
 }
 
@@ -79,13 +85,15 @@ export function archwayGround(x, z) {
   let tag = 'stone';
   // the cove and the basin behind it, walled in, with the gully up the back
   const ax = Math.abs(x);
-  if (z > 28 && ax < BASIN.half + 4 && z < GULLY.top + 2) {
+  if (z > 28 && ax < BASIN.half + 4 && z < GULLY.top) {
     let floor;
     if (z < BASIN.back) floor = basinH(z) + Math.max(0, ax - BASIN.half) * 5;
     else if (ax < GULLY.half + 1.4) {
+      // the floor under the steps sits a step below them, so the ground's
+      // mesh, drawn in straight lines, never rises through a step
       let t = GULLY.tiers[0][1];
       for (const [tz, th] of GULLY.tiers) if (z >= tz) t = th;
-      floor = t + Math.max(0, ax - GULLY.half) * 6;
+      floor = t - 1 + Math.max(0, ax - GULLY.half) * 6;
     } else floor = basinH(BASIN.back) + (z - BASIN.back) * 5 + Math.max(0, ax - BASIN.half) * 5;
     if (floor < h) { h = floor; tag = z < BASIN.beach + 1 ? 'sand' : 'grass'; }
   }
@@ -95,7 +103,30 @@ export function archwayGround(x, z) {
   if (h > 1 && tag === 'stone' && h >= plateau(x, z) - 0.6) tag = 'grass';
   return { h: Math.max(h, -6), tag };
 }
-const groundAt = (x, z) => { const h = archwayGround(x, z).h; return h < -0.55 ? -Infinity : h; };
+// The ground as drawn. archway.js builds the terrain mesh from this grid, and
+// you walk on the same triangles, so where you stand is what you see.
+export const GRID = { E: 102, S: 1.1 };
+let grid = null;
+/** The terrain sampled on the mesh's grid: { E, S, n, hs, tags } (cached). */
+export function archwayGrid() {
+  if (grid) return grid;
+  const { E, S } = GRID, n = Math.round((2 * E) / S) + 1, hs = new Float32Array(n * n), tags = new Array(n * n);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    const g = archwayGround(-E + i * S, -E + j * S);
+    hs[j * n + i] = g.h; tags[j * n + i] = g.tag;
+  }
+  grid = { E, S, n, hs, tags };
+  return grid;
+}
+/** The height of the ground as drawn (the mesh's triangles, split corner to corner as archway.js splits them). */
+export function groundH(x, z) {
+  const { E, S, n, hs } = archwayGrid();
+  const fx = (x + E) / S, fz = (z + E) / S, i = Math.floor(fx), j = Math.floor(fz);
+  if (i < 0 || j < 0 || i >= n - 1 || j >= n - 1) return -6;
+  const u = fx - i, v = fz - j, a = hs[j * n + i], b = hs[j * n + i + 1], c = hs[(j + 1) * n + i], d = hs[(j + 1) * n + i + 1];
+  return u + v <= 1 ? a + u * (b - a) + v * (c - a) : d + (1 - u) * (c - d) + (1 - v) * (b - d);
+}
+const groundAt = (x, z) => { const h = groundH(x, z); return h < -0.55 ? -Infinity : h; };
 
 // ------------------------------------------------------------------ pieces
 /** A flat-topped slab. Local x runs along `rot` (three.js rotation.y), z across. */
@@ -124,29 +155,30 @@ export function buildArchwayLayout() {
   const pieces = [], route = [], stack = [], coins = [], caches = [];
   const add = (p) => { p.id = 'p' + pieces.length; pieces.push(p); return p; };
   const node = (list, p, x = p.cx, z = p.cz) => list.push({ x, z, y: p.top, piece: p });
-  const walkTo = (list, x, z) => list.push({ x, z, y: archwayGround(x, z).h });
+  const walkTo = (list, x, z) => list.push({ x, z, y: groundH(x, z) });
   const coin = (x, y, z, value = 1) => coins.push({ id: 'c' + coins.length, x, y, z, value });
   const coinOn = (p, value) => coin(p.cx, p.top, p.cz, value);
-  const coinGround = (x, z) => coin(x, archwayGround(x, z).h, z);
+  const coinGround = (x, z) => coin(x, groundH(x, z), z);
   const coinAt = ([x, z], y, value) => coin(x, y, z, value);
 
   // ---- the cove, the basin, the gully
   let shore = 30;
-  while (shore < 40 && archwayGround(0, shore).h < 0.2) shore += 0.1;
-  const rowboat = { x: -1.5, y: Math.max(0, archwayGround(-1.5, shore - 0.4).h), z: shore - 0.4, rot: Math.PI / 2 + 0.2 };
-  const spawn = { x: 1.8, y: archwayGround(1.8, shore + 3).h, z: shore + 3, yaw: 0 };
+  while (shore < 40 && groundH(0, shore) < 0.2) shore += 0.1;
+  const rowboat = { x: -1.5, y: Math.max(0, groundH(-1.5, shore - 0.4)), z: shore - 0.4, rot: Math.PI / 2 + 0.2 };
+  const spawn = { x: 1.8, y: groundH(1.8, shore + 3), z: shore + 3, yaw: 0 };
   const exit = { x: rowboat.x, y: rowboat.y, z: rowboat.z, r: 2.8 };
   const camp = { x: -6.5, z: 39.5, rot: 0.5 }; // the fire ring and grandfather's weather board
-  camp.y = archwayGround(camp.x, camp.z).h;
+  camp.y = groundH(camp.x, camp.z);
   walkTo(route, spawn.x, spawn.z);
   walkTo(route, 0, 40);
   walkTo(route, 0, BASIN.back - 0.6);
   for (const z of [38.5, 42, 45]) coinGround(1.2, z);
-  const vault = { x: CAVE.x + 0.4, z: CAVE.z, y: 0 };
-  vault.y = archwayGround(vault.x, vault.z).h;
-  caches.push({ id: 'g0', x: CAVE.x + 0.2, y: archwayGround(CAVE.x + 0.2, CAVE.z + 1.1).h, z: CAVE.z + 1.1, value: 30 });
+  const vault = { x: CAVE.x + 0.8, z: CAVE.z, y: 0 };
+  vault.y = groundH(vault.x, vault.z);
+  caches.push({ id: 'g0', x: CAVE.x + 0.4, y: groundH(CAVE.x + 0.4, CAVE.z + 1.4), z: CAVE.z + 1.4, value: 30 });
   for (const [i, [tz, th]] of GULLY.tiers.entries()) {
-    route.push({ x: 0, z: tz + 0.8, y: th, tier: true });
+    const T = add(rect('tier', 0, tz + 0.8, th, GULLY.half + 0.6, 0.82, 0));
+    node(route, T);
     if (i % 2) coin(i % 4 === 1 ? -0.9 : 0.9, th, tz + 0.8);
   }
   const top = { x: 0, z: GULLY.top + 2.5 };
@@ -192,7 +224,7 @@ export function buildArchwayLayout() {
   // out along the mouth: ledges on the channel's west wall, rising to the arm's tip
   const wallX = -A.mouth;
   const lantern2 = { id: 'mouth', ...xz(pol(A.bay - 0.2, 4.28)), y: route[route.length - 2].y };
-  const shoulderY = archwayGround(-A.archX, A.archZ).h;
+  const shoulderY = groundH(-A.archX, A.archZ);
   let z = -34;
   const ups = [0.5, 0.2, -0.3, 0.7, 0.3, 0.6, -0.2, 0.5];
   const climb = (shoulderY - 0.5 - y - ups.reduce((t, u) => t + u, 0)) / ups.length;
@@ -204,17 +236,17 @@ export function buildArchwayLayout() {
     z -= 3.1 + (i % 3 === 1 ? 0.3 : 0);
   }
   // a broad shelf from the last ledge up onto the arm's tip
-  const rimY = archwayGround(-A.mouth - 5, z).h;
+  const rimY = groundH(-A.mouth - 5, z);
   const landing = add(rect('ledge', -A.mouth - 1.6, z + 0.4, rimY, 1.3, 3.4, Math.PI / 2));
   node(route, landing, -A.mouth + 0.6, z + 0.4);
   node(route, landing, -A.mouth - 3.6, z + 0.4);
   // up onto the west arm's tip: the shoulder
   const shoulder = { x: -A.archX + 1, z: A.archZ + 4 };
   walkTo(route, shoulder.x, shoulder.z);
-  caches.push({ id: 'g1', x: -A.archX - 2.5, y: archwayGround(-A.archX - 2.5, A.archZ + 5).h, z: A.archZ + 5, value: 20 });
+  caches.push({ id: 'g1', x: -A.archX - 2.5, y: groundH(-A.archX - 2.5, A.archZ + 5), z: A.archZ + 5, value: 20 });
 
   // ---- over the arch: steps up its back to the keystone and down to the east arm
-  const steps = [], gy = (x) => archwayGround(x, A.archZ).h;
+  const steps = [], gy = (x) => groundH(x, A.archZ);
   const yEnd = Math.max(gy(-A.archX + 2), gy(A.archX - 2));
   const archY = (x) => yEnd + A.archRise * (1 - (x / (A.archX - 2)) ** 2);
   const xs = [-(A.archX - 2)];
@@ -243,7 +275,7 @@ export function buildArchwayLayout() {
   const S = A.stack;
   walkTo(stack, A.archX - 1, A.archZ + 1);
   walkTo(stack, A.archX - 0.5, A.archZ - 0.6);
-  let sy = archwayGround(A.archX - 0.5, A.archZ - 0.6).h;
+  let sy = groundH(A.archX - 0.5, A.archZ - 0.6);
   const stepping = [[A.archX + 1, A.archZ - 3.2, -0.2], [A.archX + 2.6, A.archZ - 6.2, 0.8], [A.archX + 3.6, A.archZ - 9.4, 0.8]].map(([x, zz, up]) => {
     sy += up;
     const p = add(disc('stack', x, zz, sy, 1.1));
@@ -275,16 +307,19 @@ export function buildArchwayLayout() {
   colliders.push(...lips);
   colliders.push(cyl(S.x, S.z, S.r, -6, S.top - 0.2, 'stone'));
   colliders.push(cyl(camp.x, camp.z, 0.6, camp.y - 0.2, camp.y + 1.6, 'wood'));
+  // the cave's lintel, out of reach overhead: solid, so the camera keeps out of it
+  const caveY = groundH(CAVE.x, CAVE.z);
+  colliders.push(obox(CAVE.x - 0.5, caveY + 4.6, CAVE.z, 1.1, 1.2, CAVE.r, 0, 'stone'));
   colliders.push(obox(rowboat.x, rowboat.y + 0.2, rowboat.z, 1.7, 0.25, 0.7, rowboat.rot, 'wood'));
   // the arch's legs, from the sea floor up to its back
   for (const s of [-1, 1]) colliders.push(cyl(s * A.archX, A.archZ, 3.2, -6, yEnd - 1.2, 'stone'));
 
   const checkpoints = [
-    { id: 'gully', x: 1.6, y: archwayGround(1.6, top.z).h, z: top.z },
-    { id: 'clifftop', x: -36, y: archwayGround(-36, 28).h, z: 28 },
+    { id: 'gully', x: 1.6, y: groundH(1.6, top.z), z: top.z },
+    { id: 'clifftop', x: -36, y: groundH(-36, 28), z: 28 },
     lantern1, lantern2,
     // beside the way onto the arch, so you pass within reach of it
-    { id: 'shoulder', x: shoulder.x - 1.3, y: archwayGround(shoulder.x - 1.3, shoulder.z + 0.6).h, z: shoulder.z + 0.6 },
+    { id: 'shoulder', x: shoulder.x - 1.3, y: groundH(shoulder.x - 1.3, shoulder.z + 0.6), z: shoulder.z + 0.6 },
     { id: 'keystone', x: key.cx + 0.5, y: key.top, z: A.archZ - 0.6 },
     topLantern,
   ];
@@ -304,7 +339,7 @@ export function buildArchwayLayout() {
   for (const p of pieces.filter((q) => q.kind === 'stack' && q.cz > -20 && q.cz < 0).slice(1, 4)) gulls.push({ x: p.cx + 0.4, y: p.top, z: p.cz });
   for (const k of [0.25, 0.62]) { const p = steps[Math.floor(steps.length * k)]; gulls.push({ x: p.cx, y: p.top, z: p.cz + p.hz - 0.45 }); }
   gulls.push({ x: S.x - 2.2, y: S.top, z: S.z - 1.4 });
-  for (const [x, z] of [[-8, 34.4], [9, 35.2]]) gulls.push({ x, y: archwayGround(x, z).h, z });
+  for (const [x, z] of [[-8, 34.4], [9, 35.2]]) gulls.push({ x, y: groundH(x, z), z });
 
   // the traverse's cliff face for the camera: the bay's west wall, then the mouth's
   // (the water on its left; it runs just inside where you stand, so the cliff top stays out of reach)
@@ -329,8 +364,10 @@ export function buildArchwayLayout() {
     chests: [chest],
     summit: { x: key.cx, y: key.top, z: A.archZ }, vault, keystone: { x: key.cx, y: key.top, z: A.archZ },
     spots: {},
-    hubs: [{ x: S.x, z: S.z, orbit: S.r + 0.9, base: archwayGround(A.archX + 4, A.archZ - 3).h + 0.6, top: S.top - 0.6 }],
-    faces: [{ path: facePath, base: 7, top: 15.5, reach: 2.6 }],
+    hubs: [{ x: S.x, z: S.z, orbit: S.r + 0.9, base: groundH(A.archX + 4, A.archZ - 3) + 0.6, top: S.top - 0.6 }],
+    // the traverse's wall; and the storm cave, which the camera looks straight into
+    faces: [{ path: facePath, base: 7, top: 15.5, reach: 2.6 },
+      { path: [[CAVE.x + 2.4, CAVE.z - 3], [CAVE.x + 2.4, CAVE.z + 3]], base: caveY - 1, top: caveY + 2.5, reach: 4.2 }],
     // the far end of the walk: the lanterns there offer the quick way back to the cove
     fallBack: { drop: ASHORE.design.safeDrop, below: 3, safe: [], down, from: ['keystone', 'stack'], label: 'Climb down to the cove' },
     gulls, steps, stepping, shelves, crown, span, inlets: INLETS, cave: CAVE, basin: BASIN, gully: GULLY, yEnd, clear,
@@ -347,8 +384,8 @@ export function validateArchway(L) {
     let jumps = 0;
     for (let i = 1; i < nodes.length; i++) {
       const A = nodes[i - 1], B = nodes[i];
-      // a walk over open ground isn't a jump (the climber checks it), but a terrace is
-      if (!A.piece && !B.piece && !(A.tier && B.tier)) continue;
+      // a walk over open ground isn't a jump (the climber checks it)
+      if (!A.piece && !B.piece) continue;
       const dy = B.y - A.y, gap = A.piece && B.piece ? footGap(nodeFoot(A), nodeFoot(B)) : 0;
       const where = `${label}[${i}] ${A.piece?.kind || 'ground'}→${B.piece?.kind || 'ground'}`;
       if (dy > lim.up + 1e-6) errors.push(`${where}: jump up ${dy.toFixed(2)} > ${lim.up}`);

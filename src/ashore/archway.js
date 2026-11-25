@@ -20,7 +20,7 @@ import { propMaterial, thinOutline, PROPS } from '../props.js';
 import { toonGradient, toonMaterial } from '../toon.js';
 import { mulberry32, noise2, TAU } from '../util.js';
 import { rowboatParts } from './pieces.js';
-import { buildArchwayLayout, archwayGround, ARCHWAY } from './archway-layout.js';
+import { buildArchwayLayout, archwayGrid, groundH, ARCHWAY } from './archway-layout.js';
 import { C, bandFaces, pieceArt, archBody, stackBody, campParts, cairnParts, handlineParts, caveParts } from './archway-art.js';
 import { buildArchwayLife } from './archway-life.js';
 
@@ -34,13 +34,12 @@ function merged(parts) {
 // ------------------------------------------------------------------ ground
 let terrainMat = null;
 function terrainMesh() {
-  const E = 102, S = 1.1, n = Math.round((2 * E) / S) + 1;
-  const pos = new Float32Array(n * n * 3), col = new Float32Array(n * n * 3), hs = new Float32Array(n * n), tags = [];
+  // the same grid you walk on (archway-layout.js, groundH)
+  const { E, S, n, hs, tags } = archwayGrid();
+  const pos = new Float32Array(n * n * 3), col = new Float32Array(n * n * 3);
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-    const x = -E + i * S, z = -E + j * S, k = j * n + i;
-    const g = archwayGround(x, z);
-    hs[k] = g.h; tags[k] = g.tag;
-    pos[k * 3] = x; pos[k * 3 + 1] = g.h; pos[k * 3 + 2] = z;
+    const k = j * n + i;
+    pos[k * 3] = -E + i * S; pos[k * 3 + 1] = hs[k]; pos[k * 3 + 2] = -E + j * S;
   }
   const cs = Object.fromEntries(Object.entries(C).map(([k, v]) => [k, new THREE.Color(v)]));
   const tmp = new THREE.Color();
@@ -87,8 +86,13 @@ function buildDecor(L, group, colliders, quality) {
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   const put = (type, x, z, s, sink = 0.12, rot = rng() * TAU) => {
     q.setFromAxisAngle(up, rot);
-    m.compose(v.set(x, archwayGround(x, z).h - sink, z), q, sc.set(s, s * (0.9 + rng() * 0.25), s));
+    m.compose(v.set(x, groundH(x, z) - sink, z), q, sc.set(s, s * (0.9 + rng() * 0.25), s));
     (buckets[type] ||= []).push(m.clone());
+    // boulders are solid: you walk round them, not through them
+    if (type === 'rock' && s > 0.5) {
+      const bb = PROPS.rock.boundingBox || (PROPS.rock.computeBoundingBox(), PROPS.rock.boundingBox);
+      colliders.push({ type: 'cyl', x, z, r: Math.max(bb.max.x, bb.max.z) * s * 0.85, y0: groundH(x, z) - 0.5, y1: groundH(x, z) - sink + bb.max.y * s * 0.9, tag: 'stone' });
+    }
   };
   const trunks = [];
   for (let n = 0, done = 0; n < 900 && done < (low ? 40 : 75); n++) {
@@ -100,7 +104,7 @@ function buildDecor(L, group, colliders, quality) {
       const s = 1.4 + rng() * 0.9;
       put('pine', x, z, s, 0.3);
       trunks.push([x, z]);
-      colliders.push({ type: 'cyl', x, z, r: 0.3 * s, y0: archwayGround(x, z).h - 0.5, y1: archwayGround(x, z).h + 3 * s, tag: 'wood' });
+      colliders.push({ type: 'cyl', x, z, r: 0.3 * s, y0: groundH(x, z) - 0.5, y1: groundH(x, z) + 3 * s, tag: 'wood' });
     } else put(type, x, z, type === 'rock' ? 0.6 + rng() * 0.9 : 0.8 + rng() * 0.6);
     done++;
   }
@@ -130,7 +134,7 @@ function trailParts(L) {
   const tops = L.route.filter((n) => !n.piece && !n.tier && n.y > 12 && n.z > 10 && n.z < 72);
   for (const [k, n] of tops.entries()) {
     const x = n.x + 1.6, z = n.z + 0.8;
-    P.push(...cairnParts(x, archwayGround(x, z).h - 0.05, z, 1500 + k * 11));
+    P.push(...cairnParts(x, groundH(x, z) - 0.05, z, 1500 + k * 11));
   }
   // the handline: a pin in the face above each ledge, where the rock is at that height
   const pins = [];
@@ -139,7 +143,7 @@ function trailParts(L) {
     const y = n.y + 1.15, a = n.piece.a;
     const at = (d) => (a != null ? [Math.cos(a) * (A.bay - 0.3 + d), Math.sin(a) * (A.bay - 0.3 + d)] : [-(A.mouth - 1 + d), n.z]);
     let d = 0;
-    while (d < 6 && archwayGround(...at(d)).h < y) d += 0.1;
+    while (d < 6 && groundH(...at(d)) < y) d += 0.1;
     const [px, pz] = at(Math.max(0, d - 0.15));
     pins.push([px, y, pz]);
   }

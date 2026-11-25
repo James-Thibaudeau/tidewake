@@ -308,8 +308,24 @@ Updated 2026-11-25.
         eases round), the shoulder's lantern stood off the path, and the
         stack's lantern and chest were off to one side of where you arrive.
       - Looked at in the preview, at desktop and phone sizes. Landing from
-        inside the bay works. Still worth a play with real hands: the feel
-        of the jumps and the face camera.
+        inside the bay works.
+      - Fixes after a play by hand (2026-11-25):
+        - You sank into the ground on the gully and at the start of the
+          stack. The terrain mesh draws straight lines between grid points
+          1.1 m apart, but you walked on the exact height function, so on
+          sharp changes (the gully's terraces) the drawn ground rose
+          through your feet. Now you walk on the mesh's own triangles
+          (`groundH` in `archway-layout.js`, from the same grid
+          `archway.js` draws), and the gully's terraces are stone steps
+          (pieces) over a floor a step lower.
+        - The arch's rock carried on, flat, past the arms' edges, so by the
+          stack you waded through it. Over the arms it now goes no higher
+          than the ground.
+        - Boulders on the cliff tops and the beach are solid.
+        - The storm cave: the camera was pushed in close by the narrow nook
+          and could end up inside its overhang. The cave is wider and
+          deeper, its lintel high and solid, and the camera looks straight
+          in while you're at it (a `faces` entry).
   - [ ] 4.6 Tropical islands and 4.7 the Sunken Temple
   - [ ] 4.8 Volcanic islands (with the steam-vent launch) and 4.9 Mount
     Cinderhorn

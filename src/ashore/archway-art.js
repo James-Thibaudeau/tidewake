@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { part, jitter } from '../props.js';
 import { mulberry32, noise2, lerp, TAU } from '../util.js';
+import { groundH } from './archway-layout.js';
 
 export const C = {
   rock: '#8f877e', rock2: '#746c65', band: '#a48d72', wet: '#4f4944', top: '#b4ada2', turf: '#86ab55', turf2: '#76984b',
@@ -124,6 +125,13 @@ export function pieceArt(p, i) {
       const g = jitter(new THREE.CylinderGeometry(p.r, p.r * 0.96, 0.5, 14, 1), 0.12, 600);
       return [part(g, C.turf, { x: p.cx, y: p.top - 0.25, z: p.cz, c2: C.top, split: 0.7 })];
     }
+    case 'tier': {
+      // a step of the gully: a block of rock, pale and worn on top, tucked into the walls either side
+      const g = jitter(box(p.hx * 2, p.thick, p.hz * 2 + 0.04, 3, 1, 2), 0.07, 760 + i);
+      const out = placed(g, C.top, p, { y: p.top - p.thick / 2 });
+      out.computeVertexNormals();
+      return [bandFaces(out, { flat: 0.7, turf: 0.2, seed: 760 + i })];
+    }
     case 'step': {
       // one stone of the arch's back: pale and worn on top
       const g = jitter(box(p.hx * 2 + 0.06, 0.5, p.hz * 2, 2, 1, 2), 0.06, 700 + i);
@@ -160,7 +168,10 @@ export function archBody(L, A) {
       const k = 1 + 0.12 * noise2(x * 0.3 + j * 0.7, t * 2, 31);
       const y = yc + Math.sign(st) * Math.abs(st) ** 0.45 * hh * (st > 0 ? 1 : k);
       const z = A.archZ + Math.sign(ct) * Math.abs(ct) ** 0.6 * hd * k;
-      pos.push(x, y, z);
+      // past the walk, over the arms' tips, the rock goes no higher than the
+      // ground: you walk on the ground there, so you mustn't wade through rock
+      const gh = Math.abs(x) > A.archX - 2.5 ? groundH(x, z) : -Infinity;
+      pos.push(x, gh > 0.5 ? Math.min(y, gh - 0.12) : y, z);
       c.set(st > 0.85 ? C.top : strata(y, x, z));
       col.push(c.r, c.g, c.b);
     }
@@ -265,11 +276,14 @@ export function rod(a, b, r, color) {
 /** The storm cave's mouth: an overhang of rock and the dark inside. */
 export function caveParts(cave, floorY) {
   const P = [];
-  P.push(part(new THREE.SphereGeometry(1, 12, 8), C.cave, { x: cave.x + 1.6, y: floorY + 1.3, z: cave.z, sx: 1.4, sy: 1.8, sz: 2.4 }));
-  for (let k = 0; k < 7; k++) {
-    const a = -1.3 + (k / 6) * 2.6;
-    P.push(part(jitter(new THREE.DodecahedronGeometry(1.05, 0), 0.25, 1400 + k), strata(floorY + 2 + Math.cos(a) * 1.5), {
-      x: cave.x + 0.3, y: floorY + 1.4 + Math.cos(a) * 2.2, z: cave.z + Math.sin(a) * 2.6, s: 1.15 }));
+  // the dark inside, set back in the rock behind where the vault stands
+  P.push(part(new THREE.SphereGeometry(1, 14, 10), C.cave, { x: cave.x + 2.5, y: floorY + 1.5, z: cave.z, sx: 1.3, sy: 2.2, sz: 2.6 }));
+  // the lintel: an arch of big stones over the mouth, high enough that the
+  // view out past you clears it
+  for (let k = 0; k < 9; k++) {
+    const a = -1.25 + (k / 8) * 2.5;
+    P.push(part(jitter(new THREE.DodecahedronGeometry(1.1, 0), 0.25, 1400 + k), strata(floorY + 2 + Math.cos(a) * 2), {
+      x: cave.x - 0.5, y: floorY + 1.2 + Math.cos(a) * 3.3, z: cave.z + Math.sin(a) * 3.2, s: 1.2 }));
   }
   return P;
 }
