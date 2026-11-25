@@ -217,7 +217,7 @@ Updated 2026-11-25.
       a wreck → fitted at Port Haven (tier 1); the short-of-gold toast and the
       Refit button (tier 2); each tier's model; a pre-change save loads at
       tier 0. Not looked at on a phone.
-  - [x] 4.4 Rocky islands. `rocky` is in `ASHORE_BIOMES`, so the grapnel
+  - [x] 4.4 Rocky islands ([#37](https://github.com/James-Thibaudeau/tidewake/pull/37)). `rocky` is in `ASHORE_BIOMES`, so the grapnel
     refit (tier 1) is live: it's offered once you own the Balanced Rudder,
     and its fitting waits on a temperate island (Wren Island from Port
     Haven). Until it's fitted, rocky shores say "Your anchor won't grip bare
