@@ -105,9 +105,9 @@ export const JOURNALS = [
 ];
 
 export const STEPS = {
-  visitWreck: { title: "Grandfather's wreck", text: "Sail out past the point to your grandfather's wreck and search it." },
+  visitWreck: { title: "Grandfather's wreck", text: "Sail out past the point to your grandfather's wreck, climb aboard and search his cabin." },
   journal: { title: "Grandfather's Journals", text: "Follow Grandpa's clue and find Journal {n}." },
-  searchChest: { title: 'The chest under the bunk', text: "Return to Grandpa's wreck near Port Haven and open the old chest under his bunk." },
+  searchChest: { title: 'The chest under the bunk', text: "Return to Grandpa's wreck near Port Haven, climb aboard and open the old chest under his bunk." },
   letterHome: { title: 'The letter home', text: "Bring Grandpa's letters home to Grandma in Port Haven." },
 };
 

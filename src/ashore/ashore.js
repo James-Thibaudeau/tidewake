@@ -12,6 +12,7 @@ import { edgeFactor } from '../world.js';
 import { propMesh, part, merge, propMaterial, thinOutline } from '../props.js';
 import { STYLES, owns } from '../cosmetics.js';
 import { generateLevel } from './levelgen.js';
+import { buildWreckLevel } from './wreck.js';
 import { CharacterController } from './controller.js';
 import { FollowCamera } from './camera.js';
 
@@ -86,6 +87,12 @@ export class Ashore {
     return { prompt: `Drop anchor & go ashore on ${I.name}`, action: () => this.enter(I) };
   }
 
+  /** Climb aboard grandfather's wreck (no anchor needed: you tie up alongside). */
+  enterWreck() {
+    const W = this.game.world.wreck;
+    return W ? this.enter(W) : Promise.resolve();
+  }
+
   progress(I) {
     const A = this.game.state.ashore || (this.game.state.ashore = {});
     return (A[I.id] ||= { visited: false, coins: [], caches: [], chest: false });
@@ -106,7 +113,12 @@ export class Ashore {
     this.island = I;
     // the rowboat is drawn up on the beach facing the anchored ship
     const landingAngle = Math.atan2(g.boat.pos.z - I.z, g.boat.pos.x - I.x);
-    this.level = generateLevel(I, { quality: g.settings.quality, landingAngle });
+    this.level = I.wreck ? buildWreckLevel(I, { quality: g.settings.quality })
+      : generateLevel(I, { quality: g.settings.quality, landingAngle });
+    this.syncStory();
+    this.hintsShown = new Set();
+    const calm = this.level.calm;
+    g.ocean.uniforms.uCalm.value.set(calm?.x || 0, calm?.z || 0, calm?.r || 0);
     this.scene.add(this.level.group);
     this.buildPickups();
     this.borrowSky(true);
@@ -141,8 +153,12 @@ export class Ashore {
     // let a frame render before fading in so the camera is placed
     this.update(0.016, { jump: 0, action: 0 });
     await g.ui.fade(0, 0.6);
-    if (first && !g.state.story.flags.ashoreTutorial) {
-      g.state.story.flags.ashoreTutorial = true;
+    const flags = g.state.story.flags;
+    if (I.wreck) {
+      // the wreck is the walking tutorial; returning visitors don't need it again
+      if (!flags.wreckWalked) g.ui.toast(g.ui.touch ? "Drag the stick to walk. Climb aboard and find grandfather's cabin at the stern!" : "WASD or the arrow keys to walk, Shift to run. Climb aboard and find grandfather's cabin at the stern!", 'info');
+    } else if (first && !flags.ashoreTutorial) {
+      flags.ashoreTutorial = true;
       g.ui.toast(g.ui.touch ? 'Drag the stick to walk, tap ▲ to jump. Find your way to the top!' : 'WASD to walk, Shift to run, Space to jump. Find your way to the top!', 'info');
     }
   }
@@ -156,6 +172,7 @@ export class Ashore {
     g.events.emit('ashore:leave', this.island);
     await g.ui.fade(1, 0.5);
     this.borrowSky(false);
+    g.ocean.uniforms.uCalm.value.set(0, 0, 0);
     const ex = g.boat.explorer;
     this.removeHandLantern(ex);
     g.boat.group.add(ex.root);
@@ -269,7 +286,27 @@ export class Ashore {
     this.cam.update(dt, ctl, g.input.consumeLook(), hs > 0.3);
     this.updateLights(t);
     this.updatePickups(dt, t);
+    this.updateHints();
     this.updatePrompt(acts);
+  }
+
+  /** One-time tips by place (the wreck teaches walking and jumping this way). */
+  updateHints() {
+    const L = this.level, g = this.game, p = this.ctl.pos, flags = g.state.story.flags;
+    if (!L.hints || flags.wreckWalked) return; // reaching the cabin finishes the tutorial walk
+    for (const h of L.hints) {
+      if (this.hintsShown.has(h.id) || Math.hypot(h.x - p.x, h.z - p.z) > h.r) continue;
+      if ((h.yMin != null && p.y < h.yMin) || (h.yMax != null && p.y > h.yMax)) continue;
+      this.hintsShown.add(h.id);
+      g.ui.toast(g.ui.touch ? h.touch : h.text, 'info');
+      if (h.id === 'cabin') { flags.wreckWalked = true; g.saveVoyage(); }
+    }
+  }
+
+  /** Show what's still waiting aboard the wreck (his journal, the chest). */
+  syncStory() {
+    const st = this.game.story;
+    this.level?.syncStory?.({ journal: st ? !st.has('I') : false, chestOpen: st ? st.chapter >= 9 : false });
   }
 
   // --------------------------------------------------------------- lights
@@ -360,6 +397,18 @@ export class Ashore {
     const g = this.game, p = this.ctl.pos, L = this.level;
     let prompt = null, action = null;
     if (Math.hypot(L.exit.x - p.x, L.exit.z - p.z) < L.exit.r) { prompt = 'Row back to your ship'; action = () => this.leave(); }
+    const near = (s) => s && Math.hypot(s.x - p.x, s.z - p.z) < s.r && Math.abs(s.y - p.y) < 1.2;
+    const st = g.story;
+    if (L.spots && st) {
+      if (near(L.spots.table)) {
+        if (!st.has('I')) { prompt = 'Search the chart table'; action = () => { st.findJournal('I'); this.syncStory(); }; }
+        else { prompt = "Read grandfather's first journal"; action = () => g.ui.openJournal('story', 'I'); }
+      } else if (near(L.spots.chest)) {
+        if (st.chapter === 8) { prompt = 'Open the chest under the bunk'; action = () => { st.openChest(); this.syncStory(); }; }
+        else if (st.chapter < 8) prompt = 'An old sea chest, locked tight';
+        else prompt = 'The chest is empty now';
+      }
+    }
     for (const c of this.chests) {
       if (c.opened || Math.hypot(c.x - p.x, c.z - p.z) > 1.8 || Math.abs(c.y - p.y) > 1.5) continue;
       prompt = 'Open the chest'; action = () => this.openChest(c);

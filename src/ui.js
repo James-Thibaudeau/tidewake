@@ -406,8 +406,9 @@ export class UI {
     if (low !== this.last.low) { this.el.vignette?.classList.toggle('low', low); this.last.low = low; }
 
     if (b) {
-      // compass
-      const bearing = bearingDeg(b.heading);
+      // compass: the ship's heading at sea, the way the camera faces on foot
+      const cam = mode === 'ashore' ? g.ashore?.cam : null;
+      const bearing = bearingDeg(cam ? cam.yaw : b.heading);
       if (this.last.bearing == null || Math.abs(bearing - this.last.bearing) > 0.05) {
         this.last.bearing = bearing;
         const w = this.compassW || 300;

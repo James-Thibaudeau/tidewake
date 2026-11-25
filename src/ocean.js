@@ -33,10 +33,13 @@ const vertexShader = /* glsl */ `
 ${WAVE_GLSL}
 varying vec3 vWorld;
 varying float vH;
+uniform vec3 uCalm;
+// Ashore, water inside the island (a moat) lies still: no swell within uCalm.z of uCalm.xy.
+float calmK(vec2 p) { return uCalm.z > 0.0 ? smoothstep(uCalm.z, uCalm.z + 4.0, distance(p, uCalm.xy)) : 1.0; }
 #include <fog_pars_vertex>
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
-  float h = waveHeight(wp.xz);
+  float h = waveHeight(wp.xz) * calmK(wp.xz);
   wp.y += h;
   vWorld = wp.xyz;
   vH = h;
@@ -59,6 +62,7 @@ uniform float uLanternR;
 uniform float uRain;
 uniform vec2 uWindDir;
 uniform float uWindStr;
+uniform vec3 uCalm;
 varying vec3 vWorld;
 varying float vH;
 ${WAVE_GLSL}
@@ -82,8 +86,9 @@ float cel(float field, float thr) {
 void main() {
   vec2 p = vWorld.xz;
   float e = 0.5;
-  float hL = waveHeight(p - vec2(e, 0.0)), hR = waveHeight(p + vec2(e, 0.0));
-  float hD = waveHeight(p - vec2(0.0, e)), hU = waveHeight(p + vec2(0.0, e));
+  float calm = uCalm.z > 0.0 ? smoothstep(uCalm.z, uCalm.z + 4.0, distance(p, uCalm.xy)) : 1.0;
+  float hL = waveHeight(p - vec2(e, 0.0)) * calm, hR = waveHeight(p + vec2(e, 0.0)) * calm;
+  float hD = waveHeight(p - vec2(0.0, e)) * calm, hU = waveHeight(p + vec2(0.0, e)) * calm;
   vec3 n = normalize(vec3(hL - hR, 2.0 * e, hD - hU));
   float amp = max(uWaveScale * 1.25 + uSwellScale * 3.2, 0.05);
   float hn = (hL + hR + hD + hU) * 0.25 / amp;
@@ -212,6 +217,7 @@ export class Ocean {
       uLantern: { value: new THREE.Vector4(0, 0, 0, 0) },
       uLanternR: { value: 30 },
       uRain: { value: 0 },
+      uCalm: { value: new THREE.Vector3(0, 0, 0) }, // (x, z, radius): still water inside; radius 0 = off
     };
     this.material = new THREE.ShaderMaterial({
       uniforms: this.uniforms, vertexShader, fragmentShader, fog: true,
