@@ -35,7 +35,9 @@ decisions made along the way.
 
 ## Chapters
 
-`state.rival = { chapter, wins, losses, flags }`
+`state.rival = { chapter, wins, losses, flags, log }`. `log` is everything
+Sable has said, for the Captain Sable tab in the journal:
+`[{ title, day, lines, scene? }]`, oldest first, at most 80 entries.
 
 | chapter | Next encounter | Opens when |
 | --- | --- | --- |

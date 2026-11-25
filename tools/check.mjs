@@ -283,7 +283,7 @@ const checks = {
     const { SAVE_VERSION } = await load('config.js');
     const v1 = { v: 1, banked: 240, cargo: 0, health: 80, upgrades: { sail: 1 }, discovered: [0, 3], savePort: 0 };
     const cases = { empty: {}, v1, garbage: { quests: 7, story: 'x', rival: null, hold: {}, wardrobe: 'hat', ashore: null } };
-    const objects = { quests: ['active', 'done', 'boards', 'pinned'], story: ['chapter', 'journals', 'flags', 'seenCards'], rival: ['chapter', 'wins', 'losses', 'flags'], ashore: [] };
+    const objects = { quests: ['active', 'done', 'boards', 'pinned'], story: ['chapter', 'journals', 'flags', 'seenCards'], rival: ['chapter', 'wins', 'losses', 'flags', 'log'], ashore: [] };
     const arrays = ['wardrobe', 'hold'];
     for (const [label, input] of Object.entries(cases)) {
       const d = migrate(structuredClone(input));
@@ -302,6 +302,13 @@ const checks = {
       }
     }
     if (migrate(null) !== null || migrate('x') !== null) errors.push('migrate should return null for a non-object');
+    // a save from before Sable's log was kept gets what was said in the encounters behind it
+    for (const chapter of [0, 3, 6, 8]) {
+      const log = migrate({ profile: { name: 'Wren' }, rival: { chapter } }).rival.log;
+      const want = Math.min(chapter, 6) + (chapter >= 6) + (chapter >= 7) + (chapter >= 8);
+      if (log.length !== want) errors.push(`rival chapter ${chapter}: ${log.length} log entries, expected ${want}`);
+      if (log.some((e) => !e.title || !e.lines.length || e.lines.some((l) => /\{\w+\}/.test(l)))) errors.push(`rival chapter ${chapter}: a log entry is untitled, empty or unfilled`);
+    }
     return { errors, note: `${Object.keys(cases).length} saves` };
   },
 

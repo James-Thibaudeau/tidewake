@@ -1,6 +1,7 @@
 // localStorage persistence. Every access is guarded: private windows and
-// blocked storage simply mean "no save".
+// blocked storage simply mean "no save". migrate() brings old saves up to date.
 import { SAVE_KEY, SETTINGS_KEY, SAVE_VERSION, isTouch } from './config.js';
+import { ENCOUNTERS, CARDS } from './rival-text.js';
 
 export function loadSave() {
   try {
@@ -26,8 +27,23 @@ export function migrate(d) {
   d.hold = Array.isArray(d.hold) ? d.hold : [];
   const rv = d.rival && typeof d.rival === 'object' ? d.rival : {};
   d.rival = { chapter: rv.chapter ?? 0, wins: rv.wins ?? 0, losses: rv.losses ?? 0, flags: rv.flags || {} };
+  d.rival.log = Array.isArray(rv.log) ? rv.log : pastTalk(d.rival.chapter, d.profile?.name || 'Captain');
   d.v = SAVE_VERSION;
   return d;
+}
+
+/**
+ * Sable's log for a save from before it was kept: what was said at each
+ * encounter already behind you. The win or lose line wasn't saved, so it's left out.
+ */
+function pastTalk(chapter, captain) {
+  const fill = (s) => s.replace(/\{captain\}/g, captain);
+  const log = ENCOUNTERS.slice(0, Math.min(chapter, ENCOUNTERS.length))
+    .map((e) => ({ title: e.title, lines: [...e.hail, ...(e.after || e.towing || [])].map(fill) }));
+  for (const [ch, deck] of [[6, CARDS.mast], [7, CARDS.letter], [8, CARDS.finale]]) {
+    if (chapter >= ch) log.push({ title: deck[0].title, scene: true, lines: deck.map((c) => fill(c.text)) });
+  }
+  return log;
 }
 
 export function writeSave(data) {

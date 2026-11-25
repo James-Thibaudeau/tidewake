@@ -74,7 +74,7 @@ export class Game {
       story: { chapter: 0, journals: [], flags: {}, seenCards: [] },
       ashore: {}, hold: [],
       // the rival captain (rival.js)
-      rival: { chapter: 0, wins: 0, losses: 0, flags: {} },
+      rival: { chapter: 0, wins: 0, losses: 0, flags: {}, log: [] },
     };
   }
 
