@@ -26,7 +26,9 @@ export const SABLE_PROFILE = {
   neck: { style: 'neckerchief', color: 'cream' },
   extra: { style: 'none', color: 'tan' },
 };
-export const SABLE_LIVERY = { hull: '#1d1a22', trim: CRIMSON, deck: '#b98a58', sail: CRIMSON, flag: '#f4efe4', pennant: CRIMSON };
+// `emblem: 'wing'` puts a dark wing on the mainsail in place of the tier's own
+// stripes and roses, so she never looks like the player's ship (whose top sails are red too).
+export const SABLE_LIVERY = { hull: '#1d1a22', trim: CRIMSON, deck: '#b98a58', sail: CRIMSON, flag: '#f4efe4', pennant: CRIMSON, emblem: 'wing' };
 
 /**
  * One entry per encounter, in story order.

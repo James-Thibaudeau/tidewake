@@ -83,6 +83,7 @@ const rocks = (x) => `<g transform="translate(${x} 0)"><path d="M0 116 L6 52 L30
 const redwingArt = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})">
   <path d="M-30 0 H30 L20 13 H-20 Z" fill="#221c26" ${INK}/><path d="M-28 3 H27" stroke="#b81f2e" stroke-width="3"/><path d="M0 0 V-54" ${INK}/>
   <path d="M3 -52 L36 -6 H3 Z" fill="#b81f2e" ${INK}/><path d="M-3 -46 L-26 -6 H-3 Z" fill="#b81f2e" ${INK}/>
+  <path d="M6 -16 q6 -12 20 -13 l-6 5 5 2 -7 3 4 3 q-9 3 -16 0z" fill="#221c26"/>
   <path d="M0 -54 l10 3 -10 3" fill="#fff4dc" stroke="#2a1d12" stroke-width="1.5"/></g>`;
 const STORY_ART = {
   redwing: () => sky('#ffd9a8', '#bfe0f2') + `<circle cx="258" cy="42" r="16" fill="#ffd54a" ${INK}/>${redwingArt(150, 116, 1.35)}${smallBoat(262, 118, 0.6)}`,

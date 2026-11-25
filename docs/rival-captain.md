@@ -15,7 +15,9 @@ decisions made along the way.
   isn't always a sloop: her sails, hull, helm, keel, lantern and crow's nest
   take the same tiers as the player's ship, never below a Clipper Rig on an
   Oak hull (`SHIP_FLOOR` in `rival.js`). Her speed in a race was already a
-  fraction of the player's.
+  fraction of the player's. Her sails carry a dark wing and a dark band
+  along the foot instead of the tier's stripes and roses (`emblem: 'wing'`
+  in her livery), because the player's own tier 4 sails are red too.
 - **Sable** keeps the working name, uses they/them, and wears a dark
   tricorn with a crimson plume. Their grandmother is "the captain of the
   crimson sails", never named, like your grandparents.
@@ -69,8 +71,9 @@ new Boat(scene, opts = {})
 // opts.npc      true: not the player's boat. No PointLights (adding lights at
 //               runtime recompiles every shader); lantern glow meshes only.
 // opts.profile  appearance profile for the explorer at the helm
-// opts.livery   { hull, trim, deck, sail, flag, pennant } colours that replace
-//               the tier colours. `sail` is the cloth colour of every sail.
+// opts.livery   { hull, trim, deck, sail, flag, pennant, emblem } colours that replace
+//               the tier colours. `sail` is the cloth colour of every sail;
+//               `emblem: 'wing'` swaps the tier's sail decoration for a wing.
 boat.setLivery(livery | null)  // change at runtime; null = the standard tier look
 boat.setDismasted(on)          // broken stub mast, no sails/flags/rigging, a spar and canvas across the deck
 boat.setVisible(on)            // the model and its wake

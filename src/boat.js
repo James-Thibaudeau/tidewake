@@ -190,8 +190,33 @@ function drawEmblem(g, S, H, { u = 0.36, v = 0.52, R = 1.05, ring = '#d4402e', i
 // cloth = a dye (CSS hex) that replaces the tier's own cloth colour. On a dark
 // or saturated dye the seams go darker and the trim turns cream and gold, so
 // every tier's decoration still reads.
-function sailTexture(tier, plain = false, cloth = null) {
-  const key = tier + (plain ? 'p' : '') + (cloth || '');
+// A wing emblem for a livery's mainsail: a dark swept wing with a gold and
+// cream shoulder bar, squashed like drawEmblem so it sits right on the taper.
+const WING_INK = '#1d1a22';
+function drawWing(g, S, H, { u = 0.37, v = 0.5, R = 1.35 } = {}) {
+  const cx = u * S, cy = (1 - v) * S;
+  const rx = R / (BOOM_LEN / S), ry = R / ((H * (1 - 0.55 * u)) / S);
+  g.save(); g.translate(cx, cy); g.scale(rx, ry);
+  g.fillStyle = WING_INK;
+  g.beginPath();
+  g.moveTo(-1.0, 0.2);
+  g.quadraticCurveTo(-0.3, -0.75, 1.05, -0.9);   // leading edge, out to the tip
+  g.lineTo(0.6, -0.44); g.lineTo(0.92, -0.32);   // three feather tips down the trailing edge
+  g.lineTo(0.4, -0.02); g.lineTo(0.68, 0.16);
+  g.lineTo(0.14, 0.32); g.lineTo(0.36, 0.54);
+  g.quadraticCurveTo(-0.5, 0.66, -1.0, 0.2);
+  g.fill();
+  // the shoulder bar
+  g.save(); g.translate(-0.56, 0.08); g.rotate(-0.55);
+  g.fillStyle = GOLD; g.beginPath(); g.ellipse(0, 0, 0.3, 0.13, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#f3e7c9'; g.beginPath(); g.ellipse(0.04, 0.2, 0.26, 0.06, 0, 0, Math.PI * 2); g.fill();
+  g.restore();
+  g.restore();
+}
+
+// emblem: a livery's own mark in place of the tier's stripes and roses ('wing')
+function sailTexture(tier, plain = false, cloth = null, emblem = null) {
+  const key = tier + (plain ? 'p' : '') + (cloth || '') + (emblem || '');
   if (sailTexCache[key]) return sailTexCache[key];
   const H = SAIL_H[tier];
   const CREAM = '#f3e7c9';
@@ -236,24 +261,30 @@ function sailTexture(tier, plain = false, cloth = null) {
       g.beginPath(); g.moveTo(S, S); g.lineTo(S - 40, S); g.lineTo(S, S - 40); g.fill();
       g.beginPath(); g.moveTo(0, 0); g.lineTo(40, 0); g.lineTo(0, 40); g.fill();
     }
-    if (tier === 2 && !plain) {
+    if (tier === 2 && !plain && !emblem) {
       // racing stripes (cream and gold on a dark dye, where blue and red would sink in)
       g.fillStyle = dk ? CREAM : '#2f6fd0'; g.fillRect(0, 150, S, 22); g.fillRect(0, 184, S, 10);
       g.fillStyle = dk ? GOLD : '#d4402e'; g.fillRect(0, 175, S, 5);
     }
     const paleRose = { ring: CREAM, inner: GOLD, a: CREAM, b: GOLD, fill: 'rgba(243,231,201,0.18)' };
-    if (tier === 3 && !plain) drawEmblem(g, S, H, dk ? paleRose : {});
-    if (tier === 4 && !plain) {
+    if (tier === 3 && !plain && !emblem) drawEmblem(g, S, H, dk ? paleRose : {});
+    if (tier === 4 && !plain && !emblem) {
       // cream bands with gold piping, and a cream/gold rose
       g.fillStyle = '#f3e7c9'; g.fillRect(0, 196, S, 16); g.fillRect(0, 222, S, 6);
       g.fillStyle = GOLD; g.fillRect(0, 193, S, 3); g.fillRect(0, 212, S, 3);
       drawEmblem(g, S, H, { R: 1.0, ...paleRose });
     }
-    if (tier === 5 && !plain) {
+    if (tier === 5 && !plain && !emblem) {
       // a big navy-and-gold sunburst rose on white-gold silk
       g.fillStyle = 'rgba(255,207,74,0.16)'; g.fillRect(0, 0, S, S);
       drawEmblem(g, S, H, dk ? { R: 1.55, v: 0.5, ...paleRose, points: 16 }
         : { R: 1.55, v: 0.5, ring: '#173a63', inner: GOLD, a: '#173a63', b: GOLD, fill: 'rgba(23,58,99,0.14)', points: 16 });
+    }
+    if (emblem === 'wing') {
+      // a dark band along the foot of every sail, and the wing on the main
+      g.fillStyle = WING_INK; g.fillRect(0, S - 40, S, 26);
+      g.fillStyle = '#f3e7c9'; g.fillRect(0, S - 44, S, 3);
+      if (!plain) drawWing(g, S, H);
     }
     if (tier === 3 || tier === 5) {
       // gold wave trim along the foot
@@ -1131,11 +1162,12 @@ export class Boat {
     this.deckMat.color.set(Lv.deck || hs.deck);
     this.stripeMat.color.set(Lv.trim || '#3f7fd0');
     const cloth = Lv.sail || null;
-    this.sailMat.map = sailTexture(lv.sail, false, cloth);
+    const mark = Lv.emblem || null;
+    this.sailMat.map = sailTexture(lv.sail, false, cloth, mark);
     this.sailMat.needsUpdate = true;
-    this.jibMat.map = sailTexture(lv.sail, true, cloth);
+    this.jibMat.map = sailTexture(lv.sail, true, cloth, mark);
     this.jibMat.needsUpdate = true;
-    this.topMat.map = sailTexture(lv.sail, true, cloth);
+    this.topMat.map = sailTexture(lv.sail, true, cloth, mark);
     this.topMat.needsUpdate = true;
     this.flagMat.color.set(Lv.flag || (lv.sail >= 3 ? GOLD : '#d64a3a'));
     this.pennant.mat.color.set(Lv.pennant || (lv.sail === 4 ? '#9c2f27' : lv.sail >= 3 ? GOLD : '#2f6fd0'));
@@ -1144,7 +1176,7 @@ export class Boat {
   }
 
   /**
-   * Repaint the boat. livery: { hull, trim, deck, sail, flag, pennant } (CSS
+   * Repaint the boat. livery: { hull, trim, deck, sail, flag, pennant, emblem } (CSS
    * hex, each optional; `sail` dyes every sail), or null for the tier's look.
    */
   setLivery(livery) {
