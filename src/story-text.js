@@ -1,5 +1,5 @@
 // Main story text: "Grandfather's Journals".
-// Rules (see docs/feature-plan.md): the grandparents and his ship are never
+// Rules (see docs/shipped-plans.md): the grandparents and his ship are never
 // named; the player is the grandchild, addressed as "you" (never he/she);
 // {captain} is replaced with the player's chosen name, {n} with a roman
 // numeral. Plain ASCII apostrophes throughout.

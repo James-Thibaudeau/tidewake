@@ -9,9 +9,11 @@ export const SAVE_KEY = 'tidewake.save.v1'; // key stays put; the data inside is
 export const SAVE_VERSION = 2;
 export const SETTINGS_KEY = 'tidewake.settings.v1';
 
-export const isTouch =
+// Guarded so the pure modules (ashore layout, collision, save migration) load
+// in Node for tools/check.mjs.
+export const isTouch = typeof window !== 'undefined' && (
   (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches) ||
-  'ontouchstart' in window;
+  'ontouchstart' in window);
 
 // [wavelength, amplitude, direction(radians)]
 export const WAVE_DEFS = [

@@ -59,3 +59,16 @@ export const bearingDeg = (h) => {
   d %= 360; if (d < 0) d += 360;
   return d;
 };
+
+/**
+ * Copy the methods and getters of each part class onto `target`. The big
+ * classes (UI, Boat) are written as several part classes in their own files
+ * and joined here, so every method is still called as this.method().
+ */
+export function mixin(target, ...parts) {
+  for (const part of parts) {
+    const props = Object.getOwnPropertyDescriptors(part.prototype);
+    delete props.constructor;
+    Object.defineProperties(target.prototype, props);
+  }
+}

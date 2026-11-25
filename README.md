@@ -46,10 +46,18 @@ On foot (once grandfather's anchor is fitted):
 ES modules need a web server, so opening `index.html` as a file won't work:
 
 ```bash
-python3 -m http.server 8000
+python3 tools/serve.py 8000
 ```
 
-Then open http://localhost:8000.
+Then open http://localhost:8000. (`tools/serve.py` is a plain static server with caching turned off; `python3 -m http.server 8000` works too.)
+
+After a change, run the quick checks. They need Node and nothing else:
+
+```bash
+node tools/check.mjs
+```
+
+In the browser console, `tidewake.debug.help()` lists helpers for jumping around the game while testing.
 
 Visual effects run on the High quality setting. To compare, add `?fx=0` to the URL to turn them all off, or pick some with `?fx=edges,bloom,grade,smaa,shadows,rim`. In the console, `tidewake.fx.setEnabled(false)` flips them at runtime.
 
@@ -79,23 +87,38 @@ src/
   kraken.js       the finale set piece
   ashore/         going ashore: ashore.js (visit flow, pickups), levelgen.js + modules.js +
                   pieces.js (island levels), wreck.js (grandfather's wreck, hand-built),
-                  controller.js + collide.js (movement), camera.js, pacer.js (races on foot)
+                  controller.js + collide.js (movement), camera.js, pacer.js (races on foot),
+                  shapes.js (the collider shapes they all share)
   cosmetics.js    wardrobe catalogue: palettes, styles, unlock sources, appearance profile
   creator.js      character creator / port wardrobe (studio scene + panel)
   world.js        procedural islands, terrain height, island streaming
   props.js        low-poly prop library (trees, huts, lighthouse, rocks, chests…)
-  boat.js         boat model, upgrade visuals and sailing physics (the player's boat and the Redwing)
+  elder-tree.js   the Elder Tree landmark, as seen from the sea
+  boat.js         the Boat class (the player's boat and the Redwing): sailing physics, collisions
+  boat/           the rest of Boat: model.js (hull, mast, sails), fittings.js (helm, keel, lanterns,
+                  crow's nest), rig.js (upgrades, rig layout, animation), parts.js (shared textures and helpers)
+  wake.js         the wake ribbons behind a boat
   explorer.js     the anime explorer character: rig, poses (helm / on foot), animation
+  outfits.js      geometry for every wearable style, and the face texture
   ocean.js        toon water shader
   sky.js          sky dome, sun/moon/stars, clouds, lighting
   weather.js      weather states, wind, rain, lightning, wind streaks
   waves.js        shared CPU/GPU wave function
   toon.js         cel-shading gradient, rim-lit toon material, outline materials
   fx.js           post-processing (ink edges, bloom, grade, SMAA) and cascaded cel shadows
-  ui.js           HUD, minimap, sea chart, port/pause/wreck screens
+  ui.js           the UI class: HUD, banners and toasts, title, pause and wreck screens
+  ui/             the rest of UI: chart.js (minimap, sea chart), port.js (port screen, journal),
+                  story.js (Found! pop-up, story cards, quest tracker, races), icons.js, shared.js
   input.js        keyboard, mouse and touch controls
   audio.js        procedural WebAudio sound and music
   save.js         localStorage save/load and save-version migration
   config.js       tuning constants and upgrade catalogue
   util.js         math and noise helpers
+  debug.js        console helpers for testing (tidewake.debug)
+tools/
+  serve.py        static dev server, caching off
+  check.mjs       quick checks in Node: syntax, imports, text keys, element ids, saves, ashore layouts
+docs/
+  STATUS.md       what has shipped, what's next, known issues
+  feature-plan.md designs for phases not built yet; shipped-plans.md keeps the designs of built ones
 ```

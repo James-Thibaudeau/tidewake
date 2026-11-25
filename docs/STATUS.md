@@ -1,0 +1,173 @@
+# Tidewake status
+
+What has shipped, what's next, and known issues. **Read this before starting
+work, and update it in the same pull request as the change.**
+
+- Designs for work that hasn't started: [feature-plan.md](feature-plan.md)
+- Original designs of what has shipped (reference only): [shipped-plans.md](shipped-plans.md)
+
+Updated 2026-11-25.
+
+## Done
+
+- [x] **Phase 0, foundations:** save v2 migration, game events, scene
+  switching, sea/land input schemes with a touch joystick, articulated
+  explorer rig ([#5](https://github.com/James-Thibaudeau/tidewake/pull/5)).
+- [x] **Phase 1, character customization:** creator on new voyages, port
+  Tailor tab, 37 outfit styles ([#5](https://github.com/James-Thibaudeau/tidewake/pull/5)).
+  - Extra: six face shapes, with oval the default
+    ([#6](https://github.com/James-Thibaudeau/tidewake/pull/6)).
+- [x] **Phase 2a, quest boards:** chart, deliver and salvage quests, HUD
+  tracker, map markers, journal (`J`)
+  ([#7](https://github.com/James-Thibaudeau/tidewake/pull/7)).
+- [x] **Phase 2b, main story:** grandfather's wreck near Port Haven,
+  prologue and epilogue cards, Journals I–VII at beach camps, the letters,
+  Grandpa's scarf and helmet ([#8](https://github.com/James-Thibaudeau/tidewake/pull/8)).
+  - Extra: "Found!" pop-up for story finds
+    ([#9](https://github.com/James-Thibaudeau/tidewake/pull/9)).
+- [x] **Phase 3, going ashore (core):** grandfather's anchor quest (Oak
+  hull), temperate island levels with a difficulty curve by distance from
+  Port Haven, coins, caches, a cosmetic chest per island, lantern
+  checkpoints, a carried lantern at night
+  ([#11](https://github.com/James-Thibaudeau/tidewake/pull/11)).
+- [x] Fix: the seam through the "d" in the title logo
+  ([#10](https://github.com/James-Thibaudeau/tidewake/pull/10)).
+- [x] **Visual upgrade:** three.js r187; post-processing (ink edges, bloom,
+  colour grade, SMAA); cascaded cel shadows; a rim light on toon materials.
+  On High quality only, still no build step
+  ([#17](https://github.com/James-Thibaudeau/tidewake/pull/17)).
+  - Fix: black flashing blocks on the title and while turning the camera.
+    The sky shader made stray NaN pixels (`pow` of a value rounded just
+    below zero), which bloom blurred into large black areas. The sky is
+    fixed, and a guard pass now scrubs NaN/Inf before bloom.
+
+- [x] **The wreck as the first walkable level** (left over from Phase 3): a
+  short, safe walk from the beach up the bow rocks, down the deck and over
+  the caved-in planks to grandfather's cabin. It needs no anchor (you climb
+  aboard from the boat), and Journal I, the spyglass and the epilogue chest
+  are found in the cabin. Hand-built in `src/ashore/wreck.js`
+  ([#18](https://github.com/James-Thibaudeau/tidewake/pull/18)).
+  - Fix: the compass follows the camera on foot, and moat water lies still.
+  - Fix: a story find ashore (the spyglass) no longer pulls the explorer
+    back to the helm.
+  - Extra: the wreck at sea is the same ship you walk on, larger and far
+    more detailed (two broken masts with a tattered sail, rigging, paintwork,
+    portholes, gulls, a stern lantern), and she's broken in two on a dark
+    reef: the bow is jammed on the rocks, and the stern with the cabin has
+    torn away and rolled over. Ashore, torn planking hangs across the break
+    to the stern ([#19](https://github.com/James-Thibaudeau/tidewake/pull/19)).
+
+- [x] **Phase 8, the rival captain:** Captain Sable and their ship, the
+  Redwing, which is rigged to match your upgrades.
+  Six encounters (a sprint, a buoy race, a foot race to a summit, a fog run
+  by compass, a relic scramble, a tow after a storm), the letter, the flare
+  and the kraken rescue, then Sable as a friend with rematches from the
+  Quest Board. Rewards: Sable's tricorn, crimson sails, the title *Lifeline*.
+  How it's built, and the decisions taken, are in
+  [rival-captain.md](rival-captain.md)
+  ([#28](https://github.com/James-Thibaudeau/tidewake/pull/28)).
+  - It shipped before Phase 7, so `rival.js` schedules its own encounters
+    (harbor talk on the Quest Board, a search circle, the Redwing appears when
+    you get close). The Phase 7 director can take that over later.
+
+## Next up
+
+- [ ] **Phase 4, ashore content and fetch quests:**
+  - [x] The Elder Tree at sea: a giant, detailed landmark tree with roots,
+    an owl hollow, drifting clouds, birds and fireflies
+    ([#20](https://github.com/James-Thibaudeau/tidewake/pull/20))
+  - [ ] The Elder Grove level, the first landmark level, plus the shared
+    vault for retrieve and refit quests. Design agreed in
+    [elder-grove-level.md](elder-grove-level.md): Journal III at the
+    carving, the anchor required, an owl that hoots you up the tree.
+  - [ ] Rocky islands first, then tropical, volcanic and cold, in the order
+    of the anchor refits (Phase 6)
+  - [ ] Landmark levels; move Journals III–VII from the beach camps into
+    them, each with a unique cosmetic (makes the fur hood, flower crown,
+    gold circlet and shell necklace findable)
+  - [x] Retrieve quests, including "Find the lost map fragment": offered by
+    Harbormasters (Cartographers for the fragment) once the anchor is fitted.
+    The item waits at the level's vault (on generated islands, by the summit)
+    and goes back to the island if you're wrecked.
+  - [ ] Harmless obstacles (crabs, gulls)
+- [ ] **Phase 5, polish:**
+  - [ ] Sound: footsteps by surface, jump and land, coins, chest fanfare,
+    biome ambience, an on-foot music variant
+  - [x] Tutorial hints for the quest board and the Tailor: a one-time note
+    at the top of each tab ([#25](https://github.com/James-Thibaudeau/tidewake/pull/25))
+  - [ ] Phones: bigger buttons, less decor on Low. The joystick already has
+    a 12% dead zone; tune it on a real phone.
+  - [ ] Performance pass, including cleanup when leaving an island
+  - [x] README controls for going ashore (done in #11)
+- [ ] **Visual effects follow-ups** (after #17; `src/fx.js`, `src/toon.js`):
+  - [ ] Test High quality on real phones (touch uses 2 shadow cascades,
+    1024 maps, medium SMAA). Phones default to Low, which has no effects;
+    decide whether High on touch should drop edges or shadows.
+  - [ ] Measure frame time on desktop with effects on and off. The in-app
+    browser was throttled during the prototype, so there's no real number yet.
+  - [ ] Shadows on the ocean: the boat and cliffs cast none on the water
+    (the custom water shader needs the shadow chunks and the cel band).
+  - [ ] Shadows stop at 220 m (140 m on touch); check whether the cut-off
+    line shows while sailing and tune `maxFar` or the fade.
+  - [ ] Ink edges: check storm swells for stray lines on wave crests.
+  - [x] Thinner, lighter ink lines in the creator close-up.
+    Also the sunset sun now stays gold, and freckles are bigger
+    ([#24](https://github.com/James-Thibaudeau/tidewake/pull/24)).
+  - [ ] Rim light: check hair, hats and coats from all angles, and under
+    moonlight; consider a per-material strength.
+  - [x] Sunset sun disc reads near-white (neutral tone mapping compresses
+    it): the disc drops its white lift and most of `uSunHDR` in golden hour.
+  - [x] An "Effects" switch in the pause menu, separate from Quality
+    ([#26](https://github.com/James-Thibaudeau/tidewake/pull/26)).
+  - [x] Ashore lantern glow takes its bloom boost once at start-up, so
+    `tidewake.fx.setEnabled()` doesn't change it. It now follows the boost.
+
+- [ ] **Rival captain follow-ups** (after #28; `src/rival.js`, `src/race.js`,
+  `src/kraken.js`, `src/ashore/pacer.js`):
+  - [ ] Play every race by hand and tune the pace. So far the races have
+    been run by a test pilot in the console, not by a person: `pace` and the
+    rubber band in `race.js`, `PACE` in `pacer.js`, the tentacle timings at
+    the top of `kraken.js`.
+  - [ ] Sable's writing (`rival-text.js`) is a first draft: review it like
+    the journals were.
+  - [ ] Move the relic scramble to a tropical island when that biome can be
+    landed on (Phase 4).
+  - [ ] Hand encounter delivery to the Phase 7 event director.
+  - [ ] Sounds for the kraken, the buoys' bells and the flare (they reuse
+    existing sounds).
+  - [ ] The towed Redwing has no collision with land, and Sable carries no
+    lantern ashore at night.
+  - [ ] In the fog run the panel shows the bearing but not who's ahead.
+
+## Ideas (planned, not started)
+
+- [ ] **Phase 6, anchor refits:** refit grandfather's anchor tier by tier
+  to unlock each biome. Ships alongside the Phase 4 biomes.
+- [ ] **Phase 7, a living sea:** random ocean events (whales, dolphins, a
+  ghost ship at night…), a Sightings log, and report quests.
+
+## Known issues
+
+From Phase 1 (outfits):
+- [x] The poncho's hem clips the arms when they hang loose.
+- [x] Curly hair pokes through the flower crown and circlet.
+- [x] Grandpa's helmet looks only a little different from the normal pith
+  helmet.
+- [x] The ponytail sticks out sideways instead of hanging.
+- [x] The scarf tail hangs inside the back of every top (worst on the long
+  coat and poncho), and pokes out through the chest while running.
+- [x] Freckles are hard to see from the sailing camera.
+
+From Phase 3 (ashore):
+- [x] The compass shows the ship's heading while you're on foot.
+- [x] Water in the moat rises and falls with the ocean swell.
+- [ ] Rock faces fade into the grass with a soft band instead of a crisp
+  edge.
+- [ ] Platforms against a cliff can leave a small gap to the rock.
+
+General:
+- [x] Toasts were drawn under menus such as the port sheet, so messages
+  like "Not enough gold" never showed. They now show above an open menu
+  ([#26](https://github.com/James-Thibaudeau/tidewake/pull/26)).
+- [ ] Large easy islands can still have up to 20 small hops in total (never
+  more than 4 in a row).
