@@ -99,7 +99,8 @@ Updated 2026-11-25.
   light, and draws contact sheets such as every top with every bag from
   behind. Driven from the URL or from `window.gallery`. No game file changed.
   How to use it is in `CLAUDE.md`; the design is in
-  [shipped-plans.md](shipped-plans.md).
+  [shipped-plans.md](shipped-plans.md)
+  ([#40](https://github.com/James-Thibaudeau/tidewake/pull/40)).
   - Not yet done: live sliders, and before/after in one image (see
     [feature-plan.md](feature-plan.md)).
 
