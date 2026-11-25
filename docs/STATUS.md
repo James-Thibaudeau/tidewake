@@ -82,6 +82,16 @@ Updated 2026-11-25.
   - Not yet done: playing it by hand on a real phone, and a pass over
     Sable's foot races with the new stride.
   - The poncho now reads narrow (more of a serape); widen it if it bothers.
+  - Fix: wardrobe fit on the new body. Straps, pocket flaps, lapels and the
+    sailor collar are bands that wrap the clothes instead of flat boxes; the
+    satchel hangs behind the hip, clear of the arm; the coat covers a skirt
+    and the arms hang wider beside it; sailor stripes are clean bands. The
+    vest and coat have their own shoulders (they used to stop at the chest,
+    leaving the shirt's), and straps lie over the sailor collar, pocket
+    flaps and lapels instead of passing through them
+    ([#32](https://github.com/James-Thibaudeau/tidewake/pull/32)).
+  - Still open: thighs come through a skirt or coat front at a run (the
+    cloth is rigid).
 
 ## Next up
 

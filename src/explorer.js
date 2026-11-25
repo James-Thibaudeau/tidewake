@@ -263,7 +263,8 @@ export class Explorer {
   setAppearance(profile) {
     const p = normalizeProfile(profile);
     this.profile = p;
-    const { parts, tail } = buildOutfit(p);
+    const { parts, tail, armOut } = buildOutfit(p);
+    this.armOut = armOut;
     for (const k of BONES) {
       const g = this.looks[k];
       clearLook(g);
@@ -633,7 +634,7 @@ export class Explorer {
       const s = A2.side;
       const fwd = -s * reach * move;                    // + as this arm swings forward
       let shX = 0.1 * run - (0.32 + 0.6 * run) * fwd + Math.sin(t * 1.3 + s) * 0.03 * (1 - move) + down * 1.4;
-      let shZ = s * (0.08 + 0.1 * run + down * 1.6);
+      let shZ = s * (0.08 + this.armOut * (1 - 0.5 * run) + 0.1 * run + down * 1.6);
       let elX = -(0.2 + 1.2 * run + (0.12 + 0.3 * run) * fwd + down * 0.9);
       let elZ = -s * 0.22 * run;
       if (air > 0.001) {
