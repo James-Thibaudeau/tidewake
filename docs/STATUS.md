@@ -416,6 +416,10 @@ Updated 2026-11-25.
   to unlock each biome. Ships alongside the Phase 4 biomes.
 - [ ] **Phase 7, a living sea:** random ocean events (whales, dolphins, a
   ghost ship at night…), a Sightings log, and report quests.
+- [ ] **Phase 9, sea zones:** clear, calm home waters round Port Haven
+  where storms don't start; more storms in the open sea; rough water in
+  any weather round Frostspire (the Reach) and Mount Cinderhorn (the Rip),
+  with rogue waves. Three PRs, 9.1–9.3.
 
 ## Known issues
 
