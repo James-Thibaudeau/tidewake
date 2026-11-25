@@ -280,7 +280,8 @@ Updated 2026-11-25.
   - [x] 4.5 Archway Isle, in two PRs: 4.5a the walkable level and the arch
     at sea, 4.5b the story and the crab report. Design in
     [archway-isle-level.md](archway-isle-level.md).
-    - [x] 4.5b, the story and the crabs:
+    - [x] 4.5b, the story and the crabs
+      ([#45](https://github.com/James-Thibaudeau/tidewake/pull/45)):
       - Journal IV has moved off the beach and onto the arch: chapter IV's
         step is "Go ashore at Archway Isle. He was heading for the arch.",
         and it needs the grapnel refit (without it, or without an anchor,

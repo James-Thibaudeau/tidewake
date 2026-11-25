@@ -70,7 +70,7 @@ Two rules hold for every piece:
 | 4.3 | (done, #35) | The refit system (Phase 6): `upgrades.anchor`, the shipwright's refit quest, the fitting at a vault, the anchor model per tier, the per-biome "can't land" lines. No new biome yet | 4.0 |
 | 4.4 | (done, #37) | Rocky islands (sheer ledges, arches, sea-stack hops) and the grapnel refit, tier 1 | 4.3 |
 | 4.5a | (done, #39) | Archway Isle as a walkable level: the U-shaped island, the cliff traverse round the bay, the storm cave vault, the seaward stack; the great arch rebuilt at sea. No story yet | 4.4 |
-| 4.5b | (done) | Archway Isle's story: Journal IV at the keystone, the sou'wester, the storm lantern; the crab report quest and the crab pin | 4.5a |
+| 4.5b | (done, #45) | Archway Isle's story: Journal IV at the keystone, the sou'wester, the storm lantern; the crab report quest and the crab pin | 4.5a |
 | 4.6 | `feature/tropical-biome` | Tropical islands (palm-top hops, tide pools, rope bridges) and the coral flukes, tier 2. Sable's relic scramble moves here | 4.3 |
 | 4.7 | `feature/sunken-temple` | The Sunken Temple: flooded ruins, Journal V, the shell necklace; the temple rebuilt at sea | 4.6 |
 | 4.8 | `feature/volcanic-biome` | Volcanic islands (lava, crumbling basalt) with the steam-vent launch, and the tempered chain, tier 3 | 4.3 |
