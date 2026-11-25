@@ -466,7 +466,7 @@ const glintMat = new THREE.MeshBasicMaterial({ color: 0xffe066 });
 const glintGeo = new THREE.OctahedronGeometry(0.9, 0);
 
 let glowTex = null;
-function glowTexture() {
+export function glowTexture() {
   if (glowTex) return glowTex;
   const c = document.createElement('canvas'); c.width = c.height = 64;
   const g = c.getContext('2d');

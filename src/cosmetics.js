@@ -121,7 +121,7 @@ export const STYLES = [
   S('hat', 'tricorn', 'Tricorn', 'tailor', { price: 150 }),
   S('hat', 'captain', "Captain's cap", 'tailor', { price: 250 }),
   S('hat', 'furHood', 'Fur hood', 'found:cold', { hint: 'Found in the frozen north' }),
-  S('hat', 'flowerCrown', 'Flower crown', 'found:tropical', { hint: 'Found on a tropical isle' }),
+  S('hat', 'flowerCrown', 'Flower crown', 'found:grove', { hint: 'At the top of the Elder Grove' }),
   S('hat', 'circlet', 'Gold circlet', 'found:ruins', { hint: 'Hidden in the Sunken Temple' }),
   S('hat', 'grandPith', "Grandpa's helmet", 'story', { hint: "Your grandfather's last gift" }),
   S('hat', 'rivalTricorn', "Sable's tricorn", 'story', { hint: 'A gift from a rival captain' }),
