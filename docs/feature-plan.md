@@ -95,8 +95,8 @@ pull request merges.
 - [ ] **Phase 5, polish:**
   - [ ] Sound: footsteps by surface, jump and land, coins, chest fanfare,
     biome ambience, an on-foot music variant
-  - [ ] Tutorial hints for the quest board and the Tailor (the first
-    landing hint already exists)
+  - [x] Tutorial hints for the quest board and the Tailor: a one-time note
+    at the top of each tab ([#25](https://github.com/James-Thibaudeau/tidewake/pull/25))
   - [ ] Phones: joystick dead zone, bigger buttons, less decor on Low
   - [ ] Performance pass, including cleanup when leaving an island
   - [x] README controls for going ashore (done in #11)

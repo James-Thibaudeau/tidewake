@@ -11,6 +11,19 @@ import { bearingDeg } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const TAU = Math.PI * 2;
+// First-visit tips for the port tabs, shown as a note in the tab (flags saved in story.flags)
+const PORT_TAB_HINTS = {
+  quests: {
+    flag: 'hintQuestBoard',
+    text: `Quest board: take up to ${MAX_ACTIVE} jobs at a time. Finish a job, then dock to collect the reward. Press J to see your quests and pin one.`,
+    touch: `Quest board: take up to ${MAX_ACTIVE} jobs at a time. Finish a job, then dock to collect the reward. Tap the scroll button to see your quests and pin one.`,
+  },
+  tailor: {
+    flag: 'hintTailor',
+    text: 'New to the Tailor? Pieces sold here cost banked gold. Others are quest rewards, and the rarest are hidden in island chests.',
+  },
+};
+PORT_TAB_HINTS.tailor.touch = PORT_TAB_HINTS.tailor.text;
 const clampN = (v, a, b) => (v < a ? a : v > b ? b : v);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (n) => Math.floor(n || 0).toLocaleString();
@@ -1034,6 +1047,23 @@ export class UI {
     this.el.paneShipwright?.classList.toggle('hidden', tab !== 'shipwright');
     this.el.paneQuests?.classList.toggle('hidden', tab !== 'quests');
     this.el.paneTailor?.classList.toggle('hidden', tab !== 'tailor');
+    this.portTabHint(tab);
+  }
+
+  /** A one-time tip the first time the quest board or the Tailor is opened. */
+  portTabHint(tab) {
+    const hint = PORT_TAB_HINTS[tab], g = this.game, flags = g.state?.story?.flags;
+    if (!hint || !flags || flags[hint.flag]) return;
+    flags[hint.flag] = true;
+    if (g.mode === 'docked') g.savePortState();
+    // a note at the top of the tab: toasts sit under the port sheet
+    const pane = tab === 'quests' ? this.el.paneQuests : this.el.paneTailor;
+    if (!pane) return;
+    const note = document.createElement('div');
+    note.className = 'tabHint';
+    note.innerHTML = `<p>${esc(this.touch ? hint.touch : hint.text)}</p><button class="btn">Got it</button>`;
+    note.querySelector('button').addEventListener('click', () => { this.click(); note.remove(); });
+    pane.prepend(note);
   }
 
   // ------------------------------------------------------------ quests
