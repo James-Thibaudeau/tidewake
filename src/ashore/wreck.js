@@ -786,6 +786,7 @@ export function buildWreckLevel(W, opts = {}) {
     caches,
     chests: [],
     summit: PS(0, DECKS.cabin[2], -8),
+    vault: null, // the wreck is never a quest target
     hints: [
       { id: 'jump', ...P(-7.6, 0, 12.6), r: 3.0, text: 'Press Space to jump up the rocks', touch: 'Tap ▲ to jump up the rocks' },
       { id: 'gap', ...P(0, 0, 0.5), r: 1.7, yMin: 2.8, text: 'The deck has caved in. Jump across the hole!', touch: 'The deck has caved in. Jump across the hole!' },

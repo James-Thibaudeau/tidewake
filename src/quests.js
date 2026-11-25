@@ -13,6 +13,11 @@
 //            lost (wrecked) → re-collect at the origin port → active
 //   salvage: active (haul at the site) → ready (item aboard) → done at any port
 //            a wreck while ready drops the item back at the site
+//   retrieve: active (go ashore, climb to the island's vault) → ready (item
+//            aboard) → done back at the giving port; a wreck while ready
+//            returns the item to the island. Only offered once you can go
+//            ashore. The map-fragment variant charts an unknown island when
+//            you hand it in.
 import * as THREE from 'three';
 import { toonMaterial } from './toon.js';
 import { WORLD_HALF, WORLD_SEED } from './config.js';
@@ -20,6 +25,7 @@ import { mulberry32, headingOf, bearingDeg, TAU, clamp } from './util.js';
 import { waveHeight, waveUniforms } from './waves.js';
 import { propMesh } from './props.js';
 import { STYLES, owns } from './cosmetics.js';
+import { difficultyFor } from './ashore/modules.js';
 
 export const MAX_ACTIVE = 3;
 const OFFERS_PER_BOARD = 3;
@@ -28,12 +34,17 @@ const OFFERS_PER_BOARD = 3;
 const FIRST_NAMES = ['Maren', 'Tobin', 'Isolde', 'Bram', 'Wren', 'Corin', 'Delphine', 'Osric', 'Liesel', 'Pim',
   'Saoirse', 'Hollis', 'Ines', 'Jory', 'Kit', 'Nell', 'Ansel', 'Rosalind', 'Teague', 'Vesna', 'Ambrose', 'Calla',
   'Dov', 'Ellery', 'Fenna', 'Gideon', 'Hester', 'Ivo', 'Juno', 'Lark'];
-export const ROLES = { chart: 'Cartographer', deliver: 'Merchant', salvage: 'Old Salt' };
+// (new roles go at the end: givers are drawn in this order, so existing names stay put)
+export const ROLES = { chart: 'Cartographer', deliver: 'Merchant', salvage: 'Old Salt', retrieve: 'Harbormaster' };
 const PARCELS = ['Crate of lamp oil', 'Bundle of sealed letters', 'Barrel of pickled herring', 'Chest of spices',
   'Brass barometer', 'Bolt of sailcloth', 'Jar of wild honey', 'Cask of cider', 'Sack of seed potatoes',
   'Roll of sea charts', 'Box of ship nails', 'Basket of oranges'];
 const SALVAGE = ["Ship's bell", "Captain's strongbox", 'Carved figurehead', 'Brass astrolabe', 'Lost cargo crate',
   'Old storm lantern', 'Silver compass', "Navigator's sextant"];
+// things people left at the top of an island (retrieve quests)
+const KEEPSAKES = ['pocket watch', 'sketchbook', 'brass telescope', 'fiddle', 'lucky hat', 'bird-watching notebook',
+  'silver locket', 'tin whistle', 'walking stick', 'picnic basket'];
+export const MAP_FRAGMENT = 'Map fragment';
 const POINT_NAMES = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];
 
 const dirWord = (dx, dz) => POINT_NAMES[Math.round(bearingDeg(headingOf(dx, dz)) / 45) % 8];
@@ -135,7 +146,7 @@ export class QuestSystem {
   generate(port, day) {
     const rng = mulberry32(Math.floor((port.id + 1) * 104729 + day * 7907 + WORLD_SEED));
     const offers = [];
-    const types = ['chart', 'deliver', 'salvage'];
+    const types = ['chart', 'deliver', 'salvage', 'retrieve'];
     // shuffle so the order varies day to day, but each board tries for variety
     for (let i = types.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [types[i], types[j]] = [types[j], types[i]]; }
     const bands = [[500, 1800], [1500, 3200], [2600, 5200]];
@@ -195,6 +206,40 @@ export class QuestSystem {
       return { ...base, target: T.id, item: parcel, dist: d, days, bonus: Math.round(base.reward.gold * 0.4),
         title: `Deliver to ${T.name}`,
         text: `This ${lc(parcel)} has to reach ${T.name}, ${dirWord(T.dock.x - P.x, T.dock.z - P.z)} of here. Keep it out of the storms; if your ship goes down, so does the parcel.`,
+        ...this.maybeCosmetic(base, d, rng) };
+    }
+    if (type === 'retrieve') {
+      const A = this.game.ashore;
+      if (!A || !this.game.story?.canGoAshore) return null;
+      const taken = new Set(this.active.filter((q) => q.type === 'retrieve').map((q) => q.target));
+      const cands = this.world.islands.filter((I) => {
+        if (!A.canLand(I) || taken.has(I.id)) return false;
+        const d = Math.hypot(I.x - P.x, I.z - P.z);
+        return d >= dmin * 0.7 && d <= dmax * 1.2;
+      });
+      if (!cands.length) return null;
+      const I = cands[Math.floor(rng() * cands.length)];
+      const d = Math.hypot(I.x - P.x, I.z - P.z), where = dirWord(I.x - P.x, I.z - P.z);
+      // a search circle for islands you haven't charted yet (as for chart quests)
+      const hintR = clamp(260 + d * 0.07, 320, 680);
+      const ha = rng() * TAU, off = rng() * (hintR - I.r) * 0.6;
+      const hint = { x: I.x + Math.cos(ha) * off, z: I.z + Math.sin(ha) * off, r: hintR };
+      // harder climbs (further from Port Haven) pay more
+      const { tier } = difficultyFor(I);
+      const climb = tier === 'hard' ? 60 : tier === 'medium' ? 30 : 0;
+      const unknown = this.world.islands.some((J) => !J.port && !J.isReef && !J.wreck && !st.discovered.has(J.id));
+      if (unknown && rng() < 0.35) {
+        base.giver = giversFor(port).chart; // the cartographer wants their chart back
+        base.reward.gold = Math.round((70 + d * 0.05 + climb) * 0.7);
+        return { ...base, target: I.id, hint, item: MAP_FRAGMENT, fragment: true, dist: d,
+          title: `Find the lost map fragment`,
+          text: `A gust took half of one of my charts out of the window, and the gulls say it fetched up at the top of ${I.name}, ${where} of here, about ${fmtDist(d)} out. Bring the fragment back to me and I'll put whatever it shows on your own chart.` };
+      }
+      const item = KEEPSAKES[Math.floor(rng() * KEEPSAKES.length)];
+      base.reward.gold = Math.round(70 + d * 0.05 + climb);
+      return { ...base, target: I.id, hint, item: item.charAt(0).toUpperCase() + item.slice(1), dist: d,
+        title: `Fetch the ${item} from ${I.name}`,
+        text: `I left my ${item} at the top of ${I.name} on a picnic last summer, and my knees won't take that climb again. It's ${where} of here, about ${fmtDist(d)} out. Bring it back to me here and I'll make it worth your while.`,
         ...this.maybeCosmetic(base, d, rng) };
     }
     if (type === 'salvage') {
@@ -269,7 +314,7 @@ export class QuestSystem {
   /** Quest items aboard (mirrored into state.hold for the save). */
   syncHold() {
     this.game.state.hold = this.active
-      .filter((q) => (q.type === 'deliver' && q.state === 'active') || (q.type === 'salvage' && q.state === 'ready'))
+      .filter((q) => (q.type === 'deliver' && q.state === 'active') || ((q.type === 'salvage' || q.type === 'retrieve') && q.state === 'ready'))
       .map((q) => ({ quest: q.id, name: q.item }));
   }
 
@@ -290,6 +335,7 @@ export class QuestSystem {
     for (const q of [...this.active]) {
       const done =
         (q.type === 'deliver' && q.state === 'active' && q.target === port.id) ||
+        (q.type === 'retrieve' && q.state === 'ready' && q.from === port.id) ||
         ((q.type === 'chart' || q.type === 'salvage') && q.state === 'ready');
       if (done) { this.complete(q, port); changed = true; continue; }
       if (q.type === 'deliver' && q.state === 'lost' && q.from === port.id) {
@@ -323,8 +369,26 @@ export class QuestSystem {
     s.stats.quests = (s.stats.quests || 0) + 1;
     g.ui.banner(`+${gold} gold${note}`, `Quest complete: ${q.title}`);
     if (cosmetic) g.ui.toast(`${cosmetic.name} added to your wardrobe`, 'gold');
+    if (q.fragment) this.chartFromFragment(q);
     g.audio.play('treasure');
     g.events.emit('quest:complete', q, port);
+  }
+
+  /** The map fragment's island: the uncharted one nearest where it was found. */
+  chartFromFragment(q) {
+    const g = this.game, s = g.state, at = this.island(q.target);
+    let best = null, bd = Infinity;
+    for (const J of this.world.islands) {
+      if (J.port || J.isReef || J.wreck || s.discovered.has(J.id)) continue;
+      const d = Math.hypot(J.x - at.x, J.z - at.z);
+      if (d < bd) { bd = d; best = J; }
+    }
+    if (!best) return;
+    s.discovered.add(best.id);
+    s.stats.discoveries = s.discovered.size;
+    g.revealAround(best.x, best.z, best.r + 160);
+    g.ui.toast(`The fragment shows ${best.name}. It's on your chart now.`, 'gold');
+    g.events.emit('discover', best, 'map');
   }
 
   onWreck() {
@@ -338,6 +402,10 @@ export class QuestSystem {
         q.state = 'active'; changed = true;
         this.game.ui.toast(`The ${lc(q.item)} sank back to the bottom.`, 'warn');
       }
+      if (q.type === 'retrieve' && q.state === 'ready') {
+        q.state = 'active'; changed = true;
+        this.game.ui.toast(`The ${lc(q.item)} washed back up on ${this.island(q.target).name}.`, 'warn');
+      }
     }
     if (changed) { this.syncHold(); this.version++; this.game.saveVoyage(); }
   }
@@ -349,6 +417,25 @@ export class QuestSystem {
       if (q.type === 'salvage' && q.state === 'active' && Math.hypot(q.site.x - x, q.site.z - z) < r) return q;
     }
     return null;
+  }
+
+  // --------------------------------------------------------------- retrieve
+  /** Retrieve quests whose item is waiting on this island right now. */
+  itemsOn(islandId) {
+    return this.active.filter((q) => q.type === 'retrieve' && q.state === 'active' && q.target === islandId);
+  }
+
+  /** Picked up ashore: aboard until you hand it in (or wreck). */
+  pickUp(q) {
+    const g = this.game;
+    q.state = 'ready';
+    this.syncHold();
+    this.version++;
+    g.audio.play('treasure');
+    g.ui.banner(q.item, 'Found it!');
+    g.ui.toast(`Bring it back to ${this.island(q.from).name}`, 'info');
+    g.events.emit('quest:progress', q);
+    g.events.emit('pickup', q);
   }
 
   haul(q) {
@@ -393,6 +480,12 @@ export class QuestSystem {
     if (q.type === 'salvage') {
       if (q.state === 'ready') { const P = nearestPort(); return { x: P.dock.x, z: P.dock.z, label: `Return to port: ${P.name}` }; }
       return { x: q.site.x, z: q.site.z, label: 'Find the wreck site' };
+    }
+    if (q.type === 'retrieve') {
+      if (q.state === 'ready') { const O = this.island(q.from); return { x: O.dock.x, z: O.dock.z, label: `Return the ${lc(q.item)} to ${O.name}` }; }
+      const I = this.island(q.target);
+      if (!this.game.state.discovered.has(I.id)) return { x: q.hint.x, z: q.hint.z, r: q.hint.r, label: `Search for ${I.name}` };
+      return { x: I.x, z: I.z, label: `Go ashore and climb ${I.name}` };
     }
     return null;
   }

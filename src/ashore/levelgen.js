@@ -256,6 +256,7 @@ export function generateLevel(island, opts = {}) {
     caches: L.caches,
     chests: L.chests,
     summit: L.summit,
+    vault: L.vault,
     // still water: the moat lies inside this radius, the beach takes the swell
     calm: { x: 0, z: 0, r: calmRadius(T) },
     // extras (not in the contract, handy for debugging and hints)

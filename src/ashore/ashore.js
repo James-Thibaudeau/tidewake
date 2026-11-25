@@ -5,12 +5,15 @@
 // foot, pickups, lantern checkpoints, splash respawns and per-island saves.
 //
 // state.ashore[islandId] = { visited, coins: [id], caches: [id], chest: bool }
+// Quest items (retrieve quests) wait at the level's vault; their state lives
+// in the quest, not here.
 import * as THREE from 'three';
 import { toonMaterial, glowBoost } from '../toon.js';
 import { ASHORE } from '../config.js';
 import { edgeFactor } from '../world.js';
 import { propMesh, part, merge, propMaterial, thinOutline } from '../props.js';
 import { STYLES, owns } from '../cosmetics.js';
+import { siteBeam, MAP_FRAGMENT } from '../quests.js';
 import { generateLevel } from './levelgen.js';
 import { buildWreckLevel } from './wreck.js';
 import { CharacterController } from './controller.js';
@@ -21,7 +24,7 @@ const LAND_RANGE = 46;                       // how close to the shore the boat 
 const LAND_SPEED = 5;                        // boat speed (m/s) below which you can land
 
 // ------------------------------------------------------------- pickup art
-let coinGeo = null, pileGeo = null, postGeo = null, handGeo = null;
+let coinGeo = null, pileGeo = null, postGeo = null, handGeo = null, bundleGeo = null, scrollGeo = null;
 const handGlow = new THREE.MeshBasicMaterial({ color: '#ffd98a' });
 const coinMat = toonMaterial({ color: '#ffd54a', emissive: '#6a4a00', emissiveIntensity: 0.35 });
 const glowOff = new THREE.MeshBasicMaterial({ color: '#6b5a3a' });
@@ -44,6 +47,22 @@ function pickupGeometry() {
     part(new THREE.TorusGeometry(0.05, 0.012, 4, 8), '#c9a44a', { y: 0.32 }),
     ...[[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([a, b]) => part(new THREE.BoxGeometry(0.02, 0.2, 0.02), '#7a5426', { x: a * 0.07, y: 0.1, z: b * 0.07 })),
   ]);
+  // quest items: a cloth bundle tied with twine, and a rolled chart with a ribbon
+  bundleGeo = merge([
+    part(new THREE.BoxGeometry(0.62, 0.42, 0.5), '#cdb68a', { y: 0.21 }),
+    part(new THREE.BoxGeometry(0.66, 0.06, 0.08), '#7a5426', { y: 0.3 }),
+    part(new THREE.BoxGeometry(0.08, 0.46, 0.54), '#7a5426', { y: 0.21 }),
+    part(new THREE.SphereGeometry(0.08, 8, 6), '#7a5426', { y: 0.44 }),
+    part(new THREE.ConeGeometry(0.1, 0.2, 5), '#b9a072', { y: 0.5, x: 0.07, rz: -0.7 }),
+    part(new THREE.ConeGeometry(0.1, 0.2, 5), '#b9a072', { y: 0.5, x: -0.07, rz: 0.7 }),
+  ]);
+  scrollGeo = merge([
+    part(new THREE.CylinderGeometry(0.12, 0.12, 0.7, 12), '#efe3c4', { rz: Math.PI / 2, y: 0.14 }),
+    part(new THREE.CylinderGeometry(0.135, 0.135, 0.05, 12), '#d9c8a0', { rz: Math.PI / 2, y: 0.14, x: 0.34 }),
+    part(new THREE.CylinderGeometry(0.135, 0.135, 0.05, 12), '#d9c8a0', { rz: Math.PI / 2, y: 0.14, x: -0.34 }),
+    part(new THREE.TorusGeometry(0.135, 0.03, 6, 14), '#c8322b', { ry: Math.PI / 2, y: 0.14 }),
+    part(new THREE.BoxGeometry(0.05, 0.16, 0.03), '#c8322b', { y: -0.01, z: 0.05, rx: 0.3 }),
+  ]);
   postGeo = merge([
     part(new THREE.CylinderGeometry(0.08, 0.1, 2.0, 6), '#5b3c22', { y: 1.0 }),
     part(new THREE.BoxGeometry(0.5, 0.06, 0.08), '#5b3c22', { y: 1.95, x: 0.2 }),
@@ -63,6 +82,9 @@ export class Ashore {
   }
 
   // ----------------------------------------------------------- at sea
+  /** Islands you can explore on foot (given an anchor): not ports, reefs or the wreck. */
+  canLand(I) { return !I.isReef && !I.port && !I.wreck && LAND_BIOMES.has(I.biome); }
+
   /** The island the boat could land on from here, or null. */
   landingIsland(x, z) {
     for (const I of this.game.world.near(x, z)) {
@@ -238,13 +260,32 @@ export class Ashore {
       this.scene.add(m);
       return { ...c, mesh: m, glow, light, lit: false };
     });
-    this.owned = [this.coinMesh, ...this.caches.map((c) => c.mesh), ...this.chests.map((c) => c.mesh), ...this.lanterns.map((c) => c.mesh)];
+    // quest items wait at the vault, under a column of light you can see from below
+    const V = L.vault, quests = this.game.quests;
+    this.questItems = (V && quests ? quests.itemsOn(this.island.id) : []).map((q, i) => {
+      const geo = q.item === MAP_FRAGMENT ? scrollGeo : bundleGeo;
+      const m = new THREE.Group();
+      const item = new THREE.Group();
+      item.add(new THREE.Mesh(geo, propMaterial), new THREE.Mesh(geo, thinOutline));
+      item.scale.setScalar(1.25);
+      const beam = siteBeam();
+      beam.scale.set(0.3, 0.3, 0.3);
+      beam.userData.shared = true; // the beam's geometry belongs to the salvage sites
+      m.add(item, beam);
+      const x = V.x + i * 1.1, z = V.z;
+      m.position.set(x, V.y, z);
+      this.scene.add(m);
+      return { q, x, y: V.y, z, mesh: m, item };
+    });
+    this.owned = [this.coinMesh, ...this.caches.map((c) => c.mesh), ...this.chests.map((c) => c.mesh), ...this.lanterns.map((c) => c.mesh),
+      ...this.questItems.map((c) => c.mesh)];
   }
 
   clearPickups() {
     for (const m of this.owned || []) {
       this.scene.remove(m);
-      m.traverse((o) => { if (o.geometry && o.geometry !== coinGeo && o.geometry !== pileGeo && o.geometry !== postGeo && !o.isInstancedMesh) o.geometry.dispose(); });
+      const shared = [coinGeo, pileGeo, postGeo, bundleGeo, scrollGeo];
+      m.traverse((o) => { if (o.geometry && !shared.includes(o.geometry) && !o.isInstancedMesh && !o.userData.shared) o.geometry.dispose(); });
     }
     this.coinMesh?.dispose();
     this.owned = [];
@@ -377,6 +418,15 @@ export class Ashore {
       g.state.cargo += c.value; this.trip += c.value;
       g.audio.play('treasure');
       g.ui.banner(`+${c.value} gold`, 'Gold cache!');
+    }
+    // quest items: bob and turn; walk into one to take it aboard
+    for (const c of this.questItems) {
+      if (c.taken) continue;
+      c.item.position.y = 0.35 + Math.sin(t * 2) * 0.1;
+      c.item.rotation.y = t * 0.8;
+      if (Math.hypot(c.x - p.x, c.z - p.z) > 1.1 || Math.abs(c.y - p.y) > 1.6) continue;
+      c.taken = true; c.mesh.visible = false; changed = true;
+      g.quests.pickUp(c.q);
     }
     // lantern checkpoints light as you pass
     for (const c of this.lanterns) {
