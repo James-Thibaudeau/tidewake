@@ -15,7 +15,8 @@ Decisions already made:
   island, not walked on the real heightfield.
 - Customization is available **on a new voyage and at a port Tailor**.
 
-This file holds the designs for phases that **haven't shipped yet** (4-7).
+This file holds the designs for phases that **haven't shipped yet** (4-7),
+plus one piece of tooling, the look-dev gallery.
 What is done, what's next and known issues live in [STATUS.md](STATUS.md).
 The designs of shipped phases (0-3 and 8) moved to
 [shipped-plans.md](shipped-plans.md).
@@ -236,6 +237,62 @@ boat near land, fish jumping in calm water, and seabirds circling over reefs.
 weighting, the Sightings tab records them, a first sighting starts a report
 quest that pays out at the right port, and events never stack up or appear
 inside islands.
+
+---
+
+## Tooling: the look-dev gallery
+
+Not a game feature: a page for looking at the art. Proposed 2026-11-25, not
+scheduled. It can be built at any time and nothing waits on it.
+
+**Why.** Every shape and colour is numbers in code, and the only way to see
+one is to play to it: start a voyage, get to the place, take a screenshot
+from wherever the camera is. `tools/check.mjs` answers in a second for
+logic; nothing does that for looks. Outfits show the cost most: 37 styles on
+one body, each fix checked against the few combinations someone thought to
+try, so `outfits.js` has needed four fit passes so far.
+
+**What.** A separate `gallery.html` beside `index.html`. It imports the same
+modules and builds its own small scene, so the game is untouched and there
+is still no build step.
+
+- **One subject at a time,** picked in the URL so a view can be linked and
+  reloaded: `?show=outfit&top=coat&bag=satchel`, `?show=ship&tier=4`,
+  `?show=prop&id=tent`, `?show=grove&piece=fungus-step`.
+  - Subjects: explorer and outfits, ship by upgrade tier, the Redwing, sea
+    props, ashore modules and pieces, Elder Tree and grove pieces.
+- **Neutral ground, fixed cameras:** front, side, back, three-quarter, and
+  one at the sailing camera's distance (small details vanish there).
+- **Lighting presets:** noon, sunset, night, overcast. Effects follow the
+  same `?fx=` switch as the game.
+- **Poses** for the explorer: stand, run, jump, helm.
+- **Contact sheets:** `?sheet=tops-back` and the like render a grid into one
+  image, such as every top with every bag and scarf from behind. Clipping
+  shows in one look, and a before/after pair shows what a change broke.
+- **Console helpers** on `window.gallery`, in the style of `tidewake.debug`:
+  `show()`, `sheet()`, `light()`, `frame()`, so an agent can drive it from
+  a hidden preview tab.
+
+**Later, if wanted.**
+- Live sliders for the few numbers being tuned (sea colours, rim strength,
+  ink width) with a "copy values" button. Hand-rolled, or a slider library
+  from the CDN loaded by the gallery page only: that would be the one
+  exception to "no new dependencies", so decide before building.
+- A shot list per polish pass: agree which gallery views count as done,
+  ideally with a reference image, before the work starts.
+- The gallery is also where an imported model or painted texture would be
+  judged, if the game ever takes assets as well as code.
+
+**Building it.**
+- Subjects need to be buildable outside a `Game`. Most already are
+  (`buildOutfit(profile)`, the boat parts, `props.js`); find the ones that
+  reach for `game` and give them a plain entry point.
+- Sky and lighting: reuse `sky.js` with a fixed `dayT` rather than a second
+  lighting rig, so the gallery can't drift from the game's look.
+- Add `gallery.html` and its module to `tools/check.mjs` (imports, element
+  ids), and to "Project structure" in the README.
+- One PR, `chore/look-dev-gallery`. Contact sheets can follow in a second
+  PR if the first grows.
 
 ---
 
