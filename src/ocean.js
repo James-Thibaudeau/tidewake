@@ -1,5 +1,5 @@
-// Stylised ocean: petrol-blue water with crisp wind-blown foam streaks, whitecaps,
-// sky reflection and a sun glitter path. One centre-weighted grid follows the camera.
+// Stylised ocean: deep navy water with teal wave faces, bold lacy foam streaks, whitecaps,
+// a little sky reflection and a low-sun glitter path. One centre-weighted grid follows the camera.
 import * as THREE from 'three';
 import { WAVE_GLSL, NOISE_GLSL, waveUniforms } from './waves.js';
 
@@ -53,6 +53,7 @@ uniform vec3 uTrough;
 uniform vec3 uDeep;
 uniform vec3 uMid;
 uniform vec3 uFace;
+uniform vec3 uCrest;
 uniform vec3 uSkyColor;
 uniform vec3 uSunDir;
 uniform vec3 uLightCol;
@@ -80,7 +81,7 @@ float fbmF(vec2 x) {
 }
 // Crisp, anti-aliased threshold of a scalar field (cel-style edge).
 float cel(float field, float thr) {
-  float w = fwidth(field) * 2.2 + 0.01; // slightly soft edges
+  float w = fwidth(field) * 1.6 + 0.004; // crisp, just anti-aliased
   return smoothstep(thr - w, thr + w, field);
 }
 void main() {
@@ -96,70 +97,84 @@ void main() {
   vec3 v = normalize(cameraPosition - vWorld);
   vec3 sd = normalize(uSunDir);
 
-  // ---- water body: dark troughs, petrol blue, lighter crests (stepped)
-  vec3 col = mix(uTrough, uDeep, smoothstep(-0.34, -0.26, hn));
-  col = mix(col, uMid, smoothstep(0.28, 0.36, hn));
-  // wave faces turned toward the viewer glow teal (subsurface feel)
+  // ---- water body: deep navy troughs rising smoothly to blue, teal where a face catches the light
   float slope = length(n.xz);
+  vec3 col = mix(uTrough, uDeep, smoothstep(-0.5, 0.05, hn));
+  col = mix(col, uMid, smoothstep(0.0, 0.7, hn) * 0.7);
+  // wave faces turned toward the viewer or the sun glow teal (light through the crest)
+  vec2 nh = n.xz / max(slope, 1e-4);
   vec2 vh = normalize(v.xz + vec2(1e-5));
-  float facing = dot(n.xz / max(slope, 1e-4), vh) * slope * 7.0;
-  col = mix(col, uFace, smoothstep(0.16, 0.26, facing) * smoothstep(-0.15, 0.4, hn) * 0.85);
-  // slow-drifting large patches of deeper / brighter water
+  vec2 sh = normalize(sd.xz + vec2(1e-5));
+  float facing = max(dot(nh, vh), dot(nh, sh) * 0.8) * slope * 7.0;
+  // slow-drifting large patches where the teal comes through more readily
   float big = vnoise(p * 0.0025 + vec2(uTime * 0.004, -uTime * 0.003)) * 0.6
             + vnoise(p * 0.0011 + vec2(17.0 - uTime * 0.002, 4.0)) * 0.4;
-  col *= mix(0.93, 1.05, smoothstep(0.47, 0.53, big));
-  // toon slope shading relative to a flat sea
+  float patchK = smoothstep(0.35, 0.65, big);
+  float glow = smoothstep(0.04 - patchK * 0.1, 0.5, facing) * smoothstep(-0.35, 0.55, hn);
+  glow = max(glow, patchK * smoothstep(-0.1, 0.8, hn) * 0.45);
+  glow *= 1.0 - uLantern.w * 0.85; // no sunlight to shine through the crests at night (w = nightness)
+  col = mix(col, uFace, glow * 0.9);
+  col = mix(col, uCrest, smoothstep(0.55, 1.0, hn) * glow * 0.6);
+  // back slopes fall off into shade
   float rel = dot(n, sd) - sd.y;
-  col *= rel > 0.03 ? 1.08 : (rel < -0.05 ? 0.88 : 1.0);
+  col *= 1.0 + clamp(rel * 1.6, -0.16, 0.08);
 
-  // ---- wind-blown foam, in wind space (x = downwind, y = across)
+  // ---- foam: lacy streaks in wind space (x = downwind, y = across), draped over the swell
   vec2 wd = normalize(uWindDir + vec2(1e-4, 0.0));
-  vec2 ws = vec2(dot(p, wd), dot(p, vec2(-wd.y, wd.x)));
+  vec2 wp = vec2(-wd.y, wd.x);
+  vec2 ws = vec2(dot(p, wd), dot(p, wp));
   ws.x -= uTime * 0.8; // foam drifts slowly downwind
   float A = clamp(uWindStr * 0.55 + uWaveScale * 0.75 - 0.38, 0.05, 1.3); // how foamy the sea is
-  float detail = 1.0 - smoothstep(200.0, 560.0, dist);
-  float crestBias = smoothstep(-0.1, 0.95, hn);
+  float detail = 1.0 - smoothstep(260.0, 700.0, dist);
+  float crestBias = smoothstep(-0.2, 0.9, hn);
+  // the pattern slides a little with the surface slope, so streaks bend over each wave
+  vec2 fp = ws + vec2(dot(n.xz, wd), dot(n.xz, wp)) * 5.0;
 
-  vec2 fq = ws * vec2(0.026, 0.12);                        // stretched along the wind
-  vec2 warp = vec2(vnoise(fq * 0.6 + 3.7), vnoise(fq * 0.6 + 9.2)) - 0.5;
-  float streak = fbmF(fq + warp * 1.5);
-  // ragged, lacy edges and holes inside the patches
-  float rag = vnoise(ws * vec2(0.16, 0.42) + warp * 3.0 + 5.0) * 0.6 + vnoise(ws * vec2(0.45, 1.1) + 11.0) * 0.4;
+  vec2 fq = fp * vec2(0.08, 0.22);                        // stretched along the wind
+  vec2 warp = vec2(vnoise(fq * 0.55 + 3.7), vnoise(fq * 0.55 + 9.2)) - 0.5;
+  fq += warp * 2.6;
+  // winding veins (ridged noise) that swell into patches where the body field is high
+  // ragged edges and holes
+  float rag = vnoise(fp * vec2(0.22, 0.55) + warp * 3.0 + 5.0) * 0.5 + vnoise(fp * vec2(0.6, 1.3) + 11.0) * 0.32
+            + vnoise(fp * vec2(1.5, 2.6) + 2.0) * 0.18;
+  // winding veins (ridged noise) that swell into lacy patches where the body field is high
+  float veinN = fbmF(fq) + (rag - 0.5) * 0.05;
+  // Where the noise is nearly flat a ridge would fill in as one big slab, so narrow it by
+  // the noise's own gradient (taken in pattern space from screen derivatives).
+  vec2 qx = dFdx(fq), qy = dFdy(fq);
+  float det = qx.x * qy.y - qx.y * qy.x;
+  float gx = dFdx(veinN), gy = dFdy(veinN);
+  float grad = length(vec2(gx * qy.y - gy * qx.y, gy * qx.x - gx * qy.x)) / max(abs(det), 1e-9);
+  float flatK = clamp(0.5 / max(grad, 0.05), 1.0, 5.0);
+  float vein = 1.0 - clamp(abs(veinN - 0.5) * 5.0 * flatK, 0.0, 1.0);
+  float body = vnoise(fq * 0.45 + 21.0) * 0.65 + vnoise(fq * 1.3 + 5.0) * 0.35;
   float trail = 0.0;
 #ifndef LOW_Q
   // foam lingers downwind of crests that just passed
-  trail = smoothstep(0.55, 0.95, waveHeight(p - wd * 3.5) / amp);
+  trail = smoothstep(0.45, 0.95, waveHeight(p - wd * 3.5) / amp);
 #endif
   // only a light link to the (fast-moving) wave crests, so foam doesn't race past
-  float field = streak + (rag - 0.5) * 0.5 + crestBias * 0.04 + trail * 0.02;
-  float foam = cel(field, 0.97 - A * 0.15) * detail;
-
-  // whitecaps: ragged patches on the highest crests, more in rough seas
+  float field = vein * 0.7 + body * 0.25 + (rag - 0.5) * 0.55 + crestBias * 0.07 + trail * 0.03;
+  // whitecaps: the lace thickens on the highest crests, more in rough seas, rather than
+  // breaking out as a separate slab of white
   float capN = vnoise(p * 0.12 + wd * uTime * 0.12) * 0.6 + vnoise(p * 0.42 - uTime * 0.06) * 0.4;
   float capThr = 1.24 - smoothstep(0.3, 1.4, uWaveScale) * 0.42 - clamp(uWindStr - 0.8, 0.0, 0.8) * 0.08; // fewer caps in fair weather, same in storms
-  float capBreak = cel(vnoise(ws * vec2(0.05, 0.12) + 7.0) + (rag - 0.5) * 0.35, 0.5);
-  foam = max(foam, cel(hn + (capN - 0.5) * 0.55, capThr) * capBreak * (1.0 - smoothstep(400.0, 900.0, dist)));
+  float cap = smoothstep(capThr - 0.3, capThr + 0.1, hn + (capN - 0.5) * 0.55) * (1.0 - smoothstep(400.0, 900.0, dist));
+  float foam = cel(field + cap * 0.2, 0.94 - A * 0.085) * detail;
 
 #ifndef LOW_Q
-  // thin lace tendrils threading through the streaks
-  float rn = vnoise(ws * vec2(0.1, 0.32) + warp * 2.5);
-  float ridge = 1.0 - abs(rn * 2.0 - 1.0);
-  float tendril = cel(ridge, 0.955 - A * 0.04) * smoothstep(0.5, 0.66, streak + crestBias * 0.15)
-                * (1.0 - smoothstep(70.0, 260.0, dist));
-  // hair-thin lines shimmer as the surface heaves, so keep them for rough seas
-  foam = max(foam, tendril * smoothstep(0.9, 1.3, uWaveScale));
-  // scattered specks, denser on crests
-  vec2 sc = ws * vec2(0.35, 0.8);
+  // scattered flecks trailing off the streaks
+  vec2 sc = fp * vec2(0.55, 0.9);
   vec2 si = floor(sc);
   vec2 sf = fract(sc) - 0.5 - (vec2(hash12(si + 4.0), hash12(si + 6.0)) - 0.5) * 0.5;
-  float sl = length(sf * vec2(0.45, 1.0)) + (vnoise(sc * 6.0) - 0.5) * 0.06;
-  float speck = (1.0 - cel(sl, 0.05 + hash12(si + 2.0) * 0.08))
-              * step(0.95 - A * 0.08 - crestBias * 0.01, hash12(si))
-              * (1.0 - smoothstep(50.0, 160.0, dist));
-  foam = max(foam, speck * 0.6);
+  float sl = length(sf * vec2(0.6, 1.0)) + (vnoise(sc * 6.0) - 0.5) * 0.06;
+  float speck = (1.0 - cel(sl, 0.06 + hash12(si + 2.0) * 0.1))
+              * step(0.97 - A * 0.08, hash12(si) * 0.45 + field * 0.6)
+              * (1.0 - smoothstep(60.0, 190.0, dist));
+  foam = max(foam, speck);
 #endif
   // far away, unresolvable foam just lightens the water a touch
-  float farFoam = (1.0 - detail) * A * 0.12;
+  float farFoam = (1.0 - detail) * A * 0.1;
 
   // rain dimples
   vec2 rc = p * 1.2;
@@ -174,23 +189,23 @@ void main() {
   vec3 lit = col * light;
   // sky reflection toward grazing angles: hazy grey-teal near the horizon
   float F = 0.02 + 0.98 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
-  lit = mix(lit, uSkyColor * 0.9, clamp(F, 0.0, 1.0) * 0.38);
+  lit = mix(lit, uSkyColor * 0.9, clamp(F, 0.0, 1.0) * 0.24);
   // off-white, slightly sea-tinted foam that doesn't glare
-  vec3 foamCol = vec3(0.84, 0.9, 0.93) * min(light, vec3(1.05));
-  lit = mix(lit, foamCol, max(foam, farFoam) * 0.82);
+  vec3 foamCol = vec3(0.9, 0.95, 0.97) * min(light, vec3(1.05));
+  lit = mix(lit, foamCol, max(foam, farFoam) * 0.94);
 
   // ---- sun (or moon) glitter path, widening and warming as the sun drops
   float spec = dot(reflect(-v, n), sd);
   float low = 1.0 - smoothstep(0.12, 0.55, sd.y);
   float noFoam = 1.0 - foam;
-  lit += uLightCol * smoothstep(0.985 - low * 0.05, 1.0, spec) * (0.25 + low * 0.55) * noFoam;
+  lit += uLightCol * smoothstep(0.985 - low * 0.05, 1.0, spec) * (0.08 + low * 0.6) * noFoam;
   vec2 gc = p * 1.4 + n.xz * 2.0;
   vec2 gi = floor(gc);
   float twinkle = step(0.8, hash12(gi + floor(uTime * 1.2 + hash12(gi) * 4.0)));
   float glit = step(mix(0.994, 0.94, low), spec + (hash12(gi + 9.0) - 0.5) * 0.02) * twinkle
              * (1.0 - step(0.22, length(fract(gc) - 0.5)));
   glit = max(glit * (1.0 - smoothstep(250.0, 1200.0, dist)), step(0.996, spec));
-  lit += glit * uLightCol * (0.6 + low * 0.9) * noFoam;
+  lit += glit * uLightCol * (0.25 + low * 1.1) * noFoam;
 
   gl_FragColor = vec4(lit, 1.0);
   #include <tonemapping_fragment>
@@ -204,10 +219,11 @@ export class Ocean {
     this.uniforms = {
       ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
       ...waveUniforms,
-      uTrough: { value: new THREE.Color('#134a63') },
-      uDeep: { value: new THREE.Color('#1d5b78') },
-      uMid: { value: new THREE.Color('#2a6f8c') },
-      uFace: { value: new THREE.Color('#2f8e8c') },
+      uTrough: { value: new THREE.Color('#0d2f5e') },
+      uDeep: { value: new THREE.Color('#114b7a') },
+      uMid: { value: new THREE.Color('#1b6492') },
+      uFace: { value: new THREE.Color('#2a9a96') },
+      uCrest: { value: new THREE.Color('#58bfae') },
       uSkyColor: { value: new THREE.Color('#bfe4ff') },
       uWindDir: { value: new THREE.Vector2(1, 0) },
       uWindStr: { value: 0.9 },
