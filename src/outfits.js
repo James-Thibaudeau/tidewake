@@ -690,6 +690,26 @@ function buildExtra(B, p, c, R) {
       }
       T.push(band(ec.dark, R, [...front, ...rear], 0.04, STRAP, 2));
     }
+  } else if (st === 'crabPin') {
+    // A little enamel crab pinned high on the chest, on a brass back: red
+    // shell, two raised claws, legs either side. A solid thing, placed on the
+    // clothes' surface and facing out from it.
+    const RED = '#e0553a', RED2 = '#b33a26', a = 0.62, y = 0.455;
+    const r = R(y) + 0.004, x = r * Math.sin(a) * bodyWidth(y), z = r * Math.cos(a) * bodyDepth(y);
+    const parts = [
+      part(cyl(0.05, 0.05, 0.008, 14), BUCKLE, { rx: PI / 2 }),
+      part(sph(0.03, 10, 8), RED, { z: 0.008, sx: 1.3, sy: 0.85, sz: 0.45 }),
+      part(sph(0.006, 5, 4), '#1b1410', { x: 0.011, y: 0.02, z: 0.018 }),
+      part(sph(0.006, 5, 4), '#1b1410', { x: -0.011, y: 0.02, z: 0.018 }),
+    ];
+    for (const s of [-1, 1]) {
+      parts.push(
+        part(box(0.022, 0.007, 0.006), RED2, { x: s * 0.03, y: 0.022, z: 0.008, rz: s * 0.7 }),
+        part(sph(0.012, 6, 5), RED, { x: s * 0.038, y: 0.034, z: 0.009, sy: 1.25, sz: 0.5 }),
+      );
+      for (let k = 0; k < 2; k++) parts.push(part(box(0.024, 0.008, 0.006), RED2, { x: s * 0.04, y: -0.006 - k * 0.015, z: 0.008, rz: -s * (0.2 + k * 0.45) }));
+    }
+    T.push(rigid(group(parts, { x, y, z, ry: Math.atan2(x, z), rx: -0.12, s: 1.3, order: 'YXZ' })));
   }
 }
 
@@ -1274,6 +1294,37 @@ const HATS = {
       part(sph(0.04, 6, 4), fur, { x: 0.22, y: 0.31, z: 0.0 }),
       part(sph(0.04, 6, 4), fur, { x: -0.22, y: 0.31, z: 0.0 }),
     ], { y: HC + 0.02 });
+  },
+  souwester() {
+    // An oilskin storm hat: a round crown, a short brim turned up at the front
+    // and a long one sloping down over the back of the neck, to shed the rain.
+    const oil = '#e9b82c', dark = '#c2921c', seam = '#a87c14';
+    // The brim is a sheet with an upper and an under side that meet at the
+    // rim. It leaves the crown level and curves down, so the back clears hair
+    // tied behind the head before it falls away.
+    const sheet = (under) => {
+      const g = new THREE.RingGeometry(0.3, 1, 30, 5).rotateX(-PI / 2);
+      const q = g.attributes.position;
+      for (let i = 0; i < q.count; i++) {
+        const x = q.getX(i), z = q.getZ(i), rr = Math.hypot(x, z);
+        const back = (1 - z / rr) / 2;                     // 0 at the front, 1 at the back
+        const r = 0.4 + 0.05 * (1 - back) ** 2 + 0.36 * back ** 1.6;
+        const y = 0.05 * (1 - back) ** 2 * rr - 0.25 * back ** 1.4 * rr ** 2.4;
+        q.setXYZ(i, x * r, y - (under ? 0.024 * (1 - rr ** 6) : 0), z * r);
+      }
+      g.computeVertexNormals();
+      return g;
+    };
+    return tipBack([
+      part(sph(0.358, 20, 10, 0, TAU, 0, PI / 2), oil, { y: 0.15, sy: 0.9, sz: 1.06 }),
+      part(sheet(false), oil, { y: 0.185 }),
+      inward(part(sheet(true), dark, { y: 0.185 })),
+      part(tor(0.36, 0.016, 4, 22), dark, { y: 0.172, rx: PI / 2, sy: 1.06 }),
+      // seams over the crown, front to back and side to side, and a button where they cross
+      part(new THREE.TorusGeometry(0.36, 0.008, 3, 16, PI), seam, { y: 0.15, ry: PI / 2, sy: 0.9, sx: 1.06 }),
+      part(new THREE.TorusGeometry(0.36, 0.008, 3, 16, PI), seam, { y: 0.15, sy: 0.9 }),
+      part(sph(0.03, 8, 6), dark, { y: 0.476, sy: 0.6 }),
+    ], -0.16);
   },
   flowerCrown() {
     const B = BANDS.flowerCrown;

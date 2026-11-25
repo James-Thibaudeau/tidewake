@@ -77,7 +77,9 @@ await gallery.sheet('tops-back')           // contact sheet: every top with ever
 gallery.frame()                            // draw before a screenshot when the tab is hidden
 ```
 
-- Subjects: `outfit`, `ship`, `prop`, `tree`, `wreck`, `grove`, `level`. The
+- Subjects: `outfit`, `ship`, `prop`, `tree`, `arch`, `wreck`, `grove`,
+  `archway`, `level`. A big subject takes `at=<place>` with `view=spot` for
+  a close look at one place (`show=archway&at=keystone&view=spot`). The
   same parameters work in the URL: `gallery.html?show=ship&tier=4&light=night`.
 - **After changing how something looks, take the contact sheet that covers
   it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`…, or
@@ -100,11 +102,11 @@ which the other systems hang off:
 
 ```
 game.world  .streamer  .boat  .ocean  .env (sky)  .weather  .input  .audio  .fx
-game.ui  .creator  .story  .ashore  .quests  .rival  .debug
+game.ui  .creator  .story  .ashore  .quests  .rival  .refits  .reports  .debug
 game.state     everything that is saved (see below)
 game.mode      title | sailing | docking | docked | landing | ashore | wrecking | wrecked
 game.view      { scene, camera } being drawn: the sea, or the ashore level
-game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, cosmetic, outfit, pickup
+game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, cosmetic, outfit, pickup, sighting
 ```
 
 - **Systems react to events** (`src/events.js`) instead of patching game

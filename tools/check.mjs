@@ -283,7 +283,7 @@ const checks = {
     const { SAVE_VERSION } = await load('config.js');
     const v1 = { v: 1, banked: 240, cargo: 0, health: 80, upgrades: { sail: 1 }, discovered: [0, 3], savePort: 0 };
     const cases = { empty: {}, v1, garbage: { quests: 7, story: 'x', rival: null, hold: {}, wardrobe: 'hat', ashore: null } };
-    const objects = { quests: ['active', 'done', 'boards', 'pinned'], story: ['chapter', 'journals', 'flags', 'seenCards'], rival: ['chapter', 'wins', 'losses', 'flags', 'log'], ashore: [] };
+    const objects = { quests: ['active', 'done', 'boards', 'pinned', 'reports'], story: ['chapter', 'journals', 'flags', 'seenCards'], rival: ['chapter', 'wins', 'losses', 'flags', 'log'], ashore: [] };
     const arrays = ['wardrobe', 'hold'];
     for (const [label, input] of Object.entries(cases)) {
       const d = migrate(structuredClone(input));
@@ -408,6 +408,12 @@ const checks = {
     const L = buildArchwayLayout();
     const v = validateArchway(L);
     const errors = [...v.errors];
+    // the story: the chest's piece exists, and the journal kept here has its step text
+    const { STYLES } = await load('cosmetics.js');
+    const { STEPS } = await load('story-text.js');
+    for (const c of L.chests) if (c.cosmetic && !STYLES.some((s) => s.id === c.cosmetic)) errors.push(`chest: no cosmetic "${c.cosmetic}"`);
+    const step = STEPS.ashore[L.spots.journal?.id];
+    if (!step?.text || !step.noAnchor || !step.where) errors.push(`story: STEPS.ashore.${L.spots.journal?.id} needs text, noAnchor and where`);
     const climber = await testClimber();
     const main = climber(L, L.route, 'main', errors, 2);
     const stack = climber(L, L.stack, 'stack', errors, 2);

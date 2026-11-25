@@ -70,7 +70,7 @@ export class Game {
       stats: { distance: 0, treasures: 0, wrecks: 0, discoveries: 1 }, tutorial: 0,
       // v2: character, quests, story, ashore progress and quest cargo
       profile: normalizeProfile(null), wardrobe: [],
-      quests: { active: [], done: [], boards: {}, pinned: null },
+      quests: { active: [], done: [], boards: {}, pinned: null, reports: {} },
       story: { chapter: 0, journals: [], flags: {}, seenCards: [] },
       ashore: {}, hold: [],
       // the rival captain (rival.js)
@@ -597,7 +597,7 @@ export class Game {
       this.pointOfSail = pointOfSailName(boat.relWind);
       if (this.mode !== 'title') this.updateFlotsam(dt);
       this.updateEffects(dt);
-      if (this.mode !== 'title') { this.quests?.update(dt, this.elapsed); this.story?.update(dt, this.elapsed); this.rival?.update(dt, this.elapsed, wind); }
+      if (this.mode !== 'title') { this.quests?.update(dt, this.elapsed); this.story?.update(dt, this.elapsed); this.rival?.update(dt, this.elapsed, wind); this.reports?.update(dt); }
       this.updateCamera(dt);
     }
     this.env.update(dt, s.dayT, w.p, this.camera, w.wind, this.elapsed);

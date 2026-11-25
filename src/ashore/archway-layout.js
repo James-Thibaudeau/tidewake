@@ -296,7 +296,8 @@ export function buildArchwayLayout() {
   const crown = add(disc('top', S.x, S.z, S.top, S.r + 0.3));
   // you step up onto the top by its lantern, and walk across to the chest
   const arrive = sa + 0.4, topLantern = { id: 'stack', ...xz(pol(S.r - 1.4, arrive - 0.45, S.x, S.z)), y: S.top };
-  const chest = { id: 'chest', ...xz(pol(1.4, arrive + Math.PI, S.x, S.z)), y: S.top, yaw: arrive };
+  // the sou'wester is found here and nowhere else
+  const chest = { id: 'chest', ...xz(pol(1.4, arrive + Math.PI, S.x, S.z)), y: S.top, yaw: arrive, cosmetic: 'hat:souwester' };
   stack.push({ ...xz(pol(S.r - 1.2, arrive, S.x, S.z)), y: S.top, piece: crown });
   stack.push({ x: S.x, z: S.z, y: S.top, piece: crown });
   caches.push({ id: 'g2', x: S.x - 1.4, y: S.top, z: S.z + 1, value: 40 });
@@ -320,10 +321,27 @@ export function buildArchwayLayout() {
     lantern1, lantern2,
     // beside the way onto the arch, so you pass within reach of it
     { id: 'shoulder', x: shoulder.x - 1.3, y: groundH(shoulder.x - 1.3, shoulder.z + 0.6), z: shoulder.z + 0.6 },
-    { id: 'keystone', x: key.cx + 0.5, y: key.top, z: A.archZ - 0.6 },
+    // grandfather's storm lantern, on an iron crook out over the seaward edge
+    // (archway-art.js draws it, so it has no post; it burns after dark, lit or not)
+    { id: 'keystone', x: key.cx + 0.9, y: key.top, z: A.archZ - 0.6, post: false, burns: true, lamp: { x: 0, y: 1.72, z: -0.55 } },
     topLantern,
   ];
   const down = { x: spawn.x + 1, y: spawn.y, z: spawn.z + 1, yaw: Math.PI };
+
+  // ---- the story: the note pinned to the weather board, and at the keystone
+  // his mark scratched in the rock with Journal IV under a stone beside it
+  const door = [Math.sin(camp.rot), Math.cos(camp.rot)];   // the way the board faces
+  const note = { id: 'note', x: camp.x + door[0] * 1.5, z: camp.z + door[1] * 1.5, r: 1.9 };
+  note.y = groundH(note.x, note.z);
+  // in the middle of the keystone, between the stone he left the journal under
+  // (the way you come) and the lantern (beyond it)
+  const mark = { x: key.cx, y: key.top, z: A.archZ + 0.05 };
+  const pouch = { x: key.cx - 0.9, y: key.top, z: A.archZ + 0.5 };
+  const spots = { note, journal: { id: 'IV', ...mark, r: 1.25 } };
+  // the flagstone his mark is scratched into: a low step on the keystone. The
+  // writing runs across the walk, so it is the right way up as you come out to it
+  const flag = { cx: mark.x, cz: mark.z, hx: 0.55, hz: 0.72, top: key.top + 0.06 };
+  colliders.push(obox(flag.cx, flag.top - 0.08, flag.cz, flag.hx, 0.08, flag.hz, 0, 'stone'));
 
   // where gulls sit (archway-life.js): beside the way, so they lift off as you
   // come by, on the inlet's stacks, the arch's back, the stack's top and the cove
@@ -363,7 +381,7 @@ export function buildArchwayLayout() {
     spawn, exit, rowboat, camp, checkpoints, coins, caches,
     chests: [chest],
     summit: { x: key.cx, y: key.top, z: A.archZ }, vault, keystone: { x: key.cx, y: key.top, z: A.archZ },
-    spots: {},
+    spots, flag, pouch,
     hubs: [{ x: S.x, z: S.z, orbit: S.r + 0.9, base: groundH(A.archX + 4, A.archZ - 3) + 0.6, top: S.top - 0.6 }],
     // the traverse's wall; and the storm cave, which the camera looks straight into
     faces: [{ path: facePath, base: 7, top: 15.5, reach: 2.6 },
@@ -415,10 +433,21 @@ export function validateArchway(L) {
     }
   }
   if (L.coins.length < 40 || L.coins.length > 75) errors.push(`coins ${L.coins.length} not in 40..75`);
-  for (const c of [...L.coins, ...L.caches, ...L.checkpoints, L.vault]) {
+  for (const c of [...L.coins, ...L.caches, ...L.checkpoints, L.vault, ...Object.values(L.spots), L.pouch]) {
     const s = supportAt(L, c.x, c.z, c.y + 0.05);
     if (Math.abs(s - c.y) > 0.3) errors.push(`${c.id || 'vault'}: floating or buried (${c.y.toFixed(2)} vs ${s.toFixed(2)})`);
   }
+  // the story: the journal waits where the walk tops out, and the lantern
+  // beside it can still be reached for the climb down
+  const J = L.spots.journal, K = L.checkpoints.find((c) => c.id === 'keystone');
+  if (!J || !L.spots.note) errors.push('story: the level needs a note spot and a journal spot');
+  else {
+    if (Math.abs(J.y - L.summit.y) > 0.01) errors.push('story: the journal is not at the keystone');
+    // somewhere on the walk within the lantern's reach (2 m) but outside the journal's
+    const free = K && [1, 1.5].some((dx) => Math.hypot(K.x + dx - J.x, K.z - J.z) > J.r + 0.2);
+    if (!free) errors.push("story: the journal's spot covers the keystone lantern, so you could never climb down from it");
+  }
+  if (!L.chests[0]?.cosmetic) errors.push("the stack's chest has no cosmetic of its own");
   // the arch's back: every step a walk, not a jump
   for (let i = 1; i < L.steps.length; i++) {
     const d = Math.abs(L.steps[i].top - L.steps[i - 1].top);

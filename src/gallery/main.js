@@ -174,6 +174,8 @@ function boot() {
       orbit.dist = fitDist(box, V.yaw + stage.rotation.y, V.pitch);
     } else {
       const f = subject[V.kind];
+      // (a place may say which way it is best looked at)
+      orbit.yaw = f.yaw ?? V.yaw; orbit.pitch = f.pitch ?? V.pitch;
       subject.group.localToWorld(orbit.target.set(f.x || 0, f.y, f.z || 0));
       orbit.dist = f.span / 2 / Math.tan((FIT_FOV * Math.PI) / 360) / Math.min(1, camera.aspect);
     }

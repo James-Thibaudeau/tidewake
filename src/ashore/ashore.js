@@ -275,12 +275,14 @@ export class Ashore {
     });
     this.lanterns = L.checkpoints.map((c) => {
       const m = new THREE.Group();
-      m.add(new THREE.Mesh(postGeo, propMaterial), new THREE.Mesh(postGeo, thinOutline));
+      // a lantern the level draws itself (post: false) only needs its flame, at c.lamp
+      if (c.post !== false) m.add(new THREE.Mesh(postGeo, propMaterial), new THREE.Mesh(postGeo, thinOutline));
+      const at = c.lamp || { x: 0.42, y: 1.78, z: 0 };
       const glow = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), glowOff);
-      glow.position.set(0.42, 1.78, 0);
+      glow.position.set(at.x, at.y, at.z);
       // every post glows a little at night to show the way; lit ones shine properly
       const light = new THREE.PointLight(0xffc878, 0, 16, 1.4);
-      light.position.set(0.42, 1.7, 0);
+      light.position.set(at.x, at.y - 0.08, at.z);
       m.add(glow, light);
       m.position.set(c.x, c.y, c.z);
       this.scene.add(m);
@@ -382,10 +384,11 @@ export class Ashore {
     this.level?.syncStory?.({ journal, chestOpen: st ? st.chapter >= 9 : false });
   }
 
-  /** The note on grandfather's tent (the Elder Grove): it sends you inland. */
+  /** The note at grandfather's camp, which sends you on: on his tent in the Elder Grove, unless the level words its own. */
   readNote() {
-    return this.game.ui.showFound({ eyebrow: "Grandfather's camp", title: 'A note on the tent pole',
-      items: [{ icon: 'scroll', name: LINES.groveNote, text: LINES.groveNoteText }], main: 'Onward' });
+    const n = this.level.spots.note;
+    return this.game.ui.showFound({ eyebrow: "Grandfather's camp", title: n.title || 'A note on the tent pole',
+      items: [{ icon: 'scroll', name: n.line || LINES.groveNote, text: n.text || LINES.groveNoteText }], main: 'Onward' });
   }
 
   // --------------------------------------------------------------- lights
@@ -425,9 +428,11 @@ export class Ashore {
       glowOn.color.set('#ffe8a0').multiplyScalar(glowBoost.value);
     }
     for (const c of this.lanterns || []) {
-      c.light.intensity = night * (c.lit ? 16 : 4) * flick;
+      // (grandfather's storm lantern burns after dark whether you've lit it or not)
+      const bright = c.lit || (c.burns && night > 0.3);
+      c.light.intensity = night * (bright ? 16 : 4) * flick;
       c.glow.material = c.lit || night > 0.3 ? glowOn : glowOff;
-      c.glow.scale.setScalar(c.lit ? 1 : 0.7);
+      c.glow.scale.setScalar(bright ? 1 : 0.7);
     }
   }
 
@@ -509,12 +514,13 @@ export class Ashore {
         else if (st.chapter < 8) prompt = 'An old sea chest, locked tight';
         else prompt = 'The chest is empty now';
       } else if (near(L.spots.journal)) {
-        // a journal kept in the level (the grove's carving): take it when the story has reached it
-        const id = L.spots.journal.id;
-        if (st.waiting(id)) { prompt = 'Take the journal from the crack'; action = () => { st.findJournal(id); this.syncStory(); }; }
-        else if (st.has(id)) { prompt = "Read grandfather's journal by his carving"; action = () => g.ui.openJournal('story', id); }
-        else { prompt = 'Look at the carving'; action = () => g.ui.toast(LINES.carving, 'info'); }
-      } else if (near(L.spots.note)) { prompt = 'Read the note on the tent'; action = () => this.readNote(); }
+        // a journal kept in the level: take it when the story has reached it. The
+        // wording is the grove's carving unless the level gives its own
+        const J = L.spots.journal, id = J.id;
+        if (st.waiting(id)) { prompt = J.take || 'Take the journal from the crack'; action = () => { st.findJournal(id); this.syncStory(); }; }
+        else if (st.has(id)) { prompt = J.read || "Read grandfather's journal by his carving"; action = () => g.ui.openJournal('story', id); }
+        else { prompt = J.look || 'Look at the carving'; action = () => g.ui.toast(J.lookText || LINES.carving, 'info'); }
+      } else if (near(L.spots.note)) { prompt = L.spots.note.prompt || 'Read the note on the tent'; action = () => this.readNote(); }
     }
     for (const c of this.chests) {
       if (c.opened || Math.hypot(c.x - p.x, c.z - p.z) > 1.8 || Math.abs(c.y - p.y) > 1.5) continue;
@@ -540,7 +546,7 @@ export class Ashore {
     if (own) {
       // this chest's own piece, found nowhere else
       g.unlockCosmetic(own.id, 'chest');
-      item = { icon: 'needle', name: own.name, text: LINES.flowerCrown };
+      item = { icon: 'needle', name: own.name, text: c.text || LINES.flowerCrown };
     } else if (pool.length) {
       const s = pool[(this.island.seed >>> 0) % pool.length];
       g.unlockCosmetic(s.id, 'chest');

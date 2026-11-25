@@ -122,6 +122,7 @@ export const STYLES = [
   S('hat', 'captain', "Captain's cap", 'tailor', { price: 250 }),
   S('hat', 'furHood', 'Fur hood', 'found:cold', { hint: 'Found in the frozen north' }),
   S('hat', 'flowerCrown', 'Flower crown', 'found:grove', { hint: 'At the top of the Elder Grove' }),
+  S('hat', 'souwester', "Sou'wester", 'found:arch', { hint: 'On the sea stack off Archway Isle' }),
   S('hat', 'circlet', 'Gold circlet', 'found:ruins', { hint: 'Hidden in the Sunken Temple' }),
   S('hat', 'grandPith', "Grandpa's helmet", 'story', { hint: "Your grandfather's last gift" }),
   S('hat', 'rivalTricorn', "Sable's tricorn", 'story', { hint: 'A gift from a rival captain' }),
@@ -155,12 +156,13 @@ export const STYLES = [
   S('extra', 'satchel', 'Satchel'),
   S('extra', 'none', 'Nothing'),
   S('extra', 'backpack', 'Backpack', 'tailor', { price: 150 }),
+  S('extra', 'crabPin', 'Crab pin', 'quest:archCrabs', { hint: 'A naturalist would know' }),
 ];
 
 export const SLOTS = ['hair', 'hat', 'top', 'bottom', 'boots', 'neck', 'extra'];
 // Styles whose look is fixed (colour pickers are hidden for these)
-export const FIXED_COLOR = new Set(['hat:none', 'hat:furHood', 'hat:flowerCrown', 'hat:circlet', 'hat:grandPith', 'hat:rivalTricorn',
-  'neck:none', 'neck:shells', 'neck:grandScarf', 'extra:none']);
+export const FIXED_COLOR = new Set(['hat:none', 'hat:furHood', 'hat:flowerCrown', 'hat:souwester', 'hat:circlet', 'hat:grandPith', 'hat:rivalTricorn',
+  'neck:none', 'neck:shells', 'neck:grandScarf', 'extra:none', 'extra:crabPin']);
 
 export function stylesFor(slot) { return STYLES.filter((s) => s.slot === slot); }
 export function styleInfo(slot, style) { return STYLES.find((s) => s.slot === slot && s.style === style) || null; }

@@ -114,6 +114,12 @@ export const STEPS = {
       noAnchor: "Grandpa's third journal is ashore at the Elder Grove. You'll need an anchor to land there, and a sounder hull to carry one.",
       where: 'the carving',
     },
+    IV: {
+      text: 'Go ashore at Archway Isle. He was heading for the arch.',
+      noAnchor: "Grandpa's fourth journal is ashore at Archway Isle. You'll need an anchor to land there, and a refit to grip bare rock.",
+      noRefit: "Grandpa's fourth journal is ashore at Archway Isle. Your anchor won't grip bare rock there. Ask the shipwright about a refit.",
+      where: 'the keystone',
+    },
   },
   searchChest: { title: 'The chest under the bunk', text: "Return to Grandpa's wreck near Port Haven, climb aboard and open the old chest under his bunk." },
   letterHome: { title: 'The letter home', text: "Bring Grandpa's letters home to Grandma in Port Haven." },
@@ -161,6 +167,30 @@ export const LINES = {
   groveNoteText: 'His handwriting, in a hurry. A worn path runs inland, towards the great tree.',
   carving: 'A lopsided heart, two sets of initials worn soft by the weather, and a little anchor underneath.',
   flowerCrown: "Somebody wove it and left it at the top of the oldest tree. Try it on at any port's Tailor.",
+  archNote: '"Glass dropping. Up to the arch for a look. If it\'s coming, I\'m going through first."',
+  archNoteText: 'Pinned to his weather board, under a column of chalked readings, each lower than the last. Little cairns lead up the gully and round the cliff.',
+  keystone: 'Scratched into the rock: two initials worn smooth, "SAILED THROUGH", and an arrow pointing out to sea.',
+  souwester: "An oilskin storm hat, stiff with salt. Somebody sat out a squall up here. Try it on at any port's Tailor.",
+};
+
+// Report quests (reports.js): you see something at sea, and somebody ashore
+// wants it written down. {port} is where they live, {captain} the player's name.
+export const REPORTS = {
+  archCrabs: {
+    sighting: 'Crabs! Upside down, all over the underside of the arch.',
+    added: 'Somebody should hear about those crabs. Ask for the naturalist at {port}.',
+    title: 'The crabs under the arch',
+    text: 'Tell the naturalist at {port} about the crabs living upside down under the arch at Archway Isle. Nobody has ever written them down.',
+    label: 'A sighting to report',
+    status: 'Tell the naturalist at {port}',
+    eyebrow: 'The naturalist at {port}',
+    done: "{captain}'s crab",
+    pageName: "A page in the naturalist's book",
+    page: '"Upside down? All of them? Wait, let me get the book." A whole page, with a drawing, and your name at the top. "{captain}\'s crab. It\'s official now."',
+    pinName: 'Crab pin',
+    pin: "A little enamel crab for your collar. Find it in the Tailor's wardrobe.",
+    gold: 'For the news, and for sailing all this way to tell it.',
+  },
 };
 
 // Grandfather's anchor, refitted one piece at a time (refits.js). Index by

@@ -822,7 +822,7 @@ export class IslandStreamer {
   /** The great arch standing off Archway Isle (sea-arch.js), with its surf, gulls and crabs. */
   buildArch(I, group) {
     const P = I.archPos, S = ARCH.scale, cr = Math.cos(P.rot) * S, sr = Math.sin(P.rot) * S;
-    const A = buildSeaArch({ world: (x, z) => [P.x + x * cr + z * sr, P.z - x * sr + z * cr] });
+    const A = buildSeaArch({ world: (x, z) => [P.x + x * cr + z * sr, P.z - x * sr + z * cr], glowMap: glowTexture() });
     A.group.position.set(P.x - I.x, 0, P.z - I.z);
     A.group.rotation.y = P.rot;
     A.group.scale.setScalar(S);

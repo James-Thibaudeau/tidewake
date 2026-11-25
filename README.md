@@ -89,6 +89,7 @@ src/
   quests.js       quest boards: offer generation, tracking, hand-in, salvage sites
   story.js        main story: chapters, grandfather's camps, searches, rewards
   refits.js       grandfather's anchor refits: which biomes you can land on, the refit quest
+  reports.js      report quests: something seen at sea (the crabs under the arch), told to a naturalist
   story-text.js   all story writing (journals, cards, letters), kept apart from logic
   rival.js        the rival captain: chapters, where and when Sable appears, the Redwing, rewards
   rival-text.js   everything Sable says, quest steps and story cards
