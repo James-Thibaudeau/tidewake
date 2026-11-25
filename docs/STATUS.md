@@ -111,7 +111,8 @@ Updated 2026-11-25.
     [feature-plan.md](feature-plan.md)).
 
 - [x] **Phase 7, a living sea** (the first three events; design in
-  [feature-plan.md](feature-plan.md)): every three to six minutes of sailing
+  [feature-plan.md](feature-plan.md);
+  [#46](https://github.com/James-Thibaudeau/tidewake/pull/46)): every three to six minutes of sailing
   something turns up 150-300 m off the bow quarter, in open water, one at a
   time.
   - The director (`src/sea-events.js`) rolls from the rules in
