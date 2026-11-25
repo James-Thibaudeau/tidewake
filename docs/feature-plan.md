@@ -15,8 +15,8 @@ Decisions already made:
   island, not walked on the real heightfield.
 - Customization is available **on a new voyage and at a port Tailor**.
 
-This file holds the designs for phases that **haven't shipped yet** (4-7
-and 9),
+This file holds the designs for phases that **haven't shipped yet** (4-7,
+9 and 10),
 plus what is left of one piece of tooling, the look-dev gallery.
 What is done, what's next and known issues live in [STATUS.md](STATUS.md).
 The designs of shipped phases (0-3 and 8) moved to
@@ -485,6 +485,254 @@ and the world itself hasn't moved.
 
 ---
 
+## Phase 10: Things worth buying at the end
+
+Late in the game, gold has nowhere to go. Every upgrade together costs about
+23,600, the refits 1,750 and everything at the Tailor about 1,200. After
+that, the only thing left to buy is repairs. Meanwhile quests and treasure
+keep paying 60–400 a time.
+
+This phase adds three things to spend on, each a different size:
+- **Restoring grandfather's ship:** one long project you work towards, with
+  a story ending.
+- **The paint yard:** your ship's look, bought a piece at a time.
+- **Fireworks:** small, repeatable fun.
+
+Rules for all three:
+- **Nothing makes the ship stronger.** Upgrades stay the only stats, so the
+  sea zones' damage targets (Phase 9) and the story's soft gates still
+  hold.
+- **What you see is what you paid for.** Every purchase shows on the ship,
+  at Port Haven or in the sky.
+- **Prices follow measured income.** Before tuning, log the gold earned per
+  hour in late-game play. Set the restoration's total at about 5–8 hours of
+  that. The numbers below are starting points.
+
+### Restoring grandfather's ship
+
+Grandfather's ship lies wrecked on the rock just past the point, where the
+game begins. The epilogue ends with Grandma saying *"Just remember to come
+home."* This project lets you bring *him* home: raise his ship, rebuild her
+at Port Haven and sail her again.
+
+**When it opens:** after the epilogue (the chest's letters read). The
+shipwright at Port Haven brings it up the next time you dock: *"I've been
+looking at her from the harbor wall for years. She's not as broken as she
+looks."* It is tracked like the refit quest: no side-quest slot, always on
+the tracker.
+
+**Stages.** Each stage costs gold at Port Haven's shipwright, and most also
+need something brought from out in the world, using the Phase 4 retrieve
+mechanic: it waits in a landmark's vault while that stage is active, and is
+never lost in a wreck.
+
+| Stage | What happens | Gold | Brought from |
+| --- | --- | --- | --- |
+| 1. Raise her | Barrels and a salvage crew float her off the rock; she is towed into a slipway beside Port Haven's dock | 2,000 | — |
+| 2. Mend the hull | New planks over the broken back; the stern section is joined back on | 4,000 | Oak heartwood from the Elder Grove |
+| 3. A new keel | A new keel is laid under her, and she sits upright in the slipway | 4,000 | Iron bolts from Archway Isle's storm cave |
+| 4. Step the mast | A new mast and yards; her old figurehead goes back on the bow | 5,000 | Her figurehead, from the Sunken Temple |
+| 5. Sails and rigging | Canvas, rope and her flag | 5,000 | Sailcloth from Mount Cinderhorn's traders' cache |
+| 6. His cabin | The cabin restored: bunk, chart table, his lamp | 3,000 | His logbook's last page, from Frostspire |
+| Launch | The slipway scene (below) | — | — |
+
+About 23,000 in all: roughly what the upgrades cost, spent again on
+something that isn't a stat. The items are suggestions, to settle with each
+landmark's design. A stage whose landmark isn't walkable yet asks for gold
+only.
+
+**Seeing it happen:**
+- **At sea:** once raised, the wreck site keeps only its rocks, with a buoy
+  where she lay. In the slipway at Port Haven you can see each stage from
+  the water as you sail in: bare ribs, a planked hull, the mast, sails
+  furled, the cabin lamp lit at night.
+- **The walkable wreck** (the first ashore level, `ashore/wreck.js`) is
+  only needed before the epilogue, so raising her retires it. The rocks stay
+  as a small landing spot with a plaque.
+- **Each stage ends** with a short card in the journal's voice, read from
+  the cabin: what he wrote about this part of her. The text goes in
+  `story-text.js`.
+- **Writing rule:** his ship is never named, like the grandparents. The
+  nameboard on her stern stays blank. At the launch, Grandma explains why:
+  *"He said a name was for a ship that might not come back."*
+
+**The launch:** with stage 6 paid for, the next dock at Port Haven plays a
+scene: the harbor gathers, Grandma breaks a bottle on the bow, she slides
+down the slipway, and the town sets off fireworks (see below). Then you sail
+her once round the point at sunset with Grandma aboard, past the rock where
+she lay.
+
+**Afterwards: she is yours to sail.**
+- At Port Haven's shipwright you can switch between your own ship and his.
+  She takes **your current upgrades**, so she is never stronger or weaker.
+  The choice is a look and a feeling, not stats.
+- Grandma waves from the dock when you sail in on her.
+
+**Her model: bigger and grander than any tier.** She has to look special
+next to even a maxed ship.
+- **How:** a hull style in `boat/model.js`, built from the wreck's lines
+  (`ashore/wreck.js`), made whole. Switching ships swaps the hull style, so
+  everything already built on the boat keeps working: the rig, the sails,
+  the explorer at the helm, the anchor, the livery and the wake.
+- **Size:** `sizeScale` 1.4, against 1.25 for the largest tier (the
+  Leviathan Flagship, `SIZE_SCALE` in `boat/parts.js`).
+- **Ornate:**
+  - a raised stern castle with his cabin's gallery windows, lit at night;
+  - carved and gilded scrollwork along the rails and round the stern;
+  - her own figurehead, the one brought back from the Sunken Temple;
+  - always a bowsprit;
+  - a small mizzen mast aft, just for looks;
+  - a brass bell by the helm, his lantern at the stern;
+  - a long red pennant like his scarf;
+  - the pressed-flower emblem from Grandma's book on the mainsail.
+- **What stays yours:** your sail tier still sets the sail size and cloth,
+  and your upgrades set every stat. The mizzen sail doesn't add speed.
+- **Paint:** her default colours are his: dark varnished wood and cream
+  trim. The paint yard works on her as on any ship, and each ship keeps its
+  own livery. Her figurehead can be swapped like any other.
+
+**What being bigger touches.** `sizeScale` already scales the terrain
+probes (`boat.js`), the wake, where the explorer stands, the tow line
+(`tow.js`) and how close Sable sails (`rival.js`). So most of it follows by
+itself. Check:
+- **Tight water:** she is bigger, so narrow gaps are tighter: Archway Isle's
+  bay, the sea arch and the reefs. That's a fair trade for the look, but
+  every landmark approach and the kraken trench must still be passable.
+- **Docks:** she has to fit at every port without poking through the pier.
+  Scale the berth offset with `sizeScale` if needed.
+- **Camera:** the sailing camera pulls back in proportion, as it should
+  already for hull 4–5.
+- **Landing and hauling:** distances are measured from the boat's centre,
+  so a bigger hull puts its edge closer to the shore. Check that the landing
+  and treasure prompts still feel right.
+- **Gallery:** `gallery.show({ show: 'ship', hull: 'his', view: 'sail' })`
+  and a `his-ship` sheet: every view and every light, beside hull 5 for
+  scale.
+
+**Save:** `restore = { stage: 0–7, ship: 'own' | 'his' }`, added the usual
+three ways (`freshState()`, `migrate()`, `continueGame()` /
+`savePortState()`). Stage 7 means launched.
+
+### The paint yard
+
+A **Paint yard** section on the shipwright's tab, with a side view of your
+ship that updates as you pick. The ship can already be repainted: Sable's
+Redwing uses `setLivery({ hull, trim, deck, sail, flag, pennant, emblem })`
+in `boat/rig.js`, and Sable's reward, the crimson sail dye, is one use of
+it. The paint yard turns that into a shop.
+
+**What you buy:**
+
+| Kind | Examples | Price each |
+| --- | --- | --- |
+| **Paints** for hull, trim and deck | Harbor blue, sea green, mustard, whitewash, tar black, cherry red | 200–600 |
+| **Sail cloth** | Cream, sky blue, rose, sunset orange, striped | 400–1,000 |
+| **Sail emblems** | Compass rose, anchor, owl, crab, wave, star | 500–1,200 |
+| **Flags and pennants** | Plain colours, chequered, swallowtail | 150–400 |
+| **Figureheads** | Mermaid, dolphin, owl, sea serpent, the gilded eagle (today's) | 1,500–3,000 |
+
+- **Bought once, used for good:** like the Tailor, you buy a paint or an
+  emblem once, then put it on any part as often as you like for free. That
+  keeps trying looks fun.
+- **"Tier default"** stays as a choice for every part, so a painted ship
+  can go back to its tier's look. Parts you never touch keep following the
+  tier, as `applyColors()` does now.
+- **Earned paints:** a few can't be bought, only unlocked, then they're
+  free:
+  - **crimson** sail cloth (Sable's reward, already in the game);
+  - **gold leaf** trim, for charting every island;
+  - **kraken ink** hull, for the tow out of the Deep;
+  - the **owl** emblem, from the Elder Grove's owl.
+
+  Their tiles show how to earn them, like locked clothes do.
+- **Figureheads** sit where today's gilded eagle goes at hull 2 and up.
+  Below hull 2 there's no bow to put one on, so the shop says so.
+- **The crimson dye moves here.** Today it is a toggle in `rival.js`
+  (`flags.dye`, `flags.dyeOn`). It becomes an owned sail cloth in the
+  paint yard; `migrate()` turns `dyeOn` into a crimson sail.
+
+**Save:** `paints: []` (owned ids) and `livery: { hull, trim, deck, sail,
+flag, pennant, emblem, figurehead }` (each a paint id or null), added the
+usual three ways. With grandfather's ship, each ship keeps its own livery.
+
+**Gallery:** the `ship` subject takes the livery parameters
+(`gallery.show({ show: 'ship', tier: 4, hull: 'harbor-blue', emblem: 'owl' })`),
+plus two sheets: `paints` (every hull paint on tiers 0, 2 and 4) and
+`figureheads` (every figurehead, bow view).
+
+### Fireworks
+
+Something to set off from your ship, for no reason except that it's fun,
+and best at night.
+
+**Buying:** a **Stores** section on the shipwright's tab.
+
+| Item | What you get | Price |
+| --- | --- | --- |
+| Box of rockets | 6 single bursts in mixed colours | 120 |
+| Festival crate | 20 rockets and 4 specials | 450 |
+| Grand finale | One long show: about 30 seconds, 40 shells | 1,500 |
+
+**Shells:**
+- **Kinds:** peony (a round burst), willow (gold trails that droop),
+  crossette (splits in four), ring, and crackle (glitter and pops).
+- **Specials:** a heart, a star, an owl's face, and Sable's crimson wing
+  (earned with the crimson dye).
+
+**Setting them off:**
+- Press **F** while sailing or anchored (a button on touch). The rocket goes
+  up from the stern and bursts about 60 m up.
+- The **Grand finale** runs by itself once lit. You can keep steering.
+- **Carrying:** you hold up to 40 shells. They aren't lost in a wreck.
+  Ruining something fun as a punishment isn't worth it.
+
+**How it looks and sounds:**
+- **Look:** GPU point sprites, additive, bright enough to bloom (use
+  `glowBoost` as Sable's flare in `rival.js` does). The burst briefly
+  colours the sea below it, the way lightning flashes it now. The trails
+  drift with the wind.
+- **Sound:** procedural, in `audio.js`: a whoosh going up, then the boom
+  late by the distance, as the thunder is.
+- **Daytime:** they still work, just paler. Smoke puffs read better than
+  sparks then.
+- **Low quality:** fewer sparks per shell, and one show at a time.
+
+**Who notices:**
+- **Sable:** if she's in sight, she sometimes answers with one of her own.
+  That's a few lines in `rival-text.js`.
+- **Ports:** set one off by a port at night and you get a cheer, and a one-time toast
+  per port.
+- **The launch** of grandfather's ship ends with the town's own show: a
+  free Grand finale that doesn't come out of your hold.
+
+**Save:** `fireworks: { rocket, special, finale }`, counts, added the usual
+three ways.
+
+**New file:** `src/fireworks.js` (shells, sparks, the finale's timing),
+hanging off `game.fireworks`. The gallery gets a `fireworks` subject that
+holds each shell at its peak, so they can be judged one at a time.
+
+### Phase 10 in smaller PRs
+
+| PR | Branch | What it adds | Depends on |
+| --- | --- | --- | --- |
+| 10.1 | `feature/paint-yard` | The paint yard: paints, cloth, emblems, flags, figureheads, earned paints; the crimson dye moved in; gallery sheets | — |
+| 10.2 | `feature/fireworks` | Stores, rockets, specials and the finale; the sea flash; Sable's answer | — |
+| 10.3 | `feature/restore-ship` | The restoration quest and its six stages at the slipway; the wreck site retired; the stage cards | The epilogue (done); landmark items as each landmark ships |
+| 10.4 | `feature/his-ship` | His ship as a hull style (bigger and more ornate than any tier); the launch scene with the town's fireworks; the sail with Grandma; switching ships at Port Haven | 10.2, 10.3 |
+
+- 10.1 and 10.2 touch different files and can be built side by side. Both
+  add a section to the shipwright's tab, so agree on its layout first.
+- 10.1 is the quickest win: most of the parts already exist.
+
+**Done when:** a late-game captain has something worth saving up for; the
+paint yard's choices show on every hull tier and on his ship; fireworks
+work at sea and at anchor, day and night, on Low; his ship is raised,
+rebuilt stage by stage in sight of the harbor, launched and sailed; and no
+purchase changes a stat.
+
+---
+
 ## Tooling: the look-dev gallery, what's left
 
 The gallery itself has shipped (`gallery.html`; how to use it is in
@@ -524,6 +772,7 @@ One feature branch and PR per phase, matching how the repo already works
 | P7 | `feature/living-sea` | P2a (report quests) |
 | P8 | `feature/rival-captain` | P3, P7 (encounters come through the director), the epilogue letters, and the rival's text written and approved |
 | P9 | Three smaller PRs: see *Phase 9 in smaller PRs* | — (not at the same time as Phase 5's wave retune) |
+| P10 | Four smaller PRs: see *Phase 10 in smaller PRs* | P2b's epilogue (done); landmark items as Phase 4 ships them |
 
 **Verification each phase:** there's no test suite, so each PR is checked in
 the browser preview (`tidewake-dev` in `.claude/launch.json`):
@@ -571,3 +820,10 @@ the browser preview (`tidewake-dev` in `.claude/launch.json`):
   is still blowing when you sail home, until home waters break it up. If
   that reads as odd, the next step is a storm front with a position, which
   is a much bigger change.
+- **Restoration pricing:** the late-game income is a guess today. If the
+  restoration takes too long, players stop before the launch, which is the
+  best part. Measure income first, and keep the total within an evening or
+  two of play.
+- **Retiring the walkable wreck:** it is the first ashore level. Raising her
+  removes it, so make sure nothing after the epilogue still points there
+  (quests, hints, the chart's markers).
