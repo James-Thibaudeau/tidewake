@@ -24,6 +24,8 @@ export function migrate(d) {
   d.story = { chapter: st.chapter ?? 0, journals: Array.isArray(st.journals) ? st.journals : [], flags: st.flags || {}, seenCards: Array.isArray(st.seenCards) ? st.seenCards : [] };
   d.ashore = d.ashore && typeof d.ashore === 'object' ? d.ashore : {};
   d.hold = Array.isArray(d.hold) ? d.hold : [];
+  const rv = d.rival && typeof d.rival === 'object' ? d.rival : {};
+  d.rival = { chapter: rv.chapter ?? 0, wins: rv.wins ?? 0, losses: rv.losses ?? 0, flags: rv.flags || {} };
   d.v = SAVE_VERSION;
   return d;
 }

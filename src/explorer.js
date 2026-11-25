@@ -195,6 +195,17 @@ export class Explorer {
     return p;
   }
 
+  /** Free what this explorer owns and take it out of the scene (shared materials and cached faces stay). */
+  dispose() {
+    for (const k of BONES) clearLook(this.looks[k]);
+    this.spyglass.traverse((o) => o.geometry?.dispose());
+    this.faceMesh.geometry.dispose();
+    if (this.faceKey) { releaseFace(this.faceKey); this.faceKey = null; }
+    this.faceMat.map = null;
+    this.faceMat.dispose();
+    this.root.removeFromParent();
+  }
+
   setControl(kind) { this.control = kind; }
 
   /** 'helm' | 'ground' | 'preview'. Leaving the helm relaxes the legs. */

@@ -18,6 +18,7 @@ import { generateLevel } from './levelgen.js';
 import { buildWreckLevel } from './wreck.js';
 import { CharacterController } from './controller.js';
 import { FollowCamera } from './camera.js';
+import { LandRace } from './pacer.js';
 
 const LAND_BIOMES = new Set(['temperate']); // Phase 3: temperate islands only
 const LAND_RANGE = 46;                       // how close to the shore the boat must be
@@ -105,7 +106,9 @@ export class Ashore {
     if (!story?.canGoAshore) return slow ? { prompt: "You'll need an anchor to go ashore" } : null;
     if (!LAND_BIOMES.has(I.biome)) return slow ? { prompt: `${I.name} is too treacherous to land on (yet)` } : null;
     if (!slow) return { prompt: 'Slow down to drop anchor' };
-    return { prompt: `Drop anchor & go ashore on ${I.name}`, action: () => this.enter(I) };
+    // the rival captain may be waiting here for a race on foot
+    const sable = this.game.rival?.landEncounter(I);
+    return { prompt: sable ? `Drop anchor & go ashore: Sable is waiting on ${I.name}` : `Drop anchor & go ashore on ${I.name}`, action: () => this.enter(I) };
   }
 
   /** Climb aboard grandfather's wreck (no anchor needed: you tie up alongside). */
@@ -154,6 +157,9 @@ export class Ashore {
     this.cam = new FollowCamera(g.camera, L);
     this.cam.snap(this.ctl, L.spawn.yaw);
     this.checkpoint = { x: L.spawn.x, y: L.spawn.y, z: L.spawn.z, yaw: L.spawn.yaw };
+    // a land race, if the rival is waiting on this island (never aboard the wreck)
+    const enc = !I.wreck && L.layout ? g.rival?.landEncounter(I) : null;
+    this.race = enc ? new LandRace(this, L, enc) : null;
     this.trip = 0;
     this.prompt = null;
     this.splashT = 0;
@@ -199,6 +205,8 @@ export class Ashore {
     g.boat.group.add(ex.root);
     ex.setPose('helm');
     this.clearPickups();
+    this.race?.dispose(); // leaving mid-race just cancels it
+    this.race = null;
     this.scene.remove(this.level.group);
     this.level.dispose();
     this.level = null; this.ctl = null; this.cam = null;
@@ -301,8 +309,9 @@ export class Ashore {
     const t = g.elapsed;
     // stick / WASD relative to the camera: up = away from the camera
     const mv = g.input.move;
-    const wish = this.cam.toWorld(mv.x, mv.y);
-    const ev = ctl.update(dt, { wishX: wish.x, wishZ: wish.z, run: g.input.run, jumpPressed: acts.jump > 0, jumpHeld: g.input.jumpHeld }) || {};
+    const hold = !!this.race?.hold; // a race's countdown: stay on the start line
+    const wish = hold ? { x: 0, z: 0 } : this.cam.toWorld(mv.x, mv.y);
+    const ev = ctl.update(dt, { wishX: wish.x, wishZ: wish.z, run: g.input.run, jumpPressed: !hold && acts.jump > 0, jumpHeld: !hold && g.input.jumpHeld }) || {};
 
     // keep within the island
     const r = Math.hypot(ctl.pos.x, ctl.pos.z), R = L.bounds.r;
@@ -322,6 +331,7 @@ export class Ashore {
     this.lastYaw = ctl.yaw;
     const hs = Math.hypot(ctl.vel.x, ctl.vel.z);
     ex.update(dt, t, { footSpeed: hs, grounded: ctl.grounded, vy: ctl.vel.y, turn, windStrength: g.weather.windStrength * 0.6, windRel: Math.PI });
+    this.race?.update(dt, t, acts);
 
     this.cam.update(dt, ctl, g.input.consumeLook(), hs > 0.3);
     this.updateLights(t);
@@ -467,6 +477,10 @@ export class Ashore {
       if (c.opened || Math.hypot(c.x - p.x, c.z - p.z) > 1.8 || Math.abs(c.y - p.y) > 1.5) continue;
       prompt = 'Open the chest'; action = () => this.openChest(c);
     }
+    // the rival's challenge comes first; nothing else during a countdown
+    const rp = this.race?.prompt();
+    if (rp) { prompt = rp.prompt; action = rp.action; }
+    else if (this.race?.hold) { prompt = null; action = null; }
     if (prompt !== this.prompt) { this.prompt = prompt; g.ui.setPrompt(prompt); }
     if (acts.action && action) { this.prompt = null; g.ui.setPrompt(null); action(); }
   }

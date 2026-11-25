@@ -704,3 +704,35 @@ body.ashore #btnReturnShip { display: inline-flex; }
 #ashorePanel .apRow small { font-size: 11px; font-weight: 400; opacity: 0.8; margin-left: auto; }
 #ashorePanel .apLeft { font-size: 12px; font-weight: 400; opacity: 0.85; }
 #ashorePanel .ico { width: 16px; height: 16px; flex: none; }
+
+/* ------------------------------------------------------- the rival captain */
+#racePanel { width: 210px; max-width: calc(50vw - 20px); padding: 6px 10px 7px; display: flex; flex-direction: column; gap: 3px; border-color: rgba(232, 65, 58, 0.85); }
+#racePanel .rpHead { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #ff9a8f; line-height: 1.15; }
+#racePanel .rpHead .ico { width: 16px; height: 16px; flex: none; }
+#racePanel .rpLine { font-size: 13px; font-weight: 600; line-height: 1.25; }
+#countdown {
+  position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); pointer-events: none; opacity: 0;
+  font-size: clamp(72px, 18vw, 160px); font-weight: 700; color: var(--gold); text-shadow: var(--outline), 0 8px 16px rgba(0, 0, 0, 0.4);
+}
+#countdown.show { animation: countPop 0.9s ease-out both; }
+@keyframes countPop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(1.7); } 18% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); } }
+#hail {
+  position: absolute; left: 50%; bottom: calc(var(--sab) + 172px); transform: translate(-50%, 8px); width: min(560px, 92vw);
+  background: var(--panel); border: 2px solid #e8413a; border-radius: 16px; padding: 8px 14px 10px; opacity: 0;
+  transition: opacity 0.3s, transform 0.3s; pointer-events: none; text-shadow: var(--outline-sm);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+#hail.show { opacity: 1; transform: translate(-50%, 0); }
+#hailName { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #ff9a8f; }
+#hailText { font-size: 17px; font-weight: 600; line-height: 1.3; }
+body.touch #hail { bottom: calc(var(--sab) + 210px); }
+.sailDye { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: space-between; margin-top: 12px; }
+.sailDye p { margin: 0; font-size: 14px; opacity: 0.85; }
+.qCard.rivalNote { border-color: #e8413a; margin-bottom: 10px; }
+.qCard.rivalNote .giver b { color: #ff9a8f; }
+.qCard.rivalNote .row2 { flex-wrap: wrap; }
+.qCard.rivalNote .row2 .btn { flex: 1 1 140px; font-size: 14px; }
+.rivalLog { border-color: rgba(232, 65, 58, 0.7); }
+.rivalLog ul { margin: 4px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.4; opacity: 0.92; }
+@media (max-width: 560px) { #racePanel { width: 180px; } #hailText { font-size: 15px; } }
+@media (max-height: 460px) { #hail { bottom: calc(var(--sab) + 64px); } #hailText { font-size: 14px; } #countdown { top: 46%; } }
