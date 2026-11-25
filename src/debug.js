@@ -9,7 +9,7 @@
 // overwrite the save in localStorage, so start() backs the real one up first.
 // Always finish with restoreSave(): it puts the save back and reloads, and
 // without it the test voyage is saved over the real one when the tab closes.
-import { UPGRADES, SAVE_KEY } from './config.js';
+import { UPGRADES, SAVE_KEY, REFITS, ASHORE_BIOMES } from './config.js';
 
 const BACKUP_KEY = SAVE_KEY + '.debug-backup';
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
@@ -23,6 +23,8 @@ const HELP = `tidewake.debug
   teleport(where, off?)    where: island id, island name, or { x, z }; puts the boat in open water nearby
   give({ gold, cargo, health, upgrades })   upgrades: 'max' or { sail: 3, hull: 2, … }
   journals(n, { anchor })  story: the first n journals found (0-7); anchor: true fits grandfather's anchor
+  refit(tier, { open })    grandfather's anchor at refit tier 0-4 (fits the anchor too); open: biomes to
+                           treat as having levels, e.g. ['rocky'], so their refit is offered (until reload)
   rival(chapter)           the rival captain: jump to a chapter (same as tidewake.rival.debug)
   ashore(where?)           go ashore on an island (async); no argument = grandfather's wreck
   weather(type)            clear | breezy | cloudy | rain | storm | fog
@@ -152,6 +154,16 @@ export function installDebug(game) {
       g.syncAnchor();
       g.story.syncCamps();
       return api.state();
+    },
+
+    refit(tier = 0, { open = [] } = {}) {
+      for (const b of open) ASHORE_BIOMES.add(b);
+      g.story.S.flags.anchor = 'fitted';
+      g.story.S.flags.refit = null;
+      g.state.upgrades.anchor = Math.max(0, Math.min(REFITS.length - 1, tier));
+      g.syncAnchor();
+      g.quests.version++;
+      return { tier: g.refits.tier, landable: [...ASHORE_BIOMES], next: g.refits.next?.label || null, blocker: g.refits.blocker() };
     },
 
     rival(chapter) { return g.rival.debug(chapter); },

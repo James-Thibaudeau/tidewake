@@ -162,3 +162,46 @@ export const LINES = {
   carving: 'A lopsided heart, two sets of initials worn soft by the weather, and a little anchor underneath.',
   flowerCrown: "Somebody wove it and left it at the top of the oldest tree. Try it on at any port's Tailor.",
 };
+
+// Grandfather's anchor, refitted one piece at a time (refits.js). Index by
+// tier: 1 grapnel arms, 2 coral flukes, 3 tempered chain, 4 ice spikes.
+// {place} is the island whose vault holds the fitting.
+export const REFIT = {
+  // shown by a shore you can't land on yet, by biome
+  cantLand: {
+    rocky: "Your anchor won't grip bare rock. Ask the shipwright.",
+    tropical: 'Your anchor drags in the coral sand. Ask the shipwright.',
+    volcanic: 'The heat here would soften your anchor chain. Ask the shipwright.',
+    cold: 'Your anchor would skid on the ice. Ask the shipwright.',
+  },
+  tiers: [
+    null,
+    {
+      item: 'Old iron fitting',
+      offer: "\"That rudder will take you in among the sea stacks, but your grandfather's anchor won't grip bare rock. Bring me an old iron mooring fitting and I'll forge grapnel arms onto it. There's one at the top of {place}.\"",
+      fitted: 'Four arms now, to hook bare rock. You can land on rocky islands, and from a little further out.',
+    },
+    {
+      item: 'Bronze casting',
+      offer: "\"A hull like that can take the reefs, but your anchor slides through coral sand. Broad flukes would hold. There's an old bronze casting up on {place} I can shape into them.\"",
+      fitted: 'Broad flukes that bite in coral sand. You can land on tropical islands, and drop anchor at a faster clip.',
+    },
+    {
+      item: 'Old chain links',
+      offer: "\"With that keel you'll ride out the swells round the fire islands, but the heat there softens plain iron. I can temper you a chain if you bring me the old links from the top of {place}.\"",
+      fitted: 'A dark, tempered chain that shrugs off heat. You can land on volcanic islands, and your anchor holds in a storm.',
+    },
+    {
+      item: 'Fire-forged spikes',
+      offer: "\"A hull that strong can push through the ice floes. Ice needs spikes, and the best are forged in fire. Someone left a set at the top of {place}.\"",
+      fitted: "Spikes to grip the ice, and the whole anchor gilded while I was at it. It's still his anchor, just one that has been everywhere.",
+    },
+  ],
+  questTitle: 'Refit: {label}',
+  questFetch: 'Climb {place} and bring the {item} back to any shipwright.',
+  questBring: 'Bring the {item} to any shipwright to have the {label} fitted.',
+  questGiver: 'Opens {biome} islands',
+  needGold: 'The shipwright needs {gold} gold to fit the {label}.',
+  maxed: 'It has been everywhere.',
+  notYet: 'Nothing more to fit yet.',
+};

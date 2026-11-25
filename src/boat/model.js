@@ -134,32 +134,34 @@ export class BoatModel {
     this.group.add(this.explorer.root);
   }
 
-  /** Grandfather's anchor, hung at the starboard bow once it's fitted. */
+  /** Grandfather's anchor, hung at the starboard bow once it's fitted; its look follows the refit tier. */
   buildAnchor() {
-    const IRON = '#3c434c', IRON2 = '#5b6570';
-    const P = [
-      part(new THREE.CylinderGeometry(0.045, 0.05, 0.9, 6), IRON),                            // shank
-      part(new THREE.TorusGeometry(0.09, 0.025, 4, 10), IRON2, { y: 0.52 }),                   // ring
-      part(new THREE.CylinderGeometry(0.032, 0.032, 0.62, 5), '#6b4a2b', { y: 0.36, rz: Math.PI / 2 }), // wooden stock
-      part(new THREE.TorusGeometry(0.28, 0.045, 5, 12, Math.PI), IRON, { y: -0.2, rz: Math.PI }), // arms
-      part(new THREE.SphereGeometry(0.07, 6, 4), IRON2, { y: -0.47 }),                         // crown
-    ];
-    for (const s of [-1, 1]) P.push(part(new THREE.ConeGeometry(0.09, 0.2, 4), IRON2, { x: s * 0.28, y: -0.13, rz: s * -0.25 }));
-    const anchor = decoMesh(P, true);
-    anchor.position.set(0.98, 0.42, 2.85);
-    anchor.rotation.set(0.12, 0.3, 0.22);
-    anchor.scale.setScalar(1.7); // big enough to read from the chase camera
-    // the rope from the cathead to the ring
-    const rope = decoMesh([ropePart(V3(0.6, 1.2, 3.15), V3(0.98, 1.3, 2.95), 0.05, 0.025)]);
     this.anchorStowed = new THREE.Group();
-    this.anchorStowed.add(anchor, rope);
-    // dropped: a chain running from the bow down into the water
-    const chain = decoMesh([ropePart(V3(0.62, 1.05, 3.35), V3(1.0, -1.8, 5.0), 0.25, 0.035, '#4a525c')]);
-    this.anchorDown = chain;
+    this.anchorDown = new THREE.Group(); // dropped: a chain running from the bow down into the water
     this.anchorStowed.visible = false;
     this.anchorDown.visible = false;
     this.model.add(this.anchorStowed, this.anchorDown);
     this.anchorState = 'none';
+    this.anchorTier = -1;
+    this.setAnchorTier(0);
+  }
+
+  /** Rebuild the anchor for a refit tier (0 as found … 4 gilded, with ice spikes). */
+  setAnchorTier(tier) {
+    if (tier === this.anchorTier) return;
+    this.anchorTier = tier;
+    for (const g of [this.anchorStowed, this.anchorDown]) {
+      for (const o of [...g.children]) { g.remove(o); o.traverse((m) => m.geometry?.dispose()); }
+    }
+    const anchor = decoMesh(anchorParts(tier), true);
+    anchor.position.set(0.98, 0.42, 2.85);
+    anchor.rotation.set(0.12, 0.3, 0.22);
+    anchor.scale.setScalar(1.7); // big enough to read from the chase camera
+    // from the cathead to the ring: a rope, then the tempered chain from tier 3
+    const a = V3(0.6, 1.2, 3.15), b = V3(0.98, 1.3, 2.95);
+    const hang = decoMesh(tier >= 3 ? chainParts(a, b, 5, TEMPERED) : [ropePart(a, b, 0.05, 0.025)]);
+    this.anchorStowed.add(anchor, hang);
+    this.anchorDown.add(decoMesh([ropePart(V3(0.62, 1.05, 3.35), V3(1.0, -1.8, 5.0), 0.25, tier >= 3 ? 0.045 : 0.035, tier >= 3 ? TEMPERED : '#4a525c')]));
   }
 
   /** 'none' (no anchor yet) | 'stowed' (at the bow) | 'down' (dropped, chain in the water). */
@@ -354,4 +356,54 @@ export class BoatModel {
     this.wreckage.add(wood, heap, heapInk);
     this.model.add(this.wreckage);
   }
+}
+
+// ------------------------------------------------------------- the anchor
+const TEMPERED = '#2b3644';
+
+/**
+ * Grandfather's anchor at a refit tier, in its own space (shank along y, ring
+ * at the top). 1 adds grapnel arms across the first pair, 2 broad flukes
+ * crusted with coral, 3 the tempered chain (in setAnchorTier), 4 ice spikes
+ * and gilding. The wooden stock stays: it is still his anchor.
+ */
+function anchorParts(tier) {
+  const gilded = tier >= 4;
+  const IRON = gilded ? BRASS : '#3c434c', IRON2 = gilded ? GOLD : '#5b6570';
+  const P = [
+    part(new THREE.CylinderGeometry(0.045, 0.05, 0.9, 6), IRON),                            // shank
+    part(new THREE.TorusGeometry(0.09, 0.025, 4, 10), IRON2, { y: 0.52 }),                   // ring
+    part(new THREE.CylinderGeometry(0.032, 0.032, 0.62, 5), '#6b4a2b', { y: 0.36, rz: Math.PI / 2 }), // wooden stock
+    part(new THREE.TorusGeometry(0.28, 0.045, 5, 12, Math.PI), IRON, { y: -0.2, rz: Math.PI }), // arms
+    part(new THREE.SphereGeometry(0.07, 6, 4), IRON2, { y: -0.47 }),                         // crown
+  ];
+  const tips = [[1, 0], [-1, 0]];
+  if (tier >= 1) {
+    P.push(part(new THREE.TorusGeometry(0.28, 0.04, 5, 12, Math.PI), IRON, { y: -0.2, ry: Math.PI / 2, rz: Math.PI }));
+    tips.push([0, 1], [0, -1]);
+  }
+  for (const [sx, sz] of tips) {
+    const x = sx * 0.28, z = sz * 0.28, rz = sx * -0.25, rx = sz * 0.25;
+    if (tier >= 2) {
+      P.push(part(new THREE.SphereGeometry(0.11, 7, 5), gilded ? GOLD : '#d9735a', { x, y: -0.12, z, rx, rz, sx: sz ? 1 : 0.45, sy: 1.25, sz: sx ? 1 : 0.45 }));
+      P.push(part(new THREE.ConeGeometry(0.03, 0.1, 4), '#f6b09a', { x: x * 1.15, y: -0.03, z: z * 1.15, rx, rz }));
+    } else P.push(part(new THREE.ConeGeometry(0.09, 0.2, 4), IRON2, { x, y: -0.13, z, rx, rz }));
+    if (tier >= 4) P.push(part(new THREE.ConeGeometry(0.035, 0.15, 4), '#dff3ff', { x: x * 0.92, y: -0.28, z: z * 0.92, rx: Math.PI + rx, rz }));
+  }
+  if (tier >= 4) P.push(part(new THREE.ConeGeometry(0.045, 0.18, 4), '#dff3ff', { y: -0.6, rx: Math.PI }));
+  return P;
+}
+
+/** n links of chain from a to b, alternately flat and edge-on. */
+function chainParts(a, b, n, color) {
+  const d = b.clone().sub(a), len = d.length();
+  const e = new THREE.Euler().setFromQuaternion(new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), d.clone().normalize()));
+  const P = [];
+  for (let i = 0; i < n; i++) {
+    const p = a.clone().addScaledVector(d, (i + 0.5) / n);
+    const geo = new THREE.TorusGeometry(len / n * 0.62, 0.02, 4, 8).scale(0.55, 1, 1);
+    if (i % 2) geo.rotateY(Math.PI / 2);
+    P.push(part(geo, color, { x: p.x, y: p.y, z: p.z, rx: e.x, ry: e.y, rz: e.z }));
+  }
+  return P;
 }

@@ -259,6 +259,24 @@ export class PortUI {
         <div class="cardCur">${esc(cur.label)}</div>
         <div class="cardNext">${next ? `Next: <b>${esc(next.label)}</b>` : 'The finest on the seas.'}</div>
         ${btn}</div>`;
-    }).join('');
+    }).join('') + this.anchorCard();
+  }
+
+  /** Grandfather's anchor at the shipwright: its refit tier, and the refit button when the fitting is aboard. */
+  anchorCard() {
+    const c = this.game.refits?.card();
+    if (!c) return '';
+    const pips = Array.from({ length: c.tiers }, (_, i) => `<span class="pip${i <= c.tier ? ' on' : ''}"></span>`).join('');
+    const b = c.button;
+    const btn = !b ? '' : b.cost != null
+      ? `<button class="btn${b.enabled ? ' primary' : ''}" data-refit="1" ${b.enabled ? '' : 'disabled'}>${esc(b.label)} <span class="ico">${ICONS.coin}</span> ${fmt(b.cost)}</button>`
+      : `<button class="btn" disabled>${esc(b.label)}</button>`;
+    return `<div class="card${c.next ? '' : ' maxed'}">
+      <div class="cardHead"><div class="cardIcon">${ICONS.anchor}</div>
+        <div><div class="cardName">Anchor</div><div class="cardStat">Where you can land</div></div>
+        <div class="pips">${pips}</div></div>
+      <div class="cardCur">${esc(c.cur)}</div>
+      <div class="cardNext">${c.next ? `Next: <b>${esc(c.next)}</b>` : esc(c.note || '')}</div>
+      ${btn}</div>`;
   }
 }

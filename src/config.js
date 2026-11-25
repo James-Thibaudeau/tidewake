@@ -93,6 +93,35 @@ export const UPGRADES = [
   },
 ];
 
+// Grandfather's anchor, refitted a piece at a time (state.upgrades.anchor,
+// 0-4). Each tier opens one more biome to going ashore. The shipwright offers
+// a tier once you own `needs`; its fitting waits in a vault on an island of
+// biome `from`, and fitting it costs `cost` gold. Perks add up: `range` is how
+// far from the shore you can land, `speed` the fastest you can drop anchor
+// (m/s; the HUD shows m/s × 1.2 as knots).
+export const REFITS = [
+  { label: "Grandfather's anchor", biome: 'temperate' },
+  { label: 'Grapnel arms', biome: 'rocky', from: 'temperate', needs: { key: 'rudder', lvl: 1 }, cost: 150, range: 62 },
+  { label: 'Coral flukes', biome: 'tropical', from: 'rocky', needs: { key: 'hull', lvl: 2 }, cost: 300, speed: 6.7 },
+  { label: 'Tempered chain', biome: 'volcanic', from: 'tropical', needs: { key: 'keel', lvl: 2 }, cost: 500 },
+  { label: 'Ice spikes', biome: 'cold', from: 'volcanic', needs: { key: 'hull', lvl: 3 }, cost: 800 },
+];
+// Biomes that have ashore levels. Each Phase 4 biome PR adds its own; a
+// refit is only offered once its biome is here.
+export const ASHORE_BIOMES = new Set(['temperate']);
+export const LAND_RANGE = 46; // how close to the shore the boat must be to land (before the grapnel)
+export const LAND_SPEED = 5;  // boat speed (m/s) below which you can drop anchor (before the coral flukes)
+
+/** The anchor tier an island's biome needs (0 for temperate; -1 for a biome no refit opens). */
+export const refitFor = (biome) => REFITS.findIndex((r) => r.biome === biome);
+
+/** A perk of the refits up to `tier`: the last tier that sets it wins. */
+export function refitPerk(tier, key, fallback) {
+  let v = fallback;
+  for (let i = 1; i <= Math.min(tier, REFITS.length - 1); i++) if (REFITS[i][key] != null) v = REFITS[i][key];
+  return v;
+}
+
 export function upgradeValue(levels, key) {
   const u = UPGRADES.find((u) => u.key === key);
   return u.tiers[Math.min(levels[key] || 0, u.tiers.length - 1)].value;
