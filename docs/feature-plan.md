@@ -60,7 +60,8 @@ pull request merges.
   short, safe walk from the beach up the bow rocks, down the deck and over
   the caved-in planks to grandfather's cabin. It needs no anchor (you climb
   aboard from the boat), and Journal I, the spyglass and the epilogue chest
-  are found in the cabin. Hand-built in `src/ashore/wreck.js`.
+  are found in the cabin. Hand-built in `src/ashore/wreck.js`
+  ([#18](https://github.com/James-Thibaudeau/tidewake/pull/18)).
   - Fix: the compass follows the camera on foot, and moat water lies still.
   - Fix: a story find ashore (the spyglass) no longer pulls the explorer
     back to the helm.
