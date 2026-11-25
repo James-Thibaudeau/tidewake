@@ -402,6 +402,15 @@ export class SoundSystem {
         }
         break;
       }
+      case 'gull': {
+        // a gull taking off: two quick, falling cries
+        const v = Math.min(1, opts.volume ?? 1);
+        for (const [dt, dur] of [[0, 0.22], [0.3, 0.32]]) {
+          this.tone(1250, t + dt, dur, { type: 'triangle', vol: 0.1 * v, attack: 0.02, glide: 720 });
+          this.tone(2500, t + dt, dur * 0.7, { type: 'sine', vol: 0.02 * v, attack: 0.02, glide: 1500 });
+        }
+        break;
+      }
       case 'sail':
         this.noise(t, 0.45, { type: 'bandpass', freq: 400, sweep: 1600, q: 1.2, vol: 0.18, attack: 0.05 });
         this.noise(t + 0.12, 0.12, { type: 'bandpass', freq: 900, q: 2, vol: 0.12 });

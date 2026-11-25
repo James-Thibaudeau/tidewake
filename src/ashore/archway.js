@@ -9,6 +9,7 @@
 // the head of the bay, where the rowboat comes in.
 // Follows the level contract in shapes.js, plus:
 //   spots: {}                     story interactions (the note and Journal IV come in 4.5b)
+//   update(dt, t, { pos, night, play })   the gulls (archway-life.js)
 //   hubs: [{ x, z, orbit, base, top }]   the seaward stack, which the camera circles (camera.js)
 //   faces: [{ path, base, top, reach }]   the traverse's cliff face, which the camera looks in at
 //   fallBack: { drop, below, safe, down }  a long fall puts you back at your last lantern
@@ -21,6 +22,7 @@ import { mulberry32, noise2, TAU } from '../util.js';
 import { rowboatParts } from './pieces.js';
 import { buildArchwayLayout, archwayGround, ARCHWAY } from './archway-layout.js';
 import { C, bandFaces, pieceArt, archBody, stackBody, campParts, cairnParts, handlineParts, caveParts } from './archway-art.js';
+import { buildArchwayLife } from './archway-life.js';
 
 function merged(parts) {
   const g = mergeGeometries(parts);
@@ -177,6 +179,8 @@ export function buildArchwayLevel(I, opts = {}) {
 
   const colliders = [...L.colliders];
   const decor = buildDecor(L, group, colliders, opts.quality);
+  const life = buildArchwayLife(L, { quality: opts.quality });
+  group.add(life.group);
 
   return {
     group,
@@ -196,6 +200,7 @@ export function buildArchwayLevel(I, opts = {}) {
     vault: L.vault,
     spots: L.spots,
     syncStory() {},
+    update(dt, t, { pos, night, play }) { life.update(dt, t, pos, night, play); },
     hubs: L.hubs,
     faces: L.faces,
     fallBack: L.fallBack,
@@ -203,6 +208,7 @@ export function buildArchwayLevel(I, opts = {}) {
       group.removeFromParent();
       for (const o of own) o.dispose();
       for (const d of decor) d.dispose();
+      life.dispose();
     },
   };
 }

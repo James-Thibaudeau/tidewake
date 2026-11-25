@@ -110,7 +110,10 @@ onto the arch before it blew.
      the rock above them (it's art and a route marker, not a mechanic);
    - four sea stacks across the mouth of the first inlet;
    - a little rock arch over the second inlet;
-   - then ledges along the channel's wall, rising to the west arm's tip.
+   - then ledges along the channel's wall, rising to the west arm's tip;
+   - gulls sitting about the way, which lift off crying as you come by,
+     circle out over the bay and come back when you've gone
+     (`archway-life.js`; decor only, the gulls that swoop are 4.12).
 
    The bay is below the whole way. A miss means a splash, and **a splash
    puts you back at the last lantern**, so it costs a stretch, never the

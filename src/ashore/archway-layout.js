@@ -262,7 +262,11 @@ export function buildArchwayLayout() {
     sa -= 0.62;
   }
   const crown = add(disc('top', S.x, S.z, S.top, S.r + 0.3));
-  stack.push({ ...xz(pol(S.r - 1.2, sa + 0.4, S.x, S.z)), y: S.top, piece: crown });
+  // you step up onto the top by its lantern, and walk across to the chest
+  const arrive = sa + 0.4, topLantern = { id: 'stack', ...xz(pol(S.r - 1.4, arrive - 0.45, S.x, S.z)), y: S.top };
+  const chest = { id: 'chest', ...xz(pol(1.4, arrive + Math.PI, S.x, S.z)), y: S.top, yaw: arrive };
+  stack.push({ ...xz(pol(S.r - 1.2, arrive, S.x, S.z)), y: S.top, piece: crown });
+  stack.push({ x: S.x, z: S.z, y: S.top, piece: crown });
   caches.push({ id: 'g2', x: S.x - 1.4, y: S.top, z: S.z + 1, value: 40 });
   for (let i = 0; i < 3; i++) coinAt(pol(2.6, i * 2.1, S.x, S.z), S.top, 2);
 
@@ -279,11 +283,28 @@ export function buildArchwayLayout() {
     { id: 'gully', x: 1.6, y: archwayGround(1.6, top.z).h, z: top.z },
     { id: 'clifftop', x: -36, y: archwayGround(-36, 28).h, z: 28 },
     lantern1, lantern2,
-    { id: 'shoulder', x: -A.archX - 1.5, y: archwayGround(-A.archX - 1.5, A.archZ + 3).h, z: A.archZ + 3 },
+    // beside the way onto the arch, so you pass within reach of it
+    { id: 'shoulder', x: shoulder.x - 1.3, y: archwayGround(shoulder.x - 1.3, shoulder.z + 0.6).h, z: shoulder.z + 0.6 },
     { id: 'keystone', x: key.cx + 0.5, y: key.top, z: A.archZ - 0.6 },
-    { id: 'stack', x: S.x + 1.6, y: S.top, z: S.z - 1.8 },
+    topLantern,
   ];
   const down = { x: spawn.x + 1, y: spawn.y, z: spawn.z + 1, yaw: Math.PI };
+
+  // where gulls sit (archway-life.js): beside the way, so they lift off as you
+  // come by, on the inlet's stacks, the arch's back, the stack's top and the cove
+  const gulls = [];
+  const traverse = route.filter((nd) => nd.piece?.kind === 'ledge');
+  for (const [k, nd] of traverse.entries()) {
+    if (k % 4 !== 2) continue;
+    const p = nd.piece, side = k % 8 === 2 ? 1 : -1;
+    // along the ledge from where you stand, out near the lip
+    const ax = Math.cos(p.rot) * p.hx * 0.75 * side, az = -Math.sin(p.rot) * p.hx * 0.75 * side;
+    gulls.push({ x: nd.x + ax, y: p.top, z: nd.z + az });
+  }
+  for (const p of pieces.filter((q) => q.kind === 'stack' && q.cz > -20 && q.cz < 0).slice(1, 4)) gulls.push({ x: p.cx + 0.4, y: p.top, z: p.cz });
+  for (const k of [0.25, 0.62]) { const p = steps[Math.floor(steps.length * k)]; gulls.push({ x: p.cx, y: p.top, z: p.cz + p.hz - 0.45 }); }
+  gulls.push({ x: S.x - 2.2, y: S.top, z: S.z - 1.4 });
+  for (const [x, z] of [[-8, 34.4], [9, 35.2]]) gulls.push({ x, y: archwayGround(x, z).h, z });
 
   // the traverse's cliff face for the camera: the bay's west wall, then the mouth's
   // (the water on its left; it runs just inside where you stand, so the cliff top stays out of reach)
@@ -305,14 +326,14 @@ export function buildArchwayLayout() {
     pieces, colliders, route, stack, groundAt, groundTag: (x, z) => archwayGround(x, z).tag, waterY: 0,
     bounds: { r: 105 }, calm: { x: 0, z: -10, r: 60 },
     spawn, exit, rowboat, camp, checkpoints, coins, caches,
-    chests: [{ id: 'chest', x: S.x + 0.6, y: S.top, z: S.z + 1.8, yaw: 0.6 }],
+    chests: [chest],
     summit: { x: key.cx, y: key.top, z: A.archZ }, vault, keystone: { x: key.cx, y: key.top, z: A.archZ },
     spots: {},
     hubs: [{ x: S.x, z: S.z, orbit: S.r + 0.9, base: archwayGround(A.archX + 4, A.archZ - 3).h + 0.6, top: S.top - 0.6 }],
     faces: [{ path: facePath, base: 7, top: 15.5, reach: 2.6 }],
     // the far end of the walk: the lanterns there offer the quick way back to the cove
     fallBack: { drop: ASHORE.design.safeDrop, below: 3, safe: [], down, from: ['keystone', 'stack'], label: 'Climb down to the cove' },
-    steps, stepping, shelves, crown, span, inlets: INLETS, cave: CAVE, basin: BASIN, gully: GULLY, yEnd, clear,
+    gulls, steps, stepping, shelves, crown, span, inlets: INLETS, cave: CAVE, basin: BASIN, gully: GULLY, yEnd, clear,
   };
 }
 function xz([x, z]) { return { x, z }; }

@@ -293,9 +293,23 @@ Updated 2026-11-25.
         crisp, and the terrain's cliffs, whose faces are too tall to band,
         take tones that vary along the cliff instead. The handline's pins sit
         on the rock.
-      - Looked at in the preview, at desktop and phone sizes (sea view, the
-        traverse's camera, the arch, the stack). Not done: gulls ashore, a
-        play by hand.
+      - Gulls (`archway-life.js`): a few wheel over the bay by day; the rest
+        sit on ledges, the inlet's stacks, the arch's back, the stack's top
+        and the cove, lift off with a cry (`audio` 'gull') when you come
+        within 4.5 m, circle out over the water and come back once you've
+        moved on. Decor only: the gulls that swoop are 4.12.
+      - Played through the real game loop by a scripted pilot steering the
+        stick by the camera (stick → camera → controller, with pickups,
+        lanterns, splashes, prompts, the gulls and the cameras all live):
+        cove to the east arm in 60 s and up the stack in 13 s, no splashes,
+        every lantern lit, the chest opened, back to the ship by the rowboat.
+        It found and fixed: the face camera snapped about 70° in one frame
+        at the corner into the mouth (it now blends the wall's way in and
+        eases round), the shoulder's lantern stood off the path, and the
+        stack's lantern and chest were off to one side of where you arrive.
+      - Looked at in the preview, at desktop and phone sizes. Landing from
+        inside the bay works. Still worth a play with real hands: the feel
+        of the jumps and the face camera.
   - [ ] 4.6 Tropical islands and 4.7 the Sunken Temple
   - [ ] 4.8 Volcanic islands (with the steam-vent launch) and 4.9 Mount
     Cinderhorn
