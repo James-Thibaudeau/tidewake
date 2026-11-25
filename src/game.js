@@ -663,10 +663,12 @@ export class Game {
 
     // contextual action
     let prompt = null, action = null;
-    // Sable first; during a race or the kraken nothing else is on offer
+    // Sable first; during a race or the kraken nothing else is on offer.
+    // Her race challenge is the exception: it follows you about, so it gives way to any spot you're at.
     const rx = this.rival?.interaction(b.x, b.z, boat.speed);
     const busy = !!this.rival?.exclusive;
-    if (rx) { prompt = rx.prompt; action = rx.action || null; }
+    const hail = rx?.hail ? rx : null;
+    if (rx && !hail) { prompt = rx.prompt; action = rx.action || null; }
     const sx = !prompt && !busy ? this.story?.interaction(b.x, b.z, boat.speed) : null;
     if (sx) { prompt = sx.prompt; action = sx.action || null; }
     if (!prompt && !busy && this.dockCooldown <= 0) {
@@ -687,19 +689,28 @@ export class Game {
       }
     }
     if (!action && !busy) {
+      // From the chase camera a beam a few lengths ahead already looks like it's under the bow,
+      // so when you've slowed near one, say so before the shore offers a landing instead.
+      let close = false;
       for (const I of this.world.near(b.x, b.z)) {
         if (I.isReef || I.treasureTaken || !I.treasure) continue;
-        if (Math.hypot(I.treasure.x - b.x, I.treasure.z - b.z) < 13) {
+        const d = Math.hypot(I.treasure.x - b.x, I.treasure.z - b.z);
+        if (d < 13) {
           if (Math.abs(boat.speed) < 7) { prompt = 'Haul up treasure'; action = () => this.haulTreasure(I); }
           else prompt = 'Slow down to haul the treasure';
           break;
         }
+        if (d < 40) close = true;
       }
+      if (close && !prompt && Math.abs(boat.speed) < 7) prompt = 'Sail onto the treasure to haul it up';
     }
+    // a spot's hint ("Slow down to dock", "Sail onto the treasure…") keeps E from starting Sable's race there
+    const spot = !!prompt;
     if (!prompt && !busy && this.ashore) {
       const ax = this.ashore.interaction(boat);
       if (ax) { prompt = ax.prompt; action = ax.action || null; }
     }
+    if (hail && !action && !spot) { prompt = hail.prompt; action = hail.action; }
     if (prompt !== this.prompt) { this.prompt = prompt; this.ui.setPrompt(prompt); }
     if (acts.action && action) { action(); this.prompt = null; this.ui.setPrompt(null); }
 
