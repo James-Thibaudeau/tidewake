@@ -74,7 +74,6 @@ function pickupGeometry() {
 export class Ashore {
   constructor(game) {
     this.game = game;
-    glowOn.color.set('#ffe8a0').multiplyScalar(glowBoost.value);
     this.scene = new THREE.Scene();
     this.active = false;
     this.island = null;
@@ -381,6 +380,11 @@ export class Ashore {
       this.hand.light.intensity = night * 7 * flick;
       this.hand.group.visible = night > 0.05;
       this.hand.group.rotation.x = Math.sin(t * 3.1) * 0.12 * Math.min(1, Math.hypot(this.ctl.vel.x, this.ctl.vel.z) / 3);
+    }
+    // follows the bloom boost, which the Effects switch changes at runtime
+    if (this.glowBoost !== glowBoost.value) {
+      this.glowBoost = glowBoost.value;
+      glowOn.color.set('#ffe8a0').multiplyScalar(glowBoost.value);
     }
     for (const c of this.lanterns || []) {
       c.light.intensity = night * (c.lit ? 16 : 4) * flick;
