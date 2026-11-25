@@ -110,6 +110,68 @@ Updated 2026-11-25.
   - Not yet done: live sliders, and before/after in one image (see
     [feature-plan.md](feature-plan.md)).
 
+- [x] **Phase 7, a living sea** (the first three events; design in
+  [feature-plan.md](feature-plan.md)): every three to six minutes of sailing
+  something turns up 150-300 m off the bow quarter, in open water, one at a
+  time.
+  - The director (`src/sea-events.js`) rolls from the rules in
+    `src/sightings.js` (pure, so `node tools/check.mjs sea` runs them): by
+    latitude, time of day, weather and story. Whales keep to temperate and
+    cold water and stay down in storms; dolphins want tropical or temperate
+    water and clear or breezy weather; the ghost ship comes only at night,
+    three times likelier in fog, and not before Journal I. A kind that could
+    have been picked and wasn't gains weight, and the ghost ship is certain
+    after eight misses. No rolls while Sable has your attention, in port,
+    ashore, or with the boat stopped. The director has its own random stream.
+  - A line of text says which side to look ("A spout of mist, ahead to the
+    left!"). It counts as **seen** within 80 m, or held in the spyglass for
+    2 s; the spyglass reaches 340 m at tier 1 and 850 m at tier 5.
+  - **The whale** (`src/sea-life.js`), about 15 m long: comes up to blow
+    every 8 s, breaches now and then, and goes down with its flukes in the
+    air. Keep within 75 m at under 8 kn and it stays up (to about 3 minutes).
+  - **Dolphins**: a pod of 4-8 leaping along. Come within 75 m at over 12 kn
+    and they ride your bow wave: 8% more drive from the sail while they stay
+    (up to 45 s, or until you slow below about 10 kn).
+  - **The ghost ship** (`src/ghost-ship.js`): pale and see-through, green
+    lanterns that carry through fog, no wake, doesn't ride the swell. She
+    fades if you come within 38 m, and at first light. Stay within 340 m and
+    she leads you 650-950 m to a spot where she fades and leaves a strongbox
+    under a beam (110-190 gold in the hold; it waits 4 minutes).
+  - **Sightings**, a new tab in the journal (`J`): a card for each kind with
+    a drawing, how often you've seen it, and when and where first; a dark
+    shape and a hint until then. The crabs under the arch are in it too
+    (saves that already reported them get the card). Five whales earn the
+    whale-tail pendant (neck), three ghost ships the lantern hat.
+  - **Report quests** for all three (`src/reports.js`): the first sighting of
+    a kind starts one at the nearest port. The cartographer pays 90 gold for
+    the whale, the merchant 60 for dolphins, the old salt 150 for the ghost
+    ship. The news goes stale after 3 days; the report is dropped and the
+    next sighting starts a new one. Each kind is reported once.
+  - Saved: `state.sightings` (`seen`, and `miss` for the pity counts). A live
+    event is not saved.
+  - Tools: `tidewake.debug.sea(kind)` brings one on; the gallery has a
+    `sealife` subject and sheet.
+  - Checked in the preview through the real game: each animal's whole act,
+    the bow-wave ride and its boost, the ghost ship followed to her find and
+    the haul, all three reports paid at port, the five-whale reward, stale
+    news, the spyglass by tier, save and continue, the Sightings tab at
+    desktop and phone sizes, and 65 minutes of unattended sailing (11 events,
+    none overlapping, none over land). The hats and tops-front sheets were
+    read for the two new pieces.
+  - Not yet done: a play by hand, and the sounds heard on real speakers (the
+    blow, the splash, the breach, the dolphins' whistles, the ghost ship's
+    bell and the sighting chime are new and were not listened to). The new
+    writing (`SIGHTINGS` and the three `REPORTS` in `story-text.js`) is a
+    first draft. Tuning to judge by hand: how often events come, the 8%
+    boost, the report rewards, and how faint the ghost ship is in fog.
+  - Left for later PRs: sea turtles, the glowing bloom, waterspouts, iceberg
+    calving and the message in a bottle; "sighting wanted" bounties on the
+    boards; the ghost ship's side chain; ambient life (gulls, jumping fish);
+    handing Sable's encounters to the director. Reports go to the nearest
+    port even if you haven't charted it yet, as the crabs' does.
+  - Known: an event already out there stays if Sable turns up; the whale
+    and the dolphins don't collide with the boat.
+
 ## Next up
 
 - [ ] **Phase 4, ashore content and fetch quests:**
@@ -460,8 +522,10 @@ Updated 2026-11-25.
 
 - [ ] **Phase 6, anchor refits:** refit grandfather's anchor tier by tier
   to unlock each biome. Ships alongside the Phase 4 biomes.
-- [ ] **Phase 7, a living sea:** random ocean events (whales, dolphins, a
-  ghost ship at night…), a Sightings log, and report quests.
+- [ ] **Phase 7, the rest of the living sea:** five more events (sea
+  turtles, the glowing bloom, waterspouts, iceberg calving, the message in a
+  bottle), sighting bounties on the boards, the ghost ship's side chain and
+  ambient life. The first three events have shipped (see Done).
 - [ ] **Phase 9, sea zones:** clear, calm home waters round Port Haven
   where storms don't start; more storms in the open sea; rough water in
   any weather round Frostspire (the Reach) and Mount Cinderhorn (the Rip),

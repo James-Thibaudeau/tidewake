@@ -25,7 +25,8 @@ that every import resolves to a real export and is used, that no helper was
 left behind when code moved between files, text keys (`LINES.x`), element
 ids, save migration, 150 generated ashore layouts per landable biome, a test
 climber (the real controller) that walks 12 generated islands per biome to
-the summit, the Elder Grove (its limits, and the climber from the beach
+the summit, the living sea's rules (what turns up where, 3,000 placements in
+a toy sea), the Elder Grove (its limits, and the climber from the beach
 to the crown) and Archway Isle (its limits, and the climber from the cove
 over the arch and up the stack). One group at a time:
 `node tools/check.mjs imports`.
@@ -44,6 +45,7 @@ helpers:
 tidewake.debug.start()                    // new voyage, prologue skipped; backs up the real save
 tidewake.debug.give({ gold: 5000, upgrades: 'max' })
 tidewake.debug.teleport('Frostspire')     // id, name or { x, z }
+tidewake.debug.sea('whale')               // a sea event now: whale | dolphins | ghostShip; sea() says what's out there
 tidewake.debug.step(30)                   // 30 s of game time in well under a second
 tidewake.debug.frame()                    // draw a frame before a screenshot
 tidewake.debug.restoreSave()              // when you're done: real save back, reload to the title
@@ -78,11 +80,11 @@ gallery.frame()                            // draw before a screenshot when the 
 ```
 
 - Subjects: `outfit`, `ship`, `prop`, `tree`, `arch`, `wreck`, `grove`,
-  `archway`, `level`. A big subject takes `at=<place>` with `view=spot` for
+  `archway`, `level`, `sealife`. A big subject takes `at=<place>` with `view=spot` for
   a close look at one place (`show=archway&at=keystone&view=spot`). The
   same parameters work in the URL: `gallery.html?show=ship&tier=4&light=night`.
 - **After changing how something looks, take the contact sheet that covers
-  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`…, or
+  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `sealife`…, or
   `views` / `lights` / `distance` for the subject showing) and read every
   cell, not only the one you were fixing. A sheet takes the parameters
   already showing, so `gallery.set({ bottom: 'skirt' })` first narrows it.
@@ -102,7 +104,7 @@ which the other systems hang off:
 
 ```
 game.world  .streamer  .boat  .ocean  .env (sky)  .weather  .input  .audio  .fx
-game.ui  .creator  .story  .ashore  .quests  .rival  .refits  .reports  .debug
+game.ui  .creator  .story  .ashore  .quests  .rival  .refits  .reports  .seaEvents  .debug
 game.state     everything that is saved (see below)
 game.mode      title | sailing | docking | docked | landing | ashore | wrecking | wrecked
 game.view      { scene, camera } being drawn: the sea, or the ashore level
@@ -112,6 +114,8 @@ game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, 
 - **Systems react to events** (`src/events.js`) instead of patching game
   rules: quests, story and the rival all listen.
 - **Writing is kept apart from logic**: `story-text.js`, `rival-text.js`.
+  Sea events are rolled by `sea-events.js` from the rules in `sightings.js`;
+  each creature is an actor with `start`, `update`, `leave` and `done`.
   The grandparents are never named.
 - **`UI` and `Boat` are each one class split over several files.** The core
   is `src/ui.js` / `src/boat.js`; the rest is mixed in from `src/ui/` and
@@ -120,7 +124,7 @@ game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, 
   find it. New methods go in the part file that fits.
 - **Pure modules stay pure**: `ashore/modules.js`, `ashore/grove-layout.js`, `ashore/archway-layout.js`, `collide.js`,
   `controller.js`, `shapes.js`, `save.js`, `config.js`, `util.js`,
-  `cosmetics.js` and the text files import no three.js and touch no DOM at
+  `cosmetics.js`, `sightings.js` and the text files import no three.js and touch no DOM at
   load, so `tools/check.mjs` can run them in Node. Keep it that way.
 - Tuning numbers live in `src/config.js`; on-foot limits are `ASHORE` there,
   and ashore levels must keep required jumps inside `ASHORE.design`.

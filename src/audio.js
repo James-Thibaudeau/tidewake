@@ -411,6 +411,50 @@ export class SoundSystem {
         }
         break;
       }
+      // ---- the living sea (sea-events.js); opts.volume falls off with distance
+      case 'sighting':
+        // something for the book: three soft rising notes
+        [76, 81, 88].forEach((n, i) => this.tone(midi(n), t + i * 0.13, 1.1, { type: 'sine', vol: 0.09, attack: 0.03 }));
+        this.tone(midi(64), t, 1.6, { type: 'triangle', vol: 0.05, attack: 0.1 });
+        break;
+      case 'spout': {
+        // a whale's blow: a long breath of air and water
+        const v = Math.min(1, opts.volume ?? 1);
+        this.noise(t, 1.3, { type: 'bandpass', freq: 1500, sweep: 500, q: 0.8, vol: 0.3 * v, attack: 0.08 });
+        this.noise(t + 0.05, 0.9, { type: 'highpass', freq: 3200, vol: 0.07 * v, attack: 0.1 });
+        break;
+      }
+      case 'splash': {
+        const v = Math.min(1, opts.volume ?? 1);
+        this.noise(t, 0.8, { type: 'lowpass', freq: 1800, sweep: 400, vol: 0.28 * v, attack: 0.02 });
+        this.noise(t + 0.04, 1.0, { type: 'bandpass', freq: 2600, sweep: 900, q: 0.6, vol: 0.14 * v, attack: 0.05 });
+        break;
+      }
+      case 'breach': {
+        // a whale coming down: a deep boom under a long wash of spray
+        const v = Math.min(1, opts.volume ?? 1);
+        this.tone(62, t, 0.9, { type: 'sine', vol: 0.4 * v, glide: 34 });
+        this.noise(t, 1.6, { type: 'lowpass', freq: 1500, sweep: 250, vol: 0.4 * v, attack: 0.02 });
+        this.noise(t + 0.1, 2.4, { type: 'bandpass', freq: 2400, sweep: 600, q: 0.5, vol: 0.2 * v, attack: 0.1 });
+        this.noise(t, 0.6, { type: 'lowpass', freq: 260, vol: 0.35 * v, buf: this.brown });
+        break;
+      }
+      case 'chirp': {
+        // dolphins: a few quick rising whistles
+        const v = Math.min(1, opts.volume ?? 1);
+        for (const [dt, f] of [[0, 2200], [0.12, 2700], [0.27, 2400], [0.38, 3100]]) this.tone(f, t + dt, 0.11, { type: 'sine', vol: 0.06 * v, attack: 0.015, glide: f * 1.5 });
+        break;
+      }
+      case 'ghost': {
+        // a ship's bell, a long way off and slightly wrong
+        const v = Math.min(1, opts.volume ?? 1);
+        for (const [dt, f] of [[0, 311], [1.3, 311]]) {
+          this.tone(f, t + dt, 3.2, { type: 'sine', vol: 0.1 * v, attack: 0.02 });
+          this.tone(f * 2.41, t + dt, 2.2, { type: 'sine', vol: 0.03 * v, attack: 0.02 });
+          this.tone(f * 1.06, t + dt, 2.8, { type: 'sine', vol: 0.04 * v, attack: 0.3 });
+        }
+        break;
+      }
       case 'sail':
         this.noise(t, 0.45, { type: 'bandpass', freq: 400, sweep: 1600, q: 1.2, vol: 0.18, attack: 0.05 });
         this.noise(t + 0.12, 0.12, { type: 'bandpass', freq: 900, q: 2, vol: 0.12 });

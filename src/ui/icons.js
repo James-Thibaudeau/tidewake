@@ -1,4 +1,5 @@
-// Inline SVG: HUD and button icons (ICONS) and the story card pictures (STORY_ART).
+// Inline SVG: HUD and button icons (ICONS), the story card pictures (STORY_ART)
+// and the drawings on the journal's Sightings cards (SIGHTING_ART).
 const S = (body, vb = '0 0 24 24') => `<svg viewBox="${vb}" aria-hidden="true">${body}</svg>`;
 const STROKE = 'fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"';
 export const ICONS = {
@@ -40,8 +41,9 @@ export const ICONS = {
 // ------------------------------------------------------------ story art
 // Little painted scenes for the story cards (320×170, flat shapes, ink lines).
 const INK = 'stroke="#2a1d12" stroke-width="2.5" stroke-linejoin="round"';
-const sky = (a, b, sea = '#3f86c9', sea2 = '#2c6aa8') => `<defs><linearGradient id="sk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs>
-  <rect width="320" height="170" fill="url(#sk)"/><rect y="110" width="320" height="60" fill="${sea}"/>
+// (`id` names the gradient: pictures shown side by side each need their own)
+const sky = (a, b, sea = '#3f86c9', sea2 = '#2c6aa8', id = 'sk') => `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs>
+  <rect width="320" height="170" fill="url(#${id})"/><rect y="110" width="320" height="60" fill="${sea}"/>
   <path d="M0 122 Q20 118 40 122 T80 122 T120 122 T160 122 T200 122 T240 122 T280 122 T320 122 V170 H0Z" fill="${sea2}" opacity=".55"/>
   <path d="M30 140 q10 -4 20 0 M120 150 q10 -4 20 0 M230 136 q10 -4 20 0 M270 156 q10 -4 20 0" stroke="#fff" stroke-width="2" fill="none" opacity=".6" stroke-linecap="round"/>`;
 const smallBoat = (x, y, s = 1, patch = true) => `<g transform="translate(${x} ${y}) scale(${s})">
@@ -88,4 +90,57 @@ export const STORY_ART = {
     <rect x="112" y="70" width="20" height="18" fill="#ffd54a" ${INK}/><path d="M122 70 v18 M112 79 h20" stroke="#2a1d12" stroke-width="1.5"/>
     <rect x="150" y="74" width="18" height="30" fill="#7a4a24" ${INK}/><path d="M90 104 H194 V110 H90Z" fill="#9b7650" ${INK}/>
     <path d="M160 22 v-12 h10 v18" fill="#8f877d" ${INK}/><path d="M166 6 q6 -6 0 -10" stroke="#fff" stroke-width="3" fill="none" opacity=".7"/>`,
+};
+
+// ---------------------------------------------------------- sightings art
+// The drawings on the Sightings cards (320×170, like the story art). Each takes
+// `seen`: before you've seen the thing it is drawn as a dark shape on a dull
+// sea, with nothing to give it away.
+const DULL = ['#c9d3da', '#dfe6ea', '#9fb0bd', '#8c9eac'];
+const DARK = '#3b4a5c';
+const shade = (seen, col) => (seen ? col : DARK);
+const inkFor = (seen) => (seen ? INK : `stroke="${DARK}" stroke-width="2.5" stroke-linejoin="round"`);
+const sightSky = (seen, id, a, b, sea, sea2) => (seen ? sky(a, b, sea, sea2, id) : sky(...DULL, id));
+const foam = (seen, d) => `<path d="${d}" stroke="${seen ? '#ffffff' : DARK}" stroke-width="4" fill="none" stroke-linecap="round"/>`;
+export const SIGHTING_ART = {
+  whale: (seen) => sightSky(seen, 'sgWhale', '#bfe4ff', '#eef8ff') + `
+    <path d="M96 128 C92 84 122 46 168 40 C206 36 236 58 244 92 C247 108 240 122 232 128 Z" fill="${shade(seen, '#3f5d7d')}" ${inkFor(seen)}/>
+    <path d="M110 128 C108 104 122 82 146 70 C140 92 150 114 176 128 Z" fill="${shade(seen, '#d9e6ec')}" ${inkFor(seen)}/>
+    <path d="M150 74 C128 78 112 96 104 116 C122 110 140 96 156 82 Z" fill="${shade(seen, '#34506e')}" ${inkFor(seen)}/>
+    <circle cx="214" cy="84" r="4" fill="${shade(seen, '#141c28')}"/>
+    ${foam(seen, 'M176 36 q-4 -18 -18 -24 M182 34 q0 -18 8 -26 M188 36 q8 -14 22 -16')}
+    ${foam(seen, 'M70 130 q14 -16 28 -2 M232 130 q14 -14 26 0 M52 136 q8 -8 16 0')}`,
+  dolphins: (seen) => {
+    const one = (x, y, s, r) => `<g transform="translate(${x} ${y}) rotate(${r}) scale(${s})">
+      <path d="M-44 6 C-30 -22 14 -28 44 -6 L58 -4 L46 4 C20 14 -14 14 -34 10 L-50 22 L-48 6 L-60 -4 Z" fill="${shade(seen, '#6d8ea8')}" ${inkFor(seen)}/>
+      <path d="M-30 9 C-10 12 22 10 44 2 C22 16 -10 16 -30 9 Z" fill="${shade(seen, '#e8f0f3')}"/>
+      <path d="M-6 -20 L-12 -36 L8 -22 Z" fill="${shade(seen, '#5a7a94')}" ${inkFor(seen)}/>
+      <circle cx="34" cy="-6" r="2.6" fill="${shade(seen, '#141c28')}"/></g>`;
+    return sightSky(seen, 'sgDolphins', '#ffe9b8', '#bfe6f6', '#2f9bc0', '#1f7fa6') + one(118, 84, 1.05, -24) + one(214, 70, 0.8, 10)
+      + foam(seen, 'M62 120 q10 -14 22 -2 M150 122 q8 -10 18 0 M236 120 q10 -14 22 -2');
+  },
+  ghostShip: (seen) => {
+    const pale = shade(seen, '#bfeeda'), sail = shade(seen, '#e4fff3'), glow = shade(seen, '#8dffb9');
+    const rim = seen ? 'stroke="#7fc9b0" stroke-width="2" stroke-linejoin="round"' : inkFor(false);
+    const night = seen ? `<circle cx="64" cy="36" r="13" fill="#e8ecff" opacity=".85"/><rect y="92" width="320" height="26" fill="#aebfd8" opacity=".18"/>` : '';
+    const lamps = [[98, 88], [176, 106], [258, 94]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="${seen ? 9 : 4}" fill="${glow}" opacity="${seen ? 0.3 : 1}"/><circle cx="${x}" cy="${y}" r="3.6" fill="${glow}"/>`).join('');
+    return sightSky(seen, 'sgGhost', '#141a3a', '#2c3566', '#1a2450', '#131b40') + night + `
+      <g opacity="${seen ? 0.82 : 1}"><path d="M92 110 L104 132 H216 L236 104 L206 110 Z" fill="${pale}" ${rim}/>
+      <path d="M92 110 V94 H116 V110" fill="${pale}" ${rim}/>
+      <path d="M140 110 V28 M188 110 V40 M236 104 L262 92" fill="none" ${rim}/>
+      <path d="M116 38 H164 L160 66 L152 60 L146 70 L138 62 L130 70 L120 64 Z" fill="${sail}" ${rim}/>
+      <path d="M120 72 H160 L158 98 L148 92 L140 100 L130 94 L122 98 Z" fill="${sail}" ${rim}/>
+      <path d="M170 48 H206 L204 74 L196 68 L188 78 L180 70 L172 74 Z" fill="${sail}" ${rim}/>
+      <path d="M172 80 H204 L202 100 L194 96 L186 102 L176 98 Z" fill="${sail}" ${rim}/></g>${lamps}`;
+  },
+  archCrabs: (seen) => {
+    const crab = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s}) rotate(180)">
+      <path d="M-10 -4 l-9 -7 M10 -4 l9 -7 M-11 2 l-9 2 M11 2 l9 2 M-9 6 l-7 6 M9 6 l7 6" stroke="${shade(seen, '#b33a26')}" stroke-width="3" stroke-linecap="round"/>
+      <ellipse rx="11" ry="7.5" fill="${shade(seen, '#e0553a')}" ${inkFor(seen)}/>
+      <circle cx="-17" cy="-13" r="4.5" fill="${shade(seen, '#e0553a')}" ${inkFor(seen)}/><circle cx="17" cy="-13" r="4.5" fill="${shade(seen, '#e0553a')}" ${inkFor(seen)}/></g>`;
+    return sightSky(seen, 'sgCrabs', '#bfe4ff', '#e8f6ff') + `
+      <path d="M0 0 H320 V118 H272 C268 60 222 34 160 34 C98 34 52 60 48 118 H0 Z" fill="${shade(seen, '#a39b91')}" ${inkFor(seen)}/>
+      ${seen ? '<path d="M48 118 C52 60 98 34 160 34 C222 34 268 60 272 118 H256 C250 72 212 50 160 50 C108 50 70 72 64 118 Z" fill="#837b73"/>' : ''}
+      ${seen ? crab(112, 62, 0.9) + crab(160, 56, 1.1) + crab(208, 62, 0.9) + crab(136, 74, 0.6) + crab(186, 74, 0.6) : ''}`;
+  },
 };

@@ -2,14 +2,15 @@
 // Fast checks that need no browser and no dependencies:
 //
 //   node tools/check.mjs            everything (about a second)
-//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | layout | climb | grove | archway
+//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | sea | layout | climb | grove | archway
 //   node tools/check.mjs layout 500 layouts for 500 synthetic islands (default 150)
 //
 // Run it after every change. It catches the mistakes that otherwise only show
 // up as a blank page: a syntax error, an import of a name the other module
 // doesn't export, a helper left behind when code moved to another file, a
 // text key or element id that doesn't exist, a save that no longer migrates,
-// and an ashore layout that fails its own validation.
+// a sea event that could turn up in the wrong place, and an ashore layout
+// that fails its own validation.
 //
 // The source is read with regular expressions, not a parser. `imports` and
 // `names` rely on the house style: one-line `import { … } from '…';` and
@@ -283,7 +284,7 @@ const checks = {
     const { SAVE_VERSION } = await load('config.js');
     const v1 = { v: 1, banked: 240, cargo: 0, health: 80, upgrades: { sail: 1 }, discovered: [0, 3], savePort: 0 };
     const cases = { empty: {}, v1, garbage: { quests: 7, story: 'x', rival: null, hold: {}, wardrobe: 'hat', ashore: null } };
-    const objects = { quests: ['active', 'done', 'boards', 'pinned', 'reports'], story: ['chapter', 'journals', 'flags', 'seenCards'], rival: ['chapter', 'wins', 'losses', 'flags', 'log'], ashore: [] };
+    const objects = { quests: ['active', 'done', 'boards', 'pinned', 'reports'], story: ['chapter', 'journals', 'flags', 'seenCards'], rival: ['chapter', 'wins', 'losses', 'flags', 'log'], ashore: [], sightings: ['seen', 'miss'] };
     const arrays = ['wardrobe', 'hold'];
     for (const [label, input] of Object.entries(cases)) {
       const d = migrate(structuredClone(input));
@@ -309,7 +310,105 @@ const checks = {
       if (log.length !== want) errors.push(`rival chapter ${chapter}: ${log.length} log entries, expected ${want}`);
       if (log.some((e) => !e.title || !e.lines.length || e.lines.some((l) => /\{\w+\}/.test(l)))) errors.push(`rival chapter ${chapter}: a log entry is untitled, empty or unfilled`);
     }
+    // crabs reported before the Sightings log was kept go in it; a log already there is left alone
+    const crabbed = migrate({ quests: { reports: { archCrabs: { state: 'done', port: 4, day: 6 } } } }).sightings.seen.archCrabs;
+    if (crabbed?.n !== 1 || crabbed.day !== 6) errors.push('a save with the crabs reported should have them in the Sightings log');
+    const kept = migrate({ sightings: { seen: { whale: { n: 3, day: 2, near: 'x' } }, miss: { ghostShip: 4 } } }).sightings;
+    if (kept.seen.whale?.n !== 3 || kept.miss.ghostShip !== 4) errors.push('migrate changed the Sightings log');
     return { errors, note: `${Object.keys(cases).length} saves` };
+  },
+
+  // The living sea's rules (sightings.js): each kind turns up only where and
+  // when it should, the pity timer brings the rare one round, events are
+  // placed in open water off the bow (`count` placements in a toy sea), and
+  // the Sightings log, its milestones and its words all line up.
+  async sea(count = 3000) {
+    const errors = [];
+    const S = await load('sightings.js');
+    const { EVENTS, LOG, MILESTONES, eventWeights, pickKind, placeEvent, openWater, recordSighting, nextRoll } = S;
+    const { mulberry32 } = await load('util.js');
+    const { WORLD_HALF } = await load('config.js');
+    const { STYLES } = await load('cosmetics.js');
+    const { SIGHTINGS, REPORTS } = await load('story-text.js');
+    const expect = (ok, what) => { if (!ok) errors.push(what); };
+    const kinds = Object.keys(EVENTS);
+
+    // where and when
+    const W = (o = {}) => eventWeights({ z: 0, night: 0, weather: 'clear', chapter: 3, ...o });
+    const north = -WORLD_HALF * 0.8, south = WORLD_HALF * 0.8;
+    expect(W({ z: south }).whale === 0, 'whales turn up in tropical water');
+    expect(W({ weather: 'storm' }).whale === 0, 'whales turn up in a storm');
+    expect(W({ z: north }).whale > W().whale && W().whale > 0, 'whales should be likeliest in cold water, and found in temperate water');
+    expect(W({ z: north }).dolphins === 0, 'dolphins turn up in cold water');
+    for (const w of ['cloudy', 'rain', 'storm', 'fog']) expect(W({ weather: w }).dolphins === 0, `dolphins turn up in ${w}`);
+    expect(W({ z: south }).dolphins > W().dolphins && W({ weather: 'breezy' }).dolphins > 0, 'dolphins should be likeliest in tropical water, in clear or breezy weather');
+    expect(W().ghostShip === 0 && W({ night: 0.5 }).ghostShip === 0, 'the ghost ship turns up by day');
+    expect(W({ night: 1, chapter: 1 }).ghostShip === 0, 'the ghost ship turns up before the first journal');
+    expect(W({ night: 1, weather: 'fog' }).ghostShip > W({ night: 1 }).ghostShip && W({ night: 1 }).ghostShip > 0, 'the ghost ship should turn up at night, likelier in fog');
+    expect(W({ night: 1 }).ghostShip < W({ night: 1 }).whale, 'the ghost ship should be rarer than a whale');
+
+    // picking: by weight, never what can't happen, and the pity timer
+    const rng = mulberry32(20261125);
+    const tally = {}, miss = {};
+    let gap = 0, longest = 0;
+    for (let i = 0; i < 4000; i++) {
+      const k = pickKind(rng, W({ night: 1 }), miss);
+      tally[k] = (tally[k] || 0) + 1;
+      if (k === 'ghostShip') { longest = Math.max(longest, gap); gap = 0; } else gap++;
+    }
+    expect(kinds.every((k) => tally[k] > 0), `some kind never turned up in 4000 night rolls (${JSON.stringify(tally)})`);
+    expect(longest <= 8, `the ghost ship stayed away for ${longest} rolls in a row: the pity timer should cap it at 8`);
+    for (let i = 0; i < 500; i++) expect(pickKind(rng, W(), {}) !== 'ghostShip', 'the ghost ship was picked by day');
+    expect(pickKind(rng, { whale: 0, dolphins: 0, ghostShip: 0 }, {}) === null, 'something was picked when nothing can happen');
+    for (let i = 0; i < 50; i++) { const t = nextRoll(rng); expect(t >= 180 && t <= 360, `the next roll in ${t.toFixed(0)} s: should be 3-6 minutes`); }
+
+    // placing: a toy sea of round islands with a rock or two off each
+    const isles = [];
+    for (let i = 0; i < 60; i++) isles.push({ x: (rng() * 2 - 1) * 6000, z: (rng() * 2 - 1) * 6000, r: 50 + rng() * 220 });
+    for (const I of isles) { I.bound = I.r * 1.32; const a = rng() * 6.283; I.rock = { x: I.x + Math.cos(a) * (I.r + 50), z: I.z + Math.sin(a) * (I.r + 50), r: 5 }; }
+    const sea = {
+      islands: isles,
+      heightAt: (x, z) => Math.max(-40, ...isles.map((I) => (I.r - Math.hypot(I.x - x, I.z - z)) * 0.5)),
+      rockHit: (x, z, rad) => isles.find((I) => Math.hypot(I.rock.x - x, I.rock.z - z) < I.rock.r + rad)?.rock || null,
+    };
+    let placed = 0;
+    for (let i = 0; i < count; i++) {
+      const boat = { x: (rng() * 2 - 1) * 6200, z: (rng() * 2 - 1) * 6200, heading: rng() * 6.283 };
+      const at = placeEvent(rng, sea, boat);
+      if (!at) continue;
+      placed++;
+      const d = Math.hypot(at.x - boat.x, at.z - boat.z);
+      const off = Math.abs(Math.atan2(Math.sin(Math.atan2(at.x - boat.x, at.z - boat.z) - boat.heading), Math.cos(Math.atan2(at.x - boat.x, at.z - boat.z) - boat.heading)));
+      const where = `placement ${i} (${at.x.toFixed(0)}, ${at.z.toFixed(0)})`;
+      if (d < 149 || d > 301) errors.push(`${where}: ${d.toFixed(0)} m from the boat, should be 150-300`);
+      if (off < 0.3) errors.push(`${where}: dead ahead (${off.toFixed(2)} rad off the bow)`);
+      if (!openWater(sea, at.x, at.z, 60)) errors.push(`${where}: not open water`);
+      if (isles.some((I) => Math.hypot(I.x - at.x, I.z - at.z) < I.r + 30)) errors.push(`${where}: on or against an island`);
+      if (Math.abs(at.x) > WORLD_HALF - 350 || Math.abs(at.z) > WORLD_HALF - 350) errors.push(`${where}: outside the world`);
+      if (errors.length > 12) break;
+    }
+    expect(placed > count * 0.6, `only ${placed} of ${count} placements found room: open water should nearly always have some`);
+    expect(!placeEvent(rng, sea, { x: isles[0].x, z: isles[0].z, heading: 0 }, { min: 10, max: isles[0].r * 0.5 }), 'an event was placed in the middle of an island');
+
+    // the log and its milestones
+    const seen = {};
+    const five = [1, 2, 3, 4, 5, 6].map((day) => recordSighting(seen, 'whale', { day, near: 'north of here' }));
+    expect(five[0].first && !five[1].first, 'only the first sighting should be the first');
+    expect(five.map((r) => !!r.milestone).join() === 'false,false,false,false,true,false', 'the whale milestone should be earned on the fifth sighting only');
+    expect(seen.whale.n === 6 && seen.whale.day === 1 && seen.whale.near === 'north of here', 'the log should keep the count, and the first day and place');
+
+    // the words: every kind has its lines, its card and (the living sea's own) its report
+    for (const k of kinds) {
+      for (const key of ['name', 'hint', 'cue', 'tip', 'about']) expect(SIGHTINGS[k]?.[key], `SIGHTINGS.${k}.${key} is missing`);
+      for (const key of ['added', 'title', 'text', 'label', 'status', 'stale', 'eyebrow', 'done', 'pageName', 'page', 'gold']) expect(REPORTS[k]?.[key], `REPORTS.${k}.${key} is missing`);
+      expect(LOG.includes(k), `${k} has no card in the Sightings tab (LOG)`);
+    }
+    for (const k of LOG) for (const key of ['name', 'hint', 'about']) expect(SIGHTINGS[k]?.[key], `SIGHTINGS.${k}.${key} is missing`);
+    for (const [k, M] of Object.entries(MILESTONES)) {
+      expect(STYLES.some((s) => s.id === M.cosmetic), `milestone ${k}: no cosmetic "${M.cosmetic}"`);
+      expect(SIGHTINGS.rewards[k]?.title && SIGHTINGS.rewards[k]?.text, `SIGHTINGS.rewards.${k} needs a title and text`);
+    }
+    return { errors, note: `${kinds.length} kinds; ${placed} of ${count} placements in open water; the ghost ship at most ${longest} rolls apart` };
   },
 
   // Ashore layouts validate for islands across the whole difficulty range, in

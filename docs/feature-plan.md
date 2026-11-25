@@ -180,6 +180,13 @@ The ocean should feel inhabited between islands. A small **event director**
 rolls for an encounter every few minutes of sailing and places it ahead of
 the ship, close enough to see but not in your path.
 
+**Shipped so far** (see [STATUS.md](STATUS.md)): the director, the whale, the
+dolphins and the ghost ship, the Sightings tab with its two milestones, and
+report quests for all three. **Still to build:** the other five events (sea
+turtles, the glowing bloom, waterspouts, iceberg calving, the message in a
+bottle), "sighting wanted" bounties on the boards, the ghost ship's side
+chain, ambient life, and handing Sable's encounters to the director.
+
 ### Event director (`src/sea-events.js`)
 
 - **Rolls** about every 3–6 minutes of sailing time, never while docking, in

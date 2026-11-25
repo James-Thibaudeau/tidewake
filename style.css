@@ -733,6 +733,13 @@ body.touch #hail { bottom: calc(var(--sab) + 232px); }
 .qCard.rivalNote .row2 { flex-wrap: wrap; }
 .qCard.rivalNote .row2 .btn { flex: 1 1 140px; font-size: 14px; }
 .rivalLog { border-color: rgba(232, 65, 58, 0.7); }
+/* the journal's Sightings tab */
+.sGrid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.sCard { border-color: rgba(111, 240, 255, 0.55); }
+.sCard .sArt svg { display: block; width: 100%; height: auto; border-radius: 10px; border: 2px solid rgba(11, 24, 48, 0.55); }
+.sCard .sFirst { opacity: 0.75; font-style: italic; }
+.sCard.unseen { border-style: dashed; border-color: rgba(255, 255, 255, 0.3); }
+.sCard.unseen .qTitle { opacity: 0.7; }
 .rivalLog ul { margin: 4px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.4; opacity: 0.92; }
 .sableTalk { border-color: rgba(232, 65, 58, 0.45); margin-bottom: 8px; padding: 8px 12px 4px; }
 .sableTalk .talkHead { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; margin-bottom: 4px; }

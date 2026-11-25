@@ -49,7 +49,7 @@ const KEEPSAKES = ['pocket watch', 'sketchbook', 'brass telescope', 'fiddle', 'l
 export const MAP_FRAGMENT = 'Map fragment';
 const POINT_NAMES = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];
 
-const dirWord = (dx, dz) => POINT_NAMES[Math.round(bearingDeg(headingOf(dx, dz)) / 45) % 8];
+export const dirWord = (dx, dz) => POINT_NAMES[Math.round(bearingDeg(headingOf(dx, dz)) / 45) % 8];
 export const fmtDist = (d) => (d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${Math.max(10, Math.round(d / 10) * 10)} m`);
 const lc = (s) => s.charAt(0).toLowerCase() + s.slice(1);
 

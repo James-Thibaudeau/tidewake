@@ -100,7 +100,8 @@ export function color(palette, id) {
 
 // ------------------------------------------------------------------- styles
 // source: 'starter' (owned from the start), 'tailor' (buy at a port for `price`),
-// 'found:<biome|landmark>' (island chests, Phase 3+), 'story' / 'quest:<id>' (rewards).
+// 'found:<biome|landmark>' (island chests, Phase 3+), 'story' / 'quest:<id>' (rewards),
+// 'sighting:<kind>' (a Sightings milestone, sightings.js).
 // `hint` is shown on locked items.
 const S = (slot, style, name, source = 'starter', o = {}) => ({ id: `${slot}:${style}`, slot, style, name, source, ...o });
 
@@ -126,6 +127,7 @@ export const STYLES = [
   S('hat', 'circlet', 'Gold circlet', 'found:ruins', { hint: 'Hidden in the Sunken Temple' }),
   S('hat', 'grandPith', "Grandpa's helmet", 'story', { hint: "Your grandfather's last gift" }),
   S('hat', 'rivalTricorn', "Sable's tricorn", 'story', { hint: 'A gift from a rival captain' }),
+  S('hat', 'lantern', 'Lantern hat', 'sighting:ghostShip', { hint: 'For someone who keeps meeting the ghost ship' }),
 
   // tops (`color` is the outer layer, `shirt` the undershirt / trim)
   S('top', 'vest', 'Explorer vest'),
@@ -151,6 +153,7 @@ export const STYLES = [
   S('neck', 'none', 'Nothing'),
   S('neck', 'shells', 'Shell necklace', 'found:tropical', { hint: 'Found on a tropical isle' }),
   S('neck', 'grandScarf', "Grandpa's scarf", 'story', { hint: "Your grandfather's last gift" }),
+  S('neck', 'whaleTail', 'Whale-tail pendant', 'sighting:whale', { hint: 'For someone who has seen five whales' }),
 
   // extras
   S('extra', 'satchel', 'Satchel'),
@@ -161,8 +164,8 @@ export const STYLES = [
 
 export const SLOTS = ['hair', 'hat', 'top', 'bottom', 'boots', 'neck', 'extra'];
 // Styles whose look is fixed (colour pickers are hidden for these)
-export const FIXED_COLOR = new Set(['hat:none', 'hat:furHood', 'hat:flowerCrown', 'hat:souwester', 'hat:circlet', 'hat:grandPith', 'hat:rivalTricorn',
-  'neck:none', 'neck:shells', 'neck:grandScarf', 'extra:none', 'extra:crabPin']);
+export const FIXED_COLOR = new Set(['hat:none', 'hat:furHood', 'hat:flowerCrown', 'hat:souwester', 'hat:circlet', 'hat:grandPith', 'hat:rivalTricorn', 'hat:lantern',
+  'neck:none', 'neck:shells', 'neck:grandScarf', 'neck:whaleTail', 'extra:none', 'extra:crabPin']);
 
 export function stylesFor(slot) { return STYLES.filter((s) => s.slot === slot); }
 export function styleInfo(slot, style) { return STYLES.find((s) => s.slot === slot && s.style === style) || null; }
