@@ -16,11 +16,14 @@ import { STYLES, owns } from '../cosmetics.js';
 import { siteBeam, MAP_FRAGMENT } from '../quests.js';
 import { generateLevel } from './levelgen.js';
 import { buildWreckLevel } from './wreck.js';
+import { buildGroveLevel } from './grove.js';
 import { CharacterController } from './controller.js';
 import { FollowCamera } from './camera.js';
 import { LandRace } from './pacer.js';
 
 const LAND_BIOMES = new Set(['temperate']); // Phase 3: temperate islands only
+// Hand-built levels for landmark islands, by island.landmark; the rest are generated.
+const LANDMARK_LEVELS = { grove: buildGroveLevel };
 const LAND_RANGE = 46;                       // how close to the shore the boat must be
 const LAND_SPEED = 5;                        // boat speed (m/s) below which you can land
 
@@ -137,8 +140,8 @@ export class Ashore {
     this.island = I;
     // the rowboat is drawn up on the beach facing the anchored ship
     const landingAngle = Math.atan2(g.boat.pos.z - I.z, g.boat.pos.x - I.x);
-    this.level = I.wreck ? buildWreckLevel(I, { quality: g.settings.quality })
-      : generateLevel(I, { quality: g.settings.quality, landingAngle });
+    const build = I.wreck ? buildWreckLevel : LANDMARK_LEVELS[I.landmark] || generateLevel;
+    this.level = build(I, { quality: g.settings.quality, landingAngle });
     this.syncStory();
     this.hintsShown = new Set();
     const calm = this.level.calm;
@@ -157,12 +160,14 @@ export class Ashore {
     this.cam = new FollowCamera(g.camera, L);
     this.cam.snap(this.ctl, L.spawn.yaw);
     this.checkpoint = { x: L.spawn.x, y: L.spawn.y, z: L.spawn.z, yaw: L.spawn.yaw };
+    this.checkpointId = null;
     // a land race, if the rival is waiting on this island (never aboard the wreck)
     const enc = !I.wreck && L.layout ? g.rival?.landEncounter(I) : null;
     this.race = enc ? new LandRace(this, L, enc) : null;
     this.trip = 0;
     this.prompt = null;
     this.splashT = 0;
+    this.lastGroundY = L.spawn.y;
 
     this.addHandLantern(ex);
     const P = this.progress(I);
@@ -320,6 +325,8 @@ export class Ashore {
     if (ev.jumped) g.audio.play('sail', { volume: 0.4 });
     if (ev.landed > 6) { g.boat.explorer.land(Math.min(1, ev.landed / 18)); g.audio.play('slam', { volume: Math.min(0.5, ev.landed / 40) }); }
     if (ev.splashed && this.splashT <= 0) this.splash();
+    else if (ev.landed && this.splashT <= 0 && this.fellFromLantern(this.lastGroundY - ctl.pos.y)) this.splash(true);
+    if (ctl.grounded) this.lastGroundY = ctl.pos.y;
     this.splashT -= dt;
 
     // the explorer follows the controller
@@ -443,8 +450,11 @@ export class Ashore {
     }
     // lantern checkpoints light as you pass
     for (const c of this.lanterns) {
-      if (c.lit || Math.hypot(c.x - p.x, c.z - p.z) > 2 || Math.abs(c.y - p.y) > 2) continue;
+      if (Math.hypot(c.x - p.x, c.z - p.z) > 2 || Math.abs(c.y - p.y) > 2) continue;
+      // touching a lantern again makes it the one you return to
+      if (c.lit) { if (this.checkpointId !== c.id) { this.checkpointId = c.id; this.checkpoint = { x: c.x, y: c.y + 0.1, z: c.z, yaw: this.ctl.yaw }; } continue; }
       c.lit = true; c.glow.material = glowOn;
+      this.checkpointId = c.id;
       this.checkpoint = { x: c.x, y: c.y + 0.1, z: c.z, yaw: this.ctl.yaw };
       g.audio.play('click');
       g.ui.toast('Lantern lit: you\'ll return here if you fall in', 'info');
@@ -471,6 +481,11 @@ export class Ashore {
         else if (st.chapter < 8) prompt = 'An old sea chest, locked tight';
         else prompt = 'The chest is empty now';
       }
+    }
+    // a lit lantern high up a climb: the quick way back down
+    const fb = L.fallBack;
+    if (fb?.down && this.splashT <= 0 && this.lanterns.some((c) => c.lit && c.y - fb.down.y > fb.below && Math.hypot(c.x - p.x, c.z - p.z) < 2 && Math.abs(c.y - p.y) < 1.2)) {
+      prompt = 'Climb down to the roots'; action = () => this.climbDown();
     }
     for (const c of this.chests) {
       if (c.opened || Math.hypot(c.x - p.x, c.z - p.z) > 1.8 || Math.abs(c.y - p.y) > 1.5) continue;
@@ -506,14 +521,42 @@ export class Ashore {
     this.chests = this.chests.filter((x) => x !== c);
   }
 
-  async splash() {
+  /**
+   * On levels that ask for it (level.fallBack): did a fall of `drop` metres
+   * leave you far below the last lantern you touched? Then it costs one
+   * stretch of the climb, not all of it. Landing in a safe circle doesn't count.
+   */
+  fellFromLantern(drop) {
+    const fb = this.level.fallBack, p = this.ctl.pos;
+    if (!fb || !(drop > fb.drop) || this.checkpoint.y - p.y <= fb.below) return false;
+    return !fb.safe?.some((s) => Math.hypot(s.x - p.x, s.z - p.z) < s.r);
+  }
+
+  /** From a lantern up the tree, straight back to the foot of the climb (level.fallBack.down). */
+  async climbDown() {
+    const g = this.game, d = this.level.fallBack.down;
+    this.splashT = 2;
+    await g.ui.fade(1, 0.35);
+    this.ctl?.teleport(d.x, d.y, d.z, d.yaw);
+    this.cam?.snap(this.ctl, d.yaw);
+    // the ground is where you'd return to now, so the next drop isn't a "fall"
+    this.checkpoint = { x: d.x, y: d.y, z: d.z, yaw: d.yaw };
+    this.checkpointId = null;
+    this.lastGroundY = d.y;
+    await g.ui.fade(0, 0.4);
+  }
+
+  /** Back to the last lantern: after falling in the water, or (fell = true) a long fall from the climb. */
+  async splash(fell = false) {
     const g = this.game;
     this.splashT = 2;
-    g.audio.play('slam', { volume: 0.4 });
+    if (!fell) g.audio.play('slam', { volume: 0.4 });
     await g.ui.fade(1, 0.35);
     const c = this.checkpoint;
     this.ctl?.teleport(c.x, c.y, c.z, c.yaw);
     this.cam?.snap(this.ctl, c.yaw);
+    this.lastGroundY = c.y;
+    if (fell) g.ui.toast('A long way down! Back at your last lantern.', 'info');
     await g.ui.fade(0, 0.4);
   }
 }

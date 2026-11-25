@@ -99,20 +99,69 @@ Updated 2026-11-25.
   - [x] The Elder Tree at sea: a giant, detailed landmark tree with roots,
     an owl hollow, drifting clouds, birds and fireflies
     ([#20](https://github.com/James-Thibaudeau/tidewake/pull/20))
-  - [ ] The Elder Grove level, the first landmark level, plus the shared
-    vault for retrieve and refit quests. Design agreed in
-    [elder-grove-level.md](elder-grove-level.md): Journal III at the
-    carving, the anchor required, an owl that hoots you up the tree.
-  - [ ] Rocky islands first, then tropical, volcanic and cold, in the order
-    of the anchor refits (Phase 6)
-  - [ ] Landmark levels; move Journals III–VII from the beach camps into
-    them, each with a unique cosmetic (makes the fur hood, flower crown,
-    gold circlet and shell necklace findable)
+  Phase 4 is split into thirteen smaller PRs, 4.0 to 4.12: see *Phase 4 in
+  smaller PRs* in [feature-plan.md](feature-plan.md). Every landmark PR also
+  rebuilds that landmark's sea view to the Elder Tree's standard.
+  - [x] 4.1 The Elder Grove as a walkable level (design in
+    [elder-grove-level.md](elder-grove-level.md)): the beach camp, a log
+    bridge over the stream, root arches, the root gate and the vault, twice
+    round the trunk on bark ledges, shelf fungus and pegs to the owl hollow,
+    fungus steps to the owl bough, and an optional climb on leaf mats to the
+    crown, with a diving branch back down to a pool. Hand-built in
+    `src/ashore/grove.js` from `grove-layout.js`; `node tools/check.mjs grove`
+    checks its limits and walks a test climber up it (40 s to the owl bough
+    at a walk, 19 jumps).
+    - **Climbing round a tree is easier to control** (this also changes the
+      lookout tree on ordinary islands). The camera there is now a tower
+      camera: it looks straight in at the trunk and orbits with you, so left
+      and right on the stick run round the tree and jumps go across the
+      screen. A drag is kept as an offset instead of snapping back. Before,
+      it looked about 50° off the trunk, so no stick direction ran along the
+      ledge.
+    - Fix: walking into a low step at a slant slid you along its face
+      instead of stepping up (`controller.js` judged "blocked" by velocity,
+      not by where you were steering). On the spiral that stalled you and
+      pushed you off the outside edge.
+    - The grove's leaf clumps hang from forks at the bough tips, outside the
+      climb and the camera that circles it. Nothing hangs over the spiral
+      any more: the leaf mats that are the way down from the carving now
+      hang beyond the owl bough's tip.
+    - The camera ducks under a bough or ledge overhead (it looks along more
+      level from below it) instead of rising into it. Passing under the owl
+      bough on the spiral used to put the camera inside the bough.
+    - Fix: low steps are taken in stride. Stepping up used to carry you 19 cm
+      forward in one tick, a lurch at every step of the spiral, and on flat
+      ground beside a wall it could fire over and over.
+    - A long fall costs one stretch, not the whole climb: once a lantern up
+      the tree is lit, a fall of more than 6 m that lands well below it puts
+      you back at the last lantern you touched (`level.fallBack`, grove
+      only). Each bough of the crown climb has a lantern. The dive into the
+      pool doesn't count, and the leaf-mat way down (off the owl bough's
+      tip) has no drop over 6 m.
+      Jumping straight to the ground from the hollow or higher does send you
+      back up, so every lit lantern from the hollow up offers "Climb down to
+      the roots", which sets you down by the root gate.
+    - No story yet: Journal III is still found at the camp from the sea, and
+      the crown chest holds an ordinary tailor piece.
+    - Not yet done: a second play by hand with the new camera (a test pilot
+      that only holds the stick left and jumps at gaps now reaches the owl
+      hollow), walking out along a bough (the tower view faces you there
+      until you are past the trunk's reach), a look on Low quality and on a
+      phone.
+    - The pool is a still disc on the grass, not real water.
+  - [ ] 4.2 The grove's story: the note in the tent, Journal III at the
+    carving, the flower crown, the owl guide, fireflies
+  - [ ] 4.3 Anchor refits (Phase 6), then 4.4 rocky islands and 4.5 Archway
+    Isle
+  - [ ] 4.6 Tropical islands and 4.7 the Sunken Temple
+  - [ ] 4.8 Volcanic islands (with the steam-vent launch) and 4.9 Mount
+    Cinderhorn
+  - [ ] 4.10 Cold islands and 4.11 Frostspire
   - [x] Retrieve quests, including "Find the lost map fragment": offered by
     Harbormasters (Cartographers for the fragment) once the anchor is fitted.
     The item waits at the level's vault (on generated islands, by the summit)
     and goes back to the island if you're wrecked.
-  - [ ] Harmless obstacles (crabs, gulls)
+  - [ ] 4.12 Harmless obstacles (crabs, gulls)
 - [ ] **Phase 5, polish:**
   - [ ] Sound: footsteps by surface, jump and land, coins, chest fanfare,
     biome ambience, an on-foot music variant

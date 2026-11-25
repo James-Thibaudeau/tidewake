@@ -109,10 +109,18 @@ export class CharacterController {
     let res = moveCapsule(this.level, p, d, this.opts, this._res);
 
     // ---- step up onto low ledges we walked into
+    // "Blocked" is measured along the way the player is steering, not along the
+    // velocity: a riser met at a slant (steps round a trunk) turns the velocity
+    // into a slide along its face, which would otherwise count as getting on.
     const want = Math.hypot(d.x, d.z);
-    if (wasGrounded && want > 1e-4 && res.walls.length && Math.hypot(p.x - x0, p.z - z0) < want * 0.6) {
-      this.tryStepUp(x0, y0, z0, d);
-      res = this._res;
+    if (wasGrounded && res.walls.length) {
+      if (amt > 0.05) {
+        const along = ((p.x - x0) * tx + (p.z - z0) * tz) / top;
+        if (along < top * dt * 0.6) { this.tryStepUp(x0, y0, z0, { x: tx * dt, y: 0, z: tz * dt }); res = this._res; }
+      } else if (want > 1e-4 && Math.hypot(p.x - x0, p.z - z0) < want * 0.6) {
+        this.tryStepUp(x0, y0, z0, d);
+        res = this._res;
+      }
     }
 
     // ---- velocity response to contacts
@@ -154,25 +162,34 @@ export class CharacterController {
     if (!this.splashed && p.y < this.level.waterY - 0.6) { this.splashed = true; ev.splashed = true; }
   }
 
-  /** Lift by stepUp, retry the move, then settle down. Keeps it only if we got further. */
+  /**
+   * Lift by stepUp, retry the move, then settle down. Keeps it only if we got
+   * further and higher. A short reach is tried first, so a low step is taken
+   * almost in stride (no lurch forward); a tall one needs the longer reach to
+   * land the capsule's rounded bottom on the flat top rather than the corner.
+   */
   tryStepUp(x0, y0, z0, d) {
     const P = this.P, p = this.pos;
     const bx = p.x, by = p.y, bz = p.z;
-    const trial = { x: x0, y: y0 + P.stepUp, z: z0 };
-    if (overlaps(this.level, trial, this.opts.r, this.opts.h)) return;
-    // reach far enough onto the ledge that the capsule's rounded bottom lands on
-    // its flat top rather than its corner (a one-frame move is only ~3 cm)
-    const len = Math.hypot(d.x, d.z), reach = Math.max(len, this.opts.r * 0.6);
-    moveCapsule(this.level, trial, { x: (d.x / len) * reach, y: 0, z: (d.z / len) * reach }, this.opts, this._probe);
-    // settle back down onto the ledge
-    const down = moveCapsule(this.level, trial, { x: 0, y: -(P.stepUp + 0.02), z: 0 }, this.opts, this._probe);
-    const progressed = Math.hypot(trial.x - x0, trial.z - z0) > Math.hypot(bx - x0, bz - z0) + 1e-3;
-    if (down.grounded && down.normalY >= this.opts.cosSlope && progressed && trial.y >= y0 - 1e-3) {
-      p.x = trial.x; p.y = trial.y; p.z = trial.z;
-      Object.assign(this._res, down, { walls: [], ceiling: false });
-    } else {
-      p.x = bx; p.y = by; p.z = bz;
+    const len = Math.hypot(d.x, d.z);
+    const lifted = { x: x0, y: y0 + P.stepUp, z: z0 };
+    if (overlaps(this.level, lifted, this.opts.r, this.opts.h)) return;
+    for (const f of [0.2, 0.6]) {
+      const trial = { x: lifted.x, y: lifted.y, z: lifted.z };
+      const reach = Math.max(len, this.opts.r * f);
+      moveCapsule(this.level, trial, { x: (d.x / len) * reach, y: 0, z: (d.z / len) * reach }, this.opts, this._probe);
+      // settle back down onto the ledge
+      const down = moveCapsule(this.level, trial, { x: 0, y: -(P.stepUp + 0.02), z: 0 }, this.opts, this._probe);
+      const progressed = Math.hypot(trial.x - x0, trial.z - z0) > Math.hypot(bx - x0, bz - z0) + 1e-3;
+      // it must be a real step up: on the flat beside a wall this would otherwise
+      // succeed every tick and carry the player forward `reach` at a time
+      if (down.grounded && down.normalY >= this.opts.cosSlope && progressed && trial.y >= y0 + 0.02) {
+        p.x = trial.x; p.y = trial.y; p.z = trial.z;
+        Object.assign(this._res, down, { walls: [], ceiling: false });
+        return;
+      }
     }
+    p.x = bx; p.y = by; p.z = bz;
   }
 
   /** Move down up to `dist` looking for walkable ground; snaps there if found. */

@@ -87,6 +87,7 @@ src/
   kraken.js       the finale set piece
   ashore/         going ashore: ashore.js (visit flow, pickups), levelgen.js + modules.js +
                   pieces.js (island levels), wreck.js (grandfather's wreck, hand-built),
+                  grove.js + grove-layout.js (the Elder Grove, hand-built),
                   controller.js + collide.js (movement), camera.js, pacer.js (races on foot),
                   shapes.js (the collider shapes they all share)
   cosmetics.js    wardrobe catalogue: palettes, styles, unlock sources, appearance profile
@@ -117,7 +118,7 @@ src/
   debug.js        console helpers for testing (tidewake.debug)
 tools/
   serve.py        static dev server, caching off
-  check.mjs       quick checks in Node: syntax, imports, text keys, element ids, saves, ashore layouts
+  check.mjs       quick checks in Node: syntax, imports, text keys, element ids, saves, ashore layouts, the grove climb
 docs/
   STATUS.md       what has shipped, what's next, known issues
   feature-plan.md designs for phases not built yet; shipped-plans.md keeps the designs of built ones
