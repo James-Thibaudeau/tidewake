@@ -63,7 +63,8 @@ export class Game {
   freshState() {
     return {
       banked: 0, cargo: 0, health: 100,
-      upgrades: { sail: 0, hull: 0, rudder: 0, keel: 0, lantern: 0, spyglass: 0 },
+      // anchor: grandfather's anchor's refit tier, 0-4 (refits.js); old saves start at 0
+      upgrades: { sail: 0, hull: 0, rudder: 0, keel: 0, lantern: 0, spyglass: 0, anchor: 0 },
       discovered: new Set([0]), treasures: new Set(), pending: new Set(), savePort: 0,
       dayT: 0.3, day: 1, revealed: new Uint8Array(MAP_RES * MAP_RES),
       stats: { distance: 0, treasures: 0, wrecks: 0, discoveries: 1 }, tutorial: 0,
@@ -90,9 +91,10 @@ export class Game {
     this.state.health = Math.min(this.state.health, this.boat.maxHealth);
   }
 
-  /** Grandfather's anchor shows at the bow once it's fitted (and is down while you're ashore). */
+  /** Grandfather's anchor shows at the bow once it's fitted (and is down while you're ashore), refitted to its tier. */
   syncAnchor() {
     const fitted = this.state.story?.flags?.anchor === 'fitted';
+    this.boat.setAnchorTier(this.state.upgrades.anchor || 0);
     this.boat.setAnchor(!fitted ? 'none' : this.mode === 'ashore' || this.mode === 'landing' ? 'down' : 'stowed');
   }
 

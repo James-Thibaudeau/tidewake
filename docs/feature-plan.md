@@ -65,7 +65,7 @@ Two rules hold for every piece:
 | 4.0 | (done, #20 and the retrieve quests) | The Elder Tree at sea; the vault; retrieve quests and the map fragment | P3 |
 | 4.1 | (done, #33) | The Elder Grove as a walkable level: beach, old wood, roots and vault, the trunk spiral, the owl hollow, the owl bough, the crown. No story yet: Journal III stays at the camp | 4.0 |
 | 4.2 | (done, #34) | The note in the tent, Journal III at the carving, the flower crown in the crown chest, the owl guide and its hoot, fireflies at night. Chapter III points at the level | 4.1 |
-| 4.3 | `feature/anchor-refits` | The refit system (Phase 6): `upgrades.anchor`, the shipwright's refit quest, the fitting at a vault, the anchor model per tier, the per-biome "can't land" lines. No new biome yet | 4.0 |
+| 4.3 | (done, `feature/anchor-refits`) | The refit system (Phase 6): `upgrades.anchor`, the shipwright's refit quest, the fitting at a vault, the anchor model per tier, the per-biome "can't land" lines. No new biome yet | 4.0 |
 | 4.4 | `feature/rocky-biome` | Rocky islands (sheer ledges, arches, sea-stack hops) and the grapnel refit, tier 1 | 4.3 |
 | 4.5 | `feature/archway-isle` | Archway Isle: the cliff traverse, Journal IV, the fur hood; the great arch rebuilt at sea | 4.4 |
 | 4.6 | `feature/tropical-biome` | Tropical islands (palm-top hops, tide pools, rope bridges) and the coral flukes, tier 2. Sable's relic scramble moves here | 4.3 |

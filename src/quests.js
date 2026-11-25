@@ -213,7 +213,7 @@ export class QuestSystem {
       if (!A || !this.game.story?.canGoAshore) return null;
       const taken = new Set(this.active.filter((q) => q.type === 'retrieve').map((q) => q.target));
       const cands = this.world.islands.filter((I) => {
-        if (!A.canLand(I) || taken.has(I.id)) return false;
+        if (!A.canLandNow(I) || taken.has(I.id)) return false;
         const d = Math.hypot(I.x - P.x, I.z - P.z);
         return d >= dmin * 0.7 && d <= dmax * 1.2;
       });
@@ -303,7 +303,7 @@ export class QuestSystem {
 
   pin(id) { this.Q.pinned = id; }
   /** Story-track steps (main story, grandfather's anchor, the rival captain): never take a side-quest slot. */
-  get storyQuests() { return [...(this.game.story?.quests() || []), ...(this.game.rival?.quests() || [])]; }
+  get storyQuests() { return [...(this.game.story?.quests() || []), ...(this.game.refits?.quests() || []), ...(this.game.rival?.quests() || [])]; }
   /** Everything worth tracking: story steps first, then side quests. */
   get tracked() { return [...this.storyQuests, ...this.active]; }
   get pinned() {
@@ -420,14 +420,16 @@ export class QuestSystem {
   }
 
   // --------------------------------------------------------------- retrieve
-  /** Retrieve quests whose item is waiting on this island right now. */
+  /** Quest items waiting on this island right now: retrieve quests, and an anchor refit's fitting. */
   itemsOn(islandId) {
-    return this.active.filter((q) => q.type === 'retrieve' && q.state === 'active' && q.target === islandId);
+    return [...this.active.filter((q) => q.type === 'retrieve' && q.state === 'active' && q.target === islandId),
+      ...(this.game.refits?.itemsOn(islandId) || [])];
   }
 
   /** Picked up ashore: aboard until you hand it in (or wreck). */
   pickUp(q) {
     const g = this.game;
+    if (q.id === 'refit') return g.refits.pickUp();
     q.state = 'ready';
     this.syncHold();
     this.version++;
@@ -457,7 +459,7 @@ export class QuestSystem {
    * area rather than an exact spot.
    */
   target(q) {
-    if (q.type === 'story') return q.id === 'rival' ? this.game.rival.target() : this.game.story.target(q.id);
+    if (q.type === 'story') return q.id === 'rival' ? this.game.rival.target() : q.id === 'refit' ? this.game.refits.target() : this.game.story.target(q.id);
     const b = this.game.boat.pos;
     const nearestPort = () => {
       let best = null, bd = Infinity;

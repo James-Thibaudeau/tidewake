@@ -200,6 +200,7 @@ export class UI {
     // Upgrade buy buttons (delegated)
     if (this.el.upgradeGrid) {
       this.el.upgradeGrid.addEventListener('click', (e) => {
+        if (e.target.closest('button[data-refit]:not([disabled])')) { this.click(); g.refits.fit(); return; }
         const b = e.target.closest('button[data-key]');
         if (!b || b.disabled) return;
         this.click();

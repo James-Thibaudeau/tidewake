@@ -765,7 +765,7 @@ export class Rival {
     const g = this.game, R = this.R, enc = ENCOUNTERS.find((e) => e.id === id), port = g.dockedIsland;
     if (!enc || !port || R.chapter !== FINAL_CHAPTER) return false;
     if (enc.kind === 'summit' || enc.kind === 'relics') {
-      const land = this.world.islands.filter((I) => g.ashore?.canLand(I) && !I.landmark)
+      const land = this.world.islands.filter((I) => g.ashore?.canLandNow(I) && !I.landmark)
         .sort((a, b) => dist(a, port) - dist(b, port))[0];
       if (!land || !g.story.canGoAshore) { g.ui.toast('There is nowhere nearby to race on foot.', 'info'); return false; }
       R.flags.rematch = { id, island: land.id };

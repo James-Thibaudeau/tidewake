@@ -7,11 +7,12 @@
 // state.ashore[islandId] = { visited, coins: [id], caches: [id], chest: bool }
 // A level may carry story spots (level.spots), a chest with a cosmetic of its
 // own (chest.cosmetic) and life of its own (level.update): see wreck.js, grove.js.
-// Quest items (retrieve quests) wait at the level's vault; their state lives
-// in the quest, not here.
+// Quest items (retrieve quests, an anchor refit's fitting) wait at the level's
+// vault; their state lives in the quest, not here. Which islands the anchor
+// will hold at, and from how far out, is refits.js.
 import * as THREE from 'three';
 import { toonMaterial, glowBoost } from '../toon.js';
-import { ASHORE } from '../config.js';
+import { ASHORE, ASHORE_BIOMES } from '../config.js';
 import { edgeFactor } from '../world.js';
 import { propMesh, part, merge, propMaterial, thinOutline } from '../props.js';
 import { STYLES, owns } from '../cosmetics.js';
@@ -24,14 +25,11 @@ import { CharacterController } from './controller.js';
 import { FollowCamera } from './camera.js';
 import { LandRace } from './pacer.js';
 
-const LAND_BIOMES = new Set(['temperate']); // Phase 3: temperate islands only
 // Hand-built levels for landmark islands, by island.landmark; the rest are generated.
 const LANDMARK_LEVELS = { grove: buildGroveLevel };
-const LAND_RANGE = 46;                       // how close to the shore the boat must be
-const LAND_SPEED = 5;                        // boat speed (m/s) below which you can land
 
 // ------------------------------------------------------------- pickup art
-let coinGeo = null, pileGeo = null, postGeo = null, handGeo = null, bundleGeo = null, scrollGeo = null;
+let coinGeo = null, pileGeo = null, postGeo = null, handGeo = null, bundleGeo = null, scrollGeo = null, fittingGeo = null;
 const handGlow = new THREE.MeshBasicMaterial({ color: '#ffd98a' });
 const coinMat = toonMaterial({ color: '#ffd54a', emissive: '#6a4a00', emissiveIntensity: 0.35 });
 const glowOff = new THREE.MeshBasicMaterial({ color: '#6b5a3a' });
@@ -70,6 +68,13 @@ function pickupGeometry() {
     part(new THREE.TorusGeometry(0.135, 0.03, 6, 14), '#c8322b', { ry: Math.PI / 2, y: 0.14 }),
     part(new THREE.BoxGeometry(0.05, 0.16, 0.03), '#c8322b', { y: -0.01, z: 0.05, rx: 0.3 }),
   ]);
+  // an anchor refit's fitting: an old iron mooring ring and bar on a sailcloth wrap
+  fittingGeo = merge([
+    part(new THREE.CylinderGeometry(0.34, 0.38, 0.08, 10), '#cdb68a', { y: 0.04 }),
+    part(new THREE.TorusGeometry(0.2, 0.05, 6, 14), '#4b535d', { y: 0.32, rx: 0.25 }),
+    part(new THREE.CylinderGeometry(0.05, 0.05, 0.62, 6), '#5b6570', { y: 0.1, rz: Math.PI / 2, ry: 0.5 }),
+    part(new THREE.BoxGeometry(0.16, 0.1, 0.16), '#3c434c', { y: 0.12 }),
+  ]);
   postGeo = merge([
     part(new THREE.CylinderGeometry(0.08, 0.1, 2.0, 6), '#5b3c22', { y: 1.0 }),
     part(new THREE.BoxGeometry(0.5, 0.06, 0.08), '#5b3c22', { y: 1.95, x: 0.2 }),
@@ -88,17 +93,20 @@ export class Ashore {
   }
 
   // ----------------------------------------------------------- at sea
-  /** Islands you can explore on foot (given an anchor): not ports, reefs or the wreck. */
-  canLand(I) { return !I.isReef && !I.port && !I.wreck && LAND_BIOMES.has(I.biome); }
+  /** Islands that have a level to explore on foot: not ports, reefs or the wreck, in a biome with levels. */
+  canLand(I) { return !I.isReef && !I.port && !I.wreck && ASHORE_BIOMES.has(I.biome); }
+  /** ...and that grandfather's anchor, as refitted so far, will hold at. */
+  canLandNow(I) { return this.canLand(I) && !!this.game.refits?.holds(I); }
 
   /** The island the boat could land on from here, or null. */
   landingIsland(x, z) {
+    const range = this.game.refits.landRange;
     for (const I of this.game.world.near(x, z)) {
       if (I.isReef || I.port) continue;
       const a = Math.atan2(z - I.z, x - I.x);
       const shore = I.r * edgeFactor(I, a);
       const d = Math.hypot(x - I.x, z - I.z);
-      if (d > shore - 5 && d < shore + LAND_RANGE) return I;
+      if (d > shore - 5 && d < shore + range) return I;
     }
     return null;
   }
@@ -107,10 +115,11 @@ export class Ashore {
   interaction(boat) {
     const I = this.landingIsland(boat.pos.x, boat.pos.z);
     if (!I) return null;
-    const story = this.game.story, slow = Math.abs(boat.speed) < LAND_SPEED;
+    const story = this.game.story, slow = Math.abs(boat.speed) < this.game.refits.landSpeed;
     // hints only when you've slowed by the shore, so passing islands stays quiet
     if (!story?.canGoAshore) return slow ? { prompt: "You'll need an anchor to go ashore" } : null;
-    if (!LAND_BIOMES.has(I.biome)) return slow ? { prompt: `${I.name} is too treacherous to land on (yet)` } : null;
+    const no = this.game.refits.cantLand(I);
+    if (no) return slow ? { prompt: no } : null;
     if (!slow) return { prompt: 'Slow down to drop anchor' };
     // the rival captain may be waiting here for a race on foot
     const sable = this.game.rival?.landEncounter(I);
@@ -279,7 +288,7 @@ export class Ashore {
     // quest items wait at the vault, under a column of light you can see from below
     const V = L.vault, quests = this.game.quests;
     this.questItems = (V && quests ? quests.itemsOn(this.island.id) : []).map((q, i) => {
-      const geo = q.item === MAP_FRAGMENT ? scrollGeo : bundleGeo;
+      const geo = q.art === 'fitting' ? fittingGeo : q.item === MAP_FRAGMENT ? scrollGeo : bundleGeo;
       const m = new THREE.Group();
       const item = new THREE.Group();
       item.add(new THREE.Mesh(geo, propMaterial), new THREE.Mesh(geo, thinOutline));

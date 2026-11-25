@@ -141,11 +141,8 @@ Updated 2026-11-25.
       Jumping straight to the ground from the hollow or higher does send you
       back up, so every lit lantern from the hollow up offers "Climb down to
       the roots", which sets you down by the root gate.
-    - Not yet done: a second play by hand with the new camera (a test pilot
-      that only holds the stick left and jumps at gaps now reaches the owl
-      hollow), walking out along a bough (the tower view faces you there
-      until you are past the trunk's reach), a look on Low quality and on a
-      phone.
+    - Played by hand with the new camera, out along a bough, on Low
+      quality and on a phone (2026-11-25).
     - The pool is a still disc on the grass, not real water.
   - [x] 4.2 The grove's story
     ([#34](https://github.com/James-Thibaudeau/tidewake/pull/34)). Journal III has moved off the beach and up
@@ -181,15 +178,45 @@ Updated 2026-11-25.
       quad is one flat colour, which is what keeps them crisp.
     - Fix: grandfather's tent was upside down (its ridge in the sand), here
       and at every camp at sea.
-    - Not yet done: frame time with the new art. The level's own meshes are
-      about 175k triangles with outlines on High; Low drops the small
-      growth and uses a coarser trunk, and hasn't been looked at.
-    - Not yet done: a play by hand from the beach to the crown with the owl
-      (it was driven from the console), a listen to the hoot on real
-      speakers, and the pacing check: chapter III now needs the Oak hull
+    - The level's own meshes are about 175k triangles with outlines on High;
+      Low drops the small growth and uses a coarser trunk. Frame time on
+      both, a play by hand from the beach to the crown with the owl and the
+      hoot on real speakers were checked by hand (2026-11-25).
+    - Not yet done: the pacing check. Chapter III now needs the Oak hull
       (120 gold) and the anchor quest as well as Sails 1.
-  - [ ] 4.3 Anchor refits (Phase 6), then 4.4 rocky islands and 4.5 Archway
-    Isle
+  - [x] 4.3 Anchor refits (Phase 6), `src/refits.js`. The system is in, but
+    no new biome yet, so in normal play nothing changes: the shipwright's
+    Anchor card says "Nothing more to fit yet" and other biomes still say
+    "too treacherous to land on (yet)".
+    - `upgrades.anchor` (0-4) is saved like the other upgrades; old saves
+      start at 0 (from `freshState()`; `migrate()` leaves upgrades alone).
+    - Tiers, costs and perks are `REFITS` in `config.js`. A refit is offered
+      only once its biome is in `ASHORE_BIOMES`, so each biome PR adds its
+      biome there and its refit is live.
+    - The refit quest: offered (on docking or buying an upgrade) once you own
+      the hull, rudder or keel the tier needs. The fitting waits at the vault
+      of the nearest landable island of the previous biome (not a landmark),
+      with a search circle until it's charted. It's never lost in a wreck.
+      At a port it's fitted if you can pay; if not, the Anchor card has a
+      Refit button.
+    - Perks: tier 1 lands from 62 m off the shore (was 46), tier 2 drops
+      anchor at up to 8 kn (was 6), tier 4 is gilded. Tier 3's "holds in
+      storms" does nothing yet, because the anchor never drags.
+    - The anchor at the bow is rebuilt per tier: grapnel arms, coral flukes,
+      a tempered chain (it shows when the anchor is down; the chain from the
+      cathead hides behind the bulwark, as the rope did), ice spikes and
+      gilding.
+    - Per-biome "can't land" lines (`REFIT.cantLand` in `story-text.js`)
+      show once a biome has levels and your anchor isn't up to it.
+    - Retrieve quests and Sable's rematches only pick islands your anchor
+      holds at (`ashore.canLandNow`).
+    - `debug.refit(tier, { open: ['rocky'] })` sets the tier and opens a
+      biome so its refit can be played before the biome ships.
+    - Played in the preview: offer → fitting at Wren Island's vault → survives
+      a wreck → fitted at Port Haven (tier 1); the short-of-gold toast and the
+      Refit button (tier 2); each tier's model; a pre-change save loads at
+      tier 0. Not looked at on a phone.
+  - [ ] 4.4 Rocky islands and 4.5 Archway Isle
   - [ ] 4.6 Tropical islands and 4.7 the Sunken Temple
   - [ ] 4.8 Volcanic islands (with the steam-vent launch) and 4.9 Mount
     Cinderhorn
