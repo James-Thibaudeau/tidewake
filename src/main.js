@@ -15,6 +15,7 @@ import { Creator } from './creator.js';
 import { QuestSystem } from './quests.js';
 import { Story } from './story.js';
 import { Ashore } from './ashore/ashore.js';
+import { Rival } from './rival.js';
 import { loadSettings } from './save.js';
 import { FX, fxFlags } from './fx.js';
 
@@ -65,6 +66,7 @@ async function boot() {
   game.story = new Story(game);
   game.ashore = new Ashore(game);
   game.quests = new QuestSystem(game);
+  game.rival = new Rival(game);
 
   loadingText('Raising the sails…');
   await nextFrame();

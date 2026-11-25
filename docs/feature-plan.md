@@ -19,7 +19,7 @@ Decisions already made:
 
 ## Status
 
-Updated 2026-11-24. The phase sections below are the original plan; this
+Updated 2026-11-25. The phase sections below are the original plan; this
 section records what has shipped and what's left. Keep it current when a
 pull request merges.
 
@@ -71,6 +71,19 @@ pull request merges.
     reef: the bow is jammed on the rocks, and the stern with the cabin has
     torn away and rolled over. Ashore, torn planking hangs across the break
     to the stern ([#19](https://github.com/James-Thibaudeau/tidewake/pull/19)).
+
+- [x] **Phase 8, the rival captain:** Captain Sable and their ship, the
+  Redwing, which is rigged to match your upgrades.
+  Six encounters (a sprint, a buoy race, a foot race to a summit, a fog run
+  by compass, a relic scramble, a tow after a storm), the letter, the flare
+  and the kraken rescue, then Sable as a friend with rematches from the
+  Quest Board. Rewards: Sable's tricorn, crimson sails, the title *Lifeline*.
+  How it's built, and the decisions taken, are in
+  [rival-captain.md](rival-captain.md)
+  ([#28](https://github.com/James-Thibaudeau/tidewake/pull/28)).
+  - It shipped before Phase 7, so `rival.js` schedules its own encounters
+    (harbor talk on the Quest Board, a search circle, the Redwing appears when
+    you get close). The Phase 7 director can take that over later.
 
 ### Next up
 
@@ -124,14 +137,29 @@ pull request merges.
   - [x] Ashore lantern glow takes its bloom boost once at start-up, so
     `tidewake.fx.setEnabled()` doesn't change it. It now follows the boost.
 
+- [ ] **Rival captain follow-ups** (after #28; `src/rival.js`, `src/race.js`,
+  `src/kraken.js`, `src/ashore/pacer.js`):
+  - [ ] Play every race by hand and tune the pace. So far the races have
+    been run by a test pilot in the console, not by a person: `pace` and the
+    rubber band in `race.js`, `PACE` in `pacer.js`, the tentacle timings at
+    the top of `kraken.js`.
+  - [ ] Sable's writing (`rival-text.js`) is a first draft: review it like
+    the journals were.
+  - [ ] Move the relic scramble to a tropical island when that biome can be
+    landed on (Phase 4).
+  - [ ] Hand encounter delivery to the Phase 7 event director.
+  - [ ] Sounds for the kraken, the buoys' bells and the flare (they reuse
+    existing sounds).
+  - [ ] The towed Redwing has no collision with land, and Sable carries no
+    lantern ashore at night.
+  - [ ] In the fog run the panel shows the bearing but not who's ahead.
+
 ### Ideas (planned, not started)
 
 - [ ] **Phase 6, anchor refits:** refit grandfather's anchor tier by tier
   to unlock each biome. Ships alongside the Phase 4 biomes.
 - [ ] **Phase 7, a living sea:** random ocean events (whales, dolphins, a
   ghost ship at night…), a Sightings log, and report quests.
-- [ ] **Phase 8, the rival captain:** Captain Sable's story told through
-  races at sea and on land, ending with a kraken rescue.
 
 ### Known issues
 
@@ -759,15 +787,18 @@ a time. It ends with you saving them from a kraken.
 
 ### Who they are (draft, open to change)
 
-- **Captain Sable** (working name). About your age, sails alone in a fast
-  sloop with **crimson sails**, so you can recognise them from a long way off.
+- **Captain Sable** (working name). About your age, sails alone in the
+  *Redwing*, a fast ship with **crimson sails**, so you can recognise them
+  from a long way off. The Redwing is rigged to match your own upgrades (and
+  never worse than a Clipper Rig on an Oak hull), so she grows as your ship
+  does.
 - **The link to your story:** Sable's grandmother was your grandfather's
   great rival. The two of them raced each other across the isles for decades.
   Sable grew up on those stories and was raised to beat "the old captain's
   line". Now that the old captain is gone, you are the next best thing.
 - **The mirror:** your grandfather learned too late that fame wasn't worth
   what it cost. Sable is still in the middle of that mistake: no crew, no
-  home port (they sold the family house to buy the sloop), and nothing but
+  home port (they sold the family house to buy the Redwing), and nothing but
   the next win. The rival story is the same lesson as the journals, seen from
   the outside, and this time you get to change the ending.
 - **The tie-in:** one of the unsent letters in the epilogue sea chest is
@@ -790,7 +821,7 @@ your record.
 | 1 | Crossed bows | Off Port Haven, after Journal I | Sable cuts across your bow and dares you to a short race to the point | Sable knows exactly who your grandfather was |
 | 2 | Open water | Between two mid-range ports | A buoy race through 3 checkpoints, where reading the wind matters | The two grandparents raced each other for decades |
 | 3 | King of the hill | A temperate island, ashore | Race Sable to the summit | Sable sails alone, with no crew |
-| 4 | Fog run | Fog, rocky waters | A race through fog using the compass and spyglass | Sable sold their family home to buy the sloop |
+| 4 | Fog run | Fog, rocky waters | A race through fog using the compass and spyglass | Sable sold their family home to buy the Redwing |
 | 5 | Relic scramble | A tropical island, ashore | First to find 3 relics on the level | Sable has never once been back to their home port |
 | 6 | Dismasted | After a storm, far out | No race: Sable's mast is down, and you tow them to port | Sable admits they don't know what they'd do if they stopped |
 | Finale | The deep | A hand-placed deep-water trench | Rescue Sable from a kraken | — |
@@ -864,10 +895,12 @@ src/
   game.js              (all) new modes, event emits, wiring
   ui.js / index.html / style.css   (all) port tabs, creator, tracker, journal, ashore HUD
   sea-events.js        (P7) event director, event actors, sightings
-  race.js              (P8) checkpoints, countdown, AI rival boat
-  rival.js             (P8) rival chapters, conditions, ashore pacer
+  race.js              (P8) checkpoints, countdown, AI helmsman
+  rival.js             (P8) rival chapters, conditions, the Redwing
   rival-text.js        (P8) Sable's dialogue and story cards
+  tow.js               (P8) tow line between two boats
   kraken.js            (P8) finale set piece
+  ashore/pacer.js      (P8) Sable on foot: summit race, relic scramble
 ```
 
 ## Delivery
@@ -918,10 +951,12 @@ the browser preview (`tidewake-dev` in `.claude/launch.json`):
   tropical → volcanic → cold), so each one unlocks the next journal. The
   cost is that rocky, with its sheer ledges, comes before the gentler
   tropical biome, so the early rocky levels need tuning down.
-- **Rival name and look:** "Sable" is a working name. Their look,
-  pronouns and the grandmother backstory are still to be decided.
-- **AI boats:** `boat.js` assumes one player boat. Races and the kraken tow
-  need a second boat that can be driven by AI, which is the biggest
-  technical risk in Phase 8.
+- **Rival name and look (decided 2026-11-25, open to change):** Sable keeps
+  the working name and is "they". Dark tricorn with a plume, crimson coat,
+  black ship with crimson sails. The grandmother is "the captain of the
+  crimson sails" and is never named.
+- **AI boats (done):** `Boat` now takes options, so the Redwing is a
+  second boat with its own livery and no lights, sailed by `AutoHelm` in
+  `race.js`.
 - **Event frequency:** too many events make them wallpaper. Start rare,
   then tune from playtests.

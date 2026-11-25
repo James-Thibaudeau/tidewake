@@ -1043,6 +1043,39 @@ const HATS = {
     parts.push(part(sph(0.045, 8, 6), h.dark, { x: 0.27, y: 0.26, z: 0.2 }));
     return tipBack(parts, -0.12);
   },
+  rivalTricorn() {
+    // Sable's hat: the tricorn in near-black with crimson piping, a crimson
+    // cockade and a long cream plume swept back from the left side, so it
+    // reads as theirs (not the tailor's) from the sailing camera.
+    const base = '#221c26', dark = '#15111a', red = '#b81f2e', redDk = '#8a1622', cream = '#fff4dc', creamDk = '#e6d6b4';
+    const parts = [
+      part(sph(0.345, 18, 8, 0, TAU, 0, PI / 2), base, { y: 0.12, sy: 0.78 }),
+      part(cyl(0.35, 0.35, 0.03, 18), dark, { y: 0.13 }),
+      part(cyl(0.349, 0.349, 0.035, 18, true), red, { y: 0.165 }),
+    ];
+    for (const a of [PI, PI / 3, -PI / 3]) {
+      parts.push(group([
+        part(box(0.66, 0.17, 0.03), base, { y: 0.085 }),
+        part(box(0.67, 0.03, 0.045), red, { y: 0.17 }),
+      ], { x: Math.sin(a) * 0.33, y: 0.12, z: Math.cos(a) * 0.33, ry: a, rx: 0.62, order: 'YXZ' }));
+    }
+    // cockade on the left flap, where the plume is pinned
+    parts.push(
+      part(cyl(0.07, 0.07, 0.02, 10), red, { x: 0.3, y: 0.25, z: 0.17, rz: PI / 2, ry: -0.5, order: 'YXZ' }),
+      part(sph(0.03, 6, 4), redDk, { x: 0.325, y: 0.25, z: 0.185 }),
+    );
+    // the plume: overlapping tapered tufts arcing up and back, drooping at the tip
+    const N = 6;
+    for (let i = 0; i < N; i++) {
+      const t = i / (N - 1);
+      const r = 0.075 * (1 - t * 0.55);
+      parts.push(part(sph(r, 8, 6), i % 2 ? creamDk : cream, {
+        x: 0.3 - t * 0.05, y: 0.3 + Math.sin(t * PI * 0.8) * 0.2, z: 0.14 - t * 0.56,
+        sx: 0.55, sy: 0.9, sz: 1.9, rx: -0.7 + t * 1.5,
+      }));
+    }
+    return tipBack(parts, -0.12);
+  },
   captain(c) {
     const h = c.hat;
     return tipBack([

@@ -302,8 +302,8 @@ export class QuestSystem {
   }
 
   pin(id) { this.Q.pinned = id; }
-  /** Story-track steps (main story, grandfather's anchor): never take a side-quest slot. */
-  get storyQuests() { return this.game.story?.quests() || []; }
+  /** Story-track steps (main story, grandfather's anchor, the rival captain): never take a side-quest slot. */
+  get storyQuests() { return [...(this.game.story?.quests() || []), ...(this.game.rival?.quests() || [])]; }
   /** Everything worth tracking: story steps first, then side quests. */
   get tracked() { return [...this.storyQuests, ...this.active]; }
   get pinned() {
@@ -457,7 +457,7 @@ export class QuestSystem {
    * area rather than an exact spot.
    */
   target(q) {
-    if (q.type === 'story') return this.game.story.target(q.id);
+    if (q.type === 'story') return q.id === 'rival' ? this.game.rival.target() : this.game.story.target(q.id);
     const b = this.game.boat.pos;
     const nearestPort = () => {
       let best = null, bd = Infinity;

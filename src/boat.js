@@ -1,5 +1,7 @@
-// The player's sailboat: model (with tiered visual upgrades), sailing physics,
-// collisions, wake particles, and the explorer at the helm.
+// A sailboat: model (with tiered visual upgrades), sailing physics,
+// collisions, wake particles, and the explorer at the helm. The player's boat
+// is `new Boat(scene)`; a second, computer-sailed boat (the rival's redwing) is
+// `new Boat(scene, { npc: true, profile, livery })`.
 import * as THREE from 'three';
 import { toon, toonGradient, toonMaterial, outlineMaterial, glowBoost } from './toon.js';
 import { waveHeight } from './waves.js';
@@ -184,20 +186,53 @@ function drawEmblem(g, S, H, { u = 0.36, v = 0.52, R = 1.05, ring = '#d4402e', i
   g.restore();
 }
 
-// plain = the same cloth without emblems/stripes (for the jib and topsail)
-function sailTexture(tier, plain = false) {
-  const key = tier + (plain ? 'p' : '');
+// plain = the same cloth without emblems/stripes (for the jib and topsail).
+// cloth = a dye (CSS hex) that replaces the tier's own cloth colour. On a dark
+// or saturated dye the seams go darker and the trim turns cream and gold, so
+// every tier's decoration still reads.
+// A wing emblem for a livery's mainsail: a dark swept wing with a gold and
+// cream shoulder bar, squashed like drawEmblem so it sits right on the taper.
+const WING_INK = '#1d1a22';
+function drawWing(g, S, H, { u = 0.37, v = 0.5, R = 1.35 } = {}) {
+  const cx = u * S, cy = (1 - v) * S;
+  const rx = R / (BOOM_LEN / S), ry = R / ((H * (1 - 0.55 * u)) / S);
+  g.save(); g.translate(cx, cy); g.scale(rx, ry);
+  g.fillStyle = WING_INK;
+  g.beginPath();
+  g.moveTo(-1.0, 0.2);
+  g.quadraticCurveTo(-0.3, -0.75, 1.05, -0.9);   // leading edge, out to the tip
+  g.lineTo(0.6, -0.44); g.lineTo(0.92, -0.32);   // three feather tips down the trailing edge
+  g.lineTo(0.4, -0.02); g.lineTo(0.68, 0.16);
+  g.lineTo(0.14, 0.32); g.lineTo(0.36, 0.54);
+  g.quadraticCurveTo(-0.5, 0.66, -1.0, 0.2);
+  g.fill();
+  // the shoulder bar
+  g.save(); g.translate(-0.56, 0.08); g.rotate(-0.55);
+  g.fillStyle = GOLD; g.beginPath(); g.ellipse(0, 0, 0.3, 0.13, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#f3e7c9'; g.beginPath(); g.ellipse(0.04, 0.2, 0.26, 0.06, 0, 0, Math.PI * 2); g.fill();
+  g.restore();
+  g.restore();
+}
+
+// emblem: a livery's own mark in place of the tier's stripes and roses ('wing')
+function sailTexture(tier, plain = false, cloth = null, emblem = null) {
+  const key = tier + (plain ? 'p' : '') + (cloth || '') + (emblem || '');
   if (sailTexCache[key]) return sailTexCache[key];
   const H = SAIL_H[tier];
+  const CREAM = '#f3e7c9';
+  let dk = false; // a dyed cloth too dark for the tier's usual pale-cloth trim
+  if (cloth) { const c = new THREE.Color(cloth); dk = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b < 0.5; }
   const tex = canvasTex(256, 256, (g, S) => {
-    g.fillStyle = SAIL_BASE[tier];
+    g.fillStyle = cloth || SAIL_BASE[tier];
     g.fillRect(0, 0, S, S);
     for (let i = 0; i < 1400; i++) {
-      g.fillStyle = tier === 4 ? `rgba(40,10,5,${Math.random() * 0.08})` : `rgba(120,100,60,${Math.random() * (tier === 0 ? 0.08 : 0.04)})`;
+      g.fillStyle = dk ? `rgba(20,5,10,${Math.random() * 0.09})`
+        : tier === 4 ? `rgba(40,10,5,${Math.random() * 0.08})` : `rgba(120,100,60,${Math.random() * (tier === 0 ? 0.08 : 0.04)})`;
       g.fillRect(Math.random() * S, Math.random() * S, 2, 2);
     }
     // panel seams (finer, doubled-stitch seams on the top rigs)
-    g.strokeStyle = tier === 0 ? 'rgba(120,95,55,0.55)' : tier === 4 ? 'rgba(60,15,10,0.45)' : tier === 5 ? 'rgba(190,150,70,0.45)' : 'rgba(150,140,110,0.4)';
+    g.strokeStyle = dk ? 'rgba(25,5,10,0.42)'
+      : tier === 0 ? 'rgba(120,95,55,0.55)' : tier === 4 ? 'rgba(60,15,10,0.45)' : tier === 5 ? 'rgba(190,150,70,0.45)' : 'rgba(150,140,110,0.4)';
     g.lineWidth = 2;
     const step = tier >= 4 ? 22 : 30;
     for (let y = step; y < S; y += step) {
@@ -206,38 +241,50 @@ function sailTexture(tier, plain = false) {
     }
     if (tier >= 4) {
       // vertical cloth panels
-      g.strokeStyle = tier === 4 ? 'rgba(60,15,10,0.25)' : 'rgba(190,150,70,0.25)'; g.lineWidth = 1.5;
+      g.strokeStyle = dk ? 'rgba(25,5,10,0.22)' : tier === 4 ? 'rgba(60,15,10,0.25)' : 'rgba(190,150,70,0.25)'; g.lineWidth = 1.5;
       for (let x = 32; x < S; x += 32) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, S); g.stroke(); }
     }
     if (tier === 0) {
-      for (const [x, y, w, h, c] of [[36, 150, 62, 46, '#c8b083'], [150, 58, 52, 40, '#d8c497'], [118, 196, 46, 34, '#b99d6c'], [60, 70, 30, 26, '#cfb98d']]) {
-        g.fillStyle = c; g.fillRect(x, y, w, h);
-        g.setLineDash([5, 4]); g.strokeStyle = '#7d6440'; g.lineWidth = 2; g.strokeRect(x + 3, y + 3, w - 6, h - 6);
+      // patches: off-cuts of the same cloth when it's dyed, stitched in cream
+      const tint = (k) => '#' + new THREE.Color(cloth).lerp(new THREE.Color(k < 0 ? '#000000' : '#ffffff'), Math.abs(k)).getHexString();
+      const patches = cloth ? [tint(-0.22), tint(0.14), tint(-0.32), tint(0.07)] : ['#c8b083', '#d8c497', '#b99d6c', '#cfb98d'];
+      for (const [i, [x, y, w, h]] of [[36, 150, 62, 46], [150, 58, 52, 40], [118, 196, 46, 34], [60, 70, 30, 26]].entries()) {
+        g.fillStyle = patches[i]; g.fillRect(x, y, w, h);
+        g.setLineDash([5, 4]); g.strokeStyle = dk ? CREAM : '#7d6440'; g.lineWidth = 2; g.strokeRect(x + 3, y + 3, w - 6, h - 6);
         g.setLineDash([]);
       }
     }
     if (tier >= 1) {
       // reinforced corners
-      g.fillStyle = tier === 3 || tier === 5 ? '#f3d58a' : tier === 4 ? '#f3e7c9' : 'rgba(200,190,160,0.6)';
+      g.fillStyle = tier === 3 || tier === 5 ? '#f3d58a' : tier === 4 || dk ? CREAM : 'rgba(200,190,160,0.6)';
       g.beginPath(); g.moveTo(0, S); g.lineTo(46, S); g.lineTo(0, S - 46); g.fill();
       g.beginPath(); g.moveTo(S, S); g.lineTo(S - 40, S); g.lineTo(S, S - 40); g.fill();
       g.beginPath(); g.moveTo(0, 0); g.lineTo(40, 0); g.lineTo(0, 40); g.fill();
     }
-    if (tier === 2 && !plain) {
-      g.fillStyle = '#2f6fd0'; g.fillRect(0, 150, S, 22); g.fillRect(0, 184, S, 10);
-      g.fillStyle = '#d4402e'; g.fillRect(0, 175, S, 5);
+    if (tier === 2 && !plain && !emblem) {
+      // racing stripes (cream and gold on a dark dye, where blue and red would sink in)
+      g.fillStyle = dk ? CREAM : '#2f6fd0'; g.fillRect(0, 150, S, 22); g.fillRect(0, 184, S, 10);
+      g.fillStyle = dk ? GOLD : '#d4402e'; g.fillRect(0, 175, S, 5);
     }
-    if (tier === 3 && !plain) drawEmblem(g, S, H);
-    if (tier === 4 && !plain) {
+    const paleRose = { ring: CREAM, inner: GOLD, a: CREAM, b: GOLD, fill: 'rgba(243,231,201,0.18)' };
+    if (tier === 3 && !plain && !emblem) drawEmblem(g, S, H, dk ? paleRose : {});
+    if (tier === 4 && !plain && !emblem) {
       // cream bands with gold piping, and a cream/gold rose
       g.fillStyle = '#f3e7c9'; g.fillRect(0, 196, S, 16); g.fillRect(0, 222, S, 6);
       g.fillStyle = GOLD; g.fillRect(0, 193, S, 3); g.fillRect(0, 212, S, 3);
-      drawEmblem(g, S, H, { R: 1.0, ring: '#f3e7c9', inner: GOLD, a: '#f3e7c9', b: GOLD, fill: 'rgba(243,231,201,0.18)' });
+      drawEmblem(g, S, H, { R: 1.0, ...paleRose });
     }
-    if (tier === 5 && !plain) {
+    if (tier === 5 && !plain && !emblem) {
       // a big navy-and-gold sunburst rose on white-gold silk
       g.fillStyle = 'rgba(255,207,74,0.16)'; g.fillRect(0, 0, S, S);
-      drawEmblem(g, S, H, { R: 1.55, v: 0.5, ring: '#173a63', inner: GOLD, a: '#173a63', b: GOLD, fill: 'rgba(23,58,99,0.14)', points: 16 });
+      drawEmblem(g, S, H, dk ? { R: 1.55, v: 0.5, ...paleRose, points: 16 }
+        : { R: 1.55, v: 0.5, ring: '#173a63', inner: GOLD, a: '#173a63', b: GOLD, fill: 'rgba(23,58,99,0.14)', points: 16 });
+    }
+    if (emblem === 'wing') {
+      // a dark band along the foot of every sail, and the wing on the main
+      g.fillStyle = WING_INK; g.fillRect(0, S - 40, S, 26);
+      g.fillStyle = '#f3e7c9'; g.fillRect(0, S - 44, S, 3);
+      if (!plain) drawWing(g, S, H);
     }
     if (tier === 3 || tier === 5) {
       // gold wave trim along the foot
@@ -250,7 +297,7 @@ function sailTexture(tier, plain = false) {
       // two rows of reef points with little dangling ties
       for (const ry of [S - 44, S - 78]) {
         for (let x = 10; x < S; x += 16) {
-          g.fillStyle = tier === 4 ? '#f3e7c9' : '#7a5a2a';
+          g.fillStyle = tier === 4 || dk ? CREAM : '#7a5a2a';
           g.fillRect(x - 1.5, ry - 1.5, 3, 3);
           g.strokeStyle = g.fillStyle; g.lineWidth = 1.2;
           g.beginPath(); g.moveTo(x, ry); g.lineTo(x + 1, ry + 7); g.stroke();
@@ -258,7 +305,8 @@ function sailTexture(tier, plain = false) {
       }
     }
     // edge tape / bolt rope
-    g.strokeStyle = tier === 3 || tier === 5 ? GOLD : tier === 4 ? GOLD : tier === 0 ? 'rgba(120,95,55,0.8)' : 'rgba(170,155,120,0.8)';
+    g.strokeStyle = tier >= 3 ? GOLD : dk ? (tier === 0 ? 'rgba(25,5,10,0.6)' : 'rgba(243,231,201,0.85)')
+      : tier === 0 ? 'rgba(120,95,55,0.8)' : 'rgba(170,155,120,0.8)';
     g.lineWidth = tier >= 3 ? 10 : 6;
     g.strokeRect(0, 0, S, S);
     if (tier >= 4) { g.strokeStyle = 'rgba(90,70,50,0.9)'; g.lineWidth = 3; g.strokeRect(5, 5, S - 10, S - 10); }
@@ -367,9 +415,24 @@ function figurehead(gold, winged = false) {
   return g;
 }
 
+// The mast of a dismasted boat: this much of it is left standing.
+const STUB_H = 1.7;
+
 export class Boat {
-  constructor(scene) {
+  /**
+   * opts.npc      not the player's boat: no PointLights (adding lights at
+   *               runtime recompiles every shader), lantern glow meshes only
+   * opts.profile  appearance profile for the explorer at the helm
+   * opts.livery   { hull, trim, deck, sail, flag, pennant } colours that
+   *               replace the tier colours (see setLivery)
+   */
+  constructor(scene, opts = {}) {
     this.scene = scene;
+    this.npc = !!opts.npc;
+    this.profile = opts.profile || null;
+    this.livery = opts.livery || null;
+    this.dismasted = false;
+    this.up = null;        // upgrade values { sail, rudder, keel, hull, lantern }: an NPC's driver reads and writes these
     this.group = new THREE.Group();
     this.group.rotation.order = 'YXZ';
     scene.add(this.group);
@@ -518,7 +581,7 @@ export class Boat {
     this.buildAnchor();
 
     // The explorer
-    this.explorer = new Explorer();
+    this.explorer = this.profile ? new Explorer(this.profile) : new Explorer();
     this.group.add(this.explorer.root);
   }
 
@@ -574,7 +637,7 @@ export class Boat {
     }
     // tier 1: painted stripe + rope fenders
     {
-      const parts = [part(bandGeo(0.36, 0.48, 0.012), '#3f7fd0')];
+      const parts = [];
       for (const side of [-1, 1]) for (const z of [-1.3, 0.5]) {
         const S = sideAt(z, 0.3, side, 0.14);
         parts.push(part(new THREE.CylinderGeometry(0.11, 0.11, 0.42, 10), '#e9d7a8', { x: S.x, y: 0.3, z: S.z }));
@@ -582,7 +645,11 @@ export class Boat {
         parts.push(part(new THREE.TorusGeometry(0.11, 0.02, 4, 10), '#b89a62', { x: S.x, y: 0.18, z: S.z, rx: Math.PI / 2 }));
         parts.push(part(new THREE.CylinderGeometry(0.014, 0.014, 0.5, 4), '#8a6a3a', { x: S.x * 0.97, y: 0.75, z: S.z }));
       }
-      tiers.push(decoMesh(parts));
+      const grp = decoMesh(parts);
+      // the stripe is its own mesh so a livery's trim colour can repaint it
+      this.stripeMat = toon('#3f7fd0', { side: THREE.DoubleSide });
+      grp.add(new THREE.Mesh(bandGeo(0.36, 0.48, 0.012), this.stripeMat));
+      tiers.push(grp);
     }
     // tiers 2 and 3: rub rail, portholes, figurehead (+ gold filigree and stern brackets)
     for (const gold of [false, true]) {
@@ -927,6 +994,10 @@ export class Boat {
       this.lanterns.push(stern);
     }
     for (const L of this.lanterns) { L.group.visible = false; root.add(L.group); }
+    // An NPC boat casts no light of its own: a scene's light count is baked
+    // into every shader, so lights that come and go would recompile them all.
+    this.light = this.light2 = null;
+    if (this.npc) return;
     this.light = new THREE.PointLight(0xffc070, 0, 40, 1.2);
     root.add(this.light);
     // second light for the bow lantern / masthead heart (always present so shaders don't recompile)
@@ -1026,27 +1097,16 @@ export class Boat {
     const L = (k) => clamp(levels[k] || 0, 0, MAX_TIER);
     this.levels = { sail: L('sail'), hull: L('hull'), rudder: L('rudder'), keel: L('keel'), lantern: L('lantern'), spyglass: L('spyglass') };
     const lv = this.levels;
+    this._values = values;
     // hull (tiers 4-5 also make the whole ship bigger)
-    const hs = HULL_STYLE[lv.hull];
-    this.hullMat.color.set(hs.hull);
-    this.trimMat.color.set(hs.trim);
-    this.deckMat.color.set(hs.deck);
     this.hullTiers.forEach((t, i) => { t.visible = i === lv.hull; });
     this.sizeScale = SIZE_SCALE[lv.hull];
     this.model.scale.setScalar(this.sizeScale);
     this.hasBowsprit = lv.hull >= 4;
     // sails & rig
-    this.sailMat.map = sailTexture(lv.sail);
-    this.sailMat.needsUpdate = true;
-    this.jibMat.map = sailTexture(lv.sail, true);
-    this.jibMat.needsUpdate = true;
     this.jib.visible = lv.sail >= 1;
     this.topsail.visible = lv.sail >= 4;
-    this.topMat.map = sailTexture(lv.sail, true);
-    this.topMat.needsUpdate = true;
-    this.flagMat.color.set(lv.sail >= 3 ? GOLD : '#d64a3a');
     this.pennant.mesh.visible = lv.sail >= 2;
-    this.pennant.mat.color.set(lv.sail === 4 ? '#9c2f27' : lv.sail >= 3 ? GOLD : '#2f6fd0');
     for (const p of this.extraPennants || []) p.mesh.visible = lv.sail >= 4;
     // helm
     this.tiller.visible = lv.rudder <= 1;
@@ -1074,8 +1134,10 @@ export class Boat {
       if (l.extra) l.extra.group.visible = i === lv.lantern;
     });
     this.activeLantern = this.lanterns[lv.lantern];
-    this.light.position.copy(this.activeLantern.light);
-    this.light.color.set(this.activeLantern.color);
+    if (this.light) {
+      this.light.position.copy(this.activeLantern.light);
+      this.light.color.set(this.activeLantern.color);
+    }
     this.lanternMat = this.activeLantern.glowMat;
     // spyglass: belt spyglass, then a crow's nest, a mounted scope and a deck telescope
     ex.setSpyglass(lv.spyglass);
@@ -1084,9 +1146,127 @@ export class Boat {
     this.nestScope.visible = lv.spyglass >= 4;
     this.deckScope.visible = lv.spyglass >= 5;
     this.layoutRig();
+    this.applyColors();
+    this.applyDismast();
 
     this.maxHealth = values.hull;
     this.lanternRange = values.lantern;
+  }
+
+  /** Hull paint, sail cloth and flags: the tier's own colours, or the livery's where it names one. */
+  applyColors() {
+    const lv = this.levels, Lv = this.livery || {};
+    const hs = HULL_STYLE[lv.hull];
+    this.hullMat.color.set(Lv.hull || hs.hull);
+    this.trimMat.color.set(Lv.trim || hs.trim);
+    this.deckMat.color.set(Lv.deck || hs.deck);
+    this.stripeMat.color.set(Lv.trim || '#3f7fd0');
+    const cloth = Lv.sail || null;
+    const mark = Lv.emblem || null;
+    this.sailMat.map = sailTexture(lv.sail, false, cloth, mark);
+    this.sailMat.needsUpdate = true;
+    this.jibMat.map = sailTexture(lv.sail, true, cloth, mark);
+    this.jibMat.needsUpdate = true;
+    this.topMat.map = sailTexture(lv.sail, true, cloth, mark);
+    this.topMat.needsUpdate = true;
+    this.flagMat.color.set(Lv.flag || (lv.sail >= 3 ? GOLD : '#d64a3a'));
+    this.pennant.mat.color.set(Lv.pennant || (lv.sail === 4 ? '#9c2f27' : lv.sail >= 3 ? GOLD : '#2f6fd0'));
+    for (const p of this.extraPennants || []) p.mat.color.set(Lv.pennant || (lv.sail === 4 ? '#9c2f27' : GOLD));
+    this.wreckClothMat?.color.set(cloth || SAIL_BASE[lv.sail]);
+  }
+
+  /**
+   * Repaint the boat. livery: { hull, trim, deck, sail, flag, pennant, emblem } (CSS
+   * hex, each optional; `sail` dyes every sail), or null for the tier's look.
+   */
+  setLivery(livery) {
+    this.livery = livery || null;
+    this.applyColors();
+  }
+
+  /** Mast gone by the board: a broken stub, no sails or rigging, a spar and canvas across the deck. */
+  setDismasted(on) {
+    on = !!on;
+    if (on === this.dismasted) return;
+    this.dismasted = on;
+    if (on) { this.buildWreckage(); this.sailLevel = 0; }
+    // un-breaking the mast is a full re-rig (applyUpgrades ends with applyDismast)
+    if (!on && this._values) this.applyUpgrades(this.levels, this._values);
+    else this.applyDismast();
+  }
+
+  /** Show or hide what a dismasting takes away. Runs after every applyUpgrades, which re-shows parts by tier. */
+  applyDismast() {
+    const on = this.dismasted;
+    for (const m of [this.boom, this.rig, this.mainSheet, this.flag]) m.visible = !on;
+    if (this.wreckage) this.wreckage.visible = on;
+    if (!on) return;
+    for (const m of [this.jib, this.jibSheet, this.jibSheetSlack, this.pennant.mesh, this.heart, ...this.nests,
+      ...(this.extraPennants || []).map((p) => p.mesh)]) m.visible = false;
+    this.mast.scale.y = this.mastInk.scale.y = STUB_H;
+  }
+
+  buildWreckage() {
+    if (this.wreckage) return;
+    const WOOD = '#7a5432', top = MAST_BASE + STUB_H;
+    const parts = [];
+    // splintered top of the stub
+    for (const [x, z, h, r] of [[0.05, 0.03, 0.42, 0.06], [-0.05, 0.04, 0.3, 0.05], [0.0, -0.06, 0.24, 0.05], [0.06, -0.04, 0.16, 0.04]]) {
+      parts.push(part(new THREE.ConeGeometry(r, h, 4), WOOD, { x, y: top + h / 2 - 0.04, z: MAST_Z + z, ry: x * 9 }));
+    }
+    // the rest of the mast: fallen aft and to starboard, its head over the side
+    const a = V3(0.1, 1.5, MAST_Z - 0.35), b = V3(2.7, 0.9, -2.3); // resting on the rail
+    const mid = a.clone().lerp(b, 0.5), len = a.distanceTo(b);
+    const q = new THREE.Quaternion().setFromUnitVectors(_up, b.clone().sub(a).normalize());
+    const e = new THREE.Euler().setFromQuaternion(q);
+    parts.push(part(new THREE.CylinderGeometry(0.08, 0.12, len, 7), WOOD, { x: mid.x, y: mid.y, z: mid.z, rx: e.x, ry: e.y, rz: e.z }));
+    parts.push(part(new THREE.ConeGeometry(0.12, 0.3, 4), WOOD, { x: a.x - 0.05, y: a.y + 0.04, z: a.z + 0.14, rx: 1.9, rz: 0.5 }));
+    // the gaff, snapped off and lying across the foredeck
+    parts.push(part(new THREE.CylinderGeometry(0.05, 0.06, 2.3, 6), WOOD, { x: -0.25, y: 1.1, z: MAST_Z + 1.35, rx: Math.PI / 2, rz: 0.75 }));
+    // tangled rigging trailing over the side
+    parts.push(ropePart(V3(0.3, 1.25, MAST_Z - 0.2), V3(1.5, 0.95, -0.2), 0.2, 0.02));
+    parts.push(ropePart(V3(1.25, 1.02, -0.9), V3(1.9, -0.2, -2.9), 0.25, 0.02));
+    parts.push(ropePart(V3(-0.2, 1.3, MAST_Z + 0.2), V3(-1.25, 1.02, 1.9), 0.18, 0.02));
+    const wood = decoMesh(parts, true);
+    // sailcloth heaped round the stub and dragged over the rail with the mast
+    const cloth = [];
+    for (const [x, y, z, sx, sy, sz, ry] of [
+      [0.25, 1.12, MAST_Z - 0.7, 0.95, 0.2, 0.75, 0.3], [0.85, 1.16, MAST_Z - 1.35, 0.8, 0.24, 0.6, -0.4],
+      [-0.35, 1.1, MAST_Z - 0.15, 0.6, 0.16, 0.7, 0.9], [1.45, 0.98, -1.25, 0.6, 0.2, 0.75, 0.2],
+      [1.9, 0.72, -1.8, 0.4, 0.42, 0.8, 0.5], [0.45, 1.3, MAST_Z - 1.0, 0.5, 0.2, 0.4, 1.2],
+    ]) cloth.push(part(new THREE.SphereGeometry(1, 10, 6), '#ffffff', { x, y, z, sx, sy, sz, ry }));
+    const clothGeo = mergeParts(cloth);
+    this.wreckClothMat = toon(this.livery?.sail || SAIL_BASE[this.levels.sail], { vertexColors: true });
+    const heap = new THREE.Mesh(clothGeo, this.wreckClothMat);
+    const heapInk = new THREE.Mesh(clothGeo, thinInk);
+    this.wreckage = new THREE.Group();
+    this.wreckage.add(wood, heap, heapInk);
+    this.model.add(this.wreckage);
+  }
+
+  /** Show or hide the whole boat (the model and its wake). */
+  setVisible(on) {
+    this.group.visible = !!on;
+    this.wake.mesh.visible = !!on;
+  }
+
+  /** Take the boat out of the scene and free what it owns (shared caches and materials stay). */
+  dispose() {
+    this.explorer.dispose();
+    this.scene.remove(this.group);
+    this.scene.remove(this.wake.mesh);
+    this.wake.mesh.geometry.dispose();
+    this.wake.material.dispose();
+    const shared = new Set([decoMat, thinInk, ropeMat]);
+    const geos = new Set(), mats = new Set();
+    this.group.traverse((o) => {
+      if (o.geometry && !o.isSprite) geos.add(o.geometry); // every sprite shares one geometry
+      for (const m of Array.isArray(o.material) ? o.material : o.material ? [o.material] : []) if (!shared.has(m)) mats.add(m);
+    });
+    for (const g of geos) g.dispose();
+    // textures made for this boat alone (sail and halo textures are shared caches)
+    for (const m of [this.deckMat, this.runeMat, this.waterGlowMat]) m.map?.dispose();
+    for (const m of mats) m.dispose();
   }
 
   layoutRig() {
@@ -1177,7 +1357,6 @@ export class Boat {
     this.extraPennants.forEach((p, i) => {
       const side = i ? 1 : -1;
       p.mesh.position.set(side * 0.55, top * 0.62, MAST_Z - 1.6);
-      p.mat.color.set(lv.sail === 4 ? '#9c2f27' : GOLD);
       p.mesh.visible = lv.sail >= 4;
     });
   }
@@ -1201,7 +1380,7 @@ export class Boat {
   }
 
   /**
-   * ctl: {steer, sailTarget}; wind: {angle, strength}; up: upgrade values.
+   * ctl: {steer, drive?}; wind: {angle, strength}; up: upgrade values.
    * Returns an array of collision events: {damage, kind}.
    */
   simulate(dt, ctl, wind, world, up) {
@@ -1214,8 +1393,9 @@ export class Boat {
     // Thrust follows how much canvas is actually up (sailVis eases between
     // settings), so reefing or furling eases the drive off instead of cutting it.
     const sailF = clamp((this.sailVis - 0.06) / 0.94, 0, 1);
-    let target = sailF * this.efficiency * wind.strength * 15 * up.sail;
-    if (this.sailLevel > 0) target = Math.max(target, 1.2 * sailF);
+    const drive = ctl.drive ?? 1; // scales the sail's thrust (a boat in tow, a paced rival)
+    let target = sailF * this.efficiency * wind.strength * 15 * up.sail * drive;
+    if (this.sailLevel > 0) target = Math.max(target, 1.2 * sailF * drive);
     // Hull drag grows with speed: a fast boat sheds speed noticeably, but a
     // slow one coasts on for a good while (roughly 10-15 s to glide to a stop).
     const rate = target > this.speed ? 0.45 : 0.1 + Math.abs(this.speed) * 0.011;
@@ -1370,8 +1550,10 @@ export class Boat {
 
     // Lantern
     const Lt = this.activeLantern;
-    this.light.intensity = night * 14 * (0.9 + Math.sin(t * 7) * 0.05) * (this.levels.lantern === 0 ? 0.7 : 1);
-    this.light.distance = this.lanternRange || 30;
+    if (this.light) {
+      this.light.intensity = night * 14 * (0.9 + Math.sin(t * 7) * 0.05) * (this.levels.lantern === 0 ? 0.7 : 1);
+      this.light.distance = this.lanternRange || 30;
+    }
     const glowK = (0.75 + night * 0.25) * glowBoost.value;
     Lt.glowMat.color.set(Lt.color).multiplyScalar(glowK).offsetHSL(0, 0, night * 0.08);
     const animLamp = (E) => {
@@ -1389,11 +1571,13 @@ export class Boat {
     if (X) {
       X.glowMat.color.set(X.color).multiplyScalar(glowK).offsetHSL(0, 0, night * 0.08);
       animLamp(X);
-      this.light2.position.copy(X.light);
-      this.light2.color.set(X.color);
-      this.light2.intensity = night * 12 * (0.92 + Math.sin(t * 5.3) * 0.04);
-      this.light2.distance = (this.lanternRange || 30) * 0.8;
-    } else this.light2.intensity = 0;
+      if (this.light2) {
+        this.light2.position.copy(X.light);
+        this.light2.color.set(X.color);
+        this.light2.intensity = night * 12 * (0.92 + Math.sin(t * 5.3) * 0.04);
+        this.light2.distance = (this.lanternRange || 30) * 0.8;
+      }
+    } else if (this.light2) this.light2.intensity = 0;
     if (this.runeBand.visible) {
       const pulse = this.levels.keel >= 5 ? 0.5 + 0.5 * Math.sin(t * 2.4) : 0.5 + 0.5 * Math.sin(t * 1.6);
       this.runeMat.opacity = 0.35 + 0.45 * pulse + night * 0.2;

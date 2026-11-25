@@ -115,6 +115,7 @@ export const LETTERS = {
   title: 'Letters Never Sent',
   body: "A bundle of letters, tied with sailcloth string. The top one is the four-page letter from the squall, and the ink has run where the spray got in. Every one begins the same way: \"My love, I am coming home soon.\"\n\n" +
     "Beneath them is a little book of pressed flowers, one from every island he ever named, each labelled in his crooked hand. On the first page: \"For her, so she can see where I've been.\"\n\n" +
+    "One envelope in the bundle is not for Grandma at all. It is addressed, in the same crooked hand, \"To the captain of the crimson sails.\"\n\n" +
     "At the very bottom, folded neatly, are his red scarf and his old pith helmet, with a note pinned to the scarf: \"For my grandchild. These have seen everything. Let them see it all again, with you.\"",
 };
 

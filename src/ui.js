@@ -4,6 +4,7 @@ import { UPGRADES, MAP_RES, MAP_CELL, WORLD_HALF } from './config.js';
 import { STYLES, owns } from './cosmetics.js';
 import { MAX_ACTIVE, fmtDist } from './quests.js';
 import { PROLOGUE, EPILOGUE, JOURNALS, LETTERS, LINES } from './story-text.js';
+import { LINES as RIVAL_LINES } from './rival-text.js';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
 const fillVars = (s, vars) => s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] ?? m));
@@ -61,6 +62,8 @@ export const ICONS = {
   letters: S(`<rect x="3" y="6" width="18" height="13" rx="1.5" ${STROKE}/><path d="M3.5 7l8.5 6.5L20.5 7" ${STROKE}/><path d="M12 13.5V19" stroke="#c8322b" stroke-width="2.2"/>`),
   scarf: S(`<path d="M5 6c3 2.5 11 2.5 14 0l-1.5 4c-3.5 2-7.5 2-11 0z" fill="#c8322b" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14 10.5l2.5 9 2.5-1-1.5-8.5" fill="#c8322b" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>`),
   helmet: S(`<path d="M5 15a7 7 0 0 1 14 0z" fill="#e6cf92" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M2 15.5h20c0 1.6-4.5 2.5-10 2.5S2 17.1 2 15.5z" fill="#e6cf92" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M5.4 12.6h13.2" stroke="#c8322b" stroke-width="2"/><circle cx="12" cy="7.4" r="1.1" fill="currentColor"/><circle cx="9.6" cy="10.4" r="1.7" fill="#9fe0ec" stroke="#c9973a" stroke-width="1.2"/><circle cx="14.4" cy="10.4" r="1.7" fill="#9fe0ec" stroke="#c9973a" stroke-width="1.2"/>`),
+  flag: S(`<path d="M6 3v18" ${STROKE}/><path d="M6 4h12l-3 4 3 4H6z" fill="#e8413a" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>`),
+  tricorn: S(`<path d="M3 15c3-7 15-7 18 0-4 3-14 3-18 0z" fill="#2a2430" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4.5 14.5c4 2 11 2 15 0" fill="none" stroke="#e8413a" stroke-width="1.8"/><path d="M15.5 9.5c2-4 5-5 6-4-1 1-2.500 3.500-3.500 6" fill="#fff8e7" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>`),
   dice: S(`<rect x="3.5" y="3.5" width="17" height="17" rx="4" ${STROKE}/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"/>`),
 };
 
@@ -77,7 +80,18 @@ const smallBoat = (x, y, s = 1, patch = true) => `<g transform="translate(${x} $
   <path d="M0 -46 l9 3 -9 3" fill="#c8322b" stroke="#2a1d12" stroke-width="1.5"/></g>`;
 const rocks = (x) => `<g transform="translate(${x} 0)"><path d="M0 116 L6 52 L30 44 L40 116 Z" fill="#8f877d" ${INK}/><path d="M6 52 L30 44 L28 54 L8 58 Z" fill="#6fae55" ${INK}/>
   <path d="M34 116 L40 76 L60 72 L66 116 Z" fill="#7d766d" ${INK}/><path d="M40 76 L60 72 L59 79 L41 81Z" fill="#6fae55" stroke="#2a1d12" stroke-width="2"/></g>`;
+const redwingArt = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})">
+  <path d="M-30 0 H30 L20 13 H-20 Z" fill="#221c26" ${INK}/><path d="M-28 3 H27" stroke="#b81f2e" stroke-width="3"/><path d="M0 0 V-54" ${INK}/>
+  <path d="M3 -52 L36 -6 H3 Z" fill="#b81f2e" ${INK}/><path d="M-3 -46 L-26 -6 H-3 Z" fill="#b81f2e" ${INK}/>
+  <path d="M6 -16 q6 -12 20 -13 l-6 5 5 2 -7 3 4 3 q-9 3 -16 0z" fill="#221c26"/>
+  <path d="M0 -54 l10 3 -10 3" fill="#fff4dc" stroke="#2a1d12" stroke-width="1.5"/></g>`;
 const STORY_ART = {
+  redwing: () => sky('#ffd9a8', '#bfe0f2') + `<circle cx="258" cy="42" r="16" fill="#ffd54a" ${INK}/>${redwingArt(150, 116, 1.35)}${smallBoat(262, 118, 0.6)}`,
+  deep: () => sky('#2a2a52', '#5a4a7a', '#1d2a55', '#141d40') + `<circle cx="250" cy="34" r="12" fill="#e8ecff" ${INK}/>
+    <ellipse cx="150" cy="146" rx="96" ry="16" fill="#0c1230" opacity=".75"/>
+    <path d="M70 150 q-6 -46 16 -62 q16 -10 22 4 q-14 0 -18 14 q-4 20 4 44z" fill="#5a2f6e" ${INK}/>
+    <path d="M214 152 q12 -40 -6 -58 q-12 -10 -20 0 q12 2 14 14 q2 20 -8 44z" fill="#5a2f6e" ${INK}/>
+    <circle cx="136" cy="146" r="4" fill="#ffd54a"/><circle cx="162" cy="146" r="4" fill="#ffd54a"/>${redwingArt(280, 116, 0.5)}${smallBoat(40, 118, 0.5)}`,
   harbor: () => sky('#ffe3b0', '#9fd0ee') + `<circle cx="258" cy="40" r="18" fill="#ffd54a" ${INK}/>
     <path d="M0 112 Q50 60 120 70 T200 112 Z" fill="#6cc24a" ${INK}/><path d="M60 80 h22 v14 h-22z M100 74 h18 v12 h-18z" fill="#ead7b0" ${INK}/>
     <path d="M56 80 l15 -12 15 12 M97 74 l12 -10 12 10" fill="#c2573f" ${INK}/>
@@ -125,7 +139,8 @@ export class UI {
       'btnJournal', 'paneQuests', 'questCount', 'questOffers', 'questBadge', 'journalScreen', 'journalBody', 'journalClose',
       'journalTabs', 'journalTitle', 'storyCards', 'storyArt', 'storyTitle', 'storyText', 'storyDots', 'storySkip', 'storyNext',
       'foundScreen', 'foundEyebrow', 'foundTitle', 'foundItems', 'foundMain', 'foundLater',
-      'ashorePanel', 'apName', 'apGold', 'apLeft'];
+      'ashorePanel', 'apName', 'apGold', 'apLeft',
+      'racePanel', 'rpTitle', 'rpLine', 'countdown', 'hail', 'hailName', 'hailText', 'rivalNotes', 'sailDye', 'btnSailDye'];
     this.el = {};
     for (const id of ids) this.el[id] = $(id);
     this.notches = [...document.querySelectorAll('#sailGauge .notches span')];
@@ -232,6 +247,13 @@ export class UI {
       this.setPortTab(b.dataset.tab);
     });
     this.on('btnWardrobe', () => g.openWardrobe?.());
+    this.on('btnSailDye', () => { g.rival?.toggleDye(); this.refreshPort(); });
+    this.el.rivalNotes?.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-rematch]');
+      if (!b) return;
+      this.click();
+      g.rival?.rematch(b.dataset.rematch);
+    });
     // Quests: board, tracker, journal
     this.el.questOffers?.addEventListener('click', (e) => {
       const b = e.target.closest('button[data-accept]');
@@ -651,6 +673,7 @@ export class UI {
       }
     }
     this.drawQuestMarkers(g, X, Y, k, Math.max(6, Sz / 16), R, R, R);
+    this.drawRivalMarkers(g, X, Y, k, Math.max(5, Sz / 22), false);
     // boat arrow
     g.translate(R, R);
     g.rotate((bearingDeg(b.heading) * Math.PI) / 180);
@@ -975,6 +998,7 @@ export class UI {
       g.fillStyle = '#6a2a14'; g.fillText(Wk.name, X(Wk.x), ty);
     }
     this.drawQuestMarkers(g, X, Y, z, 14 * dpr);
+    this.drawRivalMarkers(g, X, Y, z, 9 * dpr, true);
     // ship
     const b = game.boat;
     if (b) {
@@ -1149,6 +1173,12 @@ export class UI {
     let html = '';
     const sq = Qs.storyQuests;
     if (sq.length) html += `<h3 class="sectionTitle">Main story</h3><div class="grid">${sq.map((q) => this.questCard(q, 'active')).join('')}</div>`;
+    const sable = this.game.rival?.journal();
+    if (sable) {
+      html += `<h3 class="sectionTitle">Captain Sable</h3><div class="card qCard rivalLog"><div class="qTitle">${esc(sable.record)}</div>
+        ${sable.title ? `<div class="qStatus">Title: ${esc(sable.title)}</div>` : ''}
+        ${sable.learned.length ? `<ul>${sable.learned.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : '<div class="qText">You know nothing about them yet, except that they are fast.</div>'}</div>`;
+    }
     html += `<h3 class="sectionTitle">Active (${Qs.active.length}/${MAX_ACTIVE})</h3>`;
     html += Qs.active.length
       ? `<div class="grid">${Qs.active.map((q) => this.questCard(q, 'active')).join('')}</div>`
@@ -1237,7 +1267,8 @@ export class UI {
 
   /** Show the prologue or epilogue. Resolves when the player has read (or skipped) them. */
   showStoryCards(kind) {
-    const cards = kind === 'epilogue' ? EPILOGUE : PROLOGUE;
+    // 'prologue' | 'epilogue', or a deck of cards (the rival captain's scenes)
+    const cards = Array.isArray(kind) ? kind : kind === 'epilogue' ? EPILOGUE : PROLOGUE;
     this.storyDeck = cards;
     this.storyIndex = 0;
     this.storyCardsOpen = true;
@@ -1275,7 +1306,8 @@ export class UI {
   // ------------------------------------------------------------ tracker
   updateQuestTracker() {
     const g = this.game, Qs = g.quests, b = g.boat;
-    const q = Qs && (g.mode === 'sailing' || g.mode === 'docked' || g.mode === 'docking') ? Qs.pinned : null;
+    // a sea race has its own panel (and in fog the arrow would give the buoys away)
+    const q = Qs && !g.rival?.racing && (g.mode === 'sailing' || g.mode === 'docked' || g.mode === 'docking') ? Qs.pinned : null;
     const tr = this.el.questTracker, cq = this.el.compassQuest;
     if (!q) {
       if (this.last.qt !== null) { tr?.classList.add('hidden'); cq?.classList.add('hidden'); this.last.qt = null; }
@@ -1343,6 +1375,111 @@ export class UI {
     }
   }
 
+  /** Sable on the maps: the Redwing, race buoys and the Deep. */
+  drawRivalMarkers(g, X, Y, scale, s, labels) {
+    const marks = this.game.rival?.markers() || [];
+    const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 220);
+    for (const m of marks) {
+      const x = X(m.x), y = Y(m.z);
+      g.save();
+      g.lineJoin = 'round'; g.strokeStyle = '#0b1830'; g.lineWidth = Math.max(1.2, s / 6);
+      if (m.kind === 'deep') {
+        g.beginPath(); g.arc(x, y, m.r * scale, 0, TAU);
+        g.fillStyle = 'rgba(20,24,70,0.35)'; g.fill();
+        g.setLineDash([s * 0.6, s * 0.5]); g.strokeStyle = 'rgba(40,30,90,0.8)'; g.stroke(); g.setLineDash([]);
+        if (labels) {
+          g.textAlign = 'center'; g.textBaseline = 'middle';
+          g.lineWidth = s * 0.45; g.strokeStyle = 'rgba(255,248,231,0.9)'; g.strokeText(m.name, x, y);
+          g.fillStyle = '#2a1e5a'; g.fillText(m.name, x, y);
+        }
+      } else if (m.kind === 'gate') {
+        g.beginPath(); g.arc(x, y, s * (m.next ? 0.75 : 0.5), 0, TAU);
+        g.fillStyle = m.next ? `rgba(255,213,74,${pulse})` : '#fff8e7'; g.fill(); g.stroke();
+      } else {
+        // a little crimson sail
+        g.translate(x, y);
+        g.beginPath(); g.moveTo(-s * 0.1, -s * 1.1); g.lineTo(s * 0.9, s * 0.45); g.lineTo(-s * 0.1, s * 0.45); g.closePath();
+        g.fillStyle = '#e8413a'; g.fill(); g.stroke();
+        g.beginPath(); g.moveTo(-s * 0.9, s * 0.6); g.lineTo(s * 0.95, s * 0.6); g.lineTo(s * 0.6, s * 1.05); g.lineTo(-s * 0.6, s * 1.05); g.closePath();
+        g.fillStyle = '#221c26'; g.fill(); g.stroke();
+      }
+      g.restore();
+    }
+  }
+
+  // ------------------------------------------------------------ the rival
+  /** The race panel on the HUD: { title, line }, or null to hide it. */
+  setRace(info) {
+    const el = this.el.racePanel;
+    if (!el) return;
+    el.classList.toggle('hidden', !info);
+    if (!info) return;
+    this.el.rpTitle.textContent = info.title || 'Race';
+    this.el.rpLine.textContent = info.line || '';
+  }
+
+  /** Big centred "3", "2", "1", "Go!" (null clears it). */
+  countdown(text) {
+    const el = this.el.countdown;
+    if (!el) return;
+    el.classList.remove('show');
+    if (!text) { el.textContent = ''; return; }
+    el.textContent = text;
+    void el.offsetWidth;
+    el.classList.add('show');
+  }
+
+  /**
+   * Somebody calls across the water: a speech banner that plays the lines
+   * one after another without stopping the game. Resolves when they're done
+   * (or when another hail replaces them).
+   */
+  hail(speaker, lines) {
+    const el = this.el.hail;
+    if (!el || !lines?.length) return Promise.resolve();
+    const token = this.hailToken = (this.hailToken || 0) + 1;
+    clearTimeout(this.hailTimer);
+    return new Promise((resolve) => {
+      let i = 0;
+      const next = () => {
+        if (token !== this.hailToken) { resolve(); return; }
+        if (i >= lines.length) { el.classList.remove('show'); resolve(); return; }
+        const text = lines[i++];
+        this.el.hailName.textContent = speaker;
+        this.el.hailText.textContent = text;
+        el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+        this.hailTimer = setTimeout(next, Math.max(3400, 1500 + text.length * 55));
+      };
+      next();
+    });
+  }
+
+  /** Harbor talk about the Redwing, or Sable in person, above the quest offers. */
+  refreshRivalNotes() {
+    const box = this.el.rivalNotes, rv = this.game.rival, port = this.portIsland;
+    if (!box) return;
+    const n = rv && port ? rv.portNotes(port) : null;
+    let html = '';
+    if (n?.rumour) {
+      html += `<div class="card qCard rivalNote"><div class="giver"><span class="avatar" style="background:#e8413a">!</span><span><b>${esc(n.rumour.eyebrow)}</b></span></div>
+        <div class="qTitle">${esc(n.rumour.title)}</div><div class="qText">${esc(n.rumour.text)}</div></div>`;
+    }
+    if (n?.friend) {
+      const f = n.friend;
+      html += `<div class="card qCard rivalNote"><div class="giver"><span class="avatar" style="background:#e8413a">S</span><span><b>Captain Sable</b> · a friend</span></div>
+        <div class="qTitle">${esc(f.title)}</div><div class="qText">${esc(f.text)}</div>
+        <div class="qMeta"><span class="gold">${f.gold ? `${fmt(f.gold)} gold for a win` : 'Just for fun until tomorrow'}</span></div>
+        <div class="row2">${f.races.map((r) => `<button class="btn" data-rematch="${r.id}">${esc(r.title)}</button>`).join('')}</div></div>`;
+    }
+    box.innerHTML = html;
+    const dye = this.el.sailDye;
+    if (dye) {
+      dye.classList.toggle('hidden', !rv?.canDye);
+      this.el.btnSailDye.textContent = rv?.dyeOn ? RIVAL_LINES.dye.on : RIVAL_LINES.dye.off;
+      this.el.btnSailDye.classList.toggle('off', !rv?.dyeOn);
+    }
+  }
+
   refreshTailor() {
     const st = this.game.state, grid = this.el.tailorGrid;
     if (!grid) return;
@@ -1366,6 +1503,7 @@ export class UI {
     this.el.portGold.textContent = fmt(st.banked);
     this.refreshTailor();
     this.refreshQuests();
+    this.refreshRivalNotes();
     const maxH = (b && b.maxHealth) || 100;
     this.el.portHull.textContent = `Hull ${Math.ceil(st.health || 0)}/${maxH}`;
     const cost = g.repairCost ? g.repairCost() : 0;

@@ -124,6 +124,7 @@ export const STYLES = [
   S('hat', 'flowerCrown', 'Flower crown', 'found:tropical', { hint: 'Found on a tropical isle' }),
   S('hat', 'circlet', 'Gold circlet', 'found:ruins', { hint: 'Hidden in the Sunken Temple' }),
   S('hat', 'grandPith', "Grandpa's helmet", 'story', { hint: "Your grandfather's last gift" }),
+  S('hat', 'rivalTricorn', "Sable's tricorn", 'story', { hint: 'A gift from a rival captain' }),
 
   // tops (`color` is the outer layer, `shirt` the undershirt / trim)
   S('top', 'vest', 'Explorer vest'),
@@ -158,7 +159,7 @@ export const STYLES = [
 
 export const SLOTS = ['hair', 'hat', 'top', 'bottom', 'boots', 'neck', 'extra'];
 // Styles whose look is fixed (colour pickers are hidden for these)
-export const FIXED_COLOR = new Set(['hat:none', 'hat:furHood', 'hat:flowerCrown', 'hat:circlet', 'hat:grandPith',
+export const FIXED_COLOR = new Set(['hat:none', 'hat:furHood', 'hat:flowerCrown', 'hat:circlet', 'hat:grandPith', 'hat:rivalTricorn',
   'neck:none', 'neck:shells', 'neck:grandScarf', 'extra:none']);
 
 export function stylesFor(slot) { return STYLES.filter((s) => s.slot === slot); }
