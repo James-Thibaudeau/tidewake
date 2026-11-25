@@ -2,8 +2,8 @@
 // planner that lays a course of buoys in open water, and the race itself
 // (line-up, countdown, gates, a gently rubber-banded rival, the HUD line).
 //
-// The race only *moves* the rival's sloop (boat.simulate); whoever owns the
-// sloop (rival.js) animates it once a frame and decides what the result
+// The race only *moves* the rival's redwing (boat.simulate); whoever owns the
+// redwing (rival.js) animates it once a frame and decides what the result
 // means. Heading convention as everywhere: forward = (sin h, cos h).
 import * as THREE from 'three';
 import { WORLD_HALF } from './config.js';
@@ -275,17 +275,17 @@ const BAND_FAR = 150;                   // a lead this long (m) gets the full ru
 const BAND_AHEAD = 0.93, BAND_BEHIND = 1.06;
 
 /**
- * One race between the player's boat and the rival's sloop round a course
+ * One race between the player's boat and the rival's redwing round a course
  * from planCourse.
  * opts: { title, goal (HUD wording for a one-buoy sprint), fog (no beams, no
- *   map markers: buoys by compass bearing), pace (the sloop's sail value as a
+ *   map markers: buoys by compass bearing), pace (the Redwing's sail value as a
  *   fraction of the player's, default 0.94), onFinish({ won, time }) }
  * phase: 'ready' (built, not started) → 'countdown' → 'racing' → 'done'
  */
 export class SeaRace {
-  constructor(game, sloop, course, opts = {}) {
+  constructor(game, redwing, course, opts = {}) {
     this.game = game;
-    this.sloop = sloop;
+    this.redwing = redwing;
     this.course = course;
     this.opts = opts;
     this.title = opts.title || 'Race';
@@ -299,12 +299,12 @@ export class SeaRace {
     this.count = -1;         // countdown step last shown
     this.band = 1;
     this.pg = 0;             // the player's next gate
-    this.sg = 0;             // the sloop's next gate
+    this.sg = 0;             // the Redwing's next gate
     this.ahead = true;
     this.line = null;
     this.bearingT = 0;
     this.bearing = '';
-    this.helm = new AutoHelm(sloop, game.world);
+    this.helm = new AutoHelm(redwing, game.world);
     // leg lengths, and the distance still to sail after each gate
     const G = course.gates, S = course.start;
     this.after = new Array(G.length).fill(0);
@@ -363,8 +363,8 @@ export class SeaRace {
     let side = -1;
     if (G.length > 1) side = (G[1].x - G[0].x) * px + (G[1].z - G[0].z) * pz >= 0 ? 1 : -1;
     g.boat.place(S.x + px * 6 * side, S.z + pz * 6 * side, h);
-    this.sloop.place(S.x - px * 6 * side, S.z - pz * 6 * side, h);
-    this.sloop.rudder = 0;
+    this.redwing.place(S.x - px * 6 * side, S.z - pz * 6 * side, h);
+    this.redwing.rudder = 0;
     this.helm.reset();
     g.cam.yaw = h; g.cam.lastLook = -10;
     this.phase = 'countdown';
@@ -389,10 +389,10 @@ export class SeaRace {
       return;
     }
     this.clock += dt;
-    const sloop = this.sloop;
+    const redwing = this.redwing;
 
     if (this.phase === 'countdown') {
-      sloop.speed = 0; sloop.sailLevel = 0;
+      redwing.speed = 0; redwing.sailLevel = 0;
       const step = Math.min(3, Math.floor(this.clock / COUNT_STEP));
       if (step !== this.count) {
         this.count = step;
@@ -411,21 +411,21 @@ export class SeaRace {
 
     // ---- racing
     this.time += dt;
-    const G = this.course.gates, pb = g.boat.pos, sb = sloop.pos;
+    const G = this.course.gates, pb = g.boat.pos, sb = redwing.pos;
     const left = (pos, i) => Math.hypot(G[i].x - pos.x, G[i].z - pos.z) + this.after[i];
-    // how far the sloop leads, in metres of course still to sail
+    // how far the Redwing leads, in metres of course still to sail
     const lead = left(pb, this.pg) - left(sb, this.sg);
 
-    // gentle rubber band: the sloop eases off when well ahead, presses on when well behind
+    // gentle rubber band: the Redwing eases off when well ahead, presses on when well behind
     const k = clamp(lead / BAND_FAR, -1, 1);
     this.band = damp(this.band, k > 0 ? lerp(1, BAND_AHEAD, k) : lerp(1, BAND_BEHIND, -k), 0.5, dt);
-    const up = sloop.up || (sloop.up = { sail: 1, rudder: 1.25, keel: 0.6, hull: 150, lantern: 48 });
+    const up = redwing.up || (redwing.up = { sail: 1, rudder: 1.25, keel: 0.6, hull: 150, lantern: 48 });
     up.sail = g.upv.sail * this.pace * this.band;
     up.rudder = Math.max(1.25, g.upv.rudder);
 
     const sgate = G[this.sg];
     const ctl = this.helm.update(dt, sgate.x, sgate.z, wind);
-    sloop.simulate(dt, ctl, wind, g.world, up); // a rival's knocks don't count
+    redwing.simulate(dt, ctl, wind, g.world, up); // a rival's knocks don't count
 
     // ---- gates, in order; the first boat through the last one ends it
     const pgate = G[this.pg];

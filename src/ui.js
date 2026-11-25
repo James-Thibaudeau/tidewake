@@ -80,17 +80,17 @@ const smallBoat = (x, y, s = 1, patch = true) => `<g transform="translate(${x} $
   <path d="M0 -46 l9 3 -9 3" fill="#c8322b" stroke="#2a1d12" stroke-width="1.5"/></g>`;
 const rocks = (x) => `<g transform="translate(${x} 0)"><path d="M0 116 L6 52 L30 44 L40 116 Z" fill="#8f877d" ${INK}/><path d="M6 52 L30 44 L28 54 L8 58 Z" fill="#6fae55" ${INK}/>
   <path d="M34 116 L40 76 L60 72 L66 116 Z" fill="#7d766d" ${INK}/><path d="M40 76 L60 72 L59 79 L41 81Z" fill="#6fae55" stroke="#2a1d12" stroke-width="2"/></g>`;
-const sloopArt = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})">
+const redwingArt = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${s})">
   <path d="M-30 0 H30 L20 13 H-20 Z" fill="#221c26" ${INK}/><path d="M-28 3 H27" stroke="#b81f2e" stroke-width="3"/><path d="M0 0 V-54" ${INK}/>
   <path d="M3 -52 L36 -6 H3 Z" fill="#b81f2e" ${INK}/><path d="M-3 -46 L-26 -6 H-3 Z" fill="#b81f2e" ${INK}/>
   <path d="M0 -54 l10 3 -10 3" fill="#fff4dc" stroke="#2a1d12" stroke-width="1.5"/></g>`;
 const STORY_ART = {
-  sloop: () => sky('#ffd9a8', '#bfe0f2') + `<circle cx="258" cy="42" r="16" fill="#ffd54a" ${INK}/>${sloopArt(150, 116, 1.35)}${smallBoat(262, 118, 0.6)}`,
+  redwing: () => sky('#ffd9a8', '#bfe0f2') + `<circle cx="258" cy="42" r="16" fill="#ffd54a" ${INK}/>${redwingArt(150, 116, 1.35)}${smallBoat(262, 118, 0.6)}`,
   deep: () => sky('#2a2a52', '#5a4a7a', '#1d2a55', '#141d40') + `<circle cx="250" cy="34" r="12" fill="#e8ecff" ${INK}/>
     <ellipse cx="150" cy="146" rx="96" ry="16" fill="#0c1230" opacity=".75"/>
     <path d="M70 150 q-6 -46 16 -62 q16 -10 22 4 q-14 0 -18 14 q-4 20 4 44z" fill="#5a2f6e" ${INK}/>
     <path d="M214 152 q12 -40 -6 -58 q-12 -10 -20 0 q12 2 14 14 q2 20 -8 44z" fill="#5a2f6e" ${INK}/>
-    <circle cx="136" cy="146" r="4" fill="#ffd54a"/><circle cx="162" cy="146" r="4" fill="#ffd54a"/>${sloopArt(280, 116, 0.5)}${smallBoat(40, 118, 0.5)}`,
+    <circle cx="136" cy="146" r="4" fill="#ffd54a"/><circle cx="162" cy="146" r="4" fill="#ffd54a"/>${redwingArt(280, 116, 0.5)}${smallBoat(40, 118, 0.5)}`,
   harbor: () => sky('#ffe3b0', '#9fd0ee') + `<circle cx="258" cy="40" r="18" fill="#ffd54a" ${INK}/>
     <path d="M0 112 Q50 60 120 70 T200 112 Z" fill="#6cc24a" ${INK}/><path d="M60 80 h22 v14 h-22z M100 74 h18 v12 h-18z" fill="#ead7b0" ${INK}/>
     <path d="M56 80 l15 -12 15 12 M97 74 l12 -10 12 10" fill="#c2573f" ${INK}/>
@@ -1374,7 +1374,7 @@ export class UI {
     }
   }
 
-  /** Sable on the maps: the crimson sloop, race buoys and the Deep. */
+  /** Sable on the maps: the Redwing, race buoys and the Deep. */
   drawRivalMarkers(g, X, Y, scale, s, labels) {
     const marks = this.game.rival?.markers() || [];
     const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 220);
@@ -1453,7 +1453,7 @@ export class UI {
     });
   }
 
-  /** Harbor talk about the crimson sloop, or Sable in person, above the quest offers. */
+  /** Harbor talk about the Redwing, or Sable in person, above the quest offers. */
   refreshRivalNotes() {
     const box = this.el.rivalNotes, rv = this.game.rival, port = this.portIsland;
     if (!box) return;

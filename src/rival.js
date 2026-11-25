@@ -1,8 +1,8 @@
-// The rival captain. Sable keeps turning up in a sloop with crimson sails:
+// The rival captain. Sable keeps turning up in a ship with crimson sails:
 // races at sea and on foot, a tow after a storm, a letter, and at the end a
 // rescue from the kraken (see docs/rival-captain.md). This module owns the
 // story state, decides when and where each encounter happens, and drives the
-// sloop between the set pieces; the races, the tow line and the kraken live
+// redwing between the set pieces; the races, the tow line and the kraken live
 // in race.js, tow.js, kraken.js and ashore/pacer.js.
 //
 // state.rival = { chapter, wins, losses, flags }
@@ -23,9 +23,12 @@ import { Kraken } from './kraken.js';
 import { SPEAKER, CRIMSON, SABLE_PROFILE, SABLE_LIVERY, ENCOUNTERS, LETTER, DEEP, CARDS, REWARDS, TITLE, FRIEND, LINES } from './rival-text.js';
 
 export const FINAL_CHAPTER = 8;
-const SEE = 950;          // the sloop appears when you're this close to where it waits
+const SEE = 950;          // the Redwing appears when you're this close to where it waits
 const HAIL = 62;          // close enough to shout across the water
 const TOW_DRIVE = 0.72;   // how much of your sail's drive is left with a ship in tow
+// Sable's ship keeps up with yours: every part is at least this tier, and
+// matches yours once you've passed it (so she grows into a galleon when you do).
+const SHIP_FLOOR = { sail: 2, hull: 1, rudder: 2, keel: 1, lantern: 1, spyglass: 0 };
 const POINTS = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];
 const dirWord = (dx, dz) => POINTS[Math.round(bearingDeg(headingOf(dx, dz)) / 45) % 8];
 const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] ?? m));
@@ -36,7 +39,7 @@ export class Rival {
   constructor(game) {
     this.game = game;
     this.act = null;        // what Sable is doing right now (never saved)
-    this.sloop = null;      // built the first time it's needed
+    this.redwing = null;      // built the first time it's needed
     this.cool = 12;         // seconds before the next spawn attempt
     this.flareT = 0;
     this._dye = null;
@@ -44,6 +47,7 @@ export class Rival {
     ev.on('dock', (port) => this.onDock(port));
     ev.on('wreck', () => this.onWreck());
     ev.on('ashore:leave', () => this.onLeaveIsland());
+    ev.on('upgrade', () => this.syncShip());
     ev.on('story:chest', () => { if (this.R.flags.met) game.ui.toast(LETTER.found.text, 'info'); });
   }
 
@@ -193,20 +197,34 @@ export class Rival {
   /** The place for an encounter (by id), with the words that describe it. */
   placeFor(enc) { return this.places[enc.id] || null; }
 
-  // ---------------------------------------------------------------- the sloop
-  ensureSloop() {
-    if (this.sloop) return this.sloop;
+  // ---------------------------------------------------------------- the Redwing
+  ensureRedwing() {
+    if (this.redwing) return this.redwing;
     const s = new Boat(this.game.scene, { npc: true, profile: SABLE_PROFILE, livery: SABLE_LIVERY });
     s.up = { sail: 1.5, rudder: 1.5, keel: 0.6, hull: 220, lantern: 48 };
-    s.applyUpgrades({ sail: 2, hull: 1, rudder: 2, keel: 1, lantern: 1, spyglass: 0 }, s.up);
+    this.redwing = s;
+    this._shipKey = null;
+    this.syncShip();
     s.setVisible(false);
-    this.sloop = s;
     this.helm = new AutoHelm(s, this.world);
     return s;
   }
 
-  showSloop(x, z, heading, { dismasted = false, crew = true } = {}) {
-    const s = this.ensureSloop();
+  /** Rig Sable's ship to match the player's upgrades (never below SHIP_FLOOR). */
+  syncShip() {
+    const s = this.redwing, up = this.game.state.upgrades;
+    if (!s) return;
+    const lv = {};
+    for (const k of Object.keys(SHIP_FLOOR)) lv[k] = Math.max(SHIP_FLOOR[k], up[k] || 0);
+    const key = Object.values(lv).join('');
+    if (key === this._shipKey) return;
+    this._shipKey = key;
+    s.applyUpgrades(lv, s.up); // keeps a broken mast broken
+  }
+
+  showRedwing(x, z, heading, { dismasted = false, crew = true } = {}) {
+    const s = this.ensureRedwing();
+    this.syncShip();
     s.place(x, z, heading);
     s.setDismasted(dismasted);
     s.setCharacterVisible(crew);
@@ -214,7 +232,7 @@ export class Rival {
     return s;
   }
 
-  hideSloop() { this.sloop?.setVisible(false); }
+  hideRedwing() { this.redwing?.setVisible(false); }
 
   /** Beside the pier, on the far side from where the player ties up. */
   mooring(port) {
@@ -241,7 +259,7 @@ export class Rival {
     if (this.R.chapter === 7) this.updateFlare(dt, elapsed);
     else if (this.flare) this.endFlare();
 
-    const s = this.sloop;
+    const s = this.redwing;
     if (s && s.group.visible) {
       this.keepApart(s);
       s.animate(dt, elapsed, wind, 1, g.env.night, s.up);
@@ -265,7 +283,7 @@ export class Rival {
     const a = this.act;
     if (a) { a.race?.dispose(); a.tow?.dispose(); a.kraken?.dispose(); }
     this.act = null;
-    this.hideSloop();
+    this.hideRedwing();
     this.game.ui.setRace?.(null);
   }
 
@@ -300,7 +318,7 @@ export class Rival {
       const port = R.chapter === 6 ? this.world.islands[R.flags.port] : this.friendPort();
       if (port && dist(b, port.dock) < SEE) {
         const m = this.mooring(port);
-        this.showSloop(m.x, m.z, m.heading);
+        this.showRedwing(m.x, m.z, m.heading);
         this.act = { type: 'waiting', x: port.dock.x, z: port.dock.z, port: port.id };
       }
     } else if (R.chapter === 8 && R.flags.rematch?.island != null) {
@@ -322,8 +340,8 @@ export class Rival {
       const a = p.heading + off, x = b.x + Math.sin(a) * 250, z = b.z + Math.cos(a) * 250;
       if (!this.isOpen(x, z, 60)) continue;
       // heading across the player's course
-      this.showSloop(x, z, p.heading - Math.sign(off) * 1.9);
-      this.sloop.sailLevel = 2; this.sloop.speed = 6;
+      this.showRedwing(x, z, p.heading - Math.sign(off) * 1.9);
+      this.redwing.sailLevel = 2; this.redwing.speed = 6;
       this.act = { type: 'approach', enc, hailed: false, t: 0 };
       g.ui.banner(LINES.sighted, enc.title);
       g.audio.play('discover');
@@ -335,8 +353,8 @@ export class Rival {
 
   /** Later sea encounters: Sable is already out there, sailing lazy circles. */
   spawnAt(enc, at) {
-    this.showSloop(at.x, at.z, this.game.weather.windAngle + Math.PI / 2);
-    this.sloop.sailLevel = 1;
+    this.showRedwing(at.x, at.z, this.game.weather.windAngle + Math.PI / 2);
+    this.redwing.sailLevel = 1;
     this.act = { type: 'approach', enc, hailed: false, t: 0, home: { x: at.x, z: at.z }, loiter: 0 };
     if (enc.kind === 'fog') this.fogIn();
   }
@@ -345,7 +363,7 @@ export class Rival {
   fogIn() { const w = this.game.weather; w.set('fog'); w.timer = Math.max(w.timer, 420); }
 
   updateApproach(dt, wind, act) {
-    const s = this.sloop, p = this.player, d = dist(s.pos, p.pos);
+    const s = this.redwing, p = this.player, d = dist(s.pos, p.pos);
     act.t += dt;
     s.up.sail = Math.max(1.3, this.game.upv.sail * 1.05);
     s.up.rudder = Math.max(1.5, this.game.upv.rudder);
@@ -388,7 +406,8 @@ export class Rival {
       course = planCourse(this.world, origin, { ...spec, heading: t ? undefined : (from?.heading ?? p.heading), windAngle: g.weather.windAngle, rng });
     }
     if (!course) { g.ui.toast('There\'s no room to race here. Sail out into open water.', 'info'); return false; }
-    const s = this.ensureSloop();
+    const s = this.ensureRedwing();
+    this.syncShip();
     s.setDismasted(false); s.setCharacterVisible(true); s.setVisible(true);
     const race = new SeaRace(g, s, course, { title: enc.title, fog: enc.kind === 'fog', pace: rematch ? 0.97 : 0.94,
       onFinish: (res) => this.finishRace(enc, res, rematch) });
@@ -415,7 +434,7 @@ export class Rival {
     this.act.race.dispose();
     this.settle(enc, won, rematch);
     // Sable sails off
-    const s = this.sloop, p = this.player;
+    const s = this.redwing, p = this.player;
     const away = Math.atan2(s.pos.x - p.pos.x, s.pos.z - p.pos.z);
     this.act = { type: 'depart', t: 0, x: s.pos.x + Math.sin(away) * 2500, z: s.pos.z + Math.cos(away) * 2500 };
     g.cam.lastLook = -10;
@@ -451,7 +470,7 @@ export class Rival {
   }
 
   updateDepart(dt, wind, act) {
-    const s = this.sloop;
+    const s = this.redwing;
     act.t += dt;
     s.up.sail = Math.max(1.5, this.game.upv.sail * 1.1);
     s.simulate(dt, this.helm.update(dt, act.x, act.z, wind, { sail: 2 }), wind, this.world, s.up);
@@ -459,7 +478,7 @@ export class Rival {
   }
 
   // ------------------------------------------------------------ on foot
-  /** Sable's sloop rides at anchor off the island while they wait ashore. */
+  /** The Redwing rides at anchor off the island while they wait ashore. */
   anchorOff(I, b) {
     const W = this.world;
     const a0 = Math.atan2(b.z - I.z, b.x - I.x);
@@ -470,12 +489,12 @@ export class Rival {
         const x = I.x + Math.cos(a) * d, z = I.z + Math.sin(a) * d;
         if (W.heightAt(x, z) > -5) continue;
         if (W.rockHit(x + Math.cos(a) * 14, z + Math.sin(a) * 14, 12)) break;
-        this.showSloop(x + Math.cos(a) * 14, z + Math.sin(a) * 14, headingOf(-Math.sin(a), Math.cos(a)), { crew: false });
+        this.showRedwing(x + Math.cos(a) * 14, z + Math.sin(a) * 14, headingOf(-Math.sin(a), Math.cos(a)), { crew: false });
         this.act = { type: 'waiting', x: I.x, z: I.z, island: I.id };
         return;
       }
     }
-    this.act = { type: 'waiting', x: I.x, z: I.z, island: I.id }; // no room for the sloop: Sable is still ashore
+    this.act = { type: 'waiting', x: I.x, z: I.z, island: I.id }; // no room for the Redwing: Sable is still ashore
   }
 
   /**
@@ -502,7 +521,7 @@ export class Rival {
   }
 
   onLeaveIsland() {
-    // back aboard after a race ashore: the sloop has gone (Sable left first)
+    // back aboard after a race ashore: the Redwing has gone (Sable left first)
     if (this.act?.type === 'waiting' && this.act.island != null && !this.landEncounter(this.world.islands[this.act.island])) {
       this.clearAct();
       this.cool = 30;
@@ -511,12 +530,12 @@ export class Rival {
 
   // ---------------------------------------------------------- dismasted
   setAdrift(at) {
-    this.showSloop(at.x, at.z, 1.3, { dismasted: true });
+    this.showRedwing(at.x, at.z, 1.3, { dismasted: true });
     this.act = { type: 'adrift', x: at.x, z: at.z, hailed: false };
   }
 
   updateAdrift(dt, elapsed, act) {
-    const s = this.sloop, d = dist(s.pos, this.player.pos);
+    const s = this.redwing, d = dist(s.pos, this.player.pos);
     s.speed = 0; s.sailLevel = 0;
     s.heading += Math.sin(elapsed * 0.21) * 0.05 * dt; // swinging slowly on the swell
     if (!act.hailed && d < HAIL) { act.hailed = true; this.R.flags.met = true; this.say(ENCOUNTERS[5].hail); }
@@ -524,7 +543,7 @@ export class Rival {
   }
 
   throwLine() {
-    const g = this.game, s = this.sloop;
+    const g = this.game, s = this.redwing;
     this.act = { type: 'tow', tow: new TowLine(g.scene, this.player, s, { length: 16 }), t: 0 };
     g.audio.play('treasure');
     g.ui.toast(LINES.towSlow, 'info');
@@ -586,7 +605,7 @@ export class Rival {
 
   startKraken() {
     const g = this.game, D = this.places.deep;
-    const s = this.showSloop(D.x, D.z, 0.6);
+    const s = this.showRedwing(D.x, D.z, 0.6);
     const kraken = new Kraken(g, s, D, {
       onRescue: () => this.rescued(),
       onCaught: () => this.say(DEEP.caught),
@@ -640,10 +659,10 @@ export class Rival {
   interaction(x, z, speed) {
     const act = this.act;
     if (!act) return null;
-    if (act.type === 'approach' && act.hailed && dist(this.sloop.pos, { x, z }) < 130) {
+    if (act.type === 'approach' && act.hailed && dist(this.redwing.pos, { x, z }) < 130) {
       return { prompt: act.enc.prompt, action: () => this.startRace(act.enc) };
     }
-    if (act.type === 'adrift' && dist(this.sloop.pos, { x, z }) < 24) {
+    if (act.type === 'adrift' && dist(this.redwing.pos, { x, z }) < 24) {
       if (Math.abs(speed) >= 8) return { prompt: 'Slow down to throw a line' };
       return { prompt: ENCOUNTERS[5].prompt, action: () => this.throwLine() };
     }
@@ -658,7 +677,7 @@ export class Rival {
     if (this.act?.type === 'tow') {
       this.act.tow.dispose();
       const m = this.mooring(port);
-      this.showSloop(m.x, m.z, m.heading);
+      this.showRedwing(m.x, m.z, m.heading);
       this.act = { type: 'waiting', x: port.dock.x, z: port.dock.z, port: port.id };
       this.advance();
       R.flags.port = port.id;
@@ -815,9 +834,9 @@ export class Rival {
 
   /** Where the tracker points: { x, z, r?, label }. Always set when quests() has an entry. */
   target() {
-    const R = this.R, act = this.act, P = this.places, b = this.player.pos, s = this.sloop;
+    const R = this.R, act = this.act, P = this.places, b = this.player.pos, s = this.redwing;
     if (act?.type === 'tow') { const port = this.nearestPort(b.x, b.z); return { x: port.dock.x, z: port.dock.z, label: `Tow Sable to ${port.name}` }; }
-    if (act?.type === 'approach' || act?.type === 'adrift') return { x: s.pos.x, z: s.pos.z, label: act.type === 'adrift' ? 'A ship without a mast' : 'Hail the crimson sloop' };
+    if (act?.type === 'approach' || act?.type === 'adrift') return { x: s.pos.x, z: s.pos.z, label: act.type === 'adrift' ? 'A ship without a mast' : 'Hail the crimson sails' };
     if (R.chapter === 6) { const D = this.world.islands[R.flags.port].dock; return { x: D.x, z: D.z, label: `Sable is at ${this.world.islands[R.flags.port].name}` }; }
     if (R.chapter === 7) {
       const D = P.deep;
@@ -845,7 +864,7 @@ export class Rival {
   markers() {
     const out = [], R = this.R;
     if (this.racing) for (const gt of this.act.race.gates) if (!gt.passed) out.push({ x: gt.x, z: gt.z, kind: 'gate', next: !!gt.next });
-    if (this.sloop?.group.visible) out.push({ x: this.sloop.pos.x, z: this.sloop.pos.z, kind: 'sable', heading: this.sloop.heading });
+    if (this.redwing?.group.visible) out.push({ x: this.redwing.pos.x, z: this.redwing.pos.z, kind: 'sable', heading: this.redwing.heading });
     if (R.chapter >= 7 && (R.flags.flare || R.chapter === FINAL_CHAPTER)) out.push({ ...this.places.deep, kind: 'deep', name: DEEP.name });
     return out;
   }

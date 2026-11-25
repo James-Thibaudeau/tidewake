@@ -6,8 +6,11 @@
 // {a} and {b} are filled in by rival.js. Plain ASCII apostrophes throughout.
 
 export const SPEAKER = 'Captain Sable';
+export const SHIP = 'the Redwing';
 
-// Sable's look: a fixed profile for the explorer rig, and the sloop's colours.
+// Sable's look: a fixed profile for the explorer rig, and the colours of their
+// ship, the Redwing. (She is rigged to match the player's upgrades, so she is
+// never called a sloop: late in the game she is a galleon.)
 export const CRIMSON = '#b81f2e';
 export const SABLE_PROFILE = {
   name: 'Sable',
@@ -40,10 +43,10 @@ export const ENCOUNTERS = [
   {
     id: 'bows', kind: 'sprint', title: 'Crossed bows', gold: 60,
     rumour: null,
-    step: { title: 'Crimson sails', text: 'A sloop with crimson sails is cutting across your bow. See what its captain wants.' },
+    step: { title: 'Crimson sails', text: 'A ship with crimson sails is cutting across your bow. See what her captain wants.' },
     hail: [
       "Ahoy! That's the old captain's spyglass on your belt. I'd know that brass anywhere.",
-      "So you're the grandchild. I'm Sable. My grandmother chased your grandfather across every sea on the chart.",
+      "So you're the grandchild. I'm Sable, and this is the Redwing. My grandmother chased your grandfather across every sea on the chart.",
       "Race me to the point. Let's see if it runs in the family.",
     ],
     prompt: 'Race Sable to the point',
@@ -54,7 +57,7 @@ export const ENCOUNTERS = [
   },
   {
     id: 'open', kind: 'buoys', title: 'Open water', gold: 120,
-    rumour: 'A sloop with crimson sails has been tacking back and forth between {a} and {b}. Waiting for someone, by the look of it.',
+    rumour: 'The Redwing, that ship with the crimson sails, has been tacking back and forth between {a} and {b}. Waiting for someone, by the look of it.',
     step: { title: 'Open water', text: 'Crimson sails were seen between {a} and {b}. Find Sable out on the open water.' },
     hail: [
       "There you are! I was starting to think you'd stayed in the harbor.",
@@ -84,22 +87,22 @@ export const ENCOUNTERS = [
   },
   {
     id: 'fog', kind: 'fog', title: 'Fog run', gold: 200,
-    rumour: 'Some mad sailor in a red-sailed sloop is setting bell buoys in the fog banks off {place}.',
+    rumour: 'The Redwing is out in the fog banks off {place}, and her captain is setting bell buoys. Mad as a gull.',
     step: { title: 'Fog run', text: 'Sable is setting buoys in the fog off {place}. Go and find out why.' },
     hail: [
       'Can you even see me? Good. That is the idea.',
       'Three bell buoys in the fog. No beams and no chart marks. Just your compass, and that spyglass if you are clever.',
-      "I know these rocks. I had to learn them. Everything I own is this sloop, so I can't afford to scratch her.",
+      "I know these rocks. I had to learn them. Everything I own is the Redwing, so I can't afford to scratch her.",
     ],
     prompt: 'Race Sable through the fog',
     win: ["Through the fog and ahead of me. I'm impressed, and I don't like it."],
     lose: ['Mine! You sailed that blind better than most, though.'],
     after: ["Do you know what she cost me? The house. Grandmother's house, on the hill above the harbor. A house can't win a race. That's what I told myself."],
-    learned: "Sable sold their family home to buy the sloop. It was their grandmother's house.",
+    learned: "Sable sold their family home to buy the Redwing. It was their grandmother's house.",
   },
   {
     id: 'relics', kind: 'relics', title: 'Relic scramble', gold: 250,
-    rumour: 'That crimson sloop went by, heading for {place}. The captain was asking about old carvings.',
+    rumour: 'The Redwing went by, heading for {place}. Her captain was asking about old carvings.',
     step: { title: 'Relic scramble', text: 'Sable is hunting old carvings on {place}. Drop anchor there and go ashore.' },
     hail: [
       'There are old carvings all over this island. Little stone idols. First to find three wins.',
@@ -116,7 +119,7 @@ export const ENCOUNTERS = [
     id: 'mast', kind: 'tow', title: 'Dismasted', gold: 0,
     rumour: 'The storm took a mast off somebody last night. A fishing boat saw crimson canvas in the water, far out to the {dir}.',
     step: { title: 'Dismasted', text: 'Crimson canvas was seen in the water far out to the {dir} of {place}. Somebody may need help.' },
-    towStep: { title: 'Dismasted', text: "Tow Sable's sloop to a port. You're slower with a ship behind you." },
+    towStep: { title: 'Dismasted', text: "Tow the Redwing to a port. You're slower with a ship behind you." },
     hail: [
       '...{captain}? Of all the sails on all the sea.',
       "The storm took my mast in the night. I've been drifting ever since. Don't say anything.",
@@ -150,20 +153,20 @@ export const DEEP = {
   towStep: { title: 'The Deep', text: 'Tow Sable out of the Deep. The kraken can\'t follow into the shallows.' },
 };
 
-// Story cards. art: one of ui.js STORY_ART ('harbor' | 'boat' | 'wreck' | 'letters' | 'sunset' | 'home' | 'sloop' | 'deep')
+// Story cards. art: one of ui.js STORY_ART ('harbor' | 'boat' | 'wreck' | 'letters' | 'sunset' | 'home' | 'redwing' | 'deep')
 export const CARDS = {
   mast: [
-    { art: 'sloop', title: 'Dismasted',
-      text: 'You bring the sloop in on the end of a rope, her broken mast trailing canvas. Nobody on the pier laughs. Sable notices that.' },
+    { art: 'redwing', title: 'Dismasted',
+      text: 'You bring the Redwing in on the end of a rope, her broken mast trailing canvas. Nobody on the pier laughs. Sable notices that.' },
     { art: 'harbor',
       text: "\"I've won more races than anyone alive,\" Sable says, watching the shipwrights lift the new mast. \"Lately I've wondered what I'd do if I stopped. I honestly don't know. I've never tried it.\"" },
-    { art: 'sloop',
+    { art: 'redwing',
       text: "\"Thank you for the tow, {captain}. I'll be here a while, refitting. If you ever find anything of the old captain's with my family's name on it... well. You'd know where I am.\"" },
   ],
   letter: [
     { art: 'letters', title: 'The other letter',
       text: "At the bottom of the bundle was one envelope that wasn't for Grandma. In your grandfather's crooked hand: \"To the captain of the crimson sails.\"" },
-    { art: 'sloop',
+    { art: 'redwing',
       text: "Sable turns it over twice and doesn't open it. \"He wrote to her? He never wrote to anyone. She would have... no. Not now. I've one more thing to do first.\"" },
     { art: 'sunset',
       text: "\"There's a trench past the edge of the old charts. They call it the Deep. She never crossed it, and neither did he. If I do, I've beaten them both. Then I'll read your letter.\" The crimson sails are gone on the evening tide." },
@@ -177,7 +180,7 @@ export const CARDS = {
       text: "\"To the captain of the crimson sails. You were always the faster. I only ever won when you let me, and I knew it, and I never said. Go home sometimes. I should have. Yours, from the slow boat.\"" },
     { art: 'sunset',
       text: "Sable folds it very small. \"She kept every one of his race flags, you know. I thought it was to gloat.\" A long breath. \"I think I'd like to see my own harbor again. Would you come and race me there? Just for fun, this time.\"" },
-    { art: 'sloop',
+    { art: 'redwing',
       text: "They take off their hat and set it on your head. \"For the tow. Both of them. And have the crimson for your sails, {captain}. It suits a friend of the family.\"" },
   ],
 };
@@ -199,7 +202,7 @@ export const FRIEND = {
     "I've taken on a ship's cat. It counts as crew. Don't laugh.",
     'Fancy a race? No stakes. All right, small stakes.',
   ],
-  card: { title: 'Captain Sable is in port', text: 'The crimson sloop is tied up along the pier. Sable is up for a rematch of any of your old races, for a small purse.' },
+  card: { title: 'Captain Sable is in port', text: 'The Redwing is tied up along the pier. Sable is up for a rematch of any of your old races, for a small purse.' },
   rematchGold: 80,
   rematchWin: ['Yours! I am out of practice at losing. I rather like it.'],
   rematchLose: ['Mine! Same again tomorrow?'],
@@ -212,7 +215,7 @@ export const LINES = {
   sighted: 'Crimson sails ahead!',
   left: 'You left the race. Sable will find you again.',
   wrecked: 'The race is off. Sable will find you again.',
-  towLost: "The tow line parted. Sable's sloop is adrift where you found her.",
+  towLost: "The tow line parted. The Redwing is adrift where you found her.",
   towSlow: 'Towing: your ship is slower',
   dye: { on: 'Sails: Crimson', off: 'Sails: Standard' },
   record: 'Races with Sable: {wins} won, {losses} lost',

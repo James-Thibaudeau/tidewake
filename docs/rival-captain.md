@@ -8,9 +8,14 @@ decisions made along the way.
 
 - **No Phase 7 director yet.** The plan delivers encounters through the
   Phase 7 event director, which isn't built. `rival.js` schedules its own
-  encounters (a rumour at a port, a search circle, the sloop spawned when
+  encounters (a rumour at a port, a search circle, the Redwing spawned when
   you get near). When Phase 7 lands, the director can call
   `rival.spawn()` instead; nothing else changes.
+- **The Redwing.** Sable's ship has a name (chosen 2026-11-25) because she
+  isn't always a sloop: her sails, hull, helm, keel, lantern and crow's nest
+  take the same tiers as the player's ship, never below a Clipper Rig on an
+  Oak hull (`SHIP_FLOOR` in `rival.js`). Her speed in a race was already a
+  fraction of the player's.
 - **Sable** keeps the working name, uses they/them, and wears a dark
   tricorn with a crimson plume. Their grandmother is "the captain of the
   crimson sails", never named, like your grandparents.
@@ -48,7 +53,7 @@ Encounters need a new in-game day between them, so they don't chain.
 
 ```
 src/
-  rival.js          chapters, conditions, encounter places, rumours, the sloop,
+  rival.js          chapters, conditions, encounter places, rumours, the Redwing,
                     tow encounter, letter, flare, rewards, rematches, quest/tracker glue
   rival-text.js     every line Sable says, quest steps and story cards
   race.js           AutoHelm (AI helmsman), planCourse, SeaRace
@@ -89,9 +94,9 @@ class AutoHelm {
 planCourse(world, from {x, z}, opts { legs, legLen: [min, max], heading?, windAngle, rng })
   → { start: { x, z, heading }, gates: [{ x, z, r }], length } | null
 class SeaRace {
-  constructor(game, sloop, course, opts { title, fog, pace, onFinish({ won, time }) })
+  constructor(game, redwing, course, opts { title, fog, pace, onFinish({ won, time }) })
   start()            // line both boats up, sails furled, then 3-2-1-Go (ui.countdown)
-  update(dt, wind)   // drives the sloop (simulate), checks gates, updates ui.setRace
+  update(dt, wind)   // drives the Redwing (simulate), checks gates, updates ui.setRace
   hold               // true until "Go": the player's boat must not move
   phase              // 'countdown' | 'racing' | 'done'
   gates, playerGate  // for map markers; in fog there are none
@@ -100,7 +105,7 @@ class SeaRace {
 }
 ```
 
-`Rival.update` calls `sloop.animate(...)` once a frame, after whichever
+`Rival.update` calls `redwing.animate(...)` once a frame, after whichever
 driver moved it. Drivers only move the boat (`simulate`, or `pos`,
 `heading`, `speed`, `sailLevel`).
 
@@ -118,7 +123,7 @@ class TowLine {
 
 ```js
 class Kraken {
-  constructor(game, sloop, site { x, z, r }, opts { onRescue(), onCaught() })
+  constructor(game, redwing, site { x, z, r }, opts { onRescue(), onCaught() })
   update(dt, elapsed)       // tentacles (shadow and bubbles, then the slam), hit tests, the tow
   interaction(x, z, speed)  // { prompt, action? } | null: "Throw Sable a line", "Raise your lantern"
   phase                     // 'approach' | 'tow' | 'done'

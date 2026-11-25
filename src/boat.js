@@ -1,6 +1,6 @@
 // A sailboat: model (with tiered visual upgrades), sailing physics,
 // collisions, wake particles, and the explorer at the helm. The player's boat
-// is `new Boat(scene)`; a second, computer-sailed boat (the rival's sloop) is
+// is `new Boat(scene)`; a second, computer-sailed boat (the rival's redwing) is
 // `new Boat(scene, { npc: true, profile, livery })`.
 import * as THREE from 'three';
 import { toon, toonGradient, toonMaterial, outlineMaterial, glowBoost } from './toon.js';

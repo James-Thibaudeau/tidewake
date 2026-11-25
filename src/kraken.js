@@ -1,6 +1,6 @@
-// The kraken: the finale of the rival captain's story. Sable's sloop is held
+// The kraken: the finale of the rival captain's story. The Redwing is held
 // fast in the middle of a deep-water trench, and the player has to steer
-// through the tentacles, throw a line and tow the sloop out to where the
+// through the tentacles, throw a line and tow the Redwing out to where the
 // creature can't follow.
 //
 // There is no combat and no hull damage. Every tentacle announces itself (a
@@ -9,11 +9,11 @@
 // the trench edge to try again.
 //
 // This module owns the set piece only: tentacles, shadows, bubbles, the
-// creature's eyes, the coil round the sloop and the tow line. rival.js owns
-// the sloop itself (and animates it), the dialogue and what happens next.
+// creature's eyes, the coil round the Redwing and the tow line. rival.js owns
+// the Redwing itself (and animates it), the dialogue and what happens next.
 //
-//   phase 'approach'  the sloop is held at the centre; reach it and throw a line
-//   phase 'tow'       line attached; haul the sloop out past site.r
+//   phase 'approach'  the Redwing is held at the centre; reach it and throw a line
+//   phase 'tow'       line attached; haul the Redwing out past site.r
 //   phase 'done'      clear of the trench (opts.onRescue has been called)
 import * as THREE from 'three';
 import { waveHeight, waveUniforms, WAVE_GLSL } from './waves.js';
@@ -22,7 +22,7 @@ import { clamp, lerp, smoothstep, damp, TAU } from './util.js';
 import { TowLine } from './tow.js';
 
 // ---------------------------------------------------------------- tuning
-const N_TENT = 7;            // tentacles that strike (one more slot is the coil round the sloop)
+const N_TENT = 7;            // tentacles that strike (one more slot is the coil round the Redwing)
 const MAX_ACTIVE = 3;        // telegraphing or striking at once
 const N_SEG = 22;            // body segments per tentacle
 const LEN = 28;              // tentacle length (u)
@@ -33,7 +33,7 @@ const T_TELE = 2.2, T_RISE = 0.9, T_SLAM = 0.35, T_LIE = 0.6, T_SINK = 0.9, T_DU
 const HIT_WINDOW = 0.3;      // how long a landed slam can catch you
 const WAIT = [1.5, 4];       // rest between strikes (s)
 const RISE_FRAC = 0.66;      // how much of the tentacle stands out of the water before the slam (≈ 18u)
-const SLOOP_CLEAR = 14;      // no slam this close to the held sloop
+const REDWING_CLEAR = 14;      // no slam this close to the held Redwing
 const PLAYER_CLEAR = 9;      // no telegraph starts this close to the player
 const LINE_RANGE = 20, LINE_SPEED = 8;  // throwing the line
 const TOW_LENGTH = 16;
@@ -129,12 +129,12 @@ const ease = (u) => { const k = clamp(u, 0, 1); return k * k * (3 - 2 * k); };
 
 export class Kraken {
   /**
-   * site: { x, z, r } — the trench; r is how far you must tow the sloop to
+   * site: { x, z, r } — the trench; r is how far you must tow the Redwing to
    * be clear. opts: { onRescue(), onCaught() }.
    */
-  constructor(game, sloop, site, opts = {}) {
+  constructor(game, redwing, site, opts = {}) {
     this.game = game;
-    this.sloop = sloop;
+    this.redwing = redwing;
     this.site = site;
     this.opts = opts;
     this.phase = 'approach';
@@ -145,14 +145,14 @@ export class Kraken {
     this.open = 0;             // how far the creature's eyes are open
     this.lanternCd = 0;
     this.time = 0;
-    this.h0 = sloop.heading || 0;
+    this.h0 = redwing.heading || 0;
     this.coil = { on: true, drop: 0 };
     this.disposed = false;
     this.build();
-    sloop.place(site.x, site.z, this.h0);
+    redwing.place(site.x, site.z, this.h0);
   }
 
-  /** True while the line is made fast and the sloop is still inside the trench. */
+  /** True while the line is made fast and the Redwing is still inside the trench. */
   get towing() { return this.phase === 'tow' && !!this.tow; }
 
   // ------------------------------------------------------------- building
@@ -229,7 +229,7 @@ export class Kraken {
   interaction(x, z, speed) {
     if (this.caught || this.phase === 'done' || this.disposed) return null;
     if (this.phase === 'approach') {
-      const s = this.sloop.pos;
+      const s = this.redwing.pos;
       if (Math.hypot(s.x - x, s.z - z) < LINE_RANGE) {
         if (Math.abs(speed) >= LINE_SPEED) return { prompt: 'Slow down to throw a line' };
         return { prompt: 'Throw Sable a line', action: () => this.attach() };
@@ -241,7 +241,7 @@ export class Kraken {
 
   attach() {
     if (this.phase !== 'approach' || this.caught || this.disposed) return;
-    this.tow = new TowLine(this.game.scene, this.game.boat, this.sloop, { length: TOW_LENGTH });
+    this.tow = new TowLine(this.game.scene, this.game.boat, this.redwing, { length: TOW_LENGTH });
     this.coil.on = false;   // the coil slides off as the line comes taut
     this.phase = 'tow';
     this.grace = TOW_GRACE;
@@ -288,7 +288,7 @@ export class Kraken {
     this.lanternCd = Math.max(0, this.lanternCd - dt);
     this.grace = Math.max(0, (this.grace || 0) - dt);
 
-    if (this.phase === 'approach') this.holdSloop();
+    if (this.phase === 'approach') this.holdRedwing();
     this.tow?.update(dt);
 
     if (!this.caught) {
@@ -311,9 +311,9 @@ export class Kraken {
     this.updateFlash(dt);
   }
 
-  /** The sloop, pinned at the centre, swinging slowly on the coil. */
-  holdSloop() {
-    const s = this.sloop;
+  /** The Redwing, pinned at the centre, swinging slowly on the coil. */
+  holdRedwing() {
+    const s = this.redwing;
     s.pos.x = this.site.x; s.pos.z = this.site.z;
     s.heading = this.h0 + Math.sin(this.time * 0.3) * 0.35;
     s.speed = 0; s.sailLevel = 0; s.rudder = 0;
@@ -383,7 +383,7 @@ export class Kraken {
 
   /** Choose where the next slam falls. Returns false if nowhere fair turned up. */
   pickTarget(T) {
-    const g = this.game, b = g.boat, site = this.site, s = this.sloop.pos;
+    const g = this.game, b = g.boat, site = this.site, s = this.redwing.pos;
     const px = b.pos.x, pz = b.pos.z;
     const fx = Math.sin(b.heading), fz = Math.cos(b.heading);
     const rnd = Math.random, sign = () => (rnd() < 0.5 ? -1 : 1);
@@ -401,7 +401,7 @@ export class Kraken {
           tx = px + fx * ahead - fz * side; tz = pz + fz * ahead + fx * side;
         }
       } else if (rnd() < 0.65) {
-        // between the player and the sloop, off the straight line
+        // between the player and the Redwing, off the straight line
         const t = 0.2 + rnd() * 0.7, lx = s.x - px, lz = s.z - pz, l = Math.hypot(lx, lz) || 1;
         const side = sign() * (6 + rnd() * 32);
         tx = px + lx * t - (lz / l) * side; tz = pz + lz * t + (lx / l) * side;
@@ -414,7 +414,7 @@ export class Kraken {
       const a = b.heading + sign() * Math.PI / 2 + (rnd() - 0.5) * 1.2;
       const C = { tx, tz, dx: Math.sin(a), dz: Math.cos(a) };
       if (this.stripDist(C, px, pz) < PLAYER_CLEAR) continue;
-      if (this.stripDist(C, s.x, s.z) < (held ? SLOOP_CLEAR : 8)) continue;
+      if (this.stripDist(C, s.x, s.z) < (held ? REDWING_CLEAR : 8)) continue;
       if (this.tentacles.some((O) => O !== T && O.state !== 'wait' && Math.hypot(O.tx - tx, O.tz - tz) < 12)) continue;
       T.tx = tx; T.tz = tz; T.dx = C.dx; T.dz = C.dz;
       return true;
@@ -497,7 +497,7 @@ export class Kraken {
     }
   }
 
-  /** The thick arm coiled over the sloop's foredeck (visual only); it slides off when the line is thrown. */
+  /** The thick arm coiled over the Redwing's foredeck (visual only); it slides off when the line is thrown. */
   drawCoil(dt) {
     const C = this.coil, base = N_TENT * N_SEG;
     C.drop = clamp(C.drop + (C.on ? -dt * 3 : dt / 1.2), 0, 1);
@@ -506,7 +506,7 @@ export class Kraken {
       return;
     }
     C.drawn = true;
-    const K = this.sloop.sizeScale || 1, M = this.sloop.group.matrixWorld;
+    const K = this.redwing.sizeScale || 1, M = this.redwing.group.matrixWorld;
     // boat space: up the port side, over the foredeck, down to starboard
     const A = 1.9, ZC = 2.0, TOP = 1.95, UP = 3.5, ARCH = Math.PI * A, TAIL = 2.6, total = UP + ARCH + TAIL;
     const at = (d, out) => {
@@ -570,7 +570,7 @@ export class Kraken {
       this.tow?.dispose(); this.tow = null;
       this.phase = 'approach';
       this.coil.on = true; this.coil.drop = 0;
-      this.sloop.place(site.x, site.z, this.h0);
+      this.redwing.place(site.x, site.z, this.h0);
       const b = g.boat;
       const a = this.entryAngle ?? Math.atan2(b.pos.z - site.z, b.pos.x - site.x);
       const cx = Math.cos(a), cz = Math.sin(a), heading = Math.atan2(-cx, -cz);
@@ -590,11 +590,11 @@ export class Kraken {
     const site = this.site;
     this.open = damp(this.open, this.awake ? 1 : 0, this.awake ? 0.9 : 1.6, dt);
     const o = this.open;
-    // the bulk under the sloop (it lets go, and sinks, once the sloop is clear)
+    // the bulk under the Redwing (it lets go, and sinks, once the Redwing is clear)
     this.bulk.visible = o > 0.01;
     this.bulk.position.set(site.x, 0, site.z);
     this.bulk.material.uniforms.uAlpha.value = 0.55 * o;
-    // the eyes look up from between the sloop and you
+    // the eyes look up from between the Redwing and you
     let lx = px - site.x, lz = pz - site.z;
     const l = Math.hypot(lx, lz) || 1; lx /= l; lz /= l;
     const reach = Math.min(17, l * 0.5);

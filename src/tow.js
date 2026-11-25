@@ -1,4 +1,4 @@
-// A tow line: one boat pulling another on a rope. Used when Sable's sloop is
+// A tow line: one boat pulling another on a rope. Used when the Redwing is
 // dismasted, and again to haul it clear of the kraken.
 //
 // The line only moves the towed boat (position, heading, speed, sails
