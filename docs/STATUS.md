@@ -99,7 +99,7 @@ Updated 2026-11-25.
   - [x] The Elder Tree at sea: a giant, detailed landmark tree with roots,
     an owl hollow, drifting clouds, birds and fireflies
     ([#20](https://github.com/James-Thibaudeau/tidewake/pull/20))
-  Phase 4 is split into thirteen smaller PRs, 4.0 to 4.12: see *Phase 4 in
+  Phase 4 is split into fourteen smaller PRs, 4.0 to 4.12: see *Phase 4 in
   smaller PRs* in [feature-plan.md](feature-plan.md). Every landmark PR also
   rebuilds that landmark's sea view to the Elder Tree's standard.
   - [x] 4.1 The Elder Grove as a walkable level (design in
@@ -260,7 +260,9 @@ Updated 2026-11-25.
       summit rock's invisible wall bulges into the straight line between
       two wide ledges at their joint; a player brushes it and steers round.
     - Not done: Archway Isle (4.5); a look on a phone; a play by hand.
-  - [ ] 4.5 Archway Isle
+  - [ ] 4.5 Archway Isle, in two PRs: 4.5a the walkable level and the arch
+    at sea, 4.5b the story and the crab report. Design drafted in
+    [archway-isle-level.md](archway-isle-level.md).
   - [ ] 4.6 Tropical islands and 4.7 the Sunken Temple
   - [ ] 4.8 Volcanic islands (with the steam-vent launch) and 4.9 Mount
     Cinderhorn

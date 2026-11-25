@@ -6,7 +6,7 @@ and its own cosmetic, and rebuilds the great arch at sea to the Elder Tree's
 standard. It follows the template set by
 [elder-grove-level.md](elder-grove-level.md).
 
-Status: **draft** (2026-11-25). The open questions are at the end.
+Status: **draft** (2026-11-25). Open questions and decisions are at the end.
 
 ---
 
@@ -116,9 +116,8 @@ went: up for a look at the weather, then out onto the arch before it blew.
 ## Pickups and rewards
 
 - **Journal IV** at the keystone (story, never lost).
-- **Cosmetic chest** on the seaward stack. Which cosmetic is still open (see
-  *Open questions*). This draft suggests a **sou'wester**, the oilskin storm
-  hat, for "The Squall".
+- **Cosmetic chest** on the seaward stack: a **sou'wester**, the oilskin
+  storm hat, for "The Squall". It's a new hat (`found:arch`).
 - **Coins** along the route, and **gold caches** in the storm cave, on the
   shoulder and on the seaward stack.
 - **Lanterns:** top of the gully, cliff top, two on the traverse, the
@@ -188,9 +187,46 @@ from far off and has life in it.
   find Journal IV, it's a light out at sea to steer for.
 - **The channel stays sailable.** The model's legs have to match the two
   hidden collision rocks in `world.js`, or move them along with it.
-- **Sailing through it (optional):** taking your own boat through the arch
-  writes a line in the log, *"Sailed through the arch at Archway Isle."*,
-  his "somewhere official".
+- **The arch crabs.** A colony of small, bright crabs lives **upside down on
+  the underside of the arch**, and nowhere else in the world. They're too
+  small to see from outside the channel. You only spot them by sailing
+  through (see *Sailing through: the crab report* below).
+
+## Sailing through: the crab report
+
+Grandfather wanted sailing through the arch "written down somewhere
+official". Sailing through yourself does get something written down, just
+not what you expected: the crabs.
+
+- **The trigger:** the boat crosses the line between the two legs, inside
+  the channel, in either direction. It works at any point in the story; you
+  don't need Journal IV or the grapnel.
+- **The sighting:** the first time, the camera tilts up at the underside for
+  a moment and a toast says *"Crabs! Upside down, all over the underside of
+  the arch."*
+- **The quest:** that starts a **report quest**: *"Tell the naturalist at
+  {port} about the crabs living upside down under the arch at Archway Isle.
+  Nobody has ever written them down."*
+  - **Who:** a naturalist, a new kind of quest giver who cares about exactly
+    this. They live at **the nearest port to Archway Isle**, so the reward
+    means sailing there. They aren't on that port's board: they only turn
+    up for this quest (and later for Phase 7 sightings, if that fits).
+  - **Hand-in:** dock at that port, as with other quests. The naturalist is
+    delighted, writes them down and names them after you: *"{captain}'s
+    crab. It's official now."* That's the "somewhere official" from his
+    journal, coming back round.
+  - **Reward:** gold and a **crab pin**, a little enamel crab worn on the
+    collar (a new cosmetic, source `quest:archCrabs`; its slot gets settled
+    when it's modelled). The crabs also get a page in the naturalist's book,
+    shown on the hand-in card.
+  - **Slots:** it takes **no side-quest slot** and never expires, like story
+    steps. It's one-off: once it's handed in, sailing through again does
+    nothing new.
+- **Not the 4.12 crabs:** these are decor on the sea view. They don't move
+  about or bump you. The crabs that bump you ashore come in 4.12.
+- **Phase 7:** this is the first `report` quest. It builds the quest type
+  small (a sighting starts it, a named giver at a fixed port, hand-in on
+  docking, no slot), and Phase 7's whales and dolphins extend it.
 
 ## How it plugs in
 
@@ -201,24 +237,40 @@ from far off and has life in it.
 | `src/ashore/archway-art.js` (new, if needed) | The strata rock, the handline, the cairns and the weather board. Reuses the rocky art in `pieces.js` where it can |
 | `src/ashore/ashore.js` | `LANDMARK_LEVELS.arch = buildArchwayLevel` |
 | `src/ashore/camera.js` | A **face camera** for the traverse (see *Risks*): `faces: [{ path, out }]` in the level, like `hubs` for trunks |
-| `src/sea-arch.js` (new) | The sea view. `world.js` uses it in place of `propMesh('arch')` |
+| `src/sea-arch.js` (new) | The sea view, with the crabs on the underside. `world.js` uses it in place of `propMesh('arch')`, and exports the channel line between the legs |
 | `src/story.js`, `src/story-text.js` | `IN_LEVEL` gains `'IV'`; `STEPS.ashore.IV` (text, noAnchor, where); the note, the keystone mark |
-| `src/cosmetics.js`, `src/outfits.js` | The level's cosmetic, `found:arch`, and its model if it's new |
+| `src/quests.js` | The `report` quest type, built small: started by sailing through, the naturalist at the nearest port, hand-in on docking, no slot. Saved in `state.quests` with everything else |
+| `src/story-text.js` (or a new text file) | The crab sighting toast, the quest text and the naturalist's hand-in line |
+| `src/cosmetics.js`, `src/outfits.js` | The sou'wester (`found:arch`) and the crab pin (`quest:archCrabs`), and their models |
 | `tools/check.mjs` | An `archway` group: the layout's limits, and a test climber from the cove to the keystone and up the stack |
 | `docs/STATUS.md`, `docs/feature-plan.md` | Status and the 4.5 row |
 
 ## Order of work
 
-1. **The sea view first**, as the Elder Tree came before the grove. It's
-   self-contained and sets the look the level matches.
-2. **The level in grey boxes:** cove to keystone, with the face camera,
-   tuned and passing the climber check.
-3. **The art:** strata, surf, the handline, cairns and the seaward stack.
-4. **The story:** the note, Journal IV at the keystone, the cosmetic, the
-   storm lantern, and the chapter IV step.
+Two PRs, split the way the grove was (4.1 walkable, 4.2 story). Each one
+leaves `main` playable.
 
-The grove split into 4.1 (walkable) and 4.2 (story). 4.5 could split the same
-way, or ship as one PR (see *Open questions*).
+**4.5a, the arch and the level** (`feature/archway-isle`):
+1. **The sea view first**, as the Elder Tree came before the grove. It's
+   self-contained and sets the look the level matches. The crabs on the
+   underside go in here as decor.
+2. **The level in grey boxes:** cove to keystone and up the stack, with the
+   face camera, tuned and passing the climber check.
+3. **The art:** strata, surf, the handline, cairns and the seaward stack.
+
+No story yet: Journal IV stays at the beach camp, and sailing through the
+arch does nothing. The vault works, so rocky retrieve and refit items can
+already spawn in the storm cave.
+
+**4.5b, the story and the crabs** (`feature/archway-isle-story`):
+1. **The story:** the note on the weather board, Journal IV at the keystone,
+   the keystone mark, the storm lantern (in the level and on the sea view),
+   and the chapter IV step. Saves that already found IV keep it.
+2. **The sou'wester** in the stack chest.
+3. **The crab report:** the sighting, the `report` quest, the naturalist,
+   and the crab pin.
+
+The text for 4.5b (see *Open questions*) gets approved before 4.5b is built.
 
 ## Risks
 
@@ -242,14 +294,22 @@ way, or ship as one PR (see *Open questions*).
 
 ## Open questions
 
-1. **Which cosmetic?** The feature plan suggests the fur hood, but the fur
-   hood is already set up for the cold biome (`found:cold`, *"Found in the
-   frozen north"*) and the shipped plans call it Frostspire's. This draft
-   suggests a new **sou'wester** for "The Squall" and leaving the fur hood to
-   Frostspire. (Separately, the plan pairs the gold circlet with Cinderhorn,
-   but `cosmetics.js` hints it's in the Sunken Temple. That one is for 4.7
-   and 4.9 to settle.)
-2. **Sailing through the arch:** worth a log line, or leave it out?
-3. **One PR or two**, the way the grove split into level and story?
-4. **The note's wording** and the keystone mark: these touch the story text,
-   so they need approval like the journals did.
+1. **The wording** of the note, the keystone mark, the crab toast and the
+   naturalist's lines: these touch the story text, so they need approval
+   like the journals did.
+
+## Decisions (2026-11-25)
+
+1. **The cosmetic is a new sou'wester**, the oilskin storm hat, for "The
+   Squall". The fur hood stays with Frostspire, where `cosmetics.js`
+   (`found:cold`, *"Found in the frozen north"*) and the shipped plans
+   already put it. (Separately, the feature plan pairs the gold circlet with
+   Cinderhorn, but `cosmetics.js` hints it's in the Sunken Temple. That one
+   is for 4.7 and 4.9 to settle.)
+2. **Sailing through the arch starts a report quest**, not a log entry: the
+   upside-down crabs under the arch, reported to a naturalist at the
+   nearest port (see *Sailing through: the crab report*). It's the first
+   `report` quest, ahead of Phase 7.
+3. **Reporting the crabs pays gold and a crab pin.**
+4. **Two PRs:** 4.5a, the arch and the level; 4.5b, the story and the crabs
+   (see *Order of work*).
