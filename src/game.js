@@ -13,6 +13,9 @@ import { STYLES, normalizeProfile } from './cosmetics.js';
 import { LINES } from './story-text.js';
 
 const SPYGLASS_HINT = LINES.spyglassHint;
+// Sea camera: the lowest it orbits (radians above the boat), and how far past
+// that the view can tilt up to take in tall landmarks.
+const CAM_LOW = 0.04, CAM_LOOK_UP = 0.55;
 
 const TUTORIAL = isTouch ? [
   'Raise your sail with the ▲ button.',
@@ -766,21 +769,26 @@ export class Game {
       return;
     }
 
+    // Pitch below CAM_LOW doesn't drop the camera any lower: it tilts the view
+    // up past the horizon instead, so tall landmarks fit on screen.
     if (L.dx || L.dy) {
       c.yaw -= L.dx * 0.006;
-      c.pitch = clamp(c.pitch + L.dy * 0.004, 0.04, 1.3);
+      c.pitch = clamp(c.pitch + L.dy * 0.004, CAM_LOW - CAM_LOOK_UP, 1.3);
       c.lastLook = this.elapsed;
     }
     if (L.zoom) c.dist = clamp(c.dist * Math.exp(L.zoom * 0.0012), 12, 120);
     if (this.mode === 'sailing' && this.elapsed - c.lastLook > 2.5) {
       c.yaw = dampAngle(c.yaw, boat.heading, 0.9 * Math.min(1, Math.abs(boat.speed) / 4 + 0.3), dt);
+      // once under way, the view settles back down to the horizon
+      if (c.pitch < CAM_LOW) c.pitch = damp(c.pitch, CAM_LOW, 0.9 * Math.min(1, Math.abs(boat.speed) / 4), dt);
     }
     if (this.mode === 'docked') c.yaw += dt * 0.05;
     // The explorer looks where you look (while you're steering the view)
     boat.lookYaw = this.elapsed - c.lastLook < 4 ? c.yaw : null;
     const p = boat.group.position;
     tx = p.x; ty = p.y + 3.5; tz = p.z;
-    const cp = Math.cos(c.pitch), sp = Math.sin(c.pitch);
+    const orbit = Math.max(c.pitch, CAM_LOW), lookUp = CAM_LOW - Math.min(c.pitch, CAM_LOW);
+    const cp = Math.cos(orbit), sp = Math.sin(orbit);
     let x = tx - Math.sin(c.yaw) * c.dist * cp, z = tz - Math.cos(c.yaw) * c.dist * cp;
     let y = ty + c.dist * sp;
     y = Math.max(y, waveHeight(x, z) + 1.8, this.world.heightAt(x, z) + 3);
@@ -790,6 +798,7 @@ export class Game {
     }
     cam.position.set(x, y, z);
     cam.lookAt(tx, ty, tz);
+    if (lookUp > 0) cam.rotateX(lookUp);
     // in heavy seas the horizon tilts a little with the hull
     const heavy = this.weather.p.swell;
     if (heavy > 0.05) cam.rotateZ(-boat.roll * 0.4 * heavy);
