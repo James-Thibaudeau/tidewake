@@ -71,9 +71,18 @@ const cone = (r, h, seg = 5) => new THREE.ConeGeometry(r, h, seg);
 const mix = (a, b, k) => '#' + new THREE.Color(a).lerp(new THREE.Color(b), k).getHexString();
 
 // --------------------------------------------------------------- skeleton
-// Root-space joint heights and the head centre (shared with explorer.js)
-export const HIP_Y = 0.47, KNEE_Y = 0.33, HC = 0.3;
-export const BONES = ['hipL', 'hipR', 'kneeL', 'kneeR', 'torso', 'shL', 'shR', 'elL', 'elR', 'head', 'tail1', 'tail2'];
+// Joint positions (root space unless noted) and the head centre, shared with
+// explorer.js. The figure is about four and a half heads tall: legs a little
+// under half the height, hands hanging to mid-thigh.
+export const HIP_Y = 0.84, KNEE_Y = 0.44, ANKLE_Y = 0.07, HIP_X = 0.085;
+export const TORSO_Y = 0.85;                    // the torso's origin (it pivots at the hips)
+export const SHOULDER_X = 0.2, SHOULDER_Y = 0.47; // torso space
+export const NECK_Y = 0.65;                     // the head's pivot, torso space
+export const ARM_L1 = 0.28, ARM_L2 = 0.27;      // upper arm, forearm to the middle of the hand
+// The head (skull, hair, hats, face) is modelled around a 0.32 sphere whose
+// centre is HC above the head pivot, then drawn at HEAD_SCALE.
+export const HC = 0.3, HEAD_SCALE = 0.66;
+export const BONES = ['hipL', 'hipR', 'kneeL', 'kneeR', 'footL', 'footR', 'torso', 'shL', 'shR', 'elL', 'elR', 'head', 'tail1', 'tail2'];
 
 // Fixed trim colours
 const BELT = '#5b3a1f', BUCKLE = '#ffd24a', GLOVE = '#8a5a32', SOCK = '#ffffff', GOLD = '#f2c84b';
@@ -158,6 +167,46 @@ function backProfile(p) {
   return r;
 }
 
+// ------------------------------------------------------------- body shape
+// The torso and everything worn on it are modelled round a plain barrel, then
+// a smooth field narrows them into a body: hips, a waist, a chest that is
+// wider than it is deep, and shoulders. Every layer goes through the same
+// field, so clothes, straps and packs keep sitting on one another.
+//   [torso height, width factor, depth factor]
+const BODY = [
+  [-0.3, 0.8, 0.64], [-0.04, 0.74, 0.58], [0.07, 0.72, 0.56], [0.18, 0.65, 0.5],
+  [0.3, 0.76, 0.56], [0.42, 0.87, 0.61], [0.5, 0.9, 0.6], [0.58, 0.86, 0.66], [0.66, 0.8, 0.8],
+];
+const _bk = { kx: 1, kz: 1 };
+function bodyAt(y) {
+  let i = 1;
+  while (i < BODY.length - 1 && y > BODY[i][0]) i++;
+  const a = BODY[i - 1], b = BODY[i];
+  const t = Math.min(1, Math.max(0, (y - a[0]) / (b[0] - a[0]))), e = t * t * (3 - 2 * t);
+  _bk.kx = a[1] + (b[1] - a[1]) * e;
+  _bk.kz = a[2] + (b[2] - a[2]) * e;
+  return _bk;
+}
+/** Depth factor of the body field at torso height `y` (for things placed behind the back). */
+export const bodyDepth = (y) => bodyAt(y).kz;
+/** Width factor of the body field at torso height `y` (for things hung at the side). */
+export const bodyWidth = (y) => bodyAt(y).kx;
+
+/** Narrow a torso-space part into the body's shape, in place. */
+function shapeBody(geo) {
+  const pos = geo.attributes.position, nor = geo.attributes.normal;
+  for (let i = 0; i < pos.count; i++) {
+    const { kx, kz } = bodyAt(pos.getY(i));
+    pos.setX(i, pos.getX(i) * kx);
+    pos.setZ(i, pos.getZ(i) * kz);
+    if (nor) {
+      const nx = nor.getX(i) / kx, ny = nor.getY(i), nz = nor.getZ(i) / kz, l = Math.hypot(nx, ny, nz) || 1;
+      nor.setXYZ(i, nx / l, ny / l, nz / l);
+    }
+  }
+  return geo;
+}
+
 /** Outer radius of the clothes at torso height `y`, from a backProfile(). */
 export function backRadius(back, y) {
   const f = (BACK_TOP - y) / BACK_STEP;
@@ -181,71 +230,104 @@ export function buildOutfit(p) {
   buildArms(B, p, c);
   buildNeck(B, p, c, tail);
   buildExtra(B, p, c);
+  for (const g of B.torso) shapeBody(g);
+  if (tail.back) {
+    // the scarf tail rides over the shaped back
+    tail.anchor.z *= bodyDepth(tail.anchor.y);
+    for (let i = 0; i < BACK_N; i++) tail.back[i] *= bodyDepth(BACK_TOP - i * BACK_STEP);
+  }
+  // the neck (not part of the barrel, so it keeps its own shape)
+  B.torso.push(
+    part(cyl(0.05, 0.058, 0.16, 10), c.skin, { y: 0.6 }),
+    part(sph(0.058, 10, 6), c.skin, { y: 0.53, sy: 0.6 }),
+  );
   buildHead(B, p, c);
   return { parts: B, tail };
 }
 
 // ------------------------------------------------------------------- legs
+// Thigh (hip bone), shin (knee bone) and foot (ankle bone), each modelled
+// hanging straight down from its joint.
+/** A tapered limb section from height y0 down to y1. */
+const tube = (r0, r1, y0, y1, col, seg = 10, t = {}) => part(cyl(r0, r1, y0 - y1, seg), col, { y: (y0 + y1) / 2, ...t });
+const hoop = (r, th, y, col, t = {}) => part(tor(r, th, 5, 12), col, { y, rx: PI / 2, ...t });
+
 function buildLegs(B, p, c) {
   const bst = p.bottom.style, bcol = c.bottom, boots = p.boots.style, kcol = c.boots;
+  const TH = HIP_Y - KNEE_Y, SH = KNEE_Y - ANKLE_Y;
+  const long = bst === 'trousers' || bst === 'cargo';
   for (const s of [1, -1]) {
-    const H = s > 0 ? B.hipL : B.hipR, K = s > 0 ? B.kneeL : B.kneeR;
-    const x = s * 0.1, dy = -HIP_Y, ky = -KNEE_Y;
-    const long = bst === 'trousers' || bst === 'cargo';
+    const H = s > 0 ? B.hipL : B.hipR, K = s > 0 ? B.kneeL : B.kneeR, F = s > 0 ? B.footL : B.footR;
 
-    // ---- thigh (hip group)
+    // ---- thigh
     if (bst === 'skirt') {
-      H.push(part(cyl(0.056, 0.062, 0.15, 10), c.skin, { y: 0.405 + dy })); // the skirt hangs from the torso
-    } else {
-      H.push(part(cyl(0.105, 0.1, 0.13, 12), bcol.base, { x: x * 0.05, y: 0.45 + dy }));
-      if (long) {
-        H.push(part(cyl(0.098, 0.088, 0.08, 12), bcol.base, { x: x * 0.03, y: 0.36 + dy }));
-        if (bst === 'cargo') {
-          H.push(part(box(0.035, 0.09, 0.11), bcol.dark, { x: s * 0.1, y: 0.4 + dy }));
-          H.push(part(box(0.04, 0.025, 0.12), bcol.base, { x: s * 0.102, y: 0.448 + dy }));
-        }
-      } else {
-        H.push(part(tor(0.1, 0.014, 5, 12), bcol.base, { x: x * 0.05, y: 0.39 + dy, rx: PI / 2 }));
-        H.push(part(cyl(0.056, 0.06, 0.09, 10), c.skin, { y: 0.375 + dy }));
+      // the skirt hangs from the torso
+      H.push(part(sph(0.076, 10, 6), c.skin), tube(0.076, 0.058, 0, -TH, c.skin));
+    } else if (long) {
+      H.push(part(sph(0.084, 10, 6), bcol.base), tube(0.084, 0.064, 0, -TH, bcol.base, 12));
+      if (bst === 'cargo') {
+        H.push(
+          part(box(0.03, 0.1, 0.1), bcol.dark, { x: s * 0.07, y: -0.2 }),
+          part(box(0.034, 0.025, 0.108), bcol.base, { x: s * 0.072, y: -0.148 }),
+        );
       }
+    } else {
+      // shorts to mid-thigh, a little loose at the cuff
+      H.push(
+        part(sph(0.084, 10, 6), bcol.base),
+        tube(0.084, 0.08, 0, -0.19, bcol.base, 12),
+        hoop(0.078, 0.012, -0.19, bcol.dark),
+        tube(0.07, 0.058, -0.17, -TH, c.skin),
+      );
     }
 
-    // ---- shin (knee group): trouser legs bend with the knee
+    // ---- knee and shin: trouser legs bend with the knee
     if (long) {
-      K.push(part(sph(0.087, 10, 6), bcol.base, {}));
-      K.push(part(cyl(0.086, 0.082, 0.13, 12), bcol.base, { y: 0.265 + ky }));
-      K.push(part(tor(0.082, 0.014, 5, 12), bcol.dark, { y: 0.205 + ky, rx: PI / 2 }));
+      K.push(
+        part(sph(0.064, 10, 6), bcol.base),
+        tube(0.064, 0.055, 0, -SH + 0.07, bcol.base, 12),
+        hoop(0.054, 0.011, -SH + 0.075, bcol.dark),
+        tube(0.04, 0.038, -SH + 0.09, -SH, c.skin),
+      );
+    } else {
+      K.push(
+        part(sph(0.058, 10, 6), c.skin),
+        tube(0.058, 0.042, 0, -SH, c.skin),
+        // the calf
+        part(sph(0.05, 10, 6), c.skin, { y: -0.13, z: -0.014, sx: 0.95, sy: 2.1 }),
+      );
     }
 
-    // ---- boots
+    // ---- boots: the shaft rides on the shin, the foot turns at the ankle
+    const shoe = (col, sole) => F.push(
+      part(sph(0.066, 12, 8), col, { y: -0.018, z: 0.05, sx: 0.95, sy: 0.76, sz: 1.8 }),
+      part(sph(0.05, 10, 6), col, { y: 0.0, z: -0.012, sy: 1.1 }),
+      part(box(0.128, 0.028, 0.262), sole, { y: -0.056, z: 0.048 }),
+    );
     if (boots === 'sandals') {
-      K.push(
-        part(cyl(0.06, 0.064, 0.25, 10), c.skin, { y: 0.205 + ky }),
-        part(sph(0.075, 10, 6), c.skin, { y: 0.06 + ky, z: 0.045, sy: 0.62, sz: 1.6 }),
-        part(box(0.17, 0.03, 0.3), kcol.dark, { y: 0.016 + ky, z: 0.04 }),
-        part(tor(0.066, 0.012, 4, 10), kcol.base, { y: 0.11 + ky, rx: PI / 2 }),
-        part(box(0.15, 0.022, 0.035), kcol.base, { y: 0.075 + ky, z: 0.1, rx: -0.25 }),
-        part(box(0.15, 0.022, 0.035), kcol.base, { y: 0.07 + ky, z: -0.01 }),
+      F.push(
+        part(sph(0.052, 10, 6), c.skin, { y: -0.026, z: 0.05, sy: 0.62, sz: 2.0 }),
+        part(sph(0.04, 8, 6), c.skin, { y: 0.0, z: -0.008 }),
+        part(box(0.112, 0.022, 0.25), kcol.dark, { y: -0.059, z: 0.05 }),
+        hoop(0.043, 0.01, 0.022, kcol.base),
+        part(box(0.108, 0.018, 0.03), kcol.base, { y: -0.012, z: 0.105, rx: -0.3 }),
+        part(box(0.108, 0.018, 0.03), kcol.base, { y: -0.002, z: 0.04 }),
       );
     } else if (boots === 'tall') {
       K.push(
-        part(cyl(0.06, 0.062, 0.05, 10), c.skin, { y: 0.305 + ky }),
-        part(cyl(0.092, 0.097, 0.25, 12), kcol.base, { y: 0.205 + ky }),
-        part(tor(0.093, 0.02, 5, 12), kcol.dark, { y: 0.325 + ky, rx: PI / 2 }),
-        part(tor(0.096, 0.012, 4, 12), kcol.dark, { y: 0.19 + ky, rx: PI / 2 }),
-        part(box(0.03, 0.035, 0.03), BUCKLE, { x: s * 0.095, y: 0.19 + ky }),
-        part(sph(0.1, 12, 8), kcol.base, { y: 0.075 + ky, z: 0.045, sx: 1.05, sy: 0.75, sz: 1.55 }),
-        part(box(0.2, 0.04, 0.33), kcol.dark, { y: 0.02 + ky, z: 0.04 }),
+        tube(0.064, 0.058, -0.09, -SH - 0.012, kcol.base, 12),
+        hoop(0.064, 0.015, -0.09, kcol.dark),
+        hoop(0.061, 0.01, -0.24, kcol.dark),
+        part(box(0.024, 0.03, 0.026), BUCKLE, { x: s * 0.06, y: -0.24 }),
       );
+      shoe(kcol.base, kcol.dark);
     } else { // chunky
       K.push(
-        part(cyl(0.06, 0.062, 0.05, 10), c.skin, { y: 0.305 + ky }),
-        part(cyl(0.066, 0.072, 0.1, 10), SOCK, { y: 0.25 + ky }),
-        part(cyl(0.088, 0.095, 0.09, 12), kcol.base, { y: 0.16 + ky }),
-        part(tor(0.088, 0.018, 5, 12), kcol.dark, { y: 0.2 + ky, rx: PI / 2 }),
-        part(sph(0.1, 12, 8), kcol.base, { y: 0.075 + ky, z: 0.045, sx: 1.05, sy: 0.75, sz: 1.55 }),
-        part(box(0.2, 0.04, 0.33), kcol.dark, { y: 0.02 + ky, z: 0.04 }),
+        tube(0.048, 0.046, -0.17, -0.26, SOCK),
+        tube(0.062, 0.06, -0.245, -SH - 0.012, kcol.base, 12),
+        hoop(0.061, 0.014, -0.245, kcol.dark),
       );
+      shoe(kcol.base, kcol.dark);
     }
   }
 }
@@ -285,7 +367,6 @@ function buildTorso(B, p, c) {
     part(cyl(0.245, 0.245, 0.055, 16), BELT, { y: 0.11 }),
     part(box(0.085, 0.065, 0.03), BUCKLE, { y: 0.11, z: 0.245 }),
     part(box(0.045, 0.03, 0.035), BELT, { y: 0.11, z: 0.25 }),
-    part(cyl(0.058, 0.07, 0.12, 10), c.skin, { y: 0.575 }),
   );
 
   if (top === 'vest') {
@@ -368,46 +449,47 @@ function buildTorso(B, p, c) {
 // ------------------------------------------------------------------- arms
 function buildArms(B, p, c) {
   const top = p.top.style, tc = c.top, sc = c.shirt;
+  const L1 = ARM_L1, wrist = ARM_L2 - 0.065;
   for (const s of [1, -1]) {
     const SH = s > 0 ? B.shL : B.shR, EL = s > 0 ? B.elL : B.elR;
     if (top === 'tank') {
       SH.push(
-        part(sph(0.075, 10, 8), c.skin, { y: -0.02 }),
-        part(cyl(0.062, 0.05, 0.24, 10), c.skin, { y: -0.14 }),
+        part(sph(0.058, 10, 8), c.skin),
+        tube(0.056, 0.045, 0, -L1, c.skin),
       );
     } else if (top === 'coat') {
       SH.push(
-        part(sph(0.09, 10, 8), tc.base, { y: -0.02 }),
-        part(cyl(0.088, 0.074, 0.25, 10), tc.base, { y: -0.13 }),
+        part(sph(0.07, 10, 8), tc.base),
+        tube(0.068, 0.058, 0, -L1, tc.base),
       );
     } else {
       const sleeve = sc.base;
       const cuff = top === 'poncho' ? sc.dark : tc.base;
       SH.push(
-        part(sph(0.09, 10, 8), sleeve, { y: -0.02 }),
-        part(cyl(0.088, 0.08, 0.12, 10), sleeve, { y: -0.07 }),
-        part(tor(0.08, 0.012, 5, 10), cuff, { y: -0.13, rx: PI / 2 }),
-        part(cyl(0.052, 0.048, 0.14, 10), c.skin, { y: -0.19 }),
+        part(sph(0.067, 10, 8), sleeve),
+        tube(0.066, 0.061, 0, -0.13, sleeve),
+        hoop(0.06, 0.01, -0.13, cuff, {}),
+        tube(0.05, 0.045, -0.12, -L1, c.skin),
       );
-      if (top === 'sailor') SH.push(part(tor(0.086, 0.01, 4, 10), tc.base, { y: -0.06, rx: PI / 2 }));
+      if (top === 'sailor') SH.push(hoop(0.065, 0.008, -0.07, tc.base));
     }
     if (top === 'coat') {
       EL.push(
-        part(sph(0.07, 8, 6), tc.base),
-        part(cyl(0.068, 0.062, 0.12, 10), tc.base, { y: -0.06 }),
-        part(tor(0.062, 0.016, 5, 10), sc.base, { y: -0.12, rx: PI / 2 }),
-        part(cyl(0.045, 0.045, 0.03, 10), c.skin, { y: -0.135 }),
+        part(sph(0.058, 8, 6), tc.base),
+        tube(0.058, 0.05, 0, -wrist + 0.03, tc.base),
+        hoop(0.05, 0.013, -wrist + 0.03, sc.base),
+        tube(0.036, 0.036, -wrist + 0.03, -wrist, c.skin),
       );
     } else {
       EL.push(
-        part(sph(0.05, 8, 6), c.skin),
-        part(cyl(0.048, 0.043, 0.15, 10), c.skin, { y: -0.08 }),
+        part(sph(0.045, 8, 6), c.skin),
+        tube(0.045, 0.036, 0, -wrist, c.skin),
       );
     }
     EL.push(
-      part(cyl(0.052, 0.052, 0.045, 10), GLOVE, { y: -0.16 }),
-      part(sph(0.062, 10, 8), GLOVE, { y: -0.205, sx: 0.9, sz: 1.1 }),
-      part(sph(0.03, 6, 4), GLOVE, { x: s * -0.045, y: -0.19, z: 0.04 }),
+      tube(0.041, 0.041, -wrist + 0.015, -wrist - 0.02, GLOVE),
+      part(sph(0.043, 10, 8), GLOVE, { y: -ARM_L2 + 0.004, sx: 0.8, sy: 1.25 }),
+      part(sph(0.02, 6, 4), GLOVE, { x: s * -0.03, y: -ARM_L2 + 0.016, z: 0.028 }),
     );
   }
 }
@@ -419,8 +501,8 @@ function buildNeck(B, p, c, tail) {
     const grand = st === 'grandScarf';
     const base = grand ? '#c25a4c' : nc.base, dark = grand ? '#97423a' : nc.dark;
     T.push(
-      part(tor(grand ? 0.125 : 0.12, grand ? 0.062 : 0.058, 8, 18), base, { y: 0.54, rx: PI / 2 + 0.12 }),
-      part(sph(0.065, 8, 6), dark, { x: 0.08, y: 0.5, z: 0.1 }),
+      part(tor(grand ? 0.125 : 0.12, grand ? 0.062 : 0.058, 8, 18), base, { y: 0.575, rx: PI / 2 + 0.12 }),
+      part(sph(0.065, 8, 6), dark, { x: 0.08, y: 0.535, z: 0.1 }),
     );
     // A backpack (and its bedroll) covers the back of the neck: the tail is
     // tucked away behind it.
@@ -511,7 +593,7 @@ function buildExtra(B, p, c) {
     for (const s of [-1, 1]) {
       T.push(
         part(box(0.04, 0.3, 0.02), ec.dark, { x: s * 0.11, y: 0.33, z: poncho ? 0.252 : R - 0.002, rx: poncho ? -0.34 : 0 }),
-        part(box(0.04, 0.02, 0.42), ec.dark, { x: s * 0.11, y: 0.6, z: -0.01 }),
+        part(box(0.04, 0.02, 0.37), ec.dark, { x: s * 0.11, y: 0.572, z: -0.01 }),
       );
     }
   }
@@ -521,7 +603,8 @@ function buildExtra(B, p, c) {
 // The head starts as a sphere; a smooth deformation field reshapes it. The
 // same field is applied to everything on the head bone (skin, hair, hats, the
 // face decal), so everything stays attached.
-// Every shape shares a squat, wide "mochi" skull: a slightly lower, wider
+// Every shape shares a soft "mochi" skull, only a little lower and wider
+// than a sphere now that it sits on a full-sized body: a gently flattened
 // crown, cheeks that stay full low down, and a short lower face whose broad
 // jaw ends in a clear ledge above the neck instead of melting into it. The
 // round underside behind the jaw is drawn up into the nape, and a small nose
@@ -530,7 +613,7 @@ function buildExtra(B, p, c) {
 //   late the taper starts (higher = fuller cheeks, sharper chin), chin:
 //   lengthen (or, negative, shorten) the front of the lower face, cheek:
 //   fullness at cheek height, flat: square off the chin, nose: nose height
-const MOCHI = { cx: 1.06, cy: 0.88, w: 1.1, jaw: 0.3, pow: 3.5, chin: -0.15, cheek: 0.05, cheekY: -0.19, flat: 0.3, nose: 0.05 };
+const MOCHI = { cx: 1.02, cy: 0.92, w: 1.05, jaw: 0.3, pow: 3.5, chin: -0.15, cheek: 0.05, cheekY: -0.19, flat: 0.3, nose: 0.05 };
 export const HEAD_SHAPE_PARAMS = {
   oval: { ...MOCHI },
   round: { ...MOCHI, w: 1.13, jaw: 0.22, pow: 3, chin: -0.18, cheek: 0.07, flat: 0.2 },
