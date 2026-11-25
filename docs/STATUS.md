@@ -283,7 +283,8 @@ Updated 2026-11-25.
   Phase 5 in [feature-plan.md](feature-plan.md)):
   - [x] Less repetitive water: wave colouring fades with distance (short
     waves first) and varies by region, so the sea no longer tiles into a
-    checkerboard. Shader only; the boat rides the same waves.
+    checkerboard. Shader only; the boat rides the same waves
+    ([#38](https://github.com/James-Thibaudeau/tidewake/pull/38)).
   - [ ] Bigger features: cloud shadows, gust bands, a depth tint.
   - [ ] Retune the wave set for long crests instead of a grid (changes how
     the boat rides). Rows of crests still show a few hundred metres out.
