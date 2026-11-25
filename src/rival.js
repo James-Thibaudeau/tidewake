@@ -14,7 +14,7 @@
 // turns up again.
 import * as THREE from 'three';
 import { WORLD_HALF } from './config.js';
-import { mulberry32, headingOf, bearingDeg, clamp, damp, TAU } from './util.js';
+import { mulberry32, headingOf, bearingDeg, clamp, TAU } from './util.js';
 import { glowBoost } from './toon.js';
 import { Boat } from './boat.js';
 import { AutoHelm, planCourse, SeaRace } from './race.js';

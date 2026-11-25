@@ -18,6 +18,7 @@ import { Ashore } from './ashore/ashore.js';
 import { Rival } from './rival.js';
 import { loadSettings } from './save.js';
 import { FX, fxFlags } from './fx.js';
+import { installDebug } from './debug.js';
 
 // Yield so the loading text can paint (setTimeout keeps working in background tabs).
 const nextFrame = () => new Promise((r) => setTimeout(r, 30));
@@ -117,6 +118,7 @@ async function boot() {
     fx.render(game.view, dt);
   });
   window.tidewake = game; // handy for debugging in the console
+  installDebug(game);     // tidewake.debug.help()
 }
 
 boot().catch((e) => {

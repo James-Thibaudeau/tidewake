@@ -1,7 +1,7 @@
 // Weather state machine (clear → rain → storm …), wind, rain, lightning and
 // cartoon wind streaks.
 import * as THREE from 'three';
-import { clamp, lerp, damp, TAU, noise2 } from './util.js';
+import { clamp, TAU, noise2 } from './util.js';
 
 // cloud: sky cover (≥ ~0.9 reads as a full overcast deck); dark: how much the
 // weather greys and dims the world on top of that.

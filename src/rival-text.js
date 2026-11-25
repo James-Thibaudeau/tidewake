@@ -1,5 +1,5 @@
 // The rival captain: everything Sable says, the quest steps and story cards.
-// Rules (see docs/feature-plan.md): the grandparents are never named. To
+// Rules (see docs/shipped-plans.md): the grandparents are never named. To
 // Sable he is "your grandfather" or "the old captain"; Sable's grandmother is
 // "the captain of the crimson sails". Nothing assumes the player's gender,
 // and Sable is "they". {captain} is the player's chosen name; {place}, {dir},

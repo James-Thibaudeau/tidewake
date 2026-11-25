@@ -1,6 +1,6 @@
 # Phase 8: the rival captain (implementation plan)
 
-How [Phase 8 of the feature plan](feature-plan.md#phase-8-the-rival-captain)
+How [Phase 8 of the feature plan](shipped-plans.md#phase-8-the-rival-captain)
 is built. The feature plan says *what*; this says *how*, and records the
 decisions made along the way.
 

@@ -15,7 +15,7 @@
 // Rotations (obox.rot, piece.rot) use the three.js rotation.y convention:
 // a local (x, z) maps to world (x cos r + z sin r, -x sin r + z cos r).
 import { mulberry32, noise2, clamp, lerp, smoothstep, TAU } from '../util.js';
-import { box, obox, cyl, topOf } from './shapes.js';
+import { obox, cyl, topOf } from './shapes.js';
 import { ASHORE } from '../config.js';
 
 const D = ASHORE.design;
