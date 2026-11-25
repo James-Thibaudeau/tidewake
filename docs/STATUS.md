@@ -420,6 +420,10 @@ Updated 2026-11-25.
   where storms don't start; more storms in the open sea; rough water in
   any weather round Frostspire (the Reach) and Mount Cinderhorn (the Rip),
   with rogue waves. Three PRs, 9.1–9.3.
+- [ ] **Phase 10, things worth buying at the end:** restore grandfather's
+  ship stage by stage at Port Haven and sail her; a paint yard for the
+  ship (paints, sail cloth, emblems, figureheads); fireworks. Nothing adds
+  stats. Four PRs, 10.1–10.4.
 
 ## Known issues
 
