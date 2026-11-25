@@ -93,6 +93,17 @@ Updated 2026-11-25.
   - Still open: thighs come through a skirt or coat front at a run (the
     cloth is rigid).
 
+- [x] **Look-dev gallery** (tooling, not a game feature): `gallery.html`
+  shows one piece of the art at a time (an outfit, a ship tier, a prop, a
+  landmark, a level or one of its pieces) from fixed cameras under fixed
+  light, and draws contact sheets such as every top with every bag from
+  behind. Driven from the URL or from `window.gallery`. No game file changed.
+  How to use it is in `CLAUDE.md`; the design is in
+  [shipped-plans.md](shipped-plans.md)
+  ([#40](https://github.com/James-Thibaudeau/tidewake/pull/40)).
+  - Not yet done: live sliders, and before/after in one image (see
+    [feature-plan.md](feature-plan.md)).
+
 ## Next up
 
 - [ ] **Phase 4, ashore content and fetch quests:**
@@ -344,6 +355,15 @@ Updated 2026-11-25.
     a 12% dead zone; tune it on a real phone.
   - [ ] Performance pass, including cleanup when leaving an island
   - [x] README controls for going ashore (done in #11)
+- [ ] **Water improvements** (`src/ocean.js`, `src/waves.js`; designs under
+  Phase 5 in [feature-plan.md](feature-plan.md)):
+  - [x] Less repetitive water: wave colouring fades with distance (short
+    waves first) and varies by region, so the sea no longer tiles into a
+    checkerboard. Shader only; the boat rides the same waves
+    ([#38](https://github.com/James-Thibaudeau/tidewake/pull/38)).
+  - [ ] Bigger features: cloud shadows, gust bands, a depth tint.
+  - [ ] Retune the wave set for long crests instead of a grid (changes how
+    the boat rides). Rows of crests still show a few hundred metres out.
 - [ ] **Visual effects follow-ups** (after #17; `src/fx.js`, `src/toon.js`):
   - [ ] Test High quality on real phones (touch uses 2 shadow cascades,
     1024 maps, medium SMAA). Phones default to Low, which has no effects;

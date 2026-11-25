@@ -1,7 +1,7 @@
 // Stylised ocean: deep navy water with teal wave faces, bold lacy foam streaks, whitecaps,
 // a little sky reflection and a low-sun glitter path. One centre-weighted grid follows the camera.
 import * as THREE from 'three';
-import { WAVE_GLSL, NOISE_GLSL, waveUniforms } from './waves.js';
+import { WAVE_GLSL, WAVE_LOD_GLSL, NOISE_GLSL, waveUniforms } from './waves.js';
 
 function oceanGeometry(size, segs) {
   const n = segs + 1;
@@ -67,6 +67,7 @@ uniform vec3 uCalm;
 varying vec3 vWorld;
 varying float vH;
 ${WAVE_GLSL}
+${WAVE_LOD_GLSL}
 ${NOISE_GLSL}
 #include <fog_pars_fragment>
 #ifdef LOW_Q
@@ -88,12 +89,23 @@ void main() {
   vec2 p = vWorld.xz;
   float e = 0.5;
   float calm = uCalm.z > 0.0 ? smoothstep(uCalm.z, uCalm.z + 4.0, distance(p, uCalm.xy)) : 1.0;
-  float hL = waveHeight(p - vec2(e, 0.0)) * calm, hR = waveHeight(p + vec2(e, 0.0)) * calm;
-  float hD = waveHeight(p - vec2(0.0, e)) * calm, hU = waveHeight(p + vec2(0.0, e)) * calm;
+  float dist = length(cameraPosition - vWorld);
+  // Far water: waves too small for a pixel drop out, and the rest lose contrast with distance.
+  setWaveLod(max(length(dFdx(p)), length(dFdy(p))), dist);
+  // The waves are a few fixed sines, so on their own they tile into a grid. Away from the
+  // boat, bend where the colouring samples them so the grid never lines up across the view...
+  vec2 drift = vec2(uTime * 0.003, -uTime * 0.002);
+  vec2 bend = (vec2(vnoise(p * 0.0065 + 31.0 + drift), vnoise(p * 0.0065 + 77.0 - drift)) - 0.5) * 45.0
+            + (vec2(vnoise(p.yx * 0.0019 + 5.0 - drift), vnoise(p.yx * 0.0019 + 53.0 + drift)) - 0.5) * 90.0;
+  vec2 pw = p + bend * smoothstep(50.0, 300.0, dist);
+  // ...and let the sea run livelier in some stretches and flatter in others.
+  float lively = vnoise(p * 0.0052 + 11.0 + drift * 2.0) * 0.6 + vnoise(p.yx * 0.0127 + 3.0 - drift * 2.0) * 0.4;
+  float waveK = calm * mix(0.3, 1.35, smoothstep(0.25, 0.75, lively));
+  float hL = waveHeightLod(pw - vec2(e, 0.0)) * waveK, hR = waveHeightLod(pw + vec2(e, 0.0)) * waveK;
+  float hD = waveHeightLod(pw - vec2(0.0, e)) * waveK, hU = waveHeightLod(pw + vec2(0.0, e)) * waveK;
   vec3 n = normalize(vec3(hL - hR, 2.0 * e, hD - hU));
   float amp = max(uWaveScale * 1.25 + uSwellScale * 3.2, 0.05);
   float hn = (hL + hR + hD + hU) * 0.25 / amp;
-  float dist = length(cameraPosition - vWorld);
   vec3 v = normalize(cameraPosition - vWorld);
   vec3 sd = normalize(uSunDir);
 
@@ -113,6 +125,9 @@ void main() {
   float glow = smoothstep(0.04 - patchK * 0.1, 0.5, facing) * smoothstep(-0.35, 0.55, hn);
   glow = max(glow, patchK * smoothstep(-0.1, 0.8, hn) * 0.45);
   glow *= 1.0 - uLantern.w * 0.85; // no sunlight to shine through the crests at night (w = nightness)
+  // far off, where single waves no longer read, broad soft patches carry the colour instead
+  float farK = smoothstep(150.0, 700.0, dist) * (1.0 - uLantern.w * 0.85);
+  glow = max(glow, farK * (0.1 + smoothstep(0.3, 0.7, big) * 0.3 + smoothstep(0.35, 0.8, lively) * 0.22));
   col = mix(col, uFace, glow * 0.9);
   col = mix(col, uCrest, smoothstep(0.55, 1.0, hn) * glow * 0.6);
   // back slopes fall off into shade

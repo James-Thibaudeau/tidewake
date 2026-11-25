@@ -16,7 +16,7 @@ Decisions already made:
 - Customization is available **on a new voyage and at a port Tailor**.
 
 This file holds the designs for phases that **haven't shipped yet** (4-7),
-plus one piece of tooling, the look-dev gallery.
+plus what is left of one piece of tooling, the look-dev gallery.
 What is done, what's next and known issues live in [STATUS.md](STATUS.md).
 The designs of shipped phases (0-3 and 8) moved to
 [shipped-plans.md](shipped-plans.md).
@@ -101,6 +101,23 @@ Notes:
 - **Performance:** a profile pass covering draw calls per module, outline
   cost and geometry disposal when you leave an island.
 - **README:** controls table for ashore, plus new tips.
+- **Water improvements** (`src/ocean.js`, `src/waves.js`, `WAVE_DEFS` in
+  `src/config.js`). The sea used to tile into a checkerboard. The first pass
+  fades wave colouring with distance and varies it by region (shader only).
+  Two ideas are left:
+  - **Bigger features to read.** Soft cloud shadows drifting with the wind,
+    darker gust bands running downwind, and a subtle tint for deeper and
+    shallower water, so the eye has something larger than one wave. Shader
+    only; the boat's motion doesn't change. Cloud shadows should follow the
+    weather's cloud cover and fade at night.
+  - **Retune the wave set.** The two biggest waves cross at about 63°,
+    which makes an egg-crate, and rows of crests still show a few hundred
+    metres out. Use more waves, with directions within about 40° of each
+    other and wavelengths that aren't simple multiples, for long rolling
+    crests. `waveHeight` runs on the CPU and the GPU from the same table, so
+    this changes how the boat rides: re-check handling, storm swell, shore
+    foam and the kraken. Each extra wave costs shader time (the ocean
+    samples the waves five times a pixel), so measure on Low.
 
 ---
 
@@ -246,59 +263,24 @@ inside islands.
 
 ---
 
-## Tooling: the look-dev gallery
+## Tooling: the look-dev gallery, what's left
 
-Not a game feature: a page for looking at the art. Proposed 2026-11-25, not
-scheduled. It can be built at any time and nothing waits on it.
+The gallery itself has shipped (`gallery.html`; how to use it is in
+`CLAUDE.md`, its design in [shipped-plans.md](shipped-plans.md)). These ideas
+are not built and not scheduled:
 
-**Why.** Every shape and colour is numbers in code, and the only way to see
-one is to play to it: start a voyage, get to the place, take a screenshot
-from wherever the camera is. `tools/check.mjs` answers in a second for
-logic; nothing does that for looks. Outfits show the cost most: 37 styles on
-one body, each fix checked against the few combinations someone thought to
-try, so `outfits.js` has needed four fit passes so far.
-
-**What.** A separate `gallery.html` beside `index.html`. It imports the same
-modules and builds its own small scene, so the game is untouched and there
-is still no build step.
-
-- **One subject at a time,** picked in the URL so a view can be linked and
-  reloaded: `?show=outfit&top=coat&bag=satchel`, `?show=ship&tier=4`,
-  `?show=prop&id=tent`, `?show=grove&piece=fungus-step`.
-  - Subjects: explorer and outfits, ship by upgrade tier, the Redwing, sea
-    props, ashore modules and pieces, Elder Tree and grove pieces.
-- **Neutral ground, fixed cameras:** front, side, back, three-quarter, and
-  one at the sailing camera's distance (small details vanish there).
-- **Lighting presets:** noon, sunset, night, overcast. Effects follow the
-  same `?fx=` switch as the game.
-- **Poses** for the explorer: stand, run, jump, helm.
-- **Contact sheets:** `?sheet=tops-back` and the like render a grid into one
-  image, such as every top with every bag and scarf from behind. Clipping
-  shows in one look, and a before/after pair shows what a change broke.
-- **Console helpers** on `window.gallery`, in the style of `tidewake.debug`:
-  `show()`, `sheet()`, `light()`, `frame()`, so an agent can drive it from
-  a hidden preview tab.
-
-**Later, if wanted.**
-- Live sliders for the few numbers being tuned (sea colours, rim strength,
-  ink width) with a "copy values" button. Hand-rolled, or a slider library
-  from the CDN loaded by the gallery page only: that would be the one
+- **Live sliders** for the few numbers being tuned (sea colours, rim
+  strength, ink width) with a "copy values" button. Hand-rolled, or a slider
+  library from the CDN loaded by the gallery page only: that would be the one
   exception to "no new dependencies", so decide before building.
-- A shot list per polish pass: agree which gallery views count as done,
-  ideally with a reference image, before the work starts.
+- **A shot list per polish pass:** agree which gallery views and sheets count
+  as done, ideally with a reference image, before the work starts.
+- **Before and after in one image:** keep a sheet from `main` and draw it
+  beside the same sheet from the branch (today: two screenshots).
+- **More subjects** as they are needed: the kraken, the rival's foot-race
+  pacer, sea props placed as on an island, weather (rain, fog).
 - The gallery is also where an imported model or painted texture would be
   judged, if the game ever takes assets as well as code.
-
-**Building it.**
-- Subjects need to be buildable outside a `Game`. Most already are
-  (`buildOutfit(profile)`, the boat parts, `props.js`); find the ones that
-  reach for `game` and give them a plain entry point.
-- Sky and lighting: reuse `sky.js` with a fixed `dayT` rather than a second
-  lighting rig, so the gallery can't drift from the game's look.
-- Add `gallery.html` and its module to `tools/check.mjs` (imports, element
-  ids), and to "Project structure" in the README.
-- One PR, `chore/look-dev-gallery`. Contact sheets can follow in a second
-  PR if the first grows.
 
 ---
 

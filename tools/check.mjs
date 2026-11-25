@@ -2,7 +2,7 @@
 // Fast checks that need no browser and no dependencies:
 //
 //   node tools/check.mjs            everything (about a second)
-//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | save | layout | climb | grove | archway
+//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | layout | climb | grove | archway
 //   node tools/check.mjs layout 500 layouts for 500 synthetic islands (default 150)
 //
 // Run it after every change. It catches the mistakes that otherwise only show
@@ -16,11 +16,12 @@
 // top-level declarations starting in column 0.
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'src');
+const GALLERY = join(SRC, 'gallery') + sep; // the look-dev gallery: its own page, gallery.html
 const rel = (f) => relative(ROOT, f);
 const load = (f) => import(pathToFileURL(join(SRC, f)).href);
 
@@ -222,22 +223,57 @@ const checks = {
     return { errors, note: `${count} text keys` };
   },
 
-  // Element ids looked up by literal name exist in index.html (or are created in code).
+  // Element ids looked up by literal name exist in the page that loads the
+  // file (or are created in code): gallery.html for src/gallery/, index.html
+  // for the rest.
   dom() {
     const errors = [];
-    const html = readFileSync(join(ROOT, 'index.html'), 'utf8');
-    const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
+    const made = new Set();
     for (const text of Object.values(source)) {
-      for (const m of text.matchAll(/\bid="([\w-]+)"|\.id\s*=\s*'([\w-]+)'/g)) ids.add(m[1] || m[2]);
+      for (const m of text.matchAll(/\bid="([\w-]+)"|\.id\s*=\s*'([\w-]+)'/g)) made.add(m[1] || m[2]);
     }
+    const idsIn = (page) => new Set([...made, ...[...readFileSync(join(ROOT, page), 'utf8').matchAll(/\bid="([^"]+)"/g)].map((m) => m[1])]);
+    const pages = { 'index.html': idsIn('index.html'), 'gallery.html': idsIn('gallery.html') };
     let count = 0;
     for (const f of files) {
+      const page = f.startsWith(GALLERY) ? 'gallery.html' : 'index.html';
       for (const m of source[f].matchAll(/(?:getElementById|(?<![\w$.])\$)\('([\w-]+)'\)/g)) {
         count++;
-        if (!ids.has(m[1])) errors.push(`${rel(f)}:${lineOf(source[f], m.index)}: no element with id "${m[1]}"`);
+        if (!pages[page].has(m[1])) errors.push(`${rel(f)}:${lineOf(source[f], m.index)}: no element with id "${m[1]}" in ${page}`);
       }
     }
     return { errors, note: `${count} lookups` };
+  },
+
+  // The look-dev gallery: its page loads the same libraries as the game, the
+  // game never imports it, and every contact sheet asks for things that exist.
+  async gallery() {
+    const errors = [];
+    const map = (page) => readFileSync(join(ROOT, page), 'utf8').match(/<script type="importmap">([\s\S]*?)<\/script>/)?.[1].replace(/\s+/g, '');
+    if (map('gallery.html') !== map('index.html')) errors.push("gallery.html: the import map differs from index.html's");
+    for (const f of files) {
+      if (f.startsWith(GALLERY)) continue;
+      for (const imp of importsOf(source[f])) {
+        if (resolve(dirname(f), imp.spec).startsWith(GALLERY)) errors.push(`${rel(f)}:${lineOf(source[f], imp.index)}: the game imports the gallery (${imp.spec})`);
+      }
+    }
+    const { SHEETS } = await load('gallery/sheets.js');
+    const { POSES, LIGHTS, VIEWS } = await load('gallery/presets.js');
+    const { SLOTS, styleInfo } = await load('cosmetics.js');
+    let count = 0;
+    for (const [name, S] of Object.entries(SHEETS)) {
+      const { cols, cells } = S.make({});
+      if (!cells.length || !(cols > 0) || S.tile?.length !== 2 || !S.about) errors.push(`sheet ${name}: needs cells, cols, a tile size and an "about" line`);
+      for (const { label, q } of cells) {
+        count++;
+        const bad = (what) => errors.push(`sheet ${name}, cell "${label}": ${what}`);
+        if (q.view && !VIEWS[q.view]) bad(`no view "${q.view}"`);
+        if (q.light && !LIGHTS[q.light]) bad(`no light "${q.light}"`);
+        if (q.pose && !POSES[q.pose]) bad(`no pose "${q.pose}"`);
+        for (const slot of SLOTS) if (q[slot] && !styleInfo(slot, q[slot])) bad(`no ${slot} style "${q[slot]}"`);
+      }
+    }
+    return { errors, note: `${Object.keys(SHEETS).length} sheets, ${count} cells` };
   },
 
   // Saves of any age migrate to the current shape, and migrating twice changes nothing.
