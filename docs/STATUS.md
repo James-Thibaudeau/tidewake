@@ -263,7 +263,7 @@ Updated 2026-11-25.
   - [ ] 4.5 Archway Isle, in two PRs: 4.5a the walkable level and the arch
     at sea, 4.5b the story and the crab report. Design in
     [archway-isle-level.md](archway-isle-level.md).
-    - [ ] 4.5a (`feature/archway-isle`, in progress):
+    - [ ] 4.5a ([#39](https://github.com/James-Thibaudeau/tidewake/pull/39)):
       - The island is a U round a bay (`world.js`, `bayFor`), and the arch
         spans the mouth, so you sail in through it. The channel is carved
         through the offshore shelf; you can land from inside the bay
