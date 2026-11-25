@@ -440,9 +440,11 @@ General:
   lengths ahead looked like it was under the bow, but the prompt said
   "Drop anchor & go ashore", so pressing E landed you instead of hauling.
   Slowed within 40 m of a beam you now get "Sail onto the treasure to haul
-  it up" until you're close enough to haul.
+  it up" until you're close enough to haul
+  ([#41](https://github.com/James-Thibaudeau/tidewake/pull/41)).
 - [x] While Sable was hailing you ("Race Sable…") she sails alongside, and
   her prompt blocked hauling treasure, docking and landing until you
   answered. Her challenge now gives way to whatever spot you're at
   (treasure, salvage, a dock, a story spot, or slowing by a shore to land)
-  and comes back when you move on.
+  and comes back when you move on
+  ([#41](https://github.com/James-Thibaudeau/tidewake/pull/41)).
