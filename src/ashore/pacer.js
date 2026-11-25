@@ -28,7 +28,7 @@ export const PACE = {
   lagFast: [8, 26],        // metres behind where Sable starts / finishes hurrying
   crouch: 0.12,            // pause before each jump (s)
   hop: [0.55, 0.72],       // jump duration range (s), longer for longer jumps
-  search: 2.5,             // how long Sable looks for each relic (s)
+  search: 4.5,             // how long Sable looks for each relic (s)
 };
 const SIDE = 2.4;          // Sable waits this far to the side of the landing spot
 const MEET_R = 3.2;        // walk this close to Sable for the challenge prompt

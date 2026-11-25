@@ -19,7 +19,7 @@ Decisions already made:
 
 ## Status
 
-Updated 2026-11-24. The phase sections below are the original plan; this
+Updated 2026-11-25. The phase sections below are the original plan; this
 section records what has shipped and what's left. Keep it current when a
 pull request merges.
 
@@ -71,6 +71,18 @@ pull request merges.
     reef: the bow is jammed on the rocks, and the stern with the cabin has
     torn away and rolled over. Ashore, torn planking hangs across the break
     to the stern ([#19](https://github.com/James-Thibaudeau/tidewake/pull/19)).
+
+- [x] **Phase 8, the rival captain:** Captain Sable and the crimson sloop.
+  Six encounters (a sprint, a buoy race, a foot race to a summit, a fog run
+  by compass, a relic scramble, a tow after a storm), the letter, the flare
+  and the kraken rescue, then Sable as a friend with rematches from the
+  Quest Board. Rewards: Sable's tricorn, crimson sails, the title *Lifeline*.
+  How it's built, and the decisions taken, are in
+  [rival-captain.md](rival-captain.md)
+  ([#28](https://github.com/James-Thibaudeau/tidewake/pull/28)).
+  - It shipped before Phase 7, so `rival.js` schedules its own encounters
+    (harbor talk on the Quest Board, a search circle, the sloop appears when
+    you get close). The Phase 7 director can take that over later.
 
 ### Next up
 
@@ -124,14 +136,29 @@ pull request merges.
   - [x] Ashore lantern glow takes its bloom boost once at start-up, so
     `tidewake.fx.setEnabled()` doesn't change it. It now follows the boost.
 
+- [ ] **Rival captain follow-ups** (after #28; `src/rival.js`, `src/race.js`,
+  `src/kraken.js`, `src/ashore/pacer.js`):
+  - [ ] Play every race by hand and tune the pace. So far the races have
+    been run by a test pilot in the console, not by a person: `pace` and the
+    rubber band in `race.js`, `PACE` in `pacer.js`, the tentacle timings at
+    the top of `kraken.js`.
+  - [ ] Sable's writing (`rival-text.js`) is a first draft: review it like
+    the journals were.
+  - [ ] Move the relic scramble to a tropical island when that biome can be
+    landed on (Phase 4).
+  - [ ] Hand encounter delivery to the Phase 7 event director.
+  - [ ] Sounds for the kraken, the buoys' bells and the flare (they reuse
+    existing sounds).
+  - [ ] The towed sloop has no collision with land, and Sable carries no
+    lantern ashore at night.
+  - [ ] In the fog run the panel shows the bearing but not who's ahead.
+
 ### Ideas (planned, not started)
 
 - [ ] **Phase 6, anchor refits:** refit grandfather's anchor tier by tier
   to unlock each biome. Ships alongside the Phase 4 biomes.
 - [ ] **Phase 7, a living sea:** random ocean events (whales, dolphins, a
   ghost ship at night…), a Sightings log, and report quests.
-- [ ] **Phase 8, the rival captain:** Captain Sable's story told through
-  races at sea and on land, ending with a kraken rescue.
 
 ### Known issues
 
@@ -864,10 +891,12 @@ src/
   game.js              (all) new modes, event emits, wiring
   ui.js / index.html / style.css   (all) port tabs, creator, tracker, journal, ashore HUD
   sea-events.js        (P7) event director, event actors, sightings
-  race.js              (P8) checkpoints, countdown, AI rival boat
-  rival.js             (P8) rival chapters, conditions, ashore pacer
+  race.js              (P8) checkpoints, countdown, AI helmsman
+  rival.js             (P8) rival chapters, conditions, the sloop
   rival-text.js        (P8) Sable's dialogue and story cards
+  tow.js               (P8) tow line between two boats
   kraken.js            (P8) finale set piece
+  ashore/pacer.js      (P8) Sable on foot: summit race, relic scramble
 ```
 
 ## Delivery
@@ -918,10 +947,12 @@ the browser preview (`tidewake-dev` in `.claude/launch.json`):
   tropical → volcanic → cold), so each one unlocks the next journal. The
   cost is that rocky, with its sheer ledges, comes before the gentler
   tropical biome, so the early rocky levels need tuning down.
-- **Rival name and look:** "Sable" is a working name. Their look,
-  pronouns and the grandmother backstory are still to be decided.
-- **AI boats:** `boat.js` assumes one player boat. Races and the kraken tow
-  need a second boat that can be driven by AI, which is the biggest
-  technical risk in Phase 8.
+- **Rival name and look (decided 2026-11-25, open to change):** Sable keeps
+  the working name and is "they". Dark tricorn with a plume, crimson coat,
+  black sloop with crimson sails. The grandmother is "the captain of the
+  crimson sails" and is never named.
+- **AI boats (done):** `Boat` now takes options, so Sable's sloop is a
+  second boat with its own livery and no lights, sailed by `AutoHelm` in
+  `race.js`.
 - **Event frequency:** too many events make them wallpaper. Start rare,
   then tune from playtests.

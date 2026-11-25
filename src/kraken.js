@@ -37,6 +37,7 @@ const SLOOP_CLEAR = 14;      // no slam this close to the held sloop
 const PLAYER_CLEAR = 9;      // no telegraph starts this close to the player
 const LINE_RANGE = 20, LINE_SPEED = 8;  // throwing the line
 const TOW_LENGTH = 16;
+const TOW_GRACE = 5;         // a breather after the line goes on: you start from a standstill
 const LANTERN_RANGE = 60, LANTERN_COOLDOWN = 10;
 const WAKE_MARGIN = 60;      // the creature stirs when you're within site.r + this
 const N_BUBBLES = 96;
@@ -243,6 +244,8 @@ export class Kraken {
     this.tow = new TowLine(this.game.scene, this.game.boat, this.sloop, { length: TOW_LENGTH });
     this.coil.on = false;   // the coil slides off as the line comes taut
     this.phase = 'tow';
+    this.grace = TOW_GRACE;
+    for (const T of this.tentacles) if (this.threatening(T)) this.flinch(T);
     this.game.audio.play('treasure');
   }
 
@@ -283,6 +286,7 @@ export class Kraken {
     this.awake = this.phase !== 'done' && dC < site.r + WAKE_MARGIN;
     if (this.awake && this.entryAngle == null) this.entryAngle = Math.atan2(pz - site.z, px - site.x);
     this.lanternCd = Math.max(0, this.lanternCd - dt);
+    this.grace = Math.max(0, (this.grace || 0) - dt);
 
     if (this.phase === 'approach') this.holdSloop();
     this.tow?.update(dt);
@@ -290,7 +294,7 @@ export class Kraken {
     if (!this.caught) {
       if (this.phase === 'tow' && dC > site.r) this.rescue();
       const active = this.tentacles.reduce((n, T) => n + (this.threatening(T) ? 1 : 0), 0);
-      let room = this.awake ? MAX_ACTIVE - active : 0;
+      let room = this.awake && this.grace <= 0 ? MAX_ACTIVE - active : 0;
       for (const T of this.tentacles) {
         const was = T.state;
         this.stepTentacle(T, dt, room > 0);
@@ -388,8 +392,9 @@ export class Kraken {
       let tx, tz;
       if (!held) {
         if (rnd() < 0.6) {
-          // where the player will be when it lands, set off to one side so steering clears it
-          const lead = (2.6 + rnd()) * Math.max(Math.abs(b.speed), 3), side = sign() * (6 + rnd() * 8);
+          // where the player will be when it lands, set off to one side: its near end
+          // reaches the player's course about half the time, and a touch of helm clears it
+          const lead = (2.6 + rnd()) * Math.max(Math.abs(b.speed), 3), side = sign() * (STRIP_HALF + rnd() * 9);
           tx = px + fx * lead - fz * side; tz = pz + fz * lead + fx * side;
         } else {
           const ahead = 25 + rnd() * 45, side = sign() * (10 + rnd() * 25);

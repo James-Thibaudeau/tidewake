@@ -149,7 +149,7 @@ landing prompt and on entering a level.
 ### UI the modules call
 
 ```js
-ui.setRace({ title, line } | null)  // race panel on the HUD
+ui.setRace({ title, line } | null)  // race panel on the HUD (replaces the quest tracker during a sea race)
 ui.countdown(text | null)           // big centred "3", "2", "1", "Go!"
 ui.hail(speaker, lines)             // speech banner; rival.js only
 ```
@@ -157,5 +157,18 @@ ui.hail(speaker, lines)             // speech banner; rival.js only
 ## Verifying
 
 No test suite, so: syntax-check every module, then play each encounter in
-the browser preview using the console (`tidewake.rival.debug(chapter)`
-jumps to a chapter and puts the boat by its encounter).
+the browser preview. In the console, `tidewake.rival.debug(chapter)` jumps
+to a chapter (0-8), skips its gate and puts the boat near where it happens.
+
+What was checked for the first PR, driving the game from the console with a
+test pilot steering the player's boat:
+
+- An old (v1) save loads and gains `rival`.
+- All six encounters, the letter, the flare, the kraken (caught, re-try,
+  rescue), the rewards and a reload afterwards.
+- Losing a race still advances the story; being wrecked mid-race cancels it.
+- Harbor talk appears on the Quest Board with no debug shortcuts.
+- Rematches at sea and on foot, and the crimson sail switch.
+- Phone size (375 wide, Low quality): the race panel and speech banner fit.
+
+Not yet done: a person playing the races by hand, on a real phone.

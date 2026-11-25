@@ -338,8 +338,11 @@ export class Rival {
     this.showSloop(at.x, at.z, this.game.weather.windAngle + Math.PI / 2);
     this.sloop.sailLevel = 1;
     this.act = { type: 'approach', enc, hailed: false, t: 0, home: { x: at.x, z: at.z }, loiter: 0 };
-    if (enc.kind === 'fog') { const w = this.game.weather; w.set('fog'); w.timer = 420; }
+    if (enc.kind === 'fog') this.fogIn();
   }
+
+  /** The fog run needs fog: roll it in and hold it for the length of a race. */
+  fogIn() { const w = this.game.weather; w.set('fog'); w.timer = Math.max(w.timer, 420); }
 
   updateApproach(dt, wind, act) {
     const s = this.sloop, p = this.player, d = dist(s.pos, p.pos);
@@ -390,6 +393,7 @@ export class Rival {
     const race = new SeaRace(g, s, course, { title: enc.title, fog: enc.kind === 'fog', pace: rematch ? 0.97 : 0.94,
       onFinish: (res) => this.finishRace(enc, res, rematch) });
     this.act = { type: 'race', enc, race, rematch };
+    if (enc.kind === 'fog') this.fogIn();
     g.ui.setPrompt(null);
     race.start();
     return true;
@@ -563,9 +567,9 @@ export class Rival {
     this.endFlare();
     const far = Math.min(d, 1300), ux = (D.x - b.x) / d, uz = (D.z - b.z) / d, sc = far / 1300;
     const group = new THREE.Group();
-    const core = new THREE.Mesh(new THREE.SphereGeometry(5 * sc + 1, 10, 8), new THREE.MeshBasicMaterial({ color: '#ff4a3a', transparent: true, fog: false }));
+    const core = new THREE.Mesh(new THREE.SphereGeometry(8 * sc + 1.5, 10, 8), new THREE.MeshBasicMaterial({ color: '#ff4a3a', transparent: true, fog: false }));
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTexture(), color: '#ff5a48', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
-    halo.scale.setScalar(70 * sc + 12);
+    halo.scale.setScalar(120 * sc + 20);
     group.add(core, halo);
     group.position.set(b.x + ux * far, 0, b.z + uz * far);
     this.game.scene.add(group);
@@ -590,8 +594,8 @@ export class Rival {
     this.act = { type: 'kraken', kraken, phase: 'approach', t: 0 };
     const w = g.weather; w.set('rain'); w.timer = 600;
     this.say(DEEP.arrive);
-    setTimeout(() => { if (this.act?.type === 'kraken') g.ui.toast(DEEP.tip, 'info'); }, 9000);
-    setTimeout(() => { if (this.act?.type === 'kraken') g.ui.toast(DEEP.tipLantern, 'info'); }, 22000);
+    const tip = (text, ms) => setTimeout(() => { if (this.act?.kraken === kraken && !this.act.done) g.ui.toast(text, 'info'); }, ms);
+    tip(DEEP.tip, 9000); tip(DEEP.tipLantern, 22000);
   }
 
   updateKraken(dt, elapsed, act) {
@@ -762,7 +766,7 @@ export class Rival {
     if (!from) { g.ui.toast('There is no room to race off this harbor.', 'info'); return false; }
     g.setSail();
     this.clearAct();
-    R.flags.rematch = { id };
+    R.flags.rematch = null; // only a race on foot waits for you (on its island)
     return this.startRace(enc, from, true);
   }
 
@@ -818,6 +822,7 @@ export class Rival {
     if (R.chapter === 7) {
       const D = P.deep;
       if (act?.type === 'kraken') {
+        if (act.kraken.phase === 'done') return { x: s.pos.x, z: s.pos.z, label: 'Safe in the shallows' };
         if (act.kraken.phase !== 'tow') return { x: s.pos.x, z: s.pos.z, label: 'Reach Sable\'s ship' };
         const d = dist(b, D) || 1;
         return { x: D.x + ((b.x - D.x) / d) * (D.r + 40), z: D.z + ((b.z - D.z) / d) * (D.r + 40), label: 'Tow Sable to the shallows' };
