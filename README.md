@@ -34,7 +34,7 @@ On foot (once grandfather's anchor is fitted):
 - **Bank your gold.** Gold in your hold is lost if you're shipwrecked. Docking at a port banks your cargo and saves your progress. Ports are your save points.
 - Glowing golden beams mark sunken treasure. Sail over one slowly and haul it up.
 - Spend banked gold at any port's shipwright: sails, hull, rudder, keel, lantern and spyglass. Every tier changes how the ship looks.
-- **Grandfather's Journals:** your grandfather's ship lies wrecked on the rocks just past Port Haven. Search it first: his journal and brass spyglass are aboard, and his other journals are scattered across the isles. Follow his clues; found pages are kept in the journal (`J`).
+- **Grandfather's Journals:** your grandfather's ship lies wrecked on the rocks just past Port Haven. Slow down beside it and climb aboard (no anchor needed): walk the beached hull to his cabin, where his journal and brass spyglass wait on the chart table. His other journals are scattered across the isles. Follow his clues; found pages are kept in the journal (`J`).
 - **Going ashore:** buy the Oak Planking hull and the shipwright tells you about your grandfather's anchor, lying beside his wreck. Haul it up and have it fitted, then slow down by any green (temperate) island and drop anchor. Climb to the summit for gold, light lanterns as checkpoints, and look for each island's hidden chest. Gold found ashore goes in your hold until you bank it.
 - Every port has a **Quest Board**: chart rumoured islands, carry parcels between ports and salvage wrecks (cyan beams). Up to three at a time; rewards are paid when you dock. A parcel or salvage aboard sinks with your ship, just like gold.
 - Every new voyage starts with the character creator. Restyle any time for free at a port's **Tailor** tab, where new hats, coats and boots are sold. Rarer pieces are hidden on the islands.
@@ -72,7 +72,8 @@ src/
   story.js        main story: chapters, grandfather's camps, searches, rewards
   story-text.js   all story writing (journals, cards, letters), kept apart from logic
   ashore/         going ashore: ashore.js (visit flow, pickups), levelgen.js + modules.js +
-                  pieces.js (island levels), controller.js + collide.js (movement), camera.js
+                  pieces.js (island levels), wreck.js (grandfather's wreck, hand-built),
+                  controller.js + collide.js (movement), camera.js
   cosmetics.js    wardrobe catalogue: palettes, styles, unlock sources, appearance profile
   creator.js      character creator / port wardrobe (studio scene + panel)
   world.js        procedural islands, terrain height, island streaming

@@ -56,11 +56,17 @@ pull request merges.
     below zero), which bloom blurred into large black areas. The sky is
     fixed, and a guard pass now scrubs NaN/Inf before bloom.
 
+- [x] **The wreck as the first walkable level** (left over from Phase 3): a
+  short, safe walk from the beach up the bow rocks, down the deck and over
+  the caved-in planks to grandfather's cabin. It needs no anchor (you climb
+  aboard from the boat), and Journal I, the spyglass and the epilogue chest
+  are found in the cabin. Hand-built in `src/ashore/wreck.js`.
+  - Fix: the compass follows the camera on foot, and moat water lies still.
+  - Fix: a story find ashore (the spyglass) no longer pulls the explorer
+    back to the helm.
+
 ### Next up
 
-- [ ] **The wreck as the first walkable level** (left over from Phase 3; see
-  *Later phases* under the main story). A short, safe walk across the
-  beached hull to grandfather's cabin, teaching movement and jumping.
 - [ ] **Phase 4, ashore content and fetch quests:**
   - [ ] Rocky islands first, then tropical, volcanic and cold, in the order
     of the anchor refits (Phase 6)
@@ -119,8 +125,8 @@ From Phase 1 (outfits):
 - [ ] Freckles are hard to see from the sailing camera.
 
 From Phase 3 (ashore):
-- [ ] The compass shows the ship's heading while you're on foot.
-- [ ] Water in the moat rises and falls with the ocean swell.
+- [x] The compass shows the ship's heading while you're on foot.
+- [x] Water in the moat rises and falls with the ocean swell.
 - [ ] Rock faces fade into the grass with a soft band instead of a crisp
   edge.
 - [ ] Platforms against a cliff can leave a small gap to the rock.

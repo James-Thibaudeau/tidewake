@@ -200,7 +200,7 @@ export class Story {
       return { x: best.dock.x, z: best.dock.z, label: `Take it to the shipwright: ${best.name}` };
     }
     const ch = this.chapter, W = this.wreck;
-    if ((ch === 1 || ch === 8) && W) return { x: W.searchPoint.x, z: W.searchPoint.z, label: ch === 1 ? "Search grandfather's wreck" : 'Open the chest under the bunk' };
+    if ((ch === 1 || ch === 8) && W) return { x: W.searchPoint.x, z: W.searchPoint.z, label: ch === 1 ? "Climb aboard grandfather's wreck" : 'Open the chest under his bunk' };
     if (ch >= 2 && ch <= 7) {
       const c = this.camps[ROMAN[ch - 1]];
       if (!c) return null;
@@ -213,26 +213,27 @@ export class Story {
     return null;
   }
 
-  /** Contextual action while sailing (search the wreck or a camp). */
+  /** Contextual action while sailing (board the wreck, or search a camp). */
   interaction(x, z, speed) {
     const ch = this.chapter, W = this.wreck;
-    let spot = null, label = '', act = null;
     const A = this.anchorSpot;
     if (this.anchor === 'quest' && A && Math.hypot(A.x - x, A.z - z) < 18) {
       if (Math.abs(speed) >= 7) return { prompt: 'Slow down to haul up the anchor' };
       return { prompt: "Haul up grandfather's anchor", action: () => this.haulAnchor() };
     }
-    if ((ch === 1 || ch === 8) && W) {
-      spot = W.searchPoint;
-      label = ch === 1 ? "Search grandfather's wreck" : 'Open the chest under the bunk';
-      act = () => (ch === 1 ? this.findJournal('I') : this.openChest());
-    } else if (ch >= 2 && ch <= 7) {
+    if (ch >= 2 && ch <= 7) {
       const id = ROMAN[ch - 1], c = this.camps[id];
-      if (c) { spot = c.search; label = "Search grandfather's camp"; act = () => this.findJournal(id); }
+      if (c && Math.hypot(c.search.x - x, c.search.z - z) < 26) {
+        if (Math.abs(speed) >= 7) return { prompt: 'Slow down to search' };
+        return { prompt: "Search grandfather's camp", action: () => this.findJournal(id) };
+      }
     }
-    if (!spot || Math.hypot(spot.x - x, spot.z - z) > 26) return null;
-    if (Math.abs(speed) >= 7) return { prompt: 'Slow down to search' };
-    return { prompt: label, action: act };
+    // the wreck can be walked any time: it needs no anchor, you tie up alongside
+    if (W && ch >= 1 && Math.hypot(W.searchPoint.x - x, W.searchPoint.z - z) < 26) {
+      if (Math.abs(speed) >= 7) return { prompt: 'Slow down to climb aboard' };
+      return { prompt: "Climb aboard grandfather's wreck", action: () => this.game.ashore?.enterWreck() };
+    }
+    return null;
   }
 
   // ---------------------------------------------------------------- progress

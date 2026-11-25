@@ -256,6 +256,8 @@ export function generateLevel(island, opts = {}) {
     caches: L.caches,
     chests: L.chests,
     summit: L.summit,
+    // still water: the moat lies inside this radius, the beach takes the swell
+    calm: { x: 0, z: 0, r: calmRadius(T) },
     // extras (not in the contract, handy for debugging and hints)
     modules: L.modules,
     layout: L,
@@ -266,6 +268,13 @@ export function generateLevel(island, opts = {}) {
     },
   };
   return level;
+}
+
+/** Just outside the moat's widest point (the beach beyond it hides the fade to open sea). */
+function calmRadius(T) {
+  let r = 0;
+  for (let i = 0; i < 72; i++) r = Math.max(r, T.moatOut((i / 72) * TAU));
+  return r + 1;
 }
 
 /** Validate a generated level (or a raw layout). */

@@ -1056,8 +1056,11 @@ export class Boat {
     this.binnacle.visible = lv.rudder >= 5;
     this.wheelR = lv.rudder >= 2 ? this.wheels[lv.rudder - 2].userData.R : 0.42;
     const ex = this.explorer, k = this.sizeScale;
-    if (lv.rudder >= 2) { ex.setControl('wheel'); ex.root.position.set(0, 1.0 * k, -3.0 * k); ex.root.rotation.y = 0; }
-    else { ex.setControl('tiller'); ex.root.position.set(0.42 * k, 1.0 * k, -2.55 * k); ex.root.rotation.y = -0.25; }
+    // only place the explorer at the helm while they're aboard (a story find
+    // ashore, like the spyglass, applies upgrades too)
+    const aboard = ex.root.parent === this.group;
+    if (lv.rudder >= 2) { ex.setControl('wheel'); if (aboard) { ex.root.position.set(0, 1.0 * k, -3.0 * k); ex.root.rotation.y = 0; } }
+    else { ex.setControl('tiller'); if (aboard) { ex.root.position.set(0.42 * k, 1.0 * k, -2.55 * k); ex.root.rotation.y = -0.25; } }
     // keel
     this.keelFin.visible = lv.keel >= 1;
     this.keelBulb.visible = lv.keel >= 2;
