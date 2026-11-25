@@ -79,9 +79,9 @@ pull request merges.
     an owl hollow, drifting clouds, birds, fireflies and grandfather's
     pennant ([#20](https://github.com/James-Thibaudeau/tidewake/pull/20))
   - [ ] The Elder Grove level, the first landmark level, plus the shared
-    vault for retrieve and refit quests. Draft in
-    [elder-grove-level.md](elder-grove-level.md), with open questions to
-    settle first.
+    vault for retrieve and refit quests. Design agreed in
+    [elder-grove-level.md](elder-grove-level.md): Journal III at the
+    carving, the anchor required, an owl that hoots you up the tree.
   - [ ] Rocky islands first, then tropical, volcanic and cold, in the order
     of the anchor refits (Phase 6)
   - [ ] Landmark levels; move Journals III–VII from the beach camps into
@@ -565,7 +565,8 @@ stick.
 - **Biomes:**
   - Tropical: palm-top hops, tide pools, rope bridges.
   - Cold: ice that slides, snow pines, wind gusts.
-  - Volcanic: lava, crumbling basalt, steam vents that launch you.
+  - Volcanic: lava, crumbling basalt, steam vents that launch you (the
+    launch mechanic is built here, not in the Elder Grove).
   - Rocky: sheer ledges, arches, sea-stack hops.
 - **Landmark levels:** bigger, partly hand-authored set pieces, each holding
   a unique cosmetic and one of the grandfather's journals (III–VII move here
