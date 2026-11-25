@@ -75,6 +75,13 @@ pull request merges.
 ### Next up
 
 - [ ] **Phase 4, ashore content and fetch quests:**
+  - [x] The Elder Tree at sea: a giant, detailed landmark tree with roots,
+    an owl hollow, drifting clouds, birds, fireflies and grandfather's
+    pennant ([#20](https://github.com/James-Thibaudeau/tidewake/pull/20))
+  - [ ] The Elder Grove level, the first landmark level, plus the shared
+    vault for retrieve and refit quests. Draft in
+    [elder-grove-level.md](elder-grove-level.md), with open questions to
+    settle first.
   - [ ] Rocky islands first, then tropical, volcanic and cold, in the order
     of the anchor refits (Phase 6)
   - [ ] Landmark levels; move Journals III–VII from the beach camps into
