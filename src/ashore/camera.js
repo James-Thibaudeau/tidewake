@@ -47,8 +47,9 @@ export class FollowCamera {
     return this.solid;
   }
 
-  /** Trees with platforms spiralling round them (from the level's layout). */
+  /** Trees with platforms spiralling round them (from the level's layout, or listed by a hand-built level). */
   hubs() {
+    if (this.level.hubs) return this.level.hubs;
     const b = this.level.layout?.branches;
     return Array.isArray(b) ? b.map((x) => x.tree).filter(Boolean) : [];
   }
@@ -108,7 +109,7 @@ export class FollowCamera {
     let hub = null, hd = Infinity;
     for (const h of this.hubs()) {
       const d = Math.hypot(h.x - p.x, h.z - p.z);
-      if (d < (h.orbit || 2.5) + 2.2 && p.y > h.base + 0.6 && d < hd) { hub = h; hd = d; }
+      if (d < (h.orbit || 2.5) + 2.2 && p.y > h.base + 0.6 && !(p.y > h.top) && d < hd) { hub = h; hd = d; }
     }
     if (hub && idle > 0.5) {
       const ix = (hub.x - p.x) / (hd || 1), iz = (hub.z - p.z) / (hd || 1); // toward the trunk

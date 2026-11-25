@@ -23,7 +23,8 @@ node tools/check.mjs
 About a second, no browser. Run it after every change. It checks syntax,
 that every import resolves to a real export and is used, that no helper was
 left behind when code moved between files, text keys (`LINES.x`), element
-ids, save migration, and 150 generated ashore layouts. One group at a time:
+ids, save migration, 150 generated ashore layouts, and the Elder Grove
+(its limits, and a test climber that walks it from the beach to the crown). One group at a time:
 `node tools/check.mjs imports`.
 
 It can't see rendering or behaviour. For those, use the browser.
@@ -79,7 +80,7 @@ game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, 
   `src/boat/` (see the header of each core file for the map). Methods are
   called as `this.method()` wherever they live, so grep the method name to
   find it. New methods go in the part file that fits.
-- **Pure modules stay pure**: `ashore/modules.js`, `collide.js`,
+- **Pure modules stay pure**: `ashore/modules.js`, `ashore/grove-layout.js`, `collide.js`,
   `controller.js`, `shapes.js`, `save.js`, `config.js`, `util.js`,
   `cosmetics.js` and the text files import no three.js and touch no DOM at
   load, so `tools/check.mjs` can run them in Node. Keep it that way.

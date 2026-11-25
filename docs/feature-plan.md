@@ -46,6 +46,44 @@ The designs of shipped phases (0-3 and 8) moved to
 - **Gentle obstacles:** crabs that bump you back and gulls that swoop, but no
   combat.
 
+### Phase 4 in smaller PRs
+
+Phase 4 is too big for one PR. It ships as the pieces below, in this order.
+Each one is playable on its own and leaves `main` working.
+
+Two rules hold for every piece:
+- **A biome PR ships with its anchor refit** (Phase 6), so the biome is
+  gated the moment it can be landed on.
+- **A landmark PR also rebuilds that landmark's sea view** to the standard
+  of the Elder Tree (`src/elder-tree.js`): a detailed, hand-built model that
+  reads from far off and has life in it (movement, weather of its own,
+  something at night). Today the other four are a few props: ten pillars, one
+  arch, some smoke puffs and extra ice.
+
+| PR | Branch | What it adds | Depends on |
+| --- | --- | --- | --- |
+| 4.0 | (done, #20 and the retrieve quests) | The Elder Tree at sea; the vault; retrieve quests and the map fragment | P3 |
+| 4.1 | `feature/elder-grove-level` | The Elder Grove as a walkable level: beach, old wood, roots and vault, the trunk spiral, the owl hollow, the owl bough, the crown. No story yet: Journal III stays at the camp | 4.0 |
+| 4.2 | `feature/elder-grove-story` | The note in the tent, Journal III at the carving, the flower crown in the crown chest, the owl guide and its hoot, fireflies at night. Chapter III points at the level | 4.1 |
+| 4.3 | `feature/anchor-refits` | The refit system (Phase 6): `upgrades.anchor`, the shipwright's refit quest, the fitting at a vault, the anchor model per tier, the per-biome "can't land" lines. No new biome yet | 4.0 |
+| 4.4 | `feature/rocky-biome` | Rocky islands (sheer ledges, arches, sea-stack hops) and the grapnel refit, tier 1 | 4.3 |
+| 4.5 | `feature/archway-isle` | Archway Isle: the cliff traverse, Journal IV, the fur hood; the great arch rebuilt at sea | 4.4 |
+| 4.6 | `feature/tropical-biome` | Tropical islands (palm-top hops, tide pools, rope bridges) and the coral flukes, tier 2. Sable's relic scramble moves here | 4.3 |
+| 4.7 | `feature/sunken-temple` | The Sunken Temple: flooded ruins, Journal V, the shell necklace; the temple rebuilt at sea | 4.6 |
+| 4.8 | `feature/volcanic-biome` | Volcanic islands (lava, crumbling basalt) with the steam-vent launch, and the tempered chain, tier 3 | 4.3 |
+| 4.9 | `feature/mount-cinderhorn` | Mount Cinderhorn: the crater descent, Journal VI, the gold circlet; the volcano rebuilt at sea | 4.8 |
+| 4.10 | `feature/cold-biome` | Cold islands (ice that slides, snow pines, wind gusts) and the ice spikes, tier 4 | 4.3 |
+| 4.11 | `feature/frostspire` | Frostspire: the vertical climb, Journal VII, its cosmetic; the spire rebuilt at sea | 4.10 |
+| 4.12 | `feature/ashore-critters` | Crabs that bump you back and gulls that swoop, on every biome | any biome |
+
+Notes:
+- 4.1 and 4.3 don't touch the same files, so they can be built side by side.
+- Which cosmetic goes with which landmark (after the flower crown) is a
+  suggestion, to be settled in each landmark's design.
+- Each landmark gets a short design file like
+  [elder-grove-level.md](elder-grove-level.md) before it is built.
+- 4.12 can land any time after 4.4; it is last because nothing waits on it.
+
 ---
 
 ## Phase 5: Polish
@@ -213,7 +251,7 @@ One feature branch and PR per phase, matching how the repo already works
 | P2a | `feature/quest-board` | P0 (can run in parallel with P1, but both touch the port sheet tabs; land P1 first or agree on the tab markup up front) |
 | P2b | `feature/main-story` | P2a (story quests reuse the quest engine, tracker and map markers), plus the journal text written and approved |
 | P3 | `feature/ashore-core` | P0, and P1's articulated explorer |
-| P4 | `feature/ashore-biomes-retrieve` | P2, P3 |
+| P4 | Thirteen smaller PRs: see *Phase 4 in smaller PRs* | P2, P3 |
 | P5 | `feature/ashore-polish` | P4 |
 | P6 | One refit per Phase 4 biome PR | P3, and that biome's Phase 4 work |
 | P7 | `feature/living-sea` | P2a (report quests) |

@@ -16,11 +16,14 @@ import { STYLES, owns } from '../cosmetics.js';
 import { siteBeam, MAP_FRAGMENT } from '../quests.js';
 import { generateLevel } from './levelgen.js';
 import { buildWreckLevel } from './wreck.js';
+import { buildGroveLevel } from './grove.js';
 import { CharacterController } from './controller.js';
 import { FollowCamera } from './camera.js';
 import { LandRace } from './pacer.js';
 
 const LAND_BIOMES = new Set(['temperate']); // Phase 3: temperate islands only
+// Hand-built levels for landmark islands, by island.landmark; the rest are generated.
+const LANDMARK_LEVELS = { grove: buildGroveLevel };
 const LAND_RANGE = 46;                       // how close to the shore the boat must be
 const LAND_SPEED = 5;                        // boat speed (m/s) below which you can land
 
@@ -137,8 +140,8 @@ export class Ashore {
     this.island = I;
     // the rowboat is drawn up on the beach facing the anchored ship
     const landingAngle = Math.atan2(g.boat.pos.z - I.z, g.boat.pos.x - I.x);
-    this.level = I.wreck ? buildWreckLevel(I, { quality: g.settings.quality })
-      : generateLevel(I, { quality: g.settings.quality, landingAngle });
+    const build = I.wreck ? buildWreckLevel : LANDMARK_LEVELS[I.landmark] || generateLevel;
+    this.level = build(I, { quality: g.settings.quality, landingAngle });
     this.syncStory();
     this.hintsShown = new Set();
     const calm = this.level.calm;

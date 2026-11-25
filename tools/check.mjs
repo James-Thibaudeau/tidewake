@@ -2,7 +2,7 @@
 // Fast checks that need no browser and no dependencies:
 //
 //   node tools/check.mjs            everything (about a second)
-//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | save | layout
+//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | save | layout | grove
 //   node tools/check.mjs layout 500 layouts for 500 synthetic islands (default 150)
 //
 // Run it after every change. It catches the mistakes that otherwise only show
@@ -289,6 +289,46 @@ const checks = {
       if (!L.validation.ok) errors.push(`${what}, ${L.tier}: ${L.validation.errors.slice(0, 3).join('; ')}`);
     }
     return { errors, note: `${count} islands (${Object.entries(tiers).map(([t, n]) => `${n} ${t}`).join(', ')}; ${retries} re-rolls)` };
+  },
+
+  // The Elder Grove: the layout keeps its design limits, and a test climber
+  // (the real controller, steered by a simple pilot) gets from the beach to
+  // the owl bough at a walk, and on up to the crown.
+  async grove() {
+    const { buildGroveLayout, validateGrove, footGap, nodeFoot, supportAt } = await load('ashore/grove-layout.js');
+    const { CharacterController } = await load('ashore/controller.js');
+    const { ASHORE } = await load('config.js');
+    const L = buildGroveLayout();
+    const v = validateGrove(L);
+    const errors = [...v.errors];
+    const climb = (nodes, label) => {
+      const ctl = new CharacterController(L, ASHORE);
+      ctl.teleport(nodes[0].x, nodes[0].y + 0.05, nodes[0].z, 0);
+      let t = 0;
+      for (let i = 1; i < nodes.length; i++) {
+        const A = nodes[i - 1], B = nodes[i], run = footGap(nodeFoot(A), nodeFoot(B)) > 1.5;
+        let held = 0;
+        for (let k = 0; ; k++) {
+          const p = ctl.pos, dx = B.x - p.x, dz = B.z - p.z, d = Math.hypot(dx, dz) || 1;
+          if (ctl.grounded && d < 0.7 && Math.abs(p.y - B.y) < 0.25) break;
+          const what = `${label}[${i}] ${A.piece?.kind || 'ground'}→${B.piece?.kind || 'ground'}`;
+          if (k > 60 * 25) { errors.push(`${what}: the climber got stuck at ${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`); return t; }
+          if (p.y < Math.min(A.y, B.y) - 2.5) { errors.push(`${what}: the climber fell (to ${p.y.toFixed(1)} m)`); return t; }
+          // jump at a ledge too high to step onto, or where the footing ends
+          const ahead = supportAt(L, p.x + (dx / d) * 0.5, p.z + (dz / d) * 0.5, p.y + 0.4);
+          const wall = B.piece && B.y > p.y + ASHORE.stepUp && footGap(B.piece.foot, [[p.x, p.z]]) < 0.75;
+          const jump = ctl.grounded && (wall || ahead < p.y - 0.5);
+          if (jump) held = 30;
+          ctl.update(1 / 60, { wishX: dx / d, wishZ: dz / d, run, jumpPressed: jump, jumpHeld: held-- > 0 });
+          t += 1 / 60;
+        }
+      }
+      return t;
+    };
+    const main = climb(L.route, 'main');
+    const crown = climb(L.crown, 'crown');
+    const s = v.stats;
+    return { errors, note: `${s.pieces} pieces, ${s.coins} coins; to the owl bough in ${main.toFixed(0)} s (${s.jumps} jumps), the crown in ${crown.toFixed(0)} s more (${s.crownJumps} jumps)` };
   },
 };
 
