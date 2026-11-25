@@ -69,6 +69,12 @@ Updated 2026-11-25.
   - It shipped before Phase 7, so `rival.js` schedules its own encounters
     (harbor talk on the Quest Board, a search circle, the Redwing appears when
     you get close). The Phase 7 director can take that over later.
+  - Sable has a tab of their own in the journal (`J`), shown once you've
+    met: the race record, what you've learned, and everything Sable has
+    said to you, newest first, with the story card scenes. It used to be a
+    card in the middle of the Quests tab. The talk is saved in
+    `state.rival.log`; older saves are given what was said in the
+    encounters already behind them (all but the win or lose line).
 
 - [x] **Character revamp** (not in the original plan): the explorer has
   roughly real proportions, about four and a half heads tall, with a smaller

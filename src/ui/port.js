@@ -133,20 +133,20 @@ export class PortUI {
   toggleJournal() { if (this.journalOpen) this.closeJournal(); else this.openJournal(); }
 
   renderJournal() {
-    const tab = this.journalTab || 'quests';
-    this.el.journalTabs?.querySelectorAll('button[data-jtab]').forEach((b) => b.classList.toggle('on', b.dataset.jtab === tab));
-    this.el.journalTitle.textContent = tab === 'story' ? "Grandfather's Journals" : 'Quests';
+    const sable = this.game.rival?.journal();
+    let tab = this.journalTab || 'quests';
+    if (tab === 'sable' && !sable) tab = this.journalTab = 'quests';
+    this.el.journalTabs?.querySelectorAll('button[data-jtab]').forEach((b) => {
+      b.classList.toggle('on', b.dataset.jtab === tab);
+      if (b.dataset.jtab === 'sable') b.classList.toggle('hidden', !sable);
+    });
+    this.el.journalTitle.textContent = { story: "Grandfather's Journals", sable: 'Captain Sable' }[tab] || 'Quests';
     if (tab === 'story') { this.el.journalBody.innerHTML = this.renderStoryPages(); return; }
+    if (tab === 'sable') { this.el.journalBody.innerHTML = this.renderSable(sable); return; }
     const Qs = this.game.quests;
     let html = '';
     const sq = Qs.storyQuests;
     if (sq.length) html += `<h3 class="sectionTitle">Main story</h3><div class="grid">${sq.map((q) => this.questCard(q, 'active')).join('')}</div>`;
-    const sable = this.game.rival?.journal();
-    if (sable) {
-      html += `<h3 class="sectionTitle">Captain Sable</h3><div class="card qCard rivalLog"><div class="qTitle">${esc(sable.record)}</div>
-        ${sable.title ? `<div class="qStatus">Title: ${esc(sable.title)}</div>` : ''}
-        ${sable.learned.length ? `<ul>${sable.learned.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : '<div class="qText">You know nothing about them yet, except that they are fast.</div>'}</div>`;
-    }
     html += `<h3 class="sectionTitle">Active (${Qs.active.length}/${MAX_ACTIVE})</h3>`;
     html += Qs.active.length
       ? `<div class="grid">${Qs.active.map((q) => this.questCard(q, 'active')).join('')}</div>`
@@ -181,6 +181,23 @@ export class PortUI {
         ${p.clue ? `<p class="clue">${esc(p.clue)}</p>` : ''}</div>`;
     }
     return `<div class="jStory"><div class="jList">${list}</div>${page}</div>`;
+  }
+
+  /** The Captain Sable tab: the record, what you've learned, and everything they've said to you (newest first). */
+  renderSable(s) {
+    let html = `<div class="card qCard rivalLog"><div class="giver"><span class="avatar" style="background:#e8413a">S</span><span><b>Captain Sable</b> · ${s.friend ? 'a friend' : 'a rival'}</span></div>
+      <div class="qTitle">${esc(s.record)}</div>
+      ${s.title ? `<div class="qStatus">Your title: ${esc(s.title)}</div>` : ''}
+      ${s.step ? `<div class="qText"><b>${esc(s.step.title)}:</b> ${esc(s.step.text)}</div>` : ''}</div>`;
+    html += `<h3 class="sectionTitle">What you know</h3><div class="card qCard rivalLog">${s.learned.length
+      ? `<ul>${s.learned.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`
+      : '<div class="qText">Nothing yet, except that they are fast.</div>'}</div>`;
+    html += '<h3 class="sectionTitle">Conversations</h3>';
+    html += s.log.length
+      ? s.log.map((e) => `<div class="card sableTalk${e.scene ? ' scene' : ''}"><div class="talkHead"><b>${esc(e.title)}</b>${e.day ? `<span>Day ${e.day}</span>` : ''}</div>
+        ${e.lines.map((l) => `<p>${esc(l)}</p>`).join('')}</div>`).join('')
+      : '<div class="qEmpty">Nothing said yet.</div>';
+    return html;
   }
 
   /** Harbor talk about the Redwing, or Sable in person, above the quest offers. */

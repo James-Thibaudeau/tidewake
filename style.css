@@ -734,5 +734,12 @@ body.touch #hail { bottom: calc(var(--sab) + 232px); }
 .qCard.rivalNote .row2 .btn { flex: 1 1 140px; font-size: 14px; }
 .rivalLog { border-color: rgba(232, 65, 58, 0.7); }
 .rivalLog ul { margin: 4px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.4; opacity: 0.92; }
+.sableTalk { border-color: rgba(232, 65, 58, 0.45); margin-bottom: 8px; padding: 8px 12px 4px; }
+.sableTalk .talkHead { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; margin-bottom: 4px; }
+.sableTalk .talkHead b { color: #ff9a8f; text-transform: uppercase; letter-spacing: 0.06em; }
+.sableTalk .talkHead span { opacity: 0.7; }
+.sableTalk p { margin: 0 0 6px; font-size: 14px; line-height: 1.4; }
+.sableTalk:not(.scene) p { padding-left: 10px; border-left: 2px solid rgba(232, 65, 58, 0.55); }
+.sableTalk.scene p { font-style: italic; opacity: 0.9; }
 @media (max-width: 560px) { #racePanel { width: 180px; } #hailText { font-size: 15px; } }
 @media (max-height: 460px) { #hail { bottom: calc(var(--sab) + 64px); } #hailText { font-size: 14px; } #countdown { top: 46%; } }

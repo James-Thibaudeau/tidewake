@@ -5,11 +5,13 @@
 // redwing between the set pieces; the races, the tow line and the kraken live
 // in race.js, tow.js, kraken.js and ashore/pacer.js.
 //
-// state.rival = { chapter, wins, losses, flags }
+// state.rival = { chapter, wins, losses, flags, log }
 //   chapter 0-5  the next encounter is ENCOUNTERS[chapter]
 //   chapter 6    Sable is refitting at flags.port: bring the letter
 //   chapter 7    the Deep: a flare at dusk (flags.flare), then the kraken
 //   chapter 8    friends: Sable visits ports, rematches for gold
+//   log          everything Sable has said to you, for the journal:
+//                [{ title, day, lines, scene? }], oldest first (scene: a story card deck)
 // Nothing about a live encounter is saved: quit mid-race and Sable simply
 // turns up again.
 import * as THREE from 'three';
@@ -26,6 +28,7 @@ export const FINAL_CHAPTER = 8;
 const SEE = 950;          // the Redwing appears when you're this close to where it waits
 const HAIL = 62;          // close enough to shout across the water
 const TOW_DRIVE = 0.72;   // how much of your sail's drive is left with a ship in tow
+const LOG_MAX = 80;       // conversations kept in the journal
 // Sable's ship keeps up with yours: every part is at least this tier, and
 // matches yours once you've passed it (so she grows into a galleon when you do).
 const SHIP_FLOOR = { sail: 2, hull: 1, rudder: 2, keel: 1, lantern: 1, spyglass: 0 };
@@ -57,13 +60,36 @@ export class Rival {
     if (!st.rival || typeof st.rival !== 'object') st.rival = { chapter: 0, wins: 0, losses: 0, flags: {} };
     const r = st.rival;
     r.chapter ||= 0; r.wins ||= 0; r.losses ||= 0; r.flags ||= {};
+    if (!Array.isArray(r.log)) r.log = [];
     return r;
   }
   get chapter() { return this.R.chapter; }
   get world() { return this.game.world; }
   get player() { return this.game.boat; }
   vars(extra = {}) { return { captain: this.game.state.profile?.name || 'Captain', ...extra }; }
-  say(lines, extra) { return this.game.ui.hail(SPEAKER, lines.map((l) => fill(l, this.vars(extra)))); }
+  /** Sable calls across the water; the lines go in the journal under `title` too. */
+  say(title, lines) {
+    const said = lines.map((l) => fill(l, this.vars()));
+    this.remember(title, said);
+    return this.game.ui.hail(SPEAKER, said);
+  }
+  /** A deck of story cards, logged as a scene under its first card's title. */
+  scene(deck) {
+    this.remember(deck[0].title, deck.map((c) => fill(c.text, this.vars())), true);
+    return this.game.ui.showStoryCards(deck);
+  }
+
+  /** Keep lines for the journal: new ones join today's entry of the same title; repeats are dropped. */
+  remember(title, lines, scene = false) {
+    const log = this.R.log, day = this.game.state.day || 1;
+    const heard = new Set(log.filter((e) => e.title === title).flatMap((e) => e.lines));
+    const fresh = lines.filter((l) => !heard.has(l));
+    if (!fresh.length) return;
+    const last = log[log.length - 1];
+    if (last && last.title === title && last.day === day && !last.scene === !scene) last.lines.push(...fresh);
+    else log.push(scene ? { title, day, scene: true, lines: fresh } : { title, day, lines: fresh });
+    if (log.length > LOG_MAX) log.splice(0, log.length - LOG_MAX);
+  }
 
   /** A sea race is on: the game shows no other prompts and hides the quest tracker. */
   get racing() { return this.act?.type === 'race'; }
@@ -382,7 +408,7 @@ export class Rival {
       if (d < HAIL) {
         act.hailed = true;
         this.R.flags.met = true;
-        this.say(act.enc.hail);
+        this.say(act.enc.title, act.enc.hail);
       }
     } else {
       // keep station off the player's beam so they can answer
@@ -452,9 +478,9 @@ export class Rival {
     if (rematch) {
       if (won) R.flags.rematchDay = s.day || 1;
       R.flags.rematch = null;
-      this.say(won ? FRIEND.rematchWin : FRIEND.rematchLose);
+      this.say(`Rematch: ${enc.title}`, won ? FRIEND.rematchWin : FRIEND.rematchLose);
     } else {
-      this.say([...(won ? enc.win : enc.lose), ...enc.after]);
+      this.say(enc.title, [...(won ? enc.win : enc.lose), ...enc.after]);
       this.advance();
     }
     g.events.emit('rival:race', enc.id, won);
@@ -514,7 +540,7 @@ export class Rival {
     if (this._landEnc?.id === enc.id && this._landEnc.island === I.id) return this._landEnc;
     this._landEnc = {
       id: enc.id, island: I.id, kind: enc.kind, profile: SABLE_PROFILE,
-      onMeet: () => { this.R.flags.met = true; this.say(rematch ? [FRIEND.lines[3], enc.hail[2]] : enc.hail); },
+      onMeet: () => { this.R.flags.met = true; this.say(rematch ? `Rematch: ${enc.title}` : enc.title, rematch ? [FRIEND.lines[3], enc.hail[2]] : enc.hail); },
       onStart: () => {},
       onFinish: ({ won }) => this.settle(enc, won, rematch),
     };
@@ -539,7 +565,7 @@ export class Rival {
     const s = this.redwing, d = dist(s.pos, this.player.pos);
     s.speed = 0; s.sailLevel = 0;
     s.heading += Math.sin(elapsed * 0.21) * 0.05 * dt; // swinging slowly on the swell
-    if (!act.hailed && d < HAIL) { act.hailed = true; this.R.flags.met = true; this.say(ENCOUNTERS[5].hail); }
+    if (!act.hailed && d < HAIL) { act.hailed = true; this.R.flags.met = true; this.say(ENCOUNTERS[5].title, ENCOUNTERS[5].hail); }
     if (d > SEE + 350) this.clearAct();
   }
 
@@ -549,7 +575,7 @@ export class Rival {
     g.audio.play('treasure');
     g.ui.toast(LINES.towSlow, 'info');
     g.quests.pin('rival');
-    setTimeout(() => { if (this.act?.type === 'tow') this.say(ENCOUNTERS[5].towing); }, 16000);
+    setTimeout(() => { if (this.act?.type === 'tow') this.say(ENCOUNTERS[5].title, ENCOUNTERS[5].towing); }, 16000);
   }
 
   // -------------------------------------------------------------- the Deep
@@ -609,11 +635,11 @@ export class Rival {
     const s = this.showRedwing(D.x, D.z, 0.6);
     const kraken = new Kraken(g, s, D, {
       onRescue: () => this.rescued(),
-      onCaught: () => this.say(DEEP.caught),
+      onCaught: () => this.say(DEEP.name, DEEP.caught),
     });
     this.act = { type: 'kraken', kraken, phase: 'approach', t: 0 };
     const w = g.weather; w.set('rain'); w.timer = 600;
-    this.say(DEEP.arrive);
+    this.say(DEEP.name, DEEP.arrive);
     const tip = (text, ms) => setTimeout(() => { if (this.act?.kraken === kraken && !this.act.done) g.ui.toast(text, 'info'); }, ms);
     tip(DEEP.tip, 9000); tip(DEEP.tipLantern, 22000);
   }
@@ -623,7 +649,7 @@ export class Rival {
     k.update(dt, elapsed);
     if (this.act !== act) return;
     if (k.phase !== act.phase) {
-      if (k.phase === 'tow') this.say(DEEP.lineFast);
+      if (k.phase === 'tow') this.say(DEEP.name, DEEP.lineFast);
       act.phase = k.phase;
     }
     // wandered off before throwing a line: the kraken (and Sable) will still be there
@@ -636,7 +662,7 @@ export class Rival {
     act.done = true;
     this.player.sailLevel = 0;
     await sleep(1800);
-    await g.ui.showStoryCards(CARDS.finale);
+    await this.scene(CARDS.finale);
     R.chapter = FINAL_CHAPTER;
     R.flags.day = g.state.day || 1;
     R.flags.title = TITLE;
@@ -689,7 +715,7 @@ export class Rival {
       g.savePortState();
       await this.afterDockDialogs();
       ui.closePort();
-      await ui.showStoryCards(CARDS.mast);
+      await this.scene(CARDS.mast);
       ui.openPort(port);
       return;
     }
@@ -703,7 +729,7 @@ export class Rival {
       g.savePortState();
       await this.afterDockDialogs();
       ui.closePort();
-      await ui.showStoryCards(CARDS.letter);
+      await this.scene(CARDS.letter);
       this.clearAct();
       this.cool = 5;
       ui.openPort(port);
@@ -723,7 +749,7 @@ export class Rival {
       R.flags.greetDay = g.state.day;
       const n = (g.state.day || 1) % (FRIEND.lines.length - 1);
       await this.afterDockDialogs();
-      this.say([FRIEND.lines[n]]);
+      this.say(FRIEND.card.title, [FRIEND.lines[n]]);
     }
   }
 
@@ -874,7 +900,7 @@ export class Rival {
     return out;
   }
 
-  /** What the journal knows about Sable (null until you've met). */
+  /** What the journal's Captain Sable tab shows (null until you've met). The log is newest first. */
   journal() {
     const R = this.R;
     if (!R.flags.met && !R.chapter) return null;
@@ -882,6 +908,9 @@ export class Rival {
       record: fill(LINES.record, { wins: R.wins, losses: R.losses }),
       learned: ENCOUNTERS.slice(0, Math.min(R.chapter, ENCOUNTERS.length)).map((e) => e.learned),
       title: R.flags.title || null,
+      friend: R.chapter === FINAL_CHAPTER,
+      step: this.step(),
+      log: [...R.log].reverse(),
     };
   }
 
