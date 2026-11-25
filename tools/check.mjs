@@ -325,6 +325,23 @@ const checks = {
       }
       return t;
     };
+    // Holding the stick along a ledge must carry you up its little steps without
+    // steering: the risers meet you at a slant, and you must not slide off them.
+    const R = L.route;
+    for (let i = 0; i + 3 < R.length; i++) {
+      const joined = (k) => R[i + k].piece?.kind === 'bark' && (k === 0 || (R[i + k].y - R[i + k - 1].y <= ASHORE.stepUp && footGap(nodeFoot(R[i + k - 1]), nodeFoot(R[i + k])) < 0.05));
+      if (![0, 1, 2, 3].every(joined)) continue;
+      const ctl = new CharacterController(L, ASHORE), a0 = Math.atan2(R[i].z, R[i].x);
+      ctl.teleport(R[i].x, R[i].y + 0.05, R[i].z, 0);
+      let far = 0;
+      for (let k = 0; k < 60; k++) {
+        const a = Math.atan2(ctl.pos.z, ctl.pos.x);
+        ctl.update(1 / 60, { wishX: -Math.sin(a), wishZ: Math.cos(a) });
+        far = Math.max(far, Math.hypot(ctl.pos.x, ctl.pos.z) - Math.hypot(R[i].x, R[i].z));
+      }
+      const turned = Math.atan2(Math.sin(Math.atan2(ctl.pos.z, ctl.pos.x) - a0), Math.cos(Math.atan2(ctl.pos.z, ctl.pos.x) - a0));
+      if (turned < 0.4 || far > 0.5) errors.push(`main[${i}]: walking along the ledge stalls or slides out (turned ${turned.toFixed(2)}, drifted ${far.toFixed(2)} m)`);
+    }
     const main = climb(L.route, 'main');
     const crown = climb(L.crown, 'crown');
     const s = v.stats;

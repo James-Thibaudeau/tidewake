@@ -10,6 +10,10 @@
 // level turns it so the rowboat faces your anchored ship.
 // Follows the level contract in shapes.js, plus:
 //   hubs: [{ x, z, orbit, base, top }]   trunks the camera circles (camera.js)
+//   fallBack: { drop, below, safe: [{ x, z, r }], down: { x, y, z, yaw } }   a fall longer
+//       than `drop` that lands more than `below` under your last lantern returns you to it
+//       (ashore.js), unless you land in a safe circle (the pool under the
+//       diving branch); lanterns that high offer to climb down to `down`
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { part, propMaterial, thinOutline, PROPS } from '../props.js';
@@ -154,20 +158,22 @@ function treeParts(L) {
   const rng = mulberry32(77);
   for (const b of L.boughs) {
     for (let i = 0; i < 7; i++) {
-      const r = lerp(b.r0 + 2.5, b.r1 - 0.5, rng()), side = (rng() - 0.5) * b.hz * 1.2, len = 1.2 + rng() * 3.2;
+      // out past the spiral, and on the owl bough only near its tip: nearer in they dangle in front of the camera
+      const r = lerp(Math.max(b.r0 + 2.5, b === L.boughs[0] ? 21 : 13), b.r1 - 0.5, rng()), side = (rng() - 0.5) * b.hz * 1.2, len = 1.2 + rng() * 3.2;
       const x = Math.cos(b.a) * r - Math.sin(b.a) * side, z = Math.sin(b.a) * r + Math.cos(b.a) * side;
       P.push(part(box(0.09, len, 0.09), i % 2 ? C.hang : C.moss, { x, y: b.top - b.thick - len / 2 + 0.3, z }));
     }
-    // a great clump of leaves at the tip
-    const tip = b.r1 + 1.8;
-    P.push(part(new THREE.IcosahedronGeometry(1, 1), C.leafM, { x: Math.cos(b.a) * tip, y: b.top + 0.6, z: Math.sin(b.a) * tip, sx: 3.8, sy: 2.6, sz: 3.8 }, { c2: C.leafD, split: 0.4 }));
-  }
-  // the canopy: a ring of leaf clumps below the crown, so the top looks out over it
-  for (let i = 0; i < 22; i++) {
-    const a = (i / 22) * TAU + rng() * 0.2, r = 20 + rng() * 7, y = 29 + rng() * 9, s = 3.4 + rng() * 1.6;
-    P.push(part(new THREE.IcosahedronGeometry(1, 1), [C.leafM, C.leafL, C.leafD][i % 3], { x: Math.cos(a) * r, y, z: Math.sin(a) * r, sx: s * 1.25, sy: s * 0.75, sz: s * 1.25, ry: a }));
-    // each clump hangs from a limb that reaches out of the trunk
-    P.push(rod([Math.cos(a) * 6.4, y - 4, Math.sin(a) * 6.4], [Math.cos(a) * (r - 1), y - 0.6, Math.sin(a) * (r - 1)], 0.7, 0.25, C.bark2));
+    // the canopy: each bough forks at its tip into limbs that carry great leaf
+    // clumps. They stand well outside the climb (and the camera that circles
+    // it), and below the crown, so the top looks out over them.
+    const tip = [Math.cos(b.a) * (b.r1 - 0.5), b.top - 0.5, Math.sin(b.a) * (b.r1 - 0.5)];
+    for (const [k, off] of [-0.42, 0, 0.42, -0.2, 0.22].entries()) {
+      const a = b.a + off, da = Math.atan2(Math.sin(a - L.diving.a), Math.cos(a - L.diving.a));
+      if (Math.abs(da) < 0.3) continue; // keep the dive clear
+      const r = Math.max(b.r1 + 9, 29) + rng() * 5, y = Math.min(37, b.top + 3 + k * 2.2 + rng() * 2), s = 3.6 + rng() * 1.5;
+      P.push(part(new THREE.IcosahedronGeometry(1, 1), [C.leafM, C.leafL, C.leafD][k % 3], { x: Math.cos(a) * r, y, z: Math.sin(a) * r, sx: s * 1.3, sy: s * 0.72, sz: s * 1.3, ry: a }));
+      P.push(rod(tip, [Math.cos(a) * (r - 1.5), y - 0.8, Math.sin(a) * (r - 1.5)], 0.5, 0.2, C.bark2));
+    }
   }
   // the aerial root from the diving branch down to the pool
   const d = L.diving, tx = Math.cos(d.a) * (d.r1 - 0.4), tz = Math.sin(d.a) * (d.r1 - 0.4);
@@ -192,7 +198,10 @@ function pieceArt(p) {
       break;
     case 'mat': case 'platform':
       P.push(...pieceParts({ kind: 'disc', cx: p.cx, cz: p.cz, top: p.top, r: p.r, trunk: 0 }));
-      if (p.a != null) P.push(rod([Math.cos(p.a) * 6.5, p.top - 1.6, Math.sin(p.a) * 6.5], [p.cx, p.top - 0.3, p.cz], 0.42, 0.2, C.bark2));
+      if (p.hang) {
+        // hung from the bough above on a pair of aerial roots
+        for (const s of [-0.5, 0.5]) P.push(rod([p.hang[0] + s, p.hang[1], p.hang[2] - s], [p.cx + s * 2, p.top - 0.2, p.cz - s * 2], 0.13, 0.09, C.hang, 5));
+      } else if (p.a != null) P.push(rod([Math.cos(p.a) * 6.5, p.top - 1.6, Math.sin(p.a) * 6.5], [p.cx, p.top - 0.3, p.cz], 0.42, 0.2, C.bark2));
       break;
     case 'bough': case 'branch': {
       // a limb flattened on top like a deck: thick at the trunk, thinner at the tip
@@ -338,6 +347,7 @@ export function buildGroveLevel(I, opts = {}) {
     summit: at(L.summit),
     vault: at(L.vault),
     hubs: L.hubs,
+    fallBack: { drop: L.fallBack.drop, below: L.fallBack.below, safe: L.fallBack.safe.map((c) => at(c)), down: at(L.fallBack.down, { yaw: L.fallBack.down.yaw + th }) },
     dispose() {
       group.removeFromParent();
       for (const o of own) o.dispose();

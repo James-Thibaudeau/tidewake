@@ -2,10 +2,19 @@
 // to turn and wheel/pinch to zoom (same feel as the sailing camera), swings in
 // behind the direction of travel when you haven't touched it for a moment,
 // and pulls in when scenery gets between it and you.
+//
+// Climbing round a tree it becomes a tower camera: it looks straight in at
+// the trunk and orbits with you, so left and right on the stick run round the
+// tree and jumps go across the screen, where gaps are easy to judge. A drag
+// there is kept as an offset from that view until you leave the tree.
+//
+// Under a bough or a ledge it ducks: it looks along more level, from below
+// the thing overhead, instead of rising into it.
 import { raycast } from './collide.js';
 
 const damp = (a, b, rate, dt) => b + (a - b) * Math.exp(-rate * dt);
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+const LEAD = -0.075; // seconds of the player's turning the tower view leads by (tuned: holding left hugs the trunk very slightly)
 
 export class FollowCamera {
   /**
@@ -25,7 +34,11 @@ export class FollowCamera {
     this.ahead = { x: 0, z: 0 };
     this.headHeight = 1.35;
     this.extra = 0;        // context pull-back (high up, around trees), smoothed
-    this.side = 1;         // which way we were circling the last tree
+    this.hub = null;       // the tree we're climbing round, if any
+    this.hubOff = 0;       // the view's turn away from "straight at the trunk"
+    this.hubManual = false; // the player set that turn by dragging
+    this.lead = 0;
+    this.duck = 0;         // 0..1: how far the view has dropped to get under something overhead
     this.solid = null;     // the level minus thin things, for pull-in checks
   }
 
@@ -62,6 +75,8 @@ export class FollowCamera {
     this.ahead.x = this.ahead.z = 0;
     this.target.x = ctrl.pos.x; this.target.y = ctrl.pos.y + this.headHeight; this.target.z = ctrl.pos.z;
     this.lastLook = -Infinity;
+    this.hub = null;
+    this.duck = 0;
     // start already pulled in if something solid is in the way (no pop after a teleport)
     const hit = raycast(this.solidView(), this.target, this.offsetDir(), this.dist + 0.3);
     if (hit.hit) this.cur = Math.max(1.4, hit.dist - 0.4);
@@ -104,28 +119,37 @@ export class FollowCamera {
     const high = p.y - (Number.isFinite(gy) ? gy : (this.level.waterY ?? 0));
     if (high > 2.2) { pitchT = 0.46; extraT += Math.min(2, (high - 2.2) * 0.35 + 0.8); }
 
-    // circling a tall tree: look in at the trunk from outside the spiral, turned
-    // a little toward the way we're going so the next platform stays in view
+    // climbing round a tree: look straight in at the trunk from outside the
+    // spiral and orbit with the player, so stick left/right is along the ledge
     let hub = null, hd = Infinity;
     for (const h of this.hubs()) {
       const d = Math.hypot(h.x - p.x, h.z - p.z);
       if (d < (h.orbit || 2.5) + 2.2 && p.y > h.base + 0.6 && !(p.y > h.top) && d < hd) { hub = h; hd = d; }
     }
-    if (hub && idle > 0.5) {
-      const ix = (hub.x - p.x) / (hd || 1), iz = (hub.z - p.z) / (hd || 1); // toward the trunk
-      const w = (p.x - hub.x) * v.z - (p.z - hub.z) * v.x;                   // circling direction
-      if (Math.abs(w) > 0.5) this.side = Math.sign(w);
-      const tx = -iz * this.side, tz = ix * this.side;                      // tangent we're heading along
-      const yawT = Math.atan2(ix + tx * 1.2, iz + tz * 1.2); // ~50° toward the way we're circling
-      this.yaw += wrap(yawT - this.yaw) * (1 - Math.exp(-3.2 * dt));
-      pitchT = Math.max(pitchT, 0.55); extraT = Math.max(extraT, 1.6);
+    if (hub && hd > 0.8) {
+      const inward = Math.atan2(hub.x - p.x, hub.z - p.z);
+      // arriving: start from the view we had and ease round; a drag is kept
+      if (this.hub !== hub) { this.hub = hub; this.hubOff = wrap(this.yaw - inward); this.hubManual = false; this.lead = 0; }
+      if (look.dx) { this.hubOff = wrap(this.yaw - inward - this.lead); this.hubManual = true; }
+      else if (!this.hubManual) this.hubOff = damp(this.hubOff, 0, 2.2, dt);
+      // no lag: if the view trailed behind, "left" would point a little off the
+      // ledge and walk the player slowly outward
+      // ...and a touch ahead of the player's own turning: the explorer takes a
+      // moment to bend their run round the trunk, which would do the same
+      const turning = ((p.x - hub.x) * v.z - (p.z - hub.z) * v.x) / (hd * hd); // rad/s round the trunk
+      this.lead = damp(this.lead, turning * LEAD, 6, dt);
+      this.yaw = inward + this.hubOff + this.lead;
+      // stand further back round a big trunk, to see more of the way round
+      pitchT = Math.max(pitchT, 0.5); extraT = Math.max(extraT, 1.6 + Math.min(2.4, (hub.orbit || 2.5) * 0.2));
     } else if (moving && sp > 0.6 && idle > 0.6) {
+      this.hub = null;
       // swing in behind the direction of travel
       const heading = Math.atan2(v.x, v.z);
       const off = wrap(heading - this.yaw);
       // walking straight at the camera shouldn't spin it round
       if (Math.abs(off) < 2.3) this.yaw += off * (1 - Math.exp(-(0.8 + 2.4 * Math.min(1, sp / 4.5)) * dt));
     }
+    if (!hub) this.hub = null;
     if (idle > 1.2) this.pitch = damp(this.pitch, pitchT, 1.4, dt);
     this.extra = damp(this.extra, extraT, 1.5, dt);
 
@@ -141,6 +165,11 @@ export class FollowCamera {
 
     // ---- pull in when something solid blocks the view (thin things don't count)
     const full = this.dist + this.extra;
+    // something solid overhead where the camera wants to be (a bough, the turn
+    // above): come down under it rather than pull in against its underside
+    const up = raycast(this.solidView(), t, this.offsetDir(this.pitch), full + 0.3);
+    const over = up.hit && up.point.y > t.y + 1.2;
+    this.duck = damp(this.duck, over ? 1 : 0, over ? 6 : 2, dt);
     const dir = this.offsetDir();
     const hit = raycast(this.solidView(), t, dir, full + 0.3);
     const want = hit.hit ? Math.max(1.4, hit.dist - 0.4) : full;
@@ -148,9 +177,10 @@ export class FollowCamera {
     this.place();
   }
 
-  offsetDir() {
-    const cp = Math.cos(this.pitch);
-    return { x: -Math.sin(this.yaw) * cp, y: Math.sin(this.pitch), z: -Math.cos(this.yaw) * cp };
+  /** From the target out to the camera. By default at the ducked pitch (see `duck`). */
+  offsetDir(pitch = this.pitch * (1 - 0.75 * this.duck)) {
+    const cp = Math.cos(pitch);
+    return { x: -Math.sin(this.yaw) * cp, y: Math.sin(pitch), z: -Math.cos(this.yaw) * cp };
   }
 
   place() {

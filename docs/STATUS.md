@@ -99,12 +99,45 @@ Updated 2026-11-25.
     fungus steps to the owl bough, and an optional climb on leaf mats to the
     crown, with a diving branch back down to a pool. Hand-built in
     `src/ashore/grove.js` from `grove-layout.js`; `node tools/check.mjs grove`
-    checks its limits and walks a test climber up it (48 s to the owl bough
-    at a walk, 16 jumps).
+    checks its limits and walks a test climber up it (40 s to the owl bough
+    at a walk, 19 jumps).
+    - **Climbing round a tree is easier to control** (this also changes the
+      lookout tree on ordinary islands). The camera there is now a tower
+      camera: it looks straight in at the trunk and orbits with you, so left
+      and right on the stick run round the tree and jumps go across the
+      screen. A drag is kept as an offset instead of snapping back. Before,
+      it looked about 50° off the trunk, so no stick direction ran along the
+      ledge.
+    - Fix: walking into a low step at a slant slid you along its face
+      instead of stepping up (`controller.js` judged "blocked" by velocity,
+      not by where you were steering). On the spiral that stalled you and
+      pushed you off the outside edge.
+    - The grove's leaf clumps hang from forks at the bough tips, outside the
+      climb and the camera that circles it. Nothing hangs over the spiral
+      any more: the leaf mats that are the way down from the carving now
+      hang beyond the owl bough's tip.
+    - The camera ducks under a bough or ledge overhead (it looks along more
+      level from below it) instead of rising into it. Passing under the owl
+      bough on the spiral used to put the camera inside the bough.
+    - Fix: low steps are taken in stride. Stepping up used to carry you 19 cm
+      forward in one tick, a lurch at every step of the spiral, and on flat
+      ground beside a wall it could fire over and over.
+    - A long fall costs one stretch, not the whole climb: once a lantern up
+      the tree is lit, a fall of more than 6 m that lands well below it puts
+      you back at the last lantern you touched (`level.fallBack`, grove
+      only). Each bough of the crown climb has a lantern. The dive into the
+      pool doesn't count, and the leaf-mat way down (off the owl bough's
+      tip) has no drop over 6 m.
+      Jumping straight to the ground from the hollow or higher does send you
+      back up, so every lit lantern from the hollow up offers "Climb down to
+      the roots", which sets you down by the root gate.
     - No story yet: Journal III is still found at the camp from the sea, and
       the crown chest holds an ordinary tailor piece.
-    - Not yet done: playing it by hand (it has been climbed by a test pilot
-      in the console and in Node), a look on Low quality and on a phone.
+    - Not yet done: a second play by hand with the new camera (a test pilot
+      that only holds the stick left and jumps at gaps now reaches the owl
+      hollow), walking out along a bough (the tower view faces you there
+      until you are past the trunk's reach), a look on Low quality and on a
+      phone.
     - The pool is a still disc on the grass, not real water.
   - [ ] 4.2 The grove's story: the note in the tent, Journal III at the
     carving, the flower crown, the owl guide, fireflies

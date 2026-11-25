@@ -172,8 +172,10 @@ export function buildGroveLayout() {
   const outer = (rel) => (rel < TAU + G.start ? 10.4 : 9.2); // the lower turn is wider, to catch a fall
   let a = G.start, y = G.hill, n = 0;
   const rise = (rel, max) => { y = Math.min(y + max, Math.max(y, helix(rel))); return y; };
-  const onRoute = (p) => { add(p); node(route, p, p.r != null ? null : 8.3, p.a); if (n++ % 3 === 1) coinAt(pol(8.4, p.a), p.top); return p; };
-  const walk = (count, w = 0.28, up = 0) => {
+  const onRoute = (p) => { add(p); node(route, p, p.r != null ? null : 8.3, p.a); if (n++ % 5 === 2) coinAt(pol(8.4, p.a), p.top); return p; };
+  // narrow steps: seen from above each is nearly a wedge of the ring, so a
+  // gap between two of them is a clean gap at every distance from the trunk
+  const walk = (count, w = 0.14, up = 0) => {
     for (let i = 0; i < count; i++) {
       const c = a + w / 2, r1 = outer(c);
       if (up && i === 0) y += up; else rise(c, 0.3);
@@ -194,14 +196,14 @@ export function buildGroveLayout() {
     for (let i = 0; i < count; i++) {
       a += 0.7 / 8;
       const c = a + 0.55 / 8;
-      onRoute(onTrunk('peg', GATE + c, 6.9, 8.8, 0.55, rise(c, 0.5)));
+      onRoute(onTrunk('peg', GATE + c, 6.9, 9.4, 0.55, rise(c, 0.5)));
       a = c + 0.55 / 8;
     }
     a += 0.7 / 8;
   };
-  const steps = [() => walk(5), () => { a += 1.2 / 8; }, () => walk(4), () => fungus(3), () => walk(4), () => pegs(4), () => walk(3), () => walk(4, 0.28, 0.8)];
+  const steps = [() => walk(10), () => { a += 1.2 / 8; }, () => walk(8), () => fungus(3), () => walk(8), () => pegs(4), () => walk(6), () => walk(8, 0.14, 0.8)];
   for (let i = 0; a < END - 2.2; i++) steps[i % steps.length]();
-  const left = Math.ceil((END - a) / 0.28);
+  const left = Math.ceil((END - a) / 0.14);
   walk(left, (END - a) / left);
   // the owl hollow's landing, facing the beach
   const hollowA = GATE + 2 * TAU;
@@ -224,11 +226,13 @@ export function buildGroveLayout() {
   node(route, owlBough, 8.8, aB);
   for (const r of [12, 15, 18, 21]) coinAt(pol(r, aB), G.boughY);
   const carving = { ...xz(pol(8.2, aB)), y: G.boughY };
-  // broad leaf mats under the fungus steps (a miss lands here, and one fungus
-  // step leads back up to the hollow); further out they are the easy way down
-  const down = [atPolar('mat', 9.6, hollowA + 0.74, 12.5, 2.4), atPolar('mat', 9.6, hollowA + 1.12, 12.5, 2.4), atPolar('mat', 9.6, hollowA + 1.45, 12.5, 2.4),
-    atPolar('mat', 14, aB - 0.3, 12.5, 2.6), atPolar('mat', 17, aB - 0.55, 8.6, 2.6)].map(add);
-  add(atPolar('fungus', 11.4, hollowA + 0.377, 13.3, 0.9));
+  // the easy way down from the carving: off the bough's tip onto two broad
+  // leaf mats hung from it on aerial roots. They hang beyond the tip, behind
+  // the camera that circles the trunk: anything nearer in (a mat, a limb)
+  // hides the spiral's ledges. A miss on the fungus steps lands on the turn
+  // below, or back at the hollow's lantern.
+  const tip = pol(23.4, aB), hang = [tip[0], G.boughY - 1, tip[1]];
+  const down = [atPolar('mat', 26, aB, 12.5, 2.6, { hang }), atPolar('mat', 30.5, aB + 0.12, 8.6, 2.6, { hang })].map(add);
 
   // ---- the crown climb (optional): leaf mats between three more boughs
   node(crown, owlBough, 13, aB);
@@ -279,6 +283,8 @@ export function buildGroveLayout() {
     { id: 'hollow', ...xz(pol(10, hollowA - 0.22)), y: G.hollowY },
     { id: 'carving', ...xz(pol(10.2, aB - 0.09)), y: G.boughY },
     { id: 'crown', x: 2.6, y: G.crownY, z: -2.8 },
+    // one on each bough of the crown climb, so a fall near the top costs one stretch
+    ...boughs.slice(1).map((B, i) => ({ id: 'bough' + (i + 2), ...xz(pol(9.6, B.a - 0.07)), y: B.top })),
   ];
   /** Is this a spot where a tree or bush may stand (clear of the route)? */
   const clear = (x, z, pad = 0) => {
@@ -287,6 +293,7 @@ export function buildGroveLayout() {
     if (Math.abs(z - streamZ(x)) < 6.5 + pad) return false;
     if (z > 0 && Math.abs(x) < 5.5 + pad) return false;
     if (Math.hypot(x - pool.x, z - pool.z) < pool.r + 4 + pad) return false;
+    if (down.some((m) => Math.hypot(x - m.cx, z - m.cz) < m.r + 4 + pad)) return false;
     return !stumps.some((s) => Math.hypot(x - s.cx, z - s.cz) < 4 + pad);
   };
 
@@ -297,6 +304,9 @@ export function buildGroveLayout() {
     chests: [{ id: 'chest', x: 0, y: G.crownY, z: 0, yaw: aP }],
     summit: { x: 0, y: G.crownY, z: 0 }, vault, carving, hollow: { a: hollowA, y: G.hollowY },
     hubs: [{ x: 0, z: 0, orbit: 12, base: G.hill + 0.5, top: G.crownY - 1.2 }],
+    // a long fall puts you back at your last lantern, except the dive into the pool
+    // and a lantern up the tree offers a quick way back down to the gate
+    fallBack: { drop: ASHORE.design.safeDrop, below: 3, safe: [{ x: pool.x, z: pool.z, r: pool.r + 3 }], down: { x: 1.2, y: G.hill, z: 16.2, yaw: Math.PI } },
     arches, buttresses, boughs, stumps, down, diving, pool, platform, clear,
   };
 }
@@ -321,7 +331,10 @@ export function validateGrove(L) {
       if (lim.drop && gap > 0.05 && A.piece && B.piece) {
         const mx = (A.x + B.x) / 2, mz = (A.z + B.z) / 2;
         const drop = Math.min(A.y, B.y) - supportAt(L, mx, mz, Math.min(A.y, B.y) - 0.5);
-        if (drop > lim.drop) errors.push(`${where}: a miss drops ${drop.toFixed(1)} m (max ${lim.drop})`);
+        // ...or the fall is long enough below a lantern already passed to send you back to it
+        const lantern = Math.max(-Infinity, ...L.checkpoints.filter((c) => c.y <= A.y + 0.01).map((c) => c.y));
+        const back = L.fallBack && lantern - (Math.min(A.y, B.y) - drop) > L.fallBack.below;
+        if (drop > lim.drop && !back) errors.push(`${where}: a miss drops ${drop.toFixed(1)} m (max ${lim.drop})`);
       }
     }
     return jumps;
