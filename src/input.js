@@ -112,7 +112,8 @@ export class Input {
 
   get spyHeld() {
     if (!this.enabled || this.scheme !== 'sea') return false;
-    return this.spyButton || this.keys.has('KeyZ') || this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+    // not Shift: it's part of screenshot shortcuts (Cmd+Shift+4)
+    return this.spyButton || this.keys.has('KeyZ');
   }
 
   /**

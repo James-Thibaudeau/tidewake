@@ -12,7 +12,7 @@ Built with [three.js](https://threejs.org/) as plain ES modules, plus [postproce
 | Steer | `A` / `D` or `←` / `→` | Drag the tiller (bottom left) |
 | Dock, haul treasure | `E` / `Space` | Gold action button |
 | Look around / zoom | Drag mouse / wheel | Drag / pinch |
-| Spyglass (once upgraded) | Hold `Z` or `Shift` | Spyglass button |
+| Spyglass (once upgraded) | Hold `Z` | Spyglass button |
 | Sea chart | `M` | Map button |
 | Journal (quests) | `J` | Journal button |
 
@@ -38,7 +38,7 @@ On foot (once grandfather's anchor is fitted):
 - **Going ashore:** buy the Oak Planking hull and the shipwright tells you about your grandfather's anchor, lying beside his wreck. Haul it up and have it fitted, then slow down by any green (temperate) island and drop anchor. Climb to the summit for gold, light lanterns as checkpoints, and look for each island's hidden chest. Gold found ashore goes in your hold until you bank it.
 - Every port has a **Quest Board**: chart rumoured islands, carry parcels between ports and salvage wrecks (cyan beams). Up to three at a time; rewards are paid when you dock. A parcel or salvage aboard sinks with your ship, just like gold.
 - Every new voyage starts with the character creator. Restyle any time for free at a port's **Tailor** tab, where new hats, coats and boots are sold. Rarer pieces are hidden on the islands.
-- With a spyglass, hold `Z` / `Shift` (or the spyglass button) to look through it from the explorer's eyes; drag to pan. Islands you spot through it are charted from afar.
+- With a spyglass, hold `Z` (or the spyglass button) to look through it from the explorer's eyes; drag to pan. Islands you spot through it are charted from afar.
 
 ## Run locally
 
