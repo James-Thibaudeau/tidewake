@@ -1184,10 +1184,11 @@ export function faceTexture(o) {
     }
   }
   if (o.freckles) {
-    g.fillStyle = mix(skin.dark, '#5a2810', 0.45);
-    const dots = [[-30, -8], [-22, -2], [-36, 0], [-26, 6], [-16, -6], [-32, 9]];
+    // big and dark enough to read from the sailing camera
+    g.fillStyle = mix(skin.dark, '#4a1e08', 0.65);
+    const dots = [[-30, -8], [-22, -2], [-36, 0], [-26, 6], [-16, -6], [-32, 9], [-40, -6], [-20, 10]];
     for (const [dx, dy] of dots) for (const s of [-1, 1]) {
-      g.beginPath(); g.arc(S * 0.5 + s * (S * 0.2 + dx * 0.5) , S * 0.7 + dy, 2.2, 0, TAU); g.fill();
+      g.beginPath(); g.arc(S * 0.5 + s * (S * 0.2 + dx * 0.5), S * 0.7 + dy, 3.4, 0, TAU); g.fill();
     }
   }
   // nose + grin

@@ -74,7 +74,11 @@ void main() {
   float wide = 0.05 + uGolden * 0.3;
   float sunGlow = exp(-sa * sa / 0.004) * 0.45 + exp(-sa * sa / wide) * (0.18 + uGolden * 0.35);
   col += uSunCol * sunGlow * vis * (1.0 - uNight);
-  col = mix(col, (uSunCol * 1.35 + 0.18) * uSunHDR, (1.0 - smoothstep(0.050, 0.057, sa)) * vis);
+  // near sunset, drop the white lift and most of the HDR boost: tone mapping
+  // squeezes a very bright disc towards white, and it should stay gold
+  vec3 sunDisc = mix(uSunCol * 1.35 + 0.18, uSunCol * 1.15, uGolden);
+  float sunGain = mix(uSunHDR, 1.0 + (uSunHDR - 1.0) * 0.35, uGolden);
+  col = mix(col, sunDisc * sunGain, (1.0 - smoothstep(0.050, 0.057, sa)) * vis);
   // moon with a crescent bite and a gentle falloff glow
   float md = dot(d, uMoonDir);
   float ma = sqrt(max(0.0, 2.0 * (1.0 - md)));

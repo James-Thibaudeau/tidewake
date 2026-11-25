@@ -110,12 +110,14 @@ pull request merges.
     (the custom water shader needs the shadow chunks and the cel band).
   - [ ] Shadows stop at 220 m (140 m on touch); check whether the cut-off
     line shows while sailing and tune `maxFar` or the fade.
-  - [ ] Ink edges: check storm swells for stray lines on wave crests, and
-    thin the lines in the creator close-up, which read heavy.
+  - [ ] Ink edges: check storm swells for stray lines on wave crests.
+  - [x] Thinner, lighter ink lines in the creator close-up.
+    Also the sunset sun now stays gold, and freckles are bigger
+    ([#24](https://github.com/James-Thibaudeau/tidewake/pull/24)).
   - [ ] Rim light: check hair, hats and coats from all angles, and under
     moonlight; consider a per-material strength.
-  - [ ] Sunset sun disc reads near-white (neutral tone mapping compresses
-    it); tune `uSunHDR` or the grade if it should stay gold.
+  - [x] Sunset sun disc reads near-white (neutral tone mapping compresses
+    it): the disc drops its white lift and most of `uSunHDR` in golden hour.
   - [ ] An "Effects" switch in the pause menu, separate from Quality.
   - [ ] Ashore lantern glow takes its bloom boost once at start-up, so
     `tidewake.fx.setEnabled()` doesn't change it (debug toggle only).
@@ -139,7 +141,7 @@ From Phase 1 (outfits):
 - [x] The ponytail sticks out sideways instead of hanging.
 - [x] The scarf tail hangs inside the back of every top (worst on the long
   coat and poncho), and pokes out through the chest while running.
-- [ ] Freckles are hard to see from the sailing camera.
+- [x] Freckles are hard to see from the sailing camera.
 
 From Phase 3 (ashore):
 - [x] The compass shows the ship's heading while you're on foot.
