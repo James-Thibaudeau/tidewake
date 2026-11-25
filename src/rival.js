@@ -129,7 +129,8 @@ export class Rival {
     }
     // two islands to race on foot: a gentle one fairly near home, and one down south
     const campII = this.game.story?.camps?.II?.island;
-    const landable = W.islands.filter((I) => this.game.ashore?.canLand(I) && !I.landmark && I.id !== campII && I.r > 70);
+    // temperate only: every captain can land there, and new biomes don't move Sable's races in old saves
+    const landable = W.islands.filter((I) => this.game.ashore?.canLand(I) && I.biome === 'temperate' && !I.landmark && I.id !== campII && I.r > 70);
     const near = [...landable].sort((a, b) => Math.abs(Math.hypot(a.x, a.z) - 1300) - Math.abs(Math.hypot(b.x, b.z) - 1300))[0];
     if (near) P.hill = { island: near.id, x: near.x, z: near.z, place: near.name };
     const south = landable.filter((I) => I !== near && Math.hypot(I.x, I.z) < 3500).sort((a, b) => b.z - a.z)[0];

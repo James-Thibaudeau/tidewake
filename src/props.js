@@ -54,7 +54,7 @@ export function merge(parts) {
 }
 
 // Deterministic jitter so shared corners move together (keeps meshes closed).
-function jitter(geo, amt, seed = 1) {
+export function jitter(geo, amt, seed = 1) {
   const p = geo.attributes.position;
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i);

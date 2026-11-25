@@ -23,8 +23,10 @@ node tools/check.mjs
 About a second, no browser. Run it after every change. It checks syntax,
 that every import resolves to a real export and is used, that no helper was
 left behind when code moved between files, text keys (`LINES.x`), element
-ids, save migration, 150 generated ashore layouts, and the Elder Grove
-(its limits, and a test climber that walks it from the beach to the crown). One group at a time:
+ids, save migration, 150 generated ashore layouts per landable biome, a test
+climber (the real controller) that walks 12 generated islands per biome to
+the summit, and the Elder Grove (its limits, and the climber from the beach
+to the crown). One group at a time:
 `node tools/check.mjs imports`.
 
 It can't see rendering or behaviour. For those, use the browser.

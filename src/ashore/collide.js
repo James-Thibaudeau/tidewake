@@ -149,13 +149,20 @@ function cylContact(x, z, sy0, sy1, r, c, ct) {
   return true;
 }
 
-/** Terrain normal from finite differences (y-up, normalised). */
+/**
+ * Terrain normal from finite differences (y-up, normalised). Each axis takes
+ * the flatter of its forward and backward slopes, so at a crest (flat ground
+ * meeting the top of a rock face) the flat side counts: a central difference
+ * there reaches onto the face, calls the ground steep, and pushes you back
+ * onto the rim. On an even slope both sides agree and nothing changes.
+ */
 export function terrainNormal(level, x, z, out = {}) {
-  const e = 0.25;
-  const hx = level.groundAt(x + e, z) - level.groundAt(x - e, z);
-  const hz = level.groundAt(x, z + e) - level.groundAt(x, z - e);
+  const e = 0.25, g = level.groundAt(x, z);
+  const flatter = (a, b) => (Math.abs(a) < Math.abs(b) ? a : b);
+  const hx = flatter(level.groundAt(x + e, z) - g, g - level.groundAt(x - e, z));
+  const hz = flatter(level.groundAt(x, z + e) - g, g - level.groundAt(x, z - e));
   if (!Number.isFinite(hx) || !Number.isFinite(hz)) { out.x = 0; out.y = 1; out.z = 0; return out; }
-  const nx = -hx / (2 * e), nz = -hz / (2 * e);
+  const nx = -hx / e, nz = -hz / e;
   const l = Math.hypot(nx, 1, nz);
   out.x = nx / l; out.y = 1 / l; out.z = nz / l;
   return out;

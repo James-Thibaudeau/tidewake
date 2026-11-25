@@ -217,7 +217,50 @@ Updated 2026-11-25.
       a wreck → fitted at Port Haven (tier 1); the short-of-gold toast and the
       Refit button (tier 2); each tier's model; a pre-change save loads at
       tier 0. Not looked at on a phone.
-  - [ ] 4.4 Rocky islands and 4.5 Archway Isle
+  - [x] 4.4 Rocky islands. `rocky` is in `ASHORE_BIOMES`, so the grapnel
+    refit (tier 1) is live: it's offered once you own the Balanced Rudder,
+    and its fitting waits on a temperate island (Wren Island from Port
+    Haven). Until it's fitted, rocky shores say "Your anchor won't grip bare
+    rock. Ask the shipwright."
+    - Rocky levels (`modules.js` `POOLS.rocky`, art in `pieces.js`): taller
+      walls (×1.15, summits ×1.12), and three new ways up: sheer ledges
+      (narrow shelves on the face), sea stacks (freestanding pillars a step
+      out from the wall) and rock arches (long spans on two legs). The moat
+      is crossed on sea stacks whose tops step up and down. The chest branch
+      is a rock spire with shelves round it instead of a lookout tree, and a
+      natural arch stands over the path from the moat. Grey shingle, thin
+      turf broken by scree, pines and boulders, sea stacks offshore.
+    - Gentler early on (feature plan: refits follow the story, so rocky comes
+      before tropical): rocky islands count as 800 m nearer home for
+      difficulty (`BIOME_EASE`). The world's rocky islands: Cobalt Isle,
+      Amber Isle, Briar Point and Glimmer Skerry are medium; Otter Point,
+      Plover Spire and Flint Cove hard. Averages over 300 islands: medium
+      27 jumps (temperate 25), hard 33 (31); the widest required gap on a
+      medium rocky island is 1.70 m (temperate 1.54, limit 1.9). Arches
+      never start a climb (their leg takes the spot you'd hop on from).
+    - Rocky levels are lighter than temperate ones (62-81k triangles against
+      ~112k), from fewer trees.
+    - Sable's foot races stay on temperate islands (`rival.js`), so a new
+      biome doesn't move them in old saves.
+    - Two controller fixes, found by the new climb check, which apply on
+      every island (`collide.js`, `controller.js`):
+      - Walking inland off the rim of a rock face: the ground there counted
+        as too steep (its slope was sampled across the face's edge) and
+        pushed you back onto the rim, so you had to jump. Each axis now
+        takes the flatter side.
+      - Walking down a bank onto a bridge's end: settling onto the ground
+        moved you sideways off the deck's edge, back up the bank, every
+        tick. It now only settles straight down.
+    - `node tools/check.mjs climb`: the real controller, steered by a simple
+      pilot (lifted from the grove check), walks 12 generated islands per
+      biome from the beach to the summit; a missed hop is retried at the
+      other pace. `layout` now runs 150 islands per landable biome.
+    - Known: with 60 islands per biome the pilot misses 3 hops, all on easy
+      islands with railed ledges on the summit rock (temperate too). The
+      summit rock's invisible wall bulges into the straight line between
+      two wide ledges at their joint; a player brushes it and steers round.
+    - Not done: Archway Isle (4.5); a look on a phone; a play by hand.
+  - [ ] 4.5 Archway Isle
   - [ ] 4.6 Tropical islands and 4.7 the Sunken Temple
   - [ ] 4.8 Volcanic islands (with the steam-vent launch) and 4.9 Mount
     Cinderhorn
