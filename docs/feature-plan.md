@@ -15,7 +15,8 @@ Decisions already made:
   island, not walked on the real heightfield.
 - Customization is available **on a new voyage and at a port Tailor**.
 
-This file holds the designs for phases that **haven't shipped yet** (4-7),
+This file holds the designs for phases that **haven't shipped yet** (4-7
+and 9),
 plus what is left of one piece of tooling, the look-dev gallery.
 What is done, what's next and known issues live in [STATUS.md](STATUS.md).
 The designs of shipped phases (0-3 and 8) moved to
@@ -263,6 +264,227 @@ inside islands.
 
 ---
 
+## Phase 9: Sea zones (calm home waters, rough far waters)
+
+Today the sea is the same everywhere. There is one weather for the whole
+world, and the waves only change with it, so reaching Frostspire feels like
+reaching anywhere else. This phase gives the map a shape you can feel at the
+helm:
+- **home waters** that are clear, shallow and safe;
+- **open sea** further out, where storms come more often;
+- **rough water** round the hardest places to reach, rough even under a
+  clear sky.
+
+Goals:
+- Leaving home feels like leaving home: first the water changes colour, then
+  the weather gets worse.
+- Reaching Frostspire is an event. You see the white water from far off, you
+  get ready, and you're relieved to come through it.
+- Rough water tests how you sail, not only what you've bought. A starting
+  hull can cross the Frostspire Reach if it is sailed well. A maxed hull
+  still takes real damage if it is sailed carelessly.
+
+### Bands and zones
+
+Distances are from Port Haven (0, 0). Every landmark is 5,000–6,000u out,
+so all of them sit in the open sea.
+
+| Where | Water | Storms |
+| --- | --- | --- |
+| **Home waters**: within ~1,000u, fading out over ~400u | Clear and shallow: turquoise, with sand and ripples showing below. Waves half as big | Never start here. A storm that is already blowing breaks up soon after you arrive |
+| **Coastal sea**: ~1,000–3,500u | As today | As today |
+| **Open sea**: beyond ~3,500u | As today, a shade darker | Rain and storms come about twice as often and last longer |
+| **Rough water**: named zones round the far landmarks | Tall swells and heavy chop in any weather, and rogue waves | As open sea. A storm on top makes it the worst water in the game |
+
+### Home waters (the shallows)
+
+- **Look, shader only** (`ocean.js`). A `shallowK` factor (1 inside, 0
+  past the fade) mixes the deep colours (`uDeep`, `uMid`, `uTrough`)
+  towards turquoise and draws a fake seabed under the surface: sand, ripple
+  bands and slow caustic lines. The seabed pattern is offset by the view
+  direction times a pretend depth, so it slides under the water like real
+  depth. No seabed geometry. Foam and wave faces stay on top, so it is still
+  the same cel-shaded sea. The effect fades with distance from the camera:
+  far water stays opaque.
+- The edge is a lumpy bank, not a perfect circle.
+- **Waves** are half as big inside (wave scale and swell × 0.5, on the CPU
+  and the GPU; see *Waves that change by place*).
+- **No grounding:** the shallows are only a look. Ground stays where the
+  terrain is.
+- Grandfather's wreck sits near Port Haven, so it is inside the shallows.
+  Check it still reads well there.
+- This covers the Phase 5 idea of "a subtle tint for deeper and shallower
+  water" for home. A weaker version round every island's shore can follow
+  later.
+
+### Storms by distance
+
+The weather stays one state machine for the whole world (`Weather` in
+`weather.js`): the sky, rain and light are one scene. What changes is how it
+picks the next state. The pick is weighted by the band the boat is in when
+the timer runs out.
+
+- **Home waters:** never pick `storm`; rain is half as likely. This is the
+  general version of today's `calmTimer`, which keeps the first 5 minutes of
+  a new voyage calm. Keep `calmTimer` for the prologue.
+- **Coastal sea:** today's table (`NEXT`).
+- **Open sea and rough water:** storm and rain weights × 2; a storm lasts
+  120–220 s instead of 80–170 s. Fog is likelier in the Frostspire Reach.
+- **Storms blow out at home:** sail into home waters during a storm and its
+  timer drops to at most 40 s, then it eases to rain or overcast. The swell
+  there is already halved, so the relief is immediate. Running for home in a
+  storm becomes a real choice.
+- **Targets**, measured by a test pilot sailing for a long time in each
+  band: the share of time spent in a storm is about 0% at home, today's
+  rate on the coast (measure it first), and about double that in the open.
+
+### Rough water
+
+Named zones round the hardest landmarks to reach. Each is a ring: rough
+water in a band, with a calmer pocket round the island so you can land,
+anchor and catch your breath.
+
+| Zone | Round | Severity | Ring, from the island's centre | Character |
+| --- | --- | --- | --- | --- |
+| **The Frostspire Reach** | Frostspire (radius 300) | 3 | Rough from 600u to 1,500u, worst near 900u | Tall cold swells, rogue waves, ice growlers, fog more often |
+| **The Cinder Rip** | Mount Cinderhorn (radius 330) | 2 | Rough from 600u to 1,200u | Steep chop, gusts that swing the wind, steam on the water |
+| **The Outer Swell** | The last ~600u before the world-edge current | 1 | A band along the edge | Long heavy swells: a sign you are near the edge |
+
+- **Danger follows the story**, like the refits: the Reach guards the last
+  chapter (VII), the Rip the one before it (VI).
+- **No zone** at Archway Isle (the first rocky level, tuned gentle), the
+  Elder Grove or the Sunken Temple, for now. Adding a zone is one row in the
+  table.
+- **Severity** scales every effect below: the wave and swell boost, the
+  damage and how often rogue waves come.
+
+**From outside, you can see it.** The band shows as a pale, broken line on
+the horizon: whitecaps, darker water and flying spray, well before you reach
+it. Once charted, the chart draws the band hatched, with its name. Sailing
+in shows the name like a discovery: *"The Frostspire Reach"*.
+
+**At the helm:**
+- **Swell in any weather.** The swell inside is at least a floor set by
+  severity (about 0.5, 0.8 and 1.1, where a full storm is 1.0), so the
+  existing bow slams (`checkBowSlam`) fire under a clear sky.
+- **A steady battering**, like a storm's, and less with the sails reefed.
+  It is resisted differently, though. Storms use `1 - keel`, so a max keel
+  (0.93) makes storms almost harmless. Rough water uses `1 - keel × 0.5`, so
+  a max keel only halves it and the hull's strength does the rest. That is
+  what keeps it treacherous for a maxed ship. The hull becomes the rough
+  water stat; the keel stays the storm stat.
+- **Rogue waves** (9.3): one every 20–40 s in the Reach, rarer at lower
+  severity. Each is announced: a warning (*"Big wave off the port bow!"*), a
+  sound, and a tall dark crest rising for about 4 s before it arrives. Meet
+  it bow-on with reefed sails and it costs a little. Take it side-on or
+  under full sail and it costs a lot, shoves you sideways and rolls the
+  camera. This is where skill beats upgrades. The wave is one moving ridge
+  added to `waveHeight`, so the boat rides it like any other wave.
+- **Ice growlers** (9.3, the Reach only): small chunks of floating ice
+  drifting in the band. Hitting one is a rock strike (the existing collision
+  damage). Easy to steer round in clear weather, hard in fog.
+- **Warnings:** *"Rough water: reef your sails"* under full sail, *"Rough
+  water: hull taking a beating"* otherwise.
+- **Wrecking** there works as anywhere else: back to your last port, cargo
+  lost. The calm pocket doesn't repair the hull; ports do.
+
+**Damage targets**, for one crossing of the Reach straight through its worst
+part, in clear weather. The test pilot tunes to these.
+
+| Boat | Sailed well (reefed, bow-on to rogue waves) | Sailed badly (full sail, side-on) |
+| --- | --- | --- |
+| Starting hull, no keel (100) | 35–50% of the hull | Wrecked |
+| Hull 3 and keel 2 (about what landing at Frostspire needs) | 20–30% | 60–80% |
+| Max hull and keel (600) | 10–15% | 35–50% |
+
+So a starting boat can get in, chart Frostspire and get out again only with
+no mistakes and no storm. A maxed boat gets through comfortably if sailed
+well, but a careless run still costs half the hull.
+
+### Waves that change by place
+
+- **A new pure module, `src/sea-zones.js`** (no three.js, no DOM): the zone
+  table, `bandAt(x, z)` (home, coastal or open) and `seaAt(x, z)` → `{
+  shallow, rough, severity, zone }`, with smooth fades. Zone centres come
+  from the landmark islands, looked up by their `landmark` key after the
+  world is built. Nothing draws from the world's `rng()`, so the world
+  doesn't change.
+- **`waveHeight` gets a factor per point** in `waves.js`: the wave scale and
+  swell are multiplied, and the swell floored, by what the zones say at that
+  point. The CPU and GLSL versions are generated from the same table, as the
+  waves already are. The zones reach the GPU as a small uniform array (up to
+  8). This is the same idea as `uCalm` in `ocean.js` (still water in a
+  moat).
+- **Wide fades** (at least 200u), so the boat's motion never jumps and the
+  water shows no seam.
+- **Cost:** the ocean samples the waves five times a pixel. Work out the
+  zone factor once per pixel and once per vertex and pass it in, rather
+  than once per sample. Measure on Low. The CPU only asks at the boat, the
+  Redwing and floating props, so its cost is tiny.
+- Shore foam and the other wave-aware materials include `WAVE_GLSL`, so they
+  follow along. Check the shore foam round Frostspire.
+
+### How it fits with the rest
+
+- **Refits:** the ice spikes (tier 4) need Hull 3, so a player who can land
+  at Frostspire has a boat that can cross the Reach with care. Going earlier
+  just to chart it is possible, at real risk. That's the point.
+- **Story:** chapter VII can mention the Reach (*"the water round the spire
+  never sleeps"*). Text goes in `story-text.js`, reviewed like the journals.
+  The shipwright gets a line about it when you buy Hull 3.
+- **Rival:** race courses (`race.js`) and the kraken trench stay out of
+  rough water and home waters; add that to the course planner's checks.
+  Sable could later race you *through* the Reach, as a written encounter.
+- **Phase 7 events:** the director reads `seaAt`. Waterspouts are likelier
+  in rough water; turtles and the glowing bloom look best in the clear home
+  shallows.
+- **Treasure** and salvage inside rough water are worth more (× 1.5), so
+  there's a reason to go in besides the landmark. Optional; tune after.
+- **Ashore:** the anchored ship stays safe, as today. You land from the calm
+  pocket.
+- **Save:** nothing new. The chart's hatching comes from the fog-of-war
+  cells you've already charted.
+
+### Checks and tools
+
+- **`tools/check.mjs`** gets a `seazones` group (the module is pure):
+  - home waters contain Port Haven and grandfather's wreck;
+  - every rough zone's calm pocket holds its whole island plus landing
+    range;
+  - no rough zone covers a port;
+  - every rough zone has a port within ~2,000u of its outer edge, so you
+    can repair before and after the run. If one doesn't, move the zone,
+    never a port: moving islands changes the world;
+  - the generated GLSL includes the zone code, and the CPU and GLSL tables
+    match.
+- **`tidewake.debug.sea()`** reports the band, the zone and the factors at
+  the boat. `debug.teleport('Frostspire')` and `debug.weather('storm')`
+  already exist.
+- **Gallery:** a `sea` subject, a patch of water with `zone: 'shallows' |
+  'coastal' | 'rough'` and `severity`, and a sheet of all of them under
+  every light. The shallows are judged there, not in the game.
+
+### Phase 9 in smaller PRs
+
+| PR | Branch | What it adds | Depends on |
+| --- | --- | --- | --- |
+| 9.1 | `feature/home-waters` | `sea-zones.js` with the bands; storms by distance; storms blow out at home; the clear shallows and calmer waves at home; the gallery `sea` subject | — |
+| 9.2 | `feature/rough-water` | The Reach, the Rip and the Outer Swell: waves by place, swell floor, damage, warnings, the name on entering, chart hatching; races and the kraken kept out | 9.1 |
+| 9.3 | `feature/rogue-waves` | Rogue waves, ice growlers in the Reach, and tuning to the damage targets | 9.2 |
+
+- Phase 5's *retune the wave set* also changes `waves.js` and how the boat
+  rides. Don't build both at once; whichever lands second re-tunes.
+- 9.1 is worth doing early: it makes the first minutes of the game prettier
+  and safer.
+
+**Done when:** home waters are clear and calm, and storms neither start nor
+last there; storms are measurably more common far out; the Frostspire Reach
+can be seen from outside it, a starting boat sailed well can cross it, and it
+still costs a maxed boat real hull; the test pilot hits the damage targets;
+and the world itself hasn't moved.
+
+---
+
 ## Tooling: the look-dev gallery, what's left
 
 The gallery itself has shipped (`gallery.html`; how to use it is in
@@ -301,6 +523,7 @@ One feature branch and PR per phase, matching how the repo already works
 | P6 | One refit per Phase 4 biome PR | P3, and that biome's Phase 4 work |
 | P7 | `feature/living-sea` | P2a (report quests) |
 | P8 | `feature/rival-captain` | P3, P7 (encounters come through the director), the epilogue letters, and the rival's text written and approved |
+| P9 | Three smaller PRs: see *Phase 9 in smaller PRs* | — (not at the same time as Phase 5's wave retune) |
 
 **Verification each phase:** there's no test suite, so each PR is checked in
 the browser preview (`tidewake-dev` in `.claude/launch.json`):
@@ -341,3 +564,10 @@ the browser preview (`tidewake-dev` in `.claude/launch.json`):
   `race.js`.
 - **Event frequency:** too many events make them wallpaper. Start rare,
   then tune from playtests.
+- **Rough water that punishes more than it thrills:** a wreck in the Reach
+  means a long sail back from port. If playtests find it frustrating, lower
+  the rogue waves' damage first, and keep the look and the swell.
+- **One weather for the world:** a storm that starts while you're far out
+  is still blowing when you sail home, until home waters break it up. If
+  that reads as odd, the next step is a storm front with a position, which
+  is a much bigger change.
