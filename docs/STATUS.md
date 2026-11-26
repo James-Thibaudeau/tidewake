@@ -344,8 +344,9 @@ Updated 2026-11-26.
   - Left for later: the plan's link between events and Phase 9's sea
     zones (waterspouts likelier in rough water, turtles and the bloom in
     the home shallows), which waits for Phase 9.
-- [x] **Platforming feel, items 1–3** (see *Platforming feel* in
-  [feature-plan.md](feature-plan.md)):
+- [x] **Platforming feel, items 1–3**
+  ([#63](https://github.com/James-Thibaudeau/tidewake/pull/63); see
+  *Platforming feel* in [feature-plan.md](feature-plan.md)):
   - A shadow straight down under the explorer
     (`src/ashore/ground-shadow.js`): a soft dark spot on whatever is right
     below, smaller and fainter the higher up, gone over the sea. It shows
