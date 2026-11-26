@@ -16,7 +16,7 @@ Decisions already made:
 - Customization is available **on a new voyage and at a port Tailor**.
 
 This file holds the designs for phases that **haven't shipped yet** (4, 6,
-7, 9, 10 and 11),
+7, 9, 10, 11 and 12),
 plus what is left of one piece of tooling, the look-dev gallery.
 What is done, what's next and known issues live in [STATUS.md](STATUS.md).
 The designs of shipped phases (0-3, 5 and 8) moved to
@@ -1033,6 +1033,229 @@ treasure angle is where it was.
 
 ---
 
+## Phase 12: Music that knows where you are
+
+Today the score is two things in `audio.js`: a wandering pentatonic pluck
+line (`musicNote`, in D, or A when it's stormy) that plays a note every
+second or two, and a storm score (`updateStormScore`: a drone, low hits and
+slow notes) that fades in with the weather. On foot the same line plays a
+fourth lower on a mallet (`landNote` in `audio/ashore.js`). The notes are a
+random walk, so there are no tunes, and it sounds the same everywhere.
+
+This phase gives the game a score: real tunes, a theme for each part of the
+sea, each biome, each landmark and Sable, and changes that follow you.
+
+Goals:
+- **You can tell where you are with your eyes shut:** the home shallows,
+  the open sea, fog, a storm, the Frostspire Reach, an island's biome.
+- **Tunes you'd hum.** Each biome and landmark has a melody of its own,
+  and Sable has a theme you hear before you see the crimson sails.
+- **Changes never jar.** Music moves on the next bar, with crossfades, and
+  never flips back and forth at the edge of a zone.
+- **It stays under the sea.** Quiet, with room to breathe: long stretches
+  of only a bed, like today's sparse plucks. The sea is still the main
+  sound.
+
+All of it is written in code, as the sound is today: no recorded tracks
+and no audio files. That keeps the game free of assets and lets the music
+follow the game bar by bar. A Claude session composes and builds it. It
+can't hear the result, only measure it (levels, clipping), so you listen
+and say what's wrong; the jukebox (below) makes that quick.
+
+Most of the gap between today's music and a real score is the instruments,
+not the notes, so 12.1 replaces today's few voices with better ones
+(below).
+
+### How the music is made
+
+- **A score is data.** Each theme has a key and mode, a tempo, a time
+  signature, chords bar by bar, a few melodic phrases and its layers. It is
+  written in a small text notation (`'D4 . F#4 A4 | B4 - A4 .'`) that a
+  pure parser reads. Themes live in `src/music/themes.js`, kept apart from
+  the player the same way `story-text.js` keeps the writing apart.
+- **Layers by intensity.** Every cue has a bed (pad or drone), bass, rhythm,
+  melody and counter-melody. The director sets an intensity from 0 to 3
+  (a bed only, up to everything), from speed, wind, a race or how high you
+  are on Frostspire.
+- **Variation, not a loop.** Phrases are picked, moved onto the chord and
+  sometimes ornamented, using a seeded RNG of the music's own (it never
+  touches the world's `rng()`). A theme plays a full statement, then 30–90 s
+  of bed only. That keeps today's sparseness, and long sails don't wear the
+  tune out.
+- **A real clock.** Notes are scheduled about 0.2 s ahead on the audio
+  context's clock (the usual look-ahead scheduler), so timing holds even
+  when a frame is slow. The game clock only tells the player which cue and
+  intensity it wants.
+- **Changes on the bar.** A new cue starts on the next bar line. Cues in
+  the same key share the bed and crossfade over two bars. Between keys, the
+  melody drops out first, and the bed moves through a note both keys share.
+- **No flip-flopping.** A wanted cue must hold for about 8 s before the
+  music follows it. Zone edges already fade over 200u or more, so this is
+  just a guard.
+- **One-shots in key.** `discover`, `treasure`, `dock` and the other musical
+  one-shots are played in the current cue's key, so they sit in the music
+  instead of on top of it.
+- **Instruments.** New voices, all made from oscillators and noise as
+  today, with no samples:
+  - plucked string (Karplus–Strong: guitar, harp, a ukulele);
+  - FM bells and mallets (celesta, music box, marimba, a steel drum);
+  - squeezebox (detuned reeds through a formant filter);
+  - flute and tin whistle (sine plus breath noise);
+  - fiddle (a bowed saw with vibrato);
+  - a low strings pad;
+  - frame drum, bodhrán and shaker.
+
+  A reverb from a generated impulse (decaying noise) replaces the feedback
+  echo on the music bus. Voices are built at `unlock()`; if any are costly,
+  their notes can be pre-rendered through an `OfflineAudioContext`.
+- **Where it lives:** the director's rules go in a pure
+  `src/music-cues.js` (`cueFor(situation)` → `{ cue, intensity }`), so
+  `tools/check.mjs` can test it. The player and instruments are mixed into
+  `SoundSystem` from `src/audio/music.js` and `src/audio/instruments.js`,
+  like `audio/ashore.js`. Today's `musicNote`, `landNote` and storm score
+  are retired once their cues replace them.
+
+### The main theme
+
+One tune that the rest of the score borrows from: **the Tidewake theme**,
+grandfather's tune. It plays in full on the title screen and in the home
+shallows, in fragments on the coastal sea, and it's quoted inside each
+landmark's theme, because he went there first. The journals' story cards
+and the epilogue can use it too.
+
+### Cues at sea
+
+Which cue plays at sea, in priority order. The first that applies wins.
+
+| Priority | Cue | When | Feel | Instruments |
+| --- | --- | --- | --- | --- |
+| 1 | **Sable** | An encounter, race, tow or the kraken (below) | Sable's theme | — |
+| 2 | **Rough water in a storm** | In a zone (`seaAt().rough`) and the weather is `storm` | The worst water in the game: the zone's theme over the storm's drums | Both |
+| 3 | **Storm** | `storm` above ~0.4 | Driving and dark, with a pulse. Today's storm score, rewritten with real tunes | Low drums, low strings, squeezebox stabs |
+| 4 | **Rough water** | In a zone | Heavy and rolling, in 6/8. Each zone has its own colour: the Reach glassy and cold, the Rip hot and low, the Outer Swell wide and slow | The zone's biome instruments over a heavy bass |
+| 5 | **Fog** | Thick fog (`weather.p.fog` under ~0.4) | Still and uncertain. No pulse, whole-tone hints, a far-off bell | Bells, a bowed drone |
+| 6 | **Near a landmark** | Within ~800u of a landmark island | That landmark's theme, as heard from the sea (quieter, fewer layers) | The landmark's |
+| 7 | **Home waters** | `bandAt()` is home | Warm and bright: the main theme in full | Guitar, flute, light shaker |
+| 8 | **Coastal sea** | `bandAt()` is coastal | Today's mood, but with tunes: sparse, wandering, main-theme fragments | Harp, squeezebox bed |
+| 9 | **Open sea** | `bandAt()` is open | Wider and lonelier: long notes, lower, more space | Low strings, a solo fiddle |
+
+- **Rain** is not a cue of its own. It turns the cue playing to its minor
+  colour and drops the rhythm.
+- **Night** is a colour too, as today: any calm cue slows, loses its
+  rhythm and gains a celesta.
+- **The region colours the sea.** The coastal and open cues take their
+  instruments from the region's biome (the latitude `biomeFor` uses). Sail
+  north and the marimba gives way to bells, before you see any ice.
+- **In port** a harbour tune plays: the main theme, slow, on squeezebox.
+  Port Haven plays it on guitar, as home.
+- **Silence counts.** The ghost ship fades the score to nothing and plays
+  a detuned music box in the distance. A whale breaching gets a long, low
+  phrase. Other sea events leave the music alone.
+
+### Biomes and landmarks
+
+Each biome has a theme. It plays in full ashore and colours the sea of its
+region. Each landmark has a theme in its biome's palette that quotes the
+main theme. The keys and instruments are a starting point for each theme's
+design.
+
+| Biome | Feel | Key | Instruments |
+| --- | --- | --- | --- |
+| Temperate | Pastoral, gentle, the home key | D major | Harp, flute, fiddle |
+| Rocky | Windswept and stoic | E Dorian | Tin whistle, bodhrán, a drone |
+| Tropical | Bright and bouncy, syncopated | G Mixolydian | Marimba, steel drum, shaker, ukulele |
+| Volcanic | Hot, low and tense | C Phrygian | Hand drums, bass marimba, a bowed drone |
+| Cold | Sparse, glassy and slow | B minor, Lydian for wonder | Celesta, music box, bowed glass, strings |
+
+| Landmark | Feel | Follows |
+| --- | --- | --- |
+| The Elder Grove | Old, warm and woody; the owl's hoot is part of the tune | Layers add as you climb the trunk spiral; the crown gets the full theme |
+| Archway Isle | Wind, then something heroic on the traverse | The storm cave drops to a drone; the arch top gets the full theme |
+| Sunken Temple | Watery, mysterious, echoing | Muffled (a low-pass) when you're in a flooded room |
+| Mount Cinderhorn | Ominous ritual drums | Louder drums as you descend into the crater |
+| Frostspire | A slow build | Height sets the intensity, so the summit is the peak of the music |
+
+- **At sea**, every landmark has its theme from the start (cue 6 above),
+  whether or not it is walkable yet.
+- **Ashore**, the Elder Grove and Archway Isle get theirs in 12.3. The
+  Sunken Temple, Cinderhorn and Frostspire get theirs in their own landmark
+  PRs (4.7, 4.9, 4.11), which then also tune the sea version.
+- **Ordinary islands** play their biome theme, a little thinner than at a
+  landmark.
+- **The walkable wreck** plays the main theme, slowly, on one instrument.
+
+### Sable's theme
+
+A rakish minor jig (A Dorian, 6/8) on the fiddle, with a swagger. It is
+written once and turns up in these forms:
+
+| Moment | Version |
+| --- | --- |
+| Crimson sails sighted | Two bars on a horn, faint, as if carried on the wind, before Sable is in view |
+| A race | The full jig at tempo, with drums. Intensity follows who is ahead |
+| The fog run | Only the bass line and a heartbeat drum |
+| The foot race ashore (the pacer) | Quick and light, on whistle |
+| The tow | Slow, tired and kind, in a major key |
+| The kraken | Sable's theme in the bass, under the storm score, huge and slow |
+| Won or lost | A short phrase that ends up or down |
+
+The director reads `rival.act?.type` and `rival.racing`. Where each version
+goes in the story follows [rival-captain.md](rival-captain.md).
+
+### Settings and saves
+
+- **A music volume** slider beside the music on/off setting. It is saved
+  with the other settings, not in the save.
+- **Low quality** plays fewer layers and fewer voices at once.
+- **Saves:** nothing new.
+
+### Checks and tools
+
+- **`tools/check.mjs`** gets a `music` group (the themes and
+  `music-cues.js` are pure):
+  - every theme parses, its phrases fit their bars, and every note is in
+    its instrument's range;
+  - every biome, landmark, sea cue and Sable moment has a theme;
+  - `cueFor` picks the right cue for a table of situations (home and clear
+    → home; a storm in the Reach → rough water in a storm; a race anywhere
+    → Sable);
+  - a simulated ten-minute sail back and forth across a band edge changes
+    cue no more than once each crossing.
+- **`jukebox.html`** on the same dev server, like the gallery: every cue
+  as a button, with sliders for intensity, night and rain, and a button
+  that changes cue on the next bar so a transition can be heard. This is
+  where music is judged, as the gallery is for looks. You do the listening;
+  every theme needs your ears before it ships.
+- **`tidewake.debug.music()`** says what's playing (cue, intensity, layers,
+  key, bar); `debug.music('sable-race')` forces a cue.
+- **Measuring:** render each cue for 60 s through an `OfflineAudioContext`
+  (as the sound effects are checked now) and hold every cue to the same
+  loudness within about 2 dB, with no clipping. Measure `debug.bench()` on
+  Low while a full-intensity cue plays.
+
+### Phase 12 in smaller PRs
+
+| PR | Branch | What it adds | Depends on |
+| --- | --- | --- | --- |
+| 12.1 | `feature/music-engine` | The score player (clock, bars, notation, layers, changes on the bar), the new instruments and reverb, the main theme, the home, coastal and open cues, one-shots in key, `jukebox.html`, the `music` check | — |
+| 12.2 | `feature/sea-music` | Storm (rewritten), fog, rough water per zone, rain and night colours, the harbour tune, the title screen; the director's priorities and the 8 s hold; the ghost ship's silence and the whale's phrase | 12.1, Phase 9.2 (done) |
+| 12.3 | `feature/island-music` | The five biome themes, ashore and as the sea's colour; the five landmark themes at sea; the Elder Grove and Archway Isle ashore, following the climb | 12.1 |
+| 12.4 | `feature/sable-theme` | Sable's theme and its versions | 12.1 |
+
+- 12.2, 12.3 and 12.4 only add themes and rules, so after 12.1 they can be
+  built side by side. They all add rows to `music-cues.js`, so agree on its
+  table first.
+- 12.1 is the one to get right: if the instruments sound good in the
+  jukebox, the rest is composing.
+
+**Done when:** each band, weather and rough zone at sea has its own music,
+and you can hear where you are; every biome and landmark has a theme you
+could hum; Sable's theme comes before their sails; music changes on the bar
+and never flip-flops; every cue has been listened to on real speakers; and
+it runs on Low with no drop in frame rate.
+
+---
+
 ## Tooling: the look-dev gallery, what's left
 
 The gallery itself has shipped (`gallery.html`; how to use it is in
@@ -1074,6 +1297,7 @@ One feature branch and PR per phase, matching how the repo already works
 | P9 | Three smaller PRs: see *Phase 9 in smaller PRs* | — (builds on Phase 5's wave set and shore map) |
 | P10 | Four smaller PRs: see *Phase 10 in smaller PRs* | P2b's epilogue (done); landmark items as Phase 4 ships them |
 | P11 | Four smaller PRs: see *Phase 11 in smaller PRs* | — |
+| P12 | Four smaller PRs: see *Phase 12 in smaller PRs* | — (12.2 uses Phase 9's zones; landmark themes ashore come with each landmark) |
 
 **Verification each phase:** there's no test suite, so each PR is checked in
 the browser preview (`tidewake-dev` in `.claude/launch.json`):
@@ -1129,6 +1353,12 @@ the browser preview (`tidewake-dev` in `.claude/launch.json`):
   a long hill. If shaped islands don't feel different at sea, lean on height
   (taper the peak along the shape) and on the signature touches before
   adding more forms.
+- **Music nobody has heard:** Claude can measure a cue but not hear it,
+  so every theme needs a listen on real speakers before it ships. Budget
+  for listening sessions in the jukebox, and expect a round of changes per
+  theme.
+- **Music that wears thin:** long sails hear the same cue for minutes. If
+  it starts to grate, add more rest (bed only) before adding more tunes.
 - **Retiring the walkable wreck:** it is the first ashore level. Raising her
   removes it, so make sure nothing after the epilogue still points there
   (quests, hints, the chart's markers).
