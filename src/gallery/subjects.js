@@ -33,6 +33,10 @@ import { buildArchwayLevel } from '../ashore/archway.js';
 import { buildArchwayLayout } from '../ashore/archway-layout.js';
 import { pieceArt as archwayPieceArt } from '../ashore/archway-art.js';
 import { buildSeaArch, ARCH } from '../sea-arch.js';
+import { buildWhale, buildDolphin, buildTurtle } from '../sea-life.js';
+import { buildWaterspout, buildIceberg, buildBottle } from '../sea-wonders.js';
+import { buildGull, buildFish } from '../sea-ambient.js';
+import { buildGhostShip } from '../ghost-model.js';
 import { generateLevel } from '../ashore/levelgen.js';
 import { layoutLevel } from '../ashore/modules.js';
 import { pieceParts } from '../ashore/pieces.js';
@@ -258,6 +262,70 @@ function arch(q, stage) {
   };
 }
 
+// The living sea (sea-life.js, sea-wonders.js, sea-ambient.js, ghost-ship.js):
+// `kind` picks one. The animals stand on the floor, whole, so the parts the sea
+// hides in the game can be checked; the ghost ship, the iceberg and the
+// waterspout stand in the sea, as they do there. (The glowing bloom is drawn
+// by the ocean itself, so it can only be looked at in the game.)
+const SEALIFE = ['whale', 'dolphin', 'turtle', 'gull', 'fish', 'bottle', 'berg', 'spout', 'ghost'];
+function sealife(q, stage) {
+  initProps();
+  const warnings = [];
+  let kind = q.kind || 'whale';
+  if (!SEALIFE.includes(kind)) { warnings.push(`kind=${kind} is not sea life (${SEALIFE.join(', ')})`); kind = 'whale'; }
+  if (kind === 'ghost') {
+    const G = buildGhostShip();
+    G.setFade(1);
+    stage.add(G.group);
+    return {
+      group: G.group, ground: 'sea', warnings, look: { y: 8 },
+      update(dt, t) { G.setFade(1, t); },
+      dispose() { G.group.traverse((o) => o.material?.dispose()); }, // her geometry is shared with the game's
+    };
+  }
+  if (kind === 'dolphin' || kind === 'turtle' || kind === 'fish') {
+    const D = kind === 'dolphin' ? buildDolphin() : kind === 'turtle' ? buildTurtle() : buildFish();
+    D.position.y = kind === 'fish' ? 0.2 : 0.5;
+    stage.add(D);
+    return { group: D, ground: 'floor', warnings, look: { y: D.position.y }, dispose() {} }; // shared geometry
+  }
+  if (kind === 'gull') {
+    const G = buildGull();
+    G.group.position.y = 1;
+    stage.add(G.group);
+    return {
+      group: G.group, ground: 'floor', warnings, look: { y: 1 },
+      update(dt, t) { const a = Math.sin(t * 5) * 0.45; G.wings[0].rotation.z = a; G.wings[1].rotation.z = -a; },
+      dispose() {},
+    };
+  }
+  if (kind === 'bottle') {
+    const B = buildBottle();
+    B.tilt.rotation.z = 0.95;
+    B.group.position.y = 0.6;
+    B.glint.scale.setScalar(1.6);
+    stage.add(B.group);
+    return { group: B.group, ground: 'floor', warnings, look: { y: 0.6 }, dispose() { B.glint.material.dispose(); } };
+  }
+  if (kind === 'berg' || kind === 'spout') {
+    const M = kind === 'berg' ? buildIceberg() : buildWaterspout();
+    stage.add(M.group);
+    return {
+      group: M.group, ground: 'sea', warnings, look: { y: kind === 'berg' ? 6 : 30 },
+      update(dt) { if (M.funnel) M.funnel.rotation.y -= dt * 3.4; },
+      dispose() { M.group.traverse((o) => o.geometry?.dispose()); },
+    };
+  }
+  const W = buildWhale();
+  W.group.position.y = -new THREE.Box3().setFromObject(W.group).min.y + 0.1; // belly on the floor, whatever her size
+  stage.add(W.group);
+  return {
+    group: W.group, ground: 'floor', warnings, look: { y: W.group.position.y },
+    update(dt, t) { W.tail.rotation.x = Math.sin(t * 1.5) * 0.22; },
+    dispose() { W.group.traverse((o) => o.geometry?.dispose()); },
+  };
+}
+
 // A generated island level: `biome`, `seed`, `r` (island radius) and `dist`
 // (metres from Port Haven, which sets how hard it is). With `kind=arch&n=0`,
 // one of its pieces on its own.
@@ -278,7 +346,7 @@ function level(q, stage) {
   return { group: lv.group, ground: 'sea', warnings, shoal: shoalOf(lv), note: `${lv.layout.biome}, ${lv.layout.tier}`, dispose() { lv.dispose(); } };
 }
 
-export const SUBJECTS = { outfit, ship, prop, tree, arch, wreck, grove, archway, level };
+export const SUBJECTS = { outfit, ship, prop, tree, arch, wreck, grove, archway, level, sealife };
 
 // Every parameter a subject reads, so a misspelt one is reported instead of ignored.
 const DRESS = [...SLOTS, ...SLOTS.map((s) => s + 'Color'), 'shirt', 'skin', 'head', 'eyeColor', 'eyeShape', 'blush', 'freckles', 'profile'];
@@ -292,6 +360,7 @@ const PARAMS = {
   arch: [],
   archway: ['kind', 'n', 'at', 'journal'],
   level: ['biome', 'seed', 'r', 'dist', 'kind', 'n'],
+  sealife: ['kind'],
 };
 /** The keys in `q` that the subject `show` doesn't read (`also`: the page's own parameters). */
 export function unknownParams(show, q, also) {
@@ -312,6 +381,7 @@ export function controlsFor(show) {
     case 'grove': return [['kind', [...new Set(buildGroveLayout().pieces.map((p) => p.kind))]], ['n', TIERS]];
     case 'archway': return [['at', ARCHWAY_PLACES], ['journal', ['0']], ['kind', [...new Set(buildArchwayLayout().pieces.map((p) => p.kind))]], ['n', TIERS]];
     case 'level': return [['biome', [...ASHORE_BIOMES]], ['kind', PIECE_KINDS], ['n', TIERS], ['seed', ['4401', '1121', '77', '31337']]];
+    case 'sealife': return [['kind', SEALIFE]];
     default: return [];
   }
 }

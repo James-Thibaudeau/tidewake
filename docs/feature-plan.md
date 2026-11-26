@@ -148,6 +148,14 @@ The ocean should feel inhabited between islands. A small **event director**
 rolls for an encounter every few minutes of sailing and places it ahead of
 the ship, close enough to see but not in your path.
 
+**Shipped** (see [STATUS.md](STATUS.md)): all of it. What was built differs
+from the text below in a few places: bounties need the kind's own hour and
+weather; a bottle's first message is a letter to carry, then charts and
+notes; the ghost ship's chain leads to an island you can already land on
+(there is no hand-built cove); and Sable's encounters keep their places and
+only take their moment from the director. The link to Phase 9's sea zones
+waits for Phase 9.
+
 ### Event director (`src/sea-events.js`)
 
 - **Rolls** about every 3–6 minutes of sailing time, never while docking, in

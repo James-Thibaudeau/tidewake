@@ -642,6 +642,20 @@ function buildNeck(B, p, c, tail) {
         z: Math.cos(f) * rr * Math.cos(tilt) + 0.012, sy: 0.75,
       }));
     }
+  } else if (st === 'whaleTail') {
+    // A whale's tail carved from driftwood, hanging on a dark cord: the same
+    // drape as the shell necklace, with the one pendant at the bottom of it.
+    const rr = p.top.style === 'coat' ? 0.255 : 0.24, tilt = 0.38, CORD = '#3a2c22', WOOD = '#d9c7a3', WOOD2 = '#b59a70';
+    T.push(part(new THREE.TorusGeometry(rr, 0.007, 4, 16, PI), CORD, { y: 0.56, rx: PI / 2 + tilt }));
+    T.push(part(tor(0.08, 0.007, 4, 14), CORD, { y: 0.585, rx: PI / 2 }));
+    const y = 0.56 - rr * Math.sin(tilt), z = rr * Math.cos(tilt) + 0.012;
+    const tailParts = [
+      part(sph(0.012, 6, 4), CORD, { y: -0.004 }),                                   // the knot it hangs from
+      part(cone(0.017, 0.06, 6), WOOD2, { y: -0.036, sz: 0.55 }),                    // the stock, widening downwards
+    ];
+    // the two flukes, sweeping out and up from the bottom of the stock
+    for (const s of [-1, 1]) tailParts.push(part(sph(0.03, 8, 5), WOOD, { x: s * 0.027, y: -0.066, sx: 1.0, sy: 0.42, sz: 0.3, rz: s * 0.55 }));
+    T.push(group(tailParts, { y, z, rx: -0.2, s: 1.1 }));
   }
 }
 
@@ -1282,6 +1296,25 @@ const HATS = {
       part(cyl(0.42, 0.42, 0.022, 18, false, -1.0, 2.0), '#1f1e24', { y: 0.185, rx: 0.22 }),
       part(tor(0.32, 0.01, 4, 20), GOLD, { y: 0.235, rx: PI / 2 }),
       part(sph(0.04, 8, 6), GOLD, { y: 0.26, z: 0.32, sz: 0.5 }),
+    ], -0.12);
+  },
+  lantern() {
+    // The ghost ship's keepsake: a dark, salt-stained sailor's cap with a short
+    // peak, and clipped to the front of it, like a miner's lamp, a little
+    // lantern that burns green.
+    const cloth = '#2f4a4c', band = '#1c2e30', iron = '#3d434a', glass = '#8dffb9';
+    const lz = 0.39, ly = 0.27; // against the front of the crown, just above the band
+    return tipBack([
+      part(sph(0.358, 20, 10, 0, TAU, 0, PI / 2), cloth, { y: 0.15, sy: 0.74, sz: 1.06 }),
+      part(cyl(0.364, 0.368, 0.085, 20, true), band, { y: 0.195, sz: 1.06 }),
+      part(cyl(0.43, 0.43, 0.022, 18, false, -1.0, 2.0), band, { y: 0.172, rx: 0.2 }),
+      part(sph(0.035, 8, 6), band, { y: 0.415, sy: 0.6 }),
+      // its bracket on the band, a carrying ring, a lid, green glass, a foot
+      part(box(0.035, 0.02, 0.07), iron, { y: ly - 0.045, z: lz - 0.03 }),
+      part(tor(0.018, 0.005, 4, 8), iron, { y: ly + 0.088, z: lz }),
+      part(cone(0.05, 0.035, 6), iron, { y: ly + 0.06, z: lz }),
+      part(cyl(0.04, 0.04, 0.075, 6), glass, { y: ly + 0.005, z: lz }),
+      part(cyl(0.048, 0.04, 0.018, 6), iron, { y: ly - 0.04, z: lz }),
     ], -0.12);
   },
   furHood() {

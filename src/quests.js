@@ -19,6 +19,9 @@
 //            returns the item to the island. Only offered once you can go
 //            ashore. The map-fragment variant charts an unknown island when
 //            you hand it in.
+//   sighting: active (see that kind of sea event inside the search circle,
+//            sea-events.js) → ready → done at any port. While it is active
+//            the director makes that kind likelier in the circle.
 import * as THREE from 'three';
 import { toonMaterial } from './toon.js';
 import { WORLD_HALF, WORLD_SEED } from './config.js';
@@ -27,6 +30,8 @@ import { waveHeight, waveUniforms } from './waves.js';
 import { propMesh } from './props.js';
 import { STYLES, owns } from './cosmetics.js';
 import { difficultyFor } from './ashore/modules.js';
+import { BOUNTY_KINDS, HEARS, canHappenAt } from './sightings.js';
+import { SIGHTINGS, BOUNTY } from './story-text.js';
 
 export const MAX_ACTIVE = 3;
 const OFFERS_PER_BOARD = 3;
@@ -49,9 +54,10 @@ const KEEPSAKES = ['pocket watch', 'sketchbook', 'brass telescope', 'fiddle', 'l
 export const MAP_FRAGMENT = 'Map fragment';
 const POINT_NAMES = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];
 
-const dirWord = (dx, dz) => POINT_NAMES[Math.round(bearingDeg(headingOf(dx, dz)) / 45) % 8];
+export const dirWord = (dx, dz) => POINT_NAMES[Math.round(bearingDeg(headingOf(dx, dz)) / 45) % 8];
 export const fmtDist = (d) => (d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${Math.max(10, Math.round(d / 10) * 10)} m`);
 const lc = (s) => s.charAt(0).toLowerCase() + s.slice(1);
+const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] ?? m));
 
 /** Stable quest givers for a port: one per role. */
 export function giversFor(port) {
@@ -116,6 +122,7 @@ export class QuestSystem {
     ev.on('dock', (I) => this.onDock(I));
     ev.on('respawn', (I) => this.onDock(I)); // washing ashore at a port counts as arriving
     ev.on('wreck', () => this.onWreck());
+    ev.on('sighting', (e) => this.onSighting(e));
   }
 
   get Q() {
@@ -148,7 +155,7 @@ export class QuestSystem {
   generate(port, day) {
     const rng = mulberry32(Math.floor((port.id + 1) * 104729 + day * 7907 + WORLD_SEED));
     const offers = [];
-    const types = ['chart', 'deliver', 'salvage', 'retrieve'];
+    const types = ['chart', 'deliver', 'salvage', 'retrieve', 'sighting'];
     // shuffle so the order varies day to day, but each board tries for variety
     for (let i = types.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [types[i], types[j]] = [types[j], types[i]]; }
     const bands = [[500, 1800], [1500, 3200], [2600, 5200]];
@@ -244,6 +251,25 @@ export class QuestSystem {
         text: `I left my ${item} at the top of ${I.name} on a picnic last summer, and my knees won't take that climb again. It's ${where} of here, about ${fmtDist(d)} out. Bring it back to me here and I'll make it worth your while.`,
         ...this.maybeCosmetic(base, d, rng) };
     }
+    if (type === 'sighting') {
+      // somebody wants a kind of sea event seen, in waters where it turns up: a search circle, and no more
+      const taken = new Set(this.active.filter((q) => q.type === 'sighting').map((q) => q.kind));
+      const kinds = BOUNTY_KINDS.filter((k) => !taken.has(k) && (k !== 'ghostShip' || (st.story?.chapter || 0) >= 2));
+      if (rng() < 0.5) return null; // not on every board: about one in three
+      for (let tries = 0; tries < 40 && kinds.length; tries++) {
+        const kind = kinds[Math.floor(rng() * kinds.length)];
+        const a = rng() * TAU, d = dmin + rng() * (dmax - dmin);
+        const x = P.x + Math.cos(a) * d, z = P.z + Math.sin(a) * d;
+        if (Math.abs(x) > WORLD_HALF - 900 || Math.abs(z) > WORLD_HALF - 900 || !canHappenAt(kind, z) || this.world.heightAt(x, z) > -9) continue;
+        const what = SIGHTINGS[kind].wanted;
+        base.giver = giversFor(port)[HEARS[kind]];
+        base.reward.gold = Math.round(70 + d * 0.05);
+        return { ...base, kind, area: { x, z, r: 520 }, dist: d,
+          title: fill(BOUNTY.title, { what }),
+          text: fill(BOUNTY.text, { what, dir: dirWord(x - P.x, z - P.z), dist: fmtDist(d), hint: SIGHTINGS[kind].hint }) };
+      }
+      return null;
+    }
     if (type === 'salvage') {
       for (let tries = 0; tries < 40; tries++) {
         const a = rng() * TAU, d = dmin + rng() * (dmax - dmin);
@@ -305,7 +331,10 @@ export class QuestSystem {
 
   pin(id) { this.Q.pinned = id; }
   /** Story-track steps (main story, grandfather's anchor, the rival captain, sightings to report): never take a side-quest slot. */
-  get storyQuests() { return [...(this.game.story?.quests() || []), ...(this.game.refits?.quests() || []), ...(this.game.rival?.quests() || []), ...(this.game.reports?.quests() || [])]; }
+  get storyQuests() {
+    const g = this.game;
+    return [...(g.story?.quests() || []), ...(g.refits?.quests() || []), ...(g.rival?.quests() || []), ...(g.reports?.quests() || []), ...(g.seaEvents?.chain.quests() || [])];
+  }
   /** Everything worth tracking: story steps first, then side quests. */
   get tracked() { return [...this.storyQuests, ...this.active]; }
   get pinned() {
@@ -331,6 +360,17 @@ export class QuestSystem {
     }
   }
 
+  /** A sea event was seen: was it one a board asked for, in the waters it asked about? */
+  onSighting(e) {
+    for (const q of this.active) {
+      if (q.type !== 'sighting' || q.state !== 'active' || q.kind !== e.kind || Math.hypot(q.area.x - e.x, q.area.z - e.z) > q.area.r + 150) continue;
+      q.state = 'ready';
+      this.version++;
+      setTimeout(() => this.game.ui.toast(fill(BOUNTY.seen, { what: SIGHTINGS[q.kind].wanted }), 'gold'), 3600);
+      this.game.events.emit('quest:progress', q);
+    }
+  }
+
   onDock(port) {
     const g = this.game, ui = g.ui;
     let changed = false;
@@ -338,7 +378,7 @@ export class QuestSystem {
       const done =
         (q.type === 'deliver' && q.state === 'active' && q.target === port.id) ||
         (q.type === 'retrieve' && q.state === 'ready' && q.from === port.id) ||
-        ((q.type === 'chart' || q.type === 'salvage') && q.state === 'ready');
+        ((q.type === 'chart' || q.type === 'salvage' || q.type === 'sighting') && q.state === 'ready');
       if (done) { this.complete(q, port); changed = true; continue; }
       if (q.type === 'deliver' && q.state === 'lost' && q.from === port.id) {
         q.state = 'active';
@@ -425,13 +465,14 @@ export class QuestSystem {
   /** Quest items waiting on this island right now: retrieve quests, and an anchor refit's fitting. */
   itemsOn(islandId) {
     return [...this.active.filter((q) => q.type === 'retrieve' && q.state === 'active' && q.target === islandId),
-      ...(this.game.refits?.itemsOn(islandId) || [])];
+      ...(this.game.refits?.itemsOn(islandId) || []), ...(this.game.seaEvents?.chain.itemsOn(islandId) || [])];
   }
 
   /** Picked up ashore: aboard until you hand it in (or wreck). */
   pickUp(q) {
     const g = this.game;
     if (q.id === 'refit') return g.refits.pickUp();
+    if (q.id === 'ghostLog') return g.seaEvents.chain.pickUp();
     q.state = 'ready';
     this.syncHold();
     this.version++;
@@ -462,6 +503,7 @@ export class QuestSystem {
    */
   target(q) {
     if (q.type === 'story' && q.kind) return this.game.reports.target(q); // a sighting to report
+    if (q.type === 'story' && q.id === 'ghost') return this.game.seaEvents.chain.target();
     if (q.type === 'story') return q.id === 'rival' ? this.game.rival.target() : q.id === 'refit' ? this.game.refits.target() : this.game.story.target(q.id);
     const b = this.game.boat.pos;
     const nearestPort = () => {
@@ -485,6 +527,10 @@ export class QuestSystem {
     if (q.type === 'salvage') {
       if (q.state === 'ready') { const P = nearestPort(); return { x: P.dock.x, z: P.dock.z, label: `Return to port: ${P.name}` }; }
       return { x: q.site.x, z: q.site.z, label: 'Find the wreck site' };
+    }
+    if (q.type === 'sighting') {
+      if (q.state === 'ready') { const P = nearestPort(); return { x: P.dock.x, z: P.dock.z, label: `Return to port: ${P.name}` }; }
+      return { ...q.area, label: fill(BOUNTY.search, { what: SIGHTINGS[q.kind].wanted }) };
     }
     if (q.type === 'retrieve') {
       if (q.state === 'ready') { const O = this.island(q.from); return { x: O.dock.x, z: O.dock.z, label: `Return the ${lc(q.item)} to ${O.name}` }; }

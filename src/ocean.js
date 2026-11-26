@@ -109,6 +109,7 @@ uniform vec3 uAmbient;
 uniform vec4 uLantern;
 uniform float uLanternR;
 uniform float uRain;
+uniform vec4 uBloom; // (x, z, radius, strength): a patch of glowing sea; strength 0 = off
 uniform vec2 uWindDir;
 uniform float uWindStr;
 uniform vec3 uCalm;
@@ -299,6 +300,19 @@ void main() {
   glit = max(glit * (1.0 - smoothstep(250.0, 1200.0, dist)), step(0.996, spec));
   lit += glit * uLightCol * (0.25 + low * 1.1) * noFoam;
 
+  // ---- the glowing bloom (sea-events.js): blue light in drifting patches, brightest in the
+  // foam and on the crests, with motes that wink on and off near the boat
+  if (uBloom.w > 0.001) {
+    float bd = distance(p, uBloom.xy) + (vnoise(p * 0.03) - 0.5) * 50.0;
+    float bk = (1.0 - smoothstep(uBloom.z * 0.6, uBloom.z, bd)) * uBloom.w;
+    float bn = vnoise(p * 0.045 + vec2(uTime * 0.02, -uTime * 0.015)) * 0.6 + vnoise(p * 0.19 - uTime * 0.04) * 0.4;
+    vec2 bc = p * 0.9;
+    vec2 bi = floor(bc);
+    float mote = step(0.9, hash12(bi + floor(uTime * 0.8 + hash12(bi) * 5.0))) * (1.0 - step(0.2, length(fract(bc) - 0.5)))
+               * (1.0 - smoothstep(40.0, 160.0, dist));
+    lit += vec3(0.08, 0.5, 0.95) * bk * (cel(bn, 0.5) * 0.45 + smoothstep(0.2, 0.9, hn) * 0.35 + foam * 1.1 + mote * 1.4);
+  }
+
   gl_FragColor = vec4(lit, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -331,6 +345,7 @@ export class Ocean {
       uLanternR: { value: 30 },
       uRain: { value: 0 },
       uCalm: { value: new THREE.Vector3(0, 0, 0) }, // (x, z, radius): still water inside; radius 0 = off
+      uBloom: { value: new THREE.Vector4(0, 0, 0, 0) }, // (x, z, radius, strength): the glowing bloom; strength 0 = off
       uShallow: { value: new THREE.Color('#2fb3ab') },
       uShoreMap: { value: OPEN_SEA },
       uShore: { value: 0 },                                // 1 / the map's width in metres

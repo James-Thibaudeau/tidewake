@@ -47,6 +47,8 @@ export const SHEETS = {
   // ---- ships
   'ships': { about: 'Every upgrade tier, from the bow quarter and the side', tile: LANDSCAPE, make: grid('view', ['quarter', 'side'], 'tier', ['0', '1', '2', '3', '4', '5'], { show: 'ship' }) },
   'anchors': { about: 'Every anchor refit, close on the bow', tile: LANDSCAPE, make: strip('anchor', ['0', '1', '2', '3', '4'], { show: 'ship', view: 'bow', canvas: '0' }) },
+  // ---- the living sea
+  'sealife': { about: 'Everything the living sea turns up, one of each', tile: LANDSCAPE, make: strip('kind', ['whale', 'dolphin', 'turtle', 'gull', 'fish', 'bottle', 'berg', 'spout', 'ghost'], { show: 'sealife', view: 'quarter' }, 3) },
   // ---- the sea
   'sea': { about: 'The sea in every weather: from the helm, low over the water, from a tall masthead and from a gull', tile: LANDSCAPE, make: grid('view', ['sail', 'horizon', 'aloft', 'high'], 'weather', WEATHERS, { show: 'ship', tier: '2' }) },
   'sea-lights': { about: 'The sea under every light: from the helm, a tall masthead and a gull', tile: LANDSCAPE, make: grid('view', ['sail', 'aloft', 'high'], 'light', Object.keys(LIGHTS), { show: 'ship', tier: '2' }) },

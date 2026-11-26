@@ -1,20 +1,38 @@
-// Report quests: you see something out at sea, and somebody ashore wants it
-// written down. There is one so far: the crabs that live upside down under
-// the great arch at Archway Isle. You find them by sailing through the arch,
-// and a naturalist at the nearest port wants to hear about them. (Phase 7's
-// whales and dolphins build on this.)
+// Report quests: you see something out at sea, and somebody ashore wants to
+// hear about it. The crabs that live upside down under the great arch at
+// Archway Isle are found here, by sailing through the arch, and a naturalist
+// wants them written down. Everything the living sea turns up (sea-events.js)
+// has somebody who cares too: a cartographer for whales and turtles, a
+// merchant for dolphins, a harbormaster for ice and waterspouts, a naturalist
+// for the glowing sea, an old salt for the ghost ship. A letter found in a
+// bottle is carried the same way.
 //
 // state.quests.reports = { [kind]: { state: 'active' | 'done', port, day } }
-// A report takes no side-quest slot and never expires, like a story step: it
-// is listed and marked on the chart with them, and handed in by docking at
-// its port. Each kind is seen once. The words are REPORTS in story-text.js.
+// A report takes no side-quest slot, like a story step: it is listed and
+// marked on the chart with them, and handed in by docking at its port, the
+// one nearest to where the thing was seen. Each kind is reported once. News
+// of the living sea goes stale after a few days: the report is dropped, and
+// the next sighting of that kind starts a new one. The crabs never go stale.
+// The words are REPORTS in story-text.js.
 import { REPORTS } from './story-text.js';
 import { giversFor } from './quests.js';
+import { HEARS } from './sightings.js';
 import { ARCH } from './sea-arch.js';
 import { damp } from './util.js';
 
-// what each kind of sighting pays when it's reported
-const KINDS = { archCrabs: { gold: 120, cosmetic: 'extra:crabPin' } };
+// What each kind of sighting pays when it's reported, and how many days the
+// news keeps (none: it never goes stale). Who hears it is HEARS in sightings.js.
+const KINDS = {
+  archCrabs: { gold: 120, cosmetic: 'extra:crabPin' },
+  whale: { gold: 90, stale: 3 },
+  dolphins: { gold: 60, stale: 3 },
+  turtles: { gold: 70, stale: 3 },
+  bloom: { gold: 80, stale: 3 },
+  iceberg: { gold: 100, stale: 3 },
+  waterspout: { gold: 110, stale: 2 },
+  ghostShip: { gold: 150, stale: 3 },
+  bottle: { gold: 80 },
+};
 const questId = (kind) => `report:${kind}`;
 // the clear water between the arch's legs (their collision rocks are 6 wide, in arch units)
 const CHANNEL = (ARCH.legX - 6) * ARCH.scale - 1;
@@ -51,6 +69,7 @@ export class Reports {
   update(dt) {
     const g = this.game;
     if (g.mode !== 'sailing') { this.side = 0; return; }
+    this.dropStale();
     if (this.lookT > 0) {
       // tip the view up at the underside for a moment, then let it settle
       this.lookT -= dt;
@@ -70,19 +89,50 @@ export class Reports {
     this.side = side;
   }
 
-  /** Something seen for the first time, at (x, z): it becomes a report to make. */
-  sight(kind, at) {
+  /**
+   * News worth telling, seen at (x, z): it becomes a report to make, unless
+   * this kind is already on its way to a port or has been told before.
+   * Returns true if a report started.
+   */
+  start(kind, at) {
     const g = this.game, T = REPORTS[kind];
-    if (!T || this.R[kind]) return;
+    if (!T || !KINDS[kind] || this.R[kind]) return false;
     const port = this.portNear(at.x, at.z);
     this.R[kind] = { state: 'active', port: port.id, day: g.state.day || 1 };
-    this.lookT = 2.4;
     g.quests.version++;
-    g.audio.play('click');
-    g.ui.toast(T.sighting, 'gold');
     setTimeout(() => g.ui.toast(fill(T.added, { port: port.name }), 'info'), 2400);
+    return true;
+  }
+
+  /** The crabs, seen for the first time: look up at them, and start the report. */
+  sight(kind, at) {
+    const g = this.game;
+    if (!this.start(kind, at)) return;
+    this.lookT = 2.4;
+    g.audio.play('click');
+    g.ui.toast(REPORTS[kind].sighting, 'gold');
     g.events.emit('sighting', { kind, x: at.x, z: at.z, day: g.state.day || 1 });
     g.saveVoyage();
+  }
+
+  /** Days left before a report's news is too old to tell (null: it keeps). */
+  daysLeft(kind) {
+    const r = this.R[kind], K = KINDS[kind];
+    if (!r || !K?.stale) return null;
+    return K.stale - ((this.game.state.day || 1) - r.day);
+  }
+
+  /** Old news is dropped; the next sighting of that kind starts a fresh report. */
+  dropStale() {
+    const g = this.game;
+    for (const [kind, r] of Object.entries(this.R)) {
+      if (r.state !== 'active' || !(this.daysLeft(kind) < 0)) continue;
+      delete this.R[kind];
+      if (g.quests.Q.pinned === questId(kind)) g.quests.pin('story');
+      g.quests.version++;
+      if (REPORTS[kind]?.stale) g.ui.toast(REPORTS[kind].stale, 'info');
+      g.saveVoyage();
+    }
   }
 
   // -------------------------------------------------------------- tracking
@@ -91,8 +141,8 @@ export class Reports {
     const out = [];
     for (const [kind, r] of Object.entries(this.R)) {
       const T = REPORTS[kind], port = this.world.islands[r.port];
-      if (r.state !== 'active' || !T || !port) continue;
-      const who = giversFor(port).report;
+      if (r.state !== 'active' || !T || !port || !KINDS[kind]) continue;
+      const who = giversFor(port)[HEARS[kind]];
       out.push({ id: questId(kind), type: 'story', state: 'active', kind, title: T.title, text: fill(T.text, { port: port.name }),
         giver: { name: who.name, role: who.role, label: T.label }, reward: { gold: KINDS[kind].gold } });
     }
@@ -103,17 +153,19 @@ export class Reports {
   target(q) {
     const r = this.R[q.kind], port = r && this.world.islands[r.port];
     if (!port) return null;
-    return { x: port.dock.x, z: port.dock.z, label: fill(REPORTS[q.kind].status, { port: port.name }) };
+    const left = this.daysLeft(q.kind);
+    const fresh = left == null ? '' : left > 0 ? ` · ${left} day${left === 1 ? '' : 's'} before the news is stale` : ' · the news is stale tomorrow';
+    return { x: port.dock.x, z: port.dock.z, label: fill(REPORTS[q.kind].status, { port: port.name }) + fresh };
   }
 
   // --------------------------------------------------------------- hand-in
   async onDock(port) {
     for (const [kind, r] of Object.entries(this.R)) {
-      if (r.state === 'active' && r.port === port.id && REPORTS[kind]) await this.handIn(kind, port);
+      if (r.state === 'active' && r.port === port.id && REPORTS[kind] && KINDS[kind]) await this.handIn(kind, port);
     }
   }
 
-  /** The naturalist writes it down: gold, the keepsake, and a page in their book. */
+  /** Somebody hears the news: gold, a keepsake if there is one, and what they made of it. */
   async handIn(kind, port) {
     const g = this.game, s = g.state, T = REPORTS[kind], K = KINDS[kind];
     this.R[kind].state = 'done';
@@ -133,6 +185,6 @@ export class Reports {
     const items = [{ icon: 'book', name: T.pageName, text: fill(T.page, vars) }];
     if (keepsake) items.push({ icon: 'needle', name: T.pinName, text: T.pin });
     items.push({ icon: 'coin', name: `${K.gold} gold`, text: T.gold });
-    await g.ui.showFound({ eyebrow: fill(T.eyebrow, vars), title: fill(T.done, vars), items, main: 'Wonderful!' });
+    await g.ui.showFound({ eyebrow: fill(T.eyebrow, vars), title: fill(T.done, vars), items, main: T.main || 'Wonderful!' });
   }
 }

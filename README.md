@@ -39,6 +39,7 @@ On foot (once grandfather's anchor is fitted):
 - **Going ashore:** buy the Oak Planking hull and the shipwright tells you about your grandfather's anchor, lying beside his wreck. Haul it up and have it fitted, then slow down by any green (temperate) island and drop anchor. Climb to the summit for gold, light lanterns as checkpoints, and look for each island's hidden chest. Gold found ashore goes in your hold until you bank it.
 - Every port has a **Quest Board**: chart rumoured islands, carry parcels between ports and salvage wrecks (cyan beams). Up to three at a time; rewards are paid when you dock. A parcel or salvage aboard sinks with your ship, just like gold.
 - **Captain Sable:** once you have your grandfather's first journal, the Redwing, a ship with crimson sails, starts turning up. She is rigged to match your own upgrades, and her captain will race you at sea (round buoys, and once through fog by compass bearing) and on foot, and the story moves on whether you win or lose. Harbor talk on the Quest Board says where the crimson sails were last seen.
+- **A living sea:** every few minutes of sailing something turns up off the bow: a whale in cool water, dolphins on a fine day, sea turtles in the warm south, icebergs in the north, a waterspout in a storm, a bottle with a message in it, and at night the sea glowing blue or a pale ship with green lanterns. Sail close, or hold it in the spyglass for a moment, and it goes in the journal's **Sightings** tab. Sail slowly beside a whale and it stays up; sail fast near dolphins and they ride your bow wave and pull you along; go gently among turtles; keep clear of ice and waterspouts; follow the ghost ship, not too close, and see where she stops. The first time you see each one, somebody at the nearest port wants to hear about it, and pays, if you get there before the news is stale. Quest boards sometimes ask for a sighting too.
 - Every new voyage starts with the character creator. Restyle any time for free at a port's **Tailor** tab, where new hats, coats and boots are sold. Rarer pieces are hidden on the islands.
 - With a spyglass, hold `Z` (or the spyglass button) to look through it from the explorer's eyes; drag to pan. Islands you spot through it are charted from afar.
 
@@ -90,7 +91,15 @@ src/
   quests.js       quest boards: offer generation, tracking, hand-in, salvage sites
   story.js        main story: chapters, grandfather's camps, searches, rewards
   refits.js       grandfather's anchor refits: which biomes you can land on, the refit quest
-  reports.js      report quests: something seen at sea (the crabs under the arch), told to a naturalist
+  reports.js      report quests: something seen at sea, told to somebody at the nearest port who cares
+  sea-events.js   the living sea's event director: rolls for something to turn up, the Sightings log, bottles, Sable's cue
+  sightings.js    its rules (what turns up where, picking, placing, milestones); no three.js
+  sea-life.js     the whale, the dolphin pod and the sea turtles, and the spray they throw up
+  sea-wonders.js  the waterspout, the iceberg that calves, the glowing bloom and the bottle
+  sea-ambient.js  always-on life: gulls that follow the boat near land, seabirds over reefs, jumping fish
+  ghost-ship.js   the ghost ship: how she sails, leads you and fades
+  ghost-model.js  her model: hull, decks, rig, torn sails, and the two passes that draw her see-through
+  ghost-chain.js  her side chain: follow her to an island and find her captain's log
   story-text.js   all story writing (journals, cards, letters), kept apart from logic
   rival.js        the rival captain: chapters, where and when Sable appears, the Redwing, rewards
   rival-text.js   everything Sable says, quest steps and story cards

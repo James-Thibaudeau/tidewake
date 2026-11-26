@@ -10,7 +10,7 @@ import { pointOfSailName } from './boat.js';
 import { loadSave, writeSave, clearSave, encodeBytes, decodeBytes, loadSettings, saveSettings, migrate } from './save.js';
 import { Emitter } from './events.js';
 import { STYLES, normalizeProfile } from './cosmetics.js';
-import { LINES } from './story-text.js';
+import { LINES, SIGHTINGS } from './story-text.js';
 
 const SPYGLASS_HINT = LINES.spyglassHint;
 // Sea camera: the lowest it orbits (radians above the boat), and how far past
@@ -75,6 +75,8 @@ export class Game {
       ashore: {}, hold: [],
       // the rival captain (rival.js)
       rival: { chapter: 0, wins: 0, losses: 0, flags: {}, log: [] },
+      // the living sea's log: what you've seen, and the pity counts (sea-events.js)
+      sightings: { seen: {}, miss: {}, chain: null },
     };
   }
 
@@ -108,7 +110,7 @@ export class Game {
     d.dayT = s.dayT; d.day = s.day; d.stats = s.stats; d.tutorial = s.tutorial;
     // Things that persist the moment they happen (not banked like gold)
     d.profile = s.profile; d.wardrobe = s.wardrobe; d.quests = s.quests;
-    d.story = s.story; d.ashore = s.ashore; d.hold = s.hold; d.rival = s.rival;
+    d.story = s.story; d.ashore = s.ashore; d.hold = s.hold; d.rival = s.rival; d.sightings = s.sightings;
     migrate(d); // stamps the current version
     return d;
   }
@@ -177,7 +179,7 @@ export class Game {
     s.stats = { ...s.stats, ...(d.stats || {}) };
     s.tutorial = d.tutorial ?? 5;
     s.profile = normalizeProfile(d.profile); s.wardrobe = d.wardrobe; s.quests = d.quests;
-    s.story = d.story; s.ashore = d.ashore; s.hold = d.hold; s.rival = d.rival;
+    s.story = d.story; s.ashore = d.ashore; s.hold = d.hold; s.rival = d.rival; s.sightings = d.sightings;
     this.state = s;
     this.saveData = d;
     this.applyUpgrades();
@@ -341,7 +343,7 @@ export class Game {
       this.ui.flashDamage(amount);
       this.audio.play('crash');
       this.cam.shake = Math.min(1.5, 0.3 + amount / 15);
-      this.ui.toast(kind === 'rock' ? 'Crunch! You struck a rock.' : 'You ran aground!', 'warn');
+      this.ui.toast({ rock: 'Crunch! You struck a rock.', ice: SIGHTINGS.hitIce, spout: SIGHTINGS.hitSpout, whale: SIGHTINGS.hitWhale, breach: SIGHTINGS.hitBreach }[kind] || 'You ran aground!', 'warn');
     } else if (Math.random() < amount * 0.6) {
       this.ui.flashDamage(2);
       this.cam.shake = 0.25;
@@ -546,8 +548,9 @@ export class Game {
       const nl = clamp(boat.sailLevel + ds, 0, 2);
       if (nl !== boat.sailLevel) { boat.sailLevel = nl; this.audio.play('sail'); }
       const px = boat.pos.x, pz = boat.pos.z;
-      // a ship in tow takes some of the sail's drive
-      const events = held ? [] : boat.simulate(dt, { steer: this.input.steer, drive: this.rival?.drive ?? 1 }, wind, this.world, up);
+      // a ship in tow takes some of the sail's drive; dolphins on the bow wave add a little
+      const drive = (this.rival?.drive ?? 1) * (this.seaEvents?.drive ?? 1);
+      const events = held ? [] : boat.simulate(dt, { steer: this.input.steer, drive }, wind, this.world, up);
       if (held) { boat.speed = 0; boat.rudder = damp(boat.rudder, 0, 6, dt); }
       s.stats.distance += Math.hypot(boat.pos.x - px, boat.pos.z - pz);
       for (const e of events) this.damage(e.damage, e.kind);
@@ -597,7 +600,7 @@ export class Game {
       this.pointOfSail = pointOfSailName(boat.relWind);
       if (this.mode !== 'title') this.updateFlotsam(dt);
       this.updateEffects(dt);
-      if (this.mode !== 'title') { this.quests?.update(dt, this.elapsed); this.story?.update(dt, this.elapsed); this.rival?.update(dt, this.elapsed, wind); this.reports?.update(dt); }
+      if (this.mode !== 'title') { this.quests?.update(dt, this.elapsed); this.story?.update(dt, this.elapsed); this.rival?.update(dt, this.elapsed, wind); this.reports?.update(dt); this.seaEvents?.update(dt, this.elapsed); }
       this.updateCamera(dt);
     }
     this.env.update(dt, s.dayT, w.p, this.camera, w.wind, this.elapsed);
@@ -616,6 +619,7 @@ export class Game {
     const L = ringUniforms.uLight.value.copy(this.env.oceanAmbient).add(this.env.oceanLight);
     L.r = Math.min(L.r, 1.1); L.g = Math.min(L.g, 1.1); L.b = Math.min(L.b, 1.1);
     boat.wakeMat.uniforms.uLight.value.copy(L);
+    this.seaEvents?.tintWake(boat.wakeMat.uniforms.uLight.value); // blue, in the glowing bloom
     boat.wakeMat.uniforms.uScale.value = this.renderer.domElement.height / (2 * Math.tan((this.camera.fov * Math.PI) / 360));
     this.ocean.update(this.camera);
     if (!onLand) {
@@ -689,6 +693,11 @@ export class Game {
         if (Math.abs(boat.speed) < 7) { prompt = `Haul up the ${q.item.toLowerCase()}`; action = () => this.quests.haul(q); }
         else prompt = 'Slow down to haul up the salvage';
       }
+    }
+    if (!prompt && !busy) {
+      // what the ghost ship left behind, if you followed her
+      const ex = this.seaEvents?.interaction(b.x, b.z, boat.speed);
+      if (ex) { prompt = ex.prompt; action = ex.action || null; }
     }
     if (!action && !busy) {
       // From the chase camera a beam a few lengths ahead already looks like it's under the bow,
