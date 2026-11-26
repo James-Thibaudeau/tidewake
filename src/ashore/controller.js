@@ -1,10 +1,40 @@
 // The on-foot character controller: a kinematic capsule with a cozy-platformer
 // feel (snappy acceleration, coyote time, jump buffering, variable jump height,
-// step-up and ground snapping). Pure JS so it can be tested in Node; the
-// tuning constants (config.js ASHORE) are passed in.
+// a jump that hangs at the top and falls quickly, step-up and ground snapping).
+// Physics runs in fixed steps; drawn() gives the place between the last two to
+// draw at, so a screen that refreshes at 90 or 144 Hz doesn't stutter. Pure JS
+// so it can be tested in Node; the tuning constants (config.js ASHORE) are
+// passed in.
 import { moveCapsule, makeResult, overlaps } from './collide.js';
 
 const STEP = 1 / 120; // fixed physics step (s)
+
+/**
+ * How much of gravity pulls at this moment. `jump` is the jump in progress:
+ * 'held' (the button is still down), 'cut' (let go while rising) or null
+ * (not jumping, or walked off a ledge). Rising pulls at 1; near the top of a
+ * held jump less (hangGravity), so the apex is easy to steer; falling more
+ * (fallGravity), so it isn't floaty; and rising after letting go more still
+ * (cutGravity), which is how an early release makes a lower jump.
+ */
+export function gravityScale(P, vy, jump) {
+  if (jump === 'cut' && vy > 0) return P.cutGravity;
+  if (jump === 'held' && Math.abs(vy) < P.hangSpeed) return P.hangGravity;
+  return vy > 0 ? 1 : P.fallGravity;
+}
+
+/** A jump held all the way, on the flat: its height (m) and time in the air (s), stepped as the controller steps it. */
+export function jumpArc(P) {
+  let vy = P.jumpVel, y = 0, up = 0, air = 0;
+  do {
+    vy = Math.max(-P.maxFall, vy - P.gravity * gravityScale(P, vy, 'held') * STEP);
+    y += vy * STEP; air += STEP;
+    up = Math.max(up, y);
+  } while (y > 0);
+  return { up, air };
+}
+
+const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 export class CharacterController {
   /**
@@ -23,9 +53,12 @@ export class CharacterController {
     this.groundNormalY = 1;
     this.coyote = 0;
     this.buffer = 0;
-    this.rising = false;      // in a jump that can still be cut short
+    this.jump = null;         // the jump in progress: 'held', 'cut' or null (gravityScale)
     this.splashed = false;    // fired once per fall into the water
     this.acc = 0;
+    this.prev = { x: 0, y: 0, z: 0 }; // where the step before the last one left us (drawn)
+    this.prevYaw = 0;
+    this._drawn = { x: 0, y: 0, z: 0, yaw: 0 };
     this._res = makeResult();
     this._probe = makeResult();
     this._d = { x: 0, y: 0, z: 0 };
@@ -35,14 +68,28 @@ export class CharacterController {
     this.pos.x = x; this.pos.y = y; this.pos.z = z;
     this.vel.x = this.vel.y = this.vel.z = 0;
     this.yaw = yaw;
-    this.grounded = false; this.coyote = 0; this.buffer = 0; this.rising = false; this.splashed = false;
+    this.grounded = false; this.coyote = 0; this.buffer = 0; this.jump = null; this.splashed = false;
     this.acc = 0;
     // settle onto whatever is below so we start grounded
     this.snapDown(1.0);
+    this.prev.x = this.pos.x; this.prev.y = this.pos.y; this.prev.z = this.pos.z;
+    this.prevYaw = this.yaw;
   }
 
   /** Horizontal speed (m/s). */
   get speed() { return Math.hypot(this.vel.x, this.vel.z); }
+
+  /**
+   * Where to draw the explorer: between the last two steps, by how far the
+   * clock has run into the next one. Without it a frame that falls between
+   * steps shows the same place twice. Costs one step (8 ms) of lag.
+   */
+  drawn() {
+    const a = Math.min(1, this.acc / STEP), p = this.pos, q = this.prev, o = this._drawn;
+    o.x = q.x + (p.x - q.x) * a; o.y = q.y + (p.y - q.y) * a; o.z = q.z + (p.z - q.z) * a;
+    o.yaw = this.prevYaw + wrap(this.yaw - this.prevYaw) * a;
+    return o;
+  }
 
   /**
    * input: { wishX, wishZ, run, jumpPressed, jumpHeld }
@@ -54,6 +101,8 @@ export class CharacterController {
     this.acc += Math.min(dt, 0.1);
     let steps = 0;
     while (this.acc >= STEP && steps < 24) {
+      this.prev.x = this.pos.x; this.prev.y = this.pos.y; this.prev.z = this.pos.z;
+      this.prevYaw = this.yaw;
       this.step(STEP, input, ev);
       this.acc -= STEP;
       steps++;
@@ -89,14 +138,13 @@ export class CharacterController {
     this.buffer -= dt;
     if (this.buffer > 0 && this.coyote > 0) {
       v.y = P.jumpVel;
-      this.grounded = false; this.coyote = 0; this.buffer = 0; this.rising = true;
+      this.grounded = false; this.coyote = 0; this.buffer = 0; this.jump = 'held';
       ev.jumped = true;
     }
-    if (this.rising && !input.jumpHeld && v.y > 0) { v.y *= P.jumpCut; this.rising = false; }
-    if (v.y <= 0) this.rising = false;
+    if (this.jump === 'held' && !input.jumpHeld) this.jump = 'cut';
 
     // ---- gravity
-    if (!this.grounded) v.y = Math.max(-P.maxFall, v.y - P.gravity * dt);
+    if (!this.grounded) v.y = Math.max(-P.maxFall, v.y - P.gravity * gravityScale(P, v.y, this.jump) * dt);
     else if (v.y < 0) v.y = 0;
 
     // ---- move
@@ -128,7 +176,8 @@ export class CharacterController {
       const vn = v.x * w.nx + v.z * w.nz;
       if (vn < 0) { v.x -= w.nx * vn; v.z -= w.nz * vn; }
     }
-    if (res.ceiling && v.y > 0) { v.y = 0; this.rising = false; }
+    // a head against a ceiling: no hanging under it
+    if (res.ceiling && v.y > 0) { v.y = 0; this.jump = 'cut'; }
     if (res.steepN) {
       // sliding on a slope too steep to stand on: keep the motion in its plane
       const n = res.steepN, vn = v.x * n.x + v.y * n.y + v.z * n.z;
@@ -143,6 +192,7 @@ export class CharacterController {
     if (grounded) {
       if (!wasGrounded && fallSpeed > 0.5) ev.landed = Math.max(ev.landed, fallSpeed);
       if (v.y < 0) v.y = 0;
+      if (!ev.jumped) this.jump = null;
     }
     this.grounded = grounded;
 

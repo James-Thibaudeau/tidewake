@@ -344,6 +344,36 @@ Updated 2026-11-26.
   - Left for later: the plan's link between events and Phase 9's sea
     zones (waterspouts likelier in rough water, turtles and the bloom in
     the home shallows), which waits for Phase 9.
+- [x] **Platforming feel, items 1–3**
+  ([#63](https://github.com/James-Thibaudeau/tidewake/pull/63); see
+  *Platforming feel* in [feature-plan.md](feature-plan.md)):
+  - A shadow straight down under the explorer
+    (`src/ashore/ground-shadow.js`): a soft dark spot on whatever is right
+    below, smaller and fainter the higher up, gone over the sea. It shows
+    at every quality and with `?fx=0`. It looks down from the middle and
+    the edge of the body and lies on the highest thing it finds, so it
+    stays on a ledge you are standing on (or about to land on) by its
+    rim.
+  - A new jump arc (`gravityScale` in `ashore/controller.js`; numbers in
+    `ASHORE`): falling pulls 1.6× gravity, the top of a held jump 0.6×
+    (while up or down speed is under 1.5 m/s), and letting go early
+    pulls 2× while still rising, instead of the old one-off cut to 0.45
+    of the speed. A held jump: 1.52 m up, 0.65 s in the air (before:
+    about the same height, 0.64 s, falling as slowly as it rose). A tap
+    goes 0.7–1.2 m up, higher than before (0.3–1.0 m).
+  - Drawn between physics steps: the explorer and the camera follow
+    `ctl.drawn()`, so a 90 or 144 Hz screen doesn't stutter.
+  - Generated islands keep their layouts: `LIMITS.optional` in
+    `modules.js` keeps the old jump's numbers, and `check.mjs climb` now
+    checks that the limits stay inside what the jump really does. The
+    test climbers: a few more hops need a second try (generated islands
+    1 → 2, the Elder Grove 0 → 1, Archway Isle 3 → 3). The grove's
+    climber now gets a second try, like Archway's: on one hop the new arc
+    lands it 6 cm further along a small peg, and from there its simple
+    pilot walks off the side.
+  - [ ] Only a person can do: play it by hand, on a keyboard and on a
+    phone. Is the jump better? Is a tap too high now? Is the spot easy to
+    see on sand, and is it too dark next to the sun's shadow?
 
 ## Next up
 

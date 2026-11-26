@@ -26,6 +26,7 @@ import { shoalOf } from './shapes.js';
 import { setSeaOrigin } from '../waves.js';
 import { CharacterController } from './controller.js';
 import { FollowCamera } from './camera.js';
+import { GroundShadow } from './ground-shadow.js';
 import { LandRace } from './pacer.js';
 
 // Hand-built levels for landmark islands, by island.landmark; the rest are generated.
@@ -177,6 +178,8 @@ export class Ashore {
     this.ctl.teleport(L.spawn.x, L.spawn.y, L.spawn.z, L.spawn.yaw);
     this.cam = new FollowCamera(g.camera, L);
     this.cam.snap(this.ctl, L.spawn.yaw);
+    this.shadow = new GroundShadow();
+    this.scene.add(this.shadow.mesh);
     this.checkpoint = { x: L.spawn.x, y: L.spawn.y, z: L.spawn.z, yaw: L.spawn.yaw };
     this.checkpointId = null;
     // a land race, if the rival is waiting on this island (never aboard the wreck)
@@ -236,7 +239,8 @@ export class Ashore {
     this.race = null;
     this.scene.remove(this.level.group);
     this.level.dispose();
-    this.level = null; this.ctl = null; this.cam = null;
+    this.shadow.dispose();
+    this.level = null; this.ctl = null; this.cam = null; this.shadow = null;
     document.body.classList.remove('ashore');
     g.ui.setAshore(null);
     g.input.setScheme('sea');
@@ -363,11 +367,12 @@ export class Ashore {
     if (ctl.grounded) this.lastGroundY = ctl.pos.y;
     this.splashT -= dt;
 
-    // the explorer follows the controller
-    const ex = g.boat.explorer;
-    ex.root.position.set(ctl.pos.x, ctl.pos.y, ctl.pos.z);
+    // the explorer follows the controller, drawn between its last two steps
+    const ex = g.boat.explorer, at = ctl.drawn();
+    ex.root.position.set(at.x, at.y, at.z);
     const lastYaw = this.lastYaw ?? ctl.yaw;
-    ex.root.rotation.y = ctl.yaw;
+    ex.root.rotation.y = at.yaw;
+    this.shadow.update(L, at, ASHORE.radius);
     const turn = dt > 0 ? Math.atan2(Math.sin(ctl.yaw - lastYaw), Math.cos(ctl.yaw - lastYaw)) / dt : 0;
     this.lastYaw = ctl.yaw;
     const hs = Math.hypot(ctl.vel.x, ctl.vel.z);

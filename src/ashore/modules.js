@@ -27,9 +27,14 @@ import { ASHORE } from '../config.js';
 
 const D = ASHORE.design;
 // Required moves stay comfortably inside the design limits; optional branches
-// may use up to ~90% of what the controller can really do.
-const REAL_UP = (ASHORE.jumpVel * ASHORE.jumpVel) / (2 * ASHORE.gravity);   // ≈ 1.56
-const AIR = (2 * ASHORE.jumpVel) / ASHORE.gravity;                           // ≈ 0.69 s
+// may use up to ~90% of what the controller can really do. These are the
+// height (m) and time in the air (s) of the jump before it hung at the top and
+// fell faster; the jump today goes a little higher and stays up a little longer
+// (controller.js, jumpArc; `node tools/check.mjs climb` checks that it still
+// does). Kept, so every generated island is laid out as it was: coins and
+// caches are saved by id.
+const REAL_UP = 1.536;
+const AIR = 0.64;
 export const LIMITS = {
   main: { up: D.jumpUp, gap: D.gapWalk, drop: D.safeDrop, minWidth: 1.2 },
   // islands near Port Haven: small hops between wide platforms, rests between

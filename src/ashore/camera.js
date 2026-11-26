@@ -199,11 +199,12 @@ export class FollowCamera {
     const ax = ctrl.vel.x * 0.22, az = ctrl.vel.z * 0.22;
     this.ahead.x = damp(this.ahead.x, ax, 3, dt);
     this.ahead.z = damp(this.ahead.z, az, 3, dt);
-    const t = this.target;
-    t.x = damp(t.x, ctrl.pos.x + this.ahead.x, 14, dt);
-    t.z = damp(t.z, ctrl.pos.z + this.ahead.z, 14, dt);
+    // (where the explorer is drawn, between physics steps, so the view doesn't stutter)
+    const t = this.target, at = ctrl.drawn();
+    t.x = damp(t.x, at.x + this.ahead.x, 14, dt);
+    t.z = damp(t.z, at.z + this.ahead.z, 14, dt);
     // vertical follows a bit softer, so jumps don't bob the whole view
-    t.y = damp(t.y, ctrl.pos.y + this.headHeight, ctrl.grounded ? 8 : 3.5, dt);
+    t.y = damp(t.y, at.y + this.headHeight, ctrl.grounded ? 8 : 3.5, dt);
 
     // ---- pull in when something solid blocks the view (thin things don't count)
     const full = this.dist + this.extra;
