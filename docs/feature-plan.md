@@ -803,7 +803,7 @@ moves to the shape:
 | What | Where | Change |
 | --- | --- | --- |
 | Terrain | `buildTerrain` | Nothing: it is a square grid already. Thin parts (horns, rings) must be at least 3 cells wide: about 16u |
-| Chart coastline | `I.coast`, `ui/chart.js` | Traced from the height field (marching squares at h = 0) instead of 72 rays. A coast can be more than one loop (a cluster's rocks), so it becomes `I.coasts`, a list |
+| Chart coastline | `I.coast`, `ui/chart.js` | Traced from the height field (marching squares at h = 0) instead of 72 rays. A coast can be more than one loop (a cluster's rocks), so it becomes `I.coasts`, a list. The chart's halo and inner colour bands are the coast scaled about the centre (1.12, 0.72, 0.4), which goes wrong round a lagoon; draw them as lines of equal inland depth instead |
 | Shallows and foam | `ringGeometry` | A strip along each coast loop, pushed out along its normal, instead of a ring round the centre |
 | The sea's shore map | `shores()` | Uses `formSdf` |
 | Landing | `ashore.landingIsland` | Distance to the coast from either side, so you can land from inside a crescent or a lagoon. This replaces `inBay` |
@@ -889,6 +889,51 @@ enough to read, close enough to visit early, and its name fits.
 - **Later, maybe:** calmer waves in the bowl, as a small `lee` row in
   `sea-zones.js`. Not in 11.1.
 
+### Landmarks on the chart
+
+Once you have found a landmark island, the chart and the minimap draw its
+landmark on it: the Elder Tree at the Elder Grove, the arch at Archway Isle,
+and so on. Today a landmark shows on the chart as a plain island with a
+name, like any other. The only picture is grandfather's wreck
+(`drawWreck`).
+
+- **When:** from the moment the island is discovered (`state.discovered`),
+  which is also when its name appears. Before that it is a plain island
+  under the fog, so the picture is a reward for finding it.
+- **The pictures**, drawn in the chart's own style like `drawWreck`: canvas
+  paths, flat fills and a dark ink outline, readable at a glance.
+
+  | Landmark | Picture | Where it is drawn |
+  | --- | --- | --- |
+  | The Elder Grove | The Elder Tree: a broad round canopy over a thick trunk and spreading roots | The hilltop, where the sea view stands it (the island's centre) |
+  | Archway Isle | The arch, its two legs on the arms of the bay | `I.archPos`, turned to span the bay's mouth as it does at sea |
+  | Sunken Temple Isle | A few columns under a broken pediment, with a line of water at their feet | The temple's spot at sea |
+  | Mount Cinderhorn | A cone with a glowing orange crater and a puff of smoke | The crater |
+  | Frostspire | A tall white needle shaded ice-blue | The spire's peak |
+
+- **One spot for each, shared with the sea view.** `finishIsland` sets
+  `I.landmarkAt = { x, z, rot }`, and `buildLandmark` and the chart both
+  use it, so the picture is always where the thing is. Archway Isle's is
+  `archPos`.
+- **Size:** a fixed size on screen, like the port anchors: about 22 px on
+  the chart (times `dpr`), whatever the zoom, so a landmark still reads
+  zoomed right out. When zoomed in far enough that the island is bigger
+  than the picture, it grows with the zoom, up to about half the island's
+  width. On the minimap it is the size of a port anchor.
+- **Order:** above the island and the fog, below the name, quest markers
+  and the boat. The name moves up to clear the picture.
+- **Code:** a new UI part, `src/ui/landmarks.js` (`chart.js` is 550 lines),
+  with one drawing function per landmark, keyed by `I.landmark` (`grove`,
+  `arch`, `ruins`, `volcano`, `frost`). A landmark with no function draws
+  nothing, so a new one can't break the chart.
+- **When a landmark's sea view is rebuilt** (4.7, 4.9, 4.11), that PR checks
+  that the picture still matches it, and changes the drawing if it doesn't.
+- **Checking it:** in the game. `debug.teleport` to each landmark until it
+  is discovered, then open the chart zoomed out and zoomed in, at desktop
+  and phone sizes, and look at the minimap beside it. Load an old save that
+  has already found some landmarks: their pictures appear with nothing
+  new saved.
+
 ### Not in this phase
 
 - **Ports** keep their shape: docks, towns and Port Haven's home waters
@@ -945,16 +990,21 @@ coasts. Two things can be caught out by a coast that moved:
 | 11.1 | `feature/island-forms` | The form system: `island-layout.js` and `island-forms.js` out of `world.js`; heights by inland depth; traced coasts, with the shallows and foam along them; landing, treasure, stacks, camps and props placed from the coast; Archway Isle moved onto it unchanged; Moon Island; the gallery's `island` subject and the `forms` check | — |
 | 11.2 | `feature/island-water` | The forms with water to sail into (ring, cove, hook, more crescents), their passes and treasure inside | 11.1 |
 | 11.3 | `feature/island-variety` | The other forms (twin, kidney, teardrop, point, long, lobed, cluster, bar), the name hints, and the spread over every island | 11.2 |
+| 11.4 | `feature/chart-landmarks` | Landmarks on the chart and the minimap: `ui/landmarks.js`, a picture per landmark, `I.landmarkAt` | — |
 
 - 11.2 gives its forms only to a handful of islands picked by hand, to judge
   them. 11.3 then runs the spread over the whole world once every form
   exists.
 - A landmark PR (4.7, 4.9, 4.11) that wants a shaped coast comes after
   11.1. None has to have one.
+- 11.4 needs none of the forms. It is small and can be built first, or
+  alongside any of the others: it touches the chart's drawing, not the
+  island code.
 
 **Done when:** wherever you sail, the islands in sight look different from
 one another; Moon Island is a crescent you can sail into by moonlight;
-rings, coves and crescents have water you can reach; landmarks, round
+rings, coves and crescents have water you can reach; every landmark you
+have found shows its picture on the chart and the minimap; landmarks, round
 islands and ports haven't changed by a point; and every island, port and
 treasure angle is where it was.
 
@@ -1000,7 +1050,7 @@ One feature branch and PR per phase, matching how the repo already works
 | P8 | `feature/rival-captain` | P3, P7 (encounters come through the director), the epilogue letters, and the rival's text written and approved |
 | P9 | Three smaller PRs: see *Phase 9 in smaller PRs* | — (builds on Phase 5's wave set and shore map) |
 | P10 | Four smaller PRs: see *Phase 10 in smaller PRs* | P2b's epilogue (done); landmark items as Phase 4 ships them |
-| P11 | Three smaller PRs: see *Phase 11 in smaller PRs* | — |
+| P11 | Four smaller PRs: see *Phase 11 in smaller PRs* | — |
 
 **Verification each phase:** there's no test suite, so each PR is checked in
 the browser preview (`tidewake-dev` in `.claude/launch.json`):

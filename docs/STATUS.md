@@ -881,7 +881,8 @@ Updated 2026-11-25.
   Archway Isle's bay gave it a shape: crescents, rings, coves, hooks, twins
   and more, spread so neighbours differ. Moon Island is the first, a
   crescent you can sail into. Landmarks, ports, islands and treasure angles
-  don't move or change. Three PRs, 11.1–11.3.
+  don't move or change. Found landmarks show their picture on the chart
+  (the Elder Tree, the arch…). Four PRs, 11.1–11.4.
 
 ## Known issues
 
