@@ -633,7 +633,8 @@ Updated 2026-11-25.
 - [ ] **Phase 9, sea zones:** the map gets a shape you can feel at the
   helm. Three PRs, 9.1 to 9.3: see *Phase 9* in
   [feature-plan.md](feature-plan.md).
-  - [x] **9.1 Home waters** (not in a PR yet):
+  - [x] **9.1 Home waters**
+    ([#48](https://github.com/James-Thibaudeau/tidewake/pull/48)):
     - **`src/sea-zones.js`** (pure): the zone table (`SEA_ZONES`, one row
       so far), `bandAt(x, z)` (home, coastal or open) and `seaAt(x, z)` →
       `{ shallow, rough, severity, zone, wave, swell }`. Home waters reach
