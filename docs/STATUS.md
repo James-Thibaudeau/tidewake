@@ -672,6 +672,10 @@ Updated 2026-11-26.
       relic scramble on Thorn Cove from Sable's hail to a 3-0 win; a save
       caught mid-scramble keeps Fern Atoll; a save from before this change
       loads; desktop and phone sizes.
+    - Fix, on every island: "Row back to your ship" stayed on screen after
+      you were back aboard. The island kept updating its prompts during the
+      fade to the ship and showed it again, and nothing at sea hid it
+      (`ashore.js`: no prompts once you've set off).
     - Not done: a play by hand, a listen to the new voices, and the pacing
       check (the scramble now needs Hull 2 and the coral flukes).
   - [ ] 4.7 the Sunken Temple
