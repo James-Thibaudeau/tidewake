@@ -94,7 +94,7 @@ function skirtCone(r, h, segs = 10) {
 }
 
 // A drooping, serrated palm frond (double-sided, vertex-coloured base→tip).
-function frond(len, droop, lift) {
+export function frond(len, droop, lift) {
   const segs = 8;
   const pos = [], col = [];
   const cb = new THREE.Color('#2c8a3c'), ct = new THREE.Color('#72d35c'), tmp = new THREE.Color();

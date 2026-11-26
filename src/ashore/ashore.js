@@ -219,6 +219,7 @@ export class Ashore {
     const g = this.game;
     if (!this.active) return;
     this.active = false;
+    this.prompt = null;
     g.ui.setPrompt(null);
     g.events.emit('ashore:leave', this.island);
     await g.ui.fade(1, 0.5);
@@ -382,7 +383,9 @@ export class Ashore {
     this.updateLights(t);
     this.updatePickups(dt, t);
     this.updateHints();
-    this.updatePrompt(acts);
+    // no prompts once you've set off back to the ship: during the fade it
+    // would show "Row back to your ship" again, and nothing at sea clears it
+    if (this.active) this.updatePrompt(acts);
   }
 
   /** One-time tips by place (the wreck teaches walking and jumping this way). */

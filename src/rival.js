@@ -12,6 +12,10 @@
 //   chapter 8    friends: Sable visits ports, rematches for gold
 //   log          everything Sable has said to you, for the journal:
 //                [{ title, day, lines, scene? }], oldest first (scene: a story card deck)
+//   flags.relicsIsle  the island Sable was found waiting on for the relic
+//                scramble. The scramble is on a tropical island, but a save
+//                that had already found Sable on its old temperate island
+//                (before Phase 4.6) keeps that one.
 // Nothing about a live encounter is saved: quit mid-race and Sable simply
 // turns up again.
 import * as THREE from 'three';
@@ -111,10 +115,16 @@ export class Rival {
       case 1: return st.chapter >= 3 && up.sail >= 1;         // Journal II, better sails
       case 2: return st.canGoAshore;
       case 3: return st.chapter >= 5 && up.rudder >= 1;       // Journal IV
-      case 4: return st.chapter >= 6 && st.canGoAshore;       // Journal V
+      case 4: return st.chapter >= 6 && st.canGoAshore && this.relicsOpen(); // Journal V, and an anchor that holds where Sable is
       case 5: return st.chapter >= 7 && up.hull >= 2;         // Journal VI
       default: return false;
     }
+  }
+
+  /** Can your anchor hold on the relic scramble's island? (The tropical one needs the coral flukes.) */
+  relicsOpen() {
+    const at = this.places.relics, I = at && this.world.islands[at.island];
+    return !I || !!this.game.refits?.holds(I);
   }
 
   /** The encounter that could happen now, or null. Needs a new day since the last one. */
@@ -126,9 +136,25 @@ export class Rival {
   }
 
   // ------------------------------------------------------------------ places
-  /** Where each encounter happens: fixed for this world (own RNG, like the camps). */
+  /**
+   * Where each encounter happens: fixed for this world (own RNG, like the
+   * camps), except that the relic scramble stays wherever Sable was first
+   * found waiting for it (flags.relicsIsle).
+   */
   get places() {
-    if (this._places) return this._places;
+    const P = this._places ||= this.findPlaces(), R = this.R;
+    // a save from before the scramble moved, with Sable already found on the old island: keep it there
+    if (R.chapter === 4 && R.flags.heard === 4 && R.flags.relicsIsle == null && this._oldRelics) R.flags.relicsIsle = this._oldRelics.island;
+    const id = R.flags.relicsIsle;
+    if (id == null || id === P.relics?.island || !this.world.islands[id]) return P;
+    if (this._keptRelics?.relics.island !== id) {
+      const I = this.world.islands[id];
+      this._keptRelics = { ...P, relics: { island: I.id, x: I.x, z: I.z, place: I.name } };
+    }
+    return this._keptRelics;
+  }
+
+  findPlaces() {
     const W = this.world, H = W.home, rng = mulberry32(W.seed * 53 + 0x5ab1e);
     const P = {};
     // open water between two ports a fair sail apart
@@ -159,8 +185,13 @@ export class Rival {
     const landable = W.islands.filter((I) => this.game.ashore?.canLand(I) && I.biome === 'temperate' && !I.landmark && I.id !== campII && I.r > 70);
     const near = [...landable].sort((a, b) => Math.abs(Math.hypot(a.x, a.z) - 1300) - Math.abs(Math.hypot(b.x, b.z) - 1300))[0];
     if (near) P.hill = { island: near.id, x: near.x, z: near.z, place: near.name };
+    // where the relic scramble was before tropical islands could be landed on (old saves may keep it)
     const south = landable.filter((I) => I !== near && Math.hypot(I.x, I.z) < 3500).sort((a, b) => b.z - a.z)[0];
-    if (south) P.relics = { island: south.id, x: south.x, z: south.z, place: south.name };
+    this._oldRelics = south ? { island: south.id, x: south.x, z: south.z, place: south.name } : null;
+    // the relic scramble: a tropical island a fair sail from home (needs the coral flukes)
+    const tropic = W.islands.filter((I) => this.game.ashore?.canLand(I) && I.biome === 'tropical' && !I.landmark && I.id !== campII && I.r > 70)
+      .sort((a, b) => Math.abs(Math.hypot(a.x, a.z) - 1600) - Math.abs(Math.hypot(b.x, b.z) - 1600))[0];
+    P.relics = tropic ? { island: tropic.id, x: tropic.x, z: tropic.z, place: tropic.name } : this._oldRelics;
     // far out, a long way from any harbor
     for (let t = 0; t < 400 && !P.mast; t++) {
       const x = (rng() * 2 - 1) * (WORLD_HALF - 900), z = (rng() * 2 - 1) * (WORLD_HALF - 900);
@@ -190,7 +221,6 @@ export class Rival {
       P[k].dir = dirWord(P[k].x - ref.x, P[k].z - ref.z);
       P[k].place ||= port.name;
     }
-    this._places = P;
     return P;
   }
 
@@ -349,7 +379,11 @@ export class Rival {
       const at = P[enc.id];
       if (at && dist(b, at) < SEE) {
         if (!free && enc.kind !== 'summit' && enc.kind !== 'relics') return 'wait';
-        if (R.flags.heard !== R.chapter) { R.flags.heard = R.chapter; g.quests.pin('rival'); }
+        if (R.flags.heard !== R.chapter) {
+          R.flags.heard = R.chapter;
+          if (enc.id === 'relics') R.flags.relicsIsle = at.island; // found Sable there: the scramble stays put
+          g.quests.pin('rival');
+        }
         if (enc.kind === 'summit' || enc.kind === 'relics') this.anchorOff(g.world.islands[at.island], b);
         else if (enc.kind === 'tow') this.setAdrift(at);
         else this.spawnAt(enc, at);
@@ -937,9 +971,11 @@ export class Rival {
    * skips its gate and puts the boat near where it happens.
    */
   debug(chapter) {
-    const g = this.game, R = this.R, P = this.places;
+    const g = this.game, R = this.R;
     this.reset(g.state);
     R.chapter = chapter; R.flags.heard = chapter; R.flags.day = 0; R.flags.met = true;
+    if (chapter === 4) R.flags.relicsIsle = (this._places ||= this.findPlaces()).relics?.island; // today's island, not an old save's
+    const P = this.places;
     this.forced = true; this._landEnc = null; this.cool = 1;
     let at = chapter < 6 ? P[ENCOUNTERS[chapter].id] : null;
     if (chapter === 0) at = { x: g.world.home.dock.x + 60, z: g.world.home.dock.z + 420 };

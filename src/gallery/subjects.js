@@ -343,7 +343,35 @@ function level(q, stage) {
   }
   const lv = generateLevel(I, opts);
   stage.add(lv.group);
-  return { group: lv.group, ground: 'sea', warnings, shoal: shoalOf(lv), note: `${lv.layout.biome}, ${lv.layout.tier}`, dispose() { lv.dispose(); } };
+  const PLACES = levelPlaces(lv.layout);
+  let at = q.at || 'cliff';
+  if (!PLACES[at]) { warnings.push(`at=${at} is not a place here (${Object.keys(PLACES).join(', ')})`); at = Object.keys(PLACES)[0]; }
+  return { group: lv.group, ground: 'sea', warnings, shoal: shoalOf(lv), spot: PLACES[at], note: `${lv.layout.biome}, ${lv.layout.tier}${q.at ? ', ' + at : ''}`, dispose() { lv.dispose(); } };
+}
+
+/**
+ * Close-ups of a generated level for the `spot` view, each looked at from
+ * outside the island: the moat crossing, the start of the climbs up cliff 1
+ * and the mesa, and the chest's branch.
+ */
+function levelPlaces(L) {
+  const main = L.pieces.filter((p) => p.route === 'main' && p.kind !== 'vista');
+  const out = {};
+  const around = (ps, pad) => {
+    if (!ps.length) return null;
+    const x = ps.reduce((s, p) => s + p.cx, 0) / ps.length, z = ps.reduce((s, p) => s + p.cz, 0) / ps.length;
+    const y = ps.reduce((s, p) => s + p.top, 0) / ps.length;
+    const span = Math.max(...ps.map((p) => Math.hypot(p.cx - x, p.cz - z) + (p.r || p.hx))) * 2 + pad;
+    const a = Math.atan2(z, x);
+    return { x, y: y + 0.5, z, span, yaw: Math.atan2(Math.cos(a), Math.sin(a)), pitch: 0.35 };
+  };
+  out.moat = around(main.filter((p) => p.base === -2.4), 3);
+  const climb = main.filter((p) => p.base !== -2.4);
+  out.cliff = around(climb.filter((p) => p.top <= L.T.h1 + 0.1).slice(0, 4), 3);
+  out.mesa = around(climb.filter((p) => p.top > L.T.h1 + 0.1).slice(0, 4), 3);
+  const chest = L.branches.find((b) => b.name === 'chest');
+  if (chest) out.chest = { ...around(chest.nodes.filter((n) => n.piece).map((n) => n.piece), 4), y: (chest.tree.base + chest.tree.top) / 2 };
+  return Object.fromEntries(Object.entries(out).filter(([, v]) => v));
 }
 
 export const SUBJECTS = { outfit, ship, prop, tree, arch, wreck, grove, archway, level, sealife };
@@ -359,7 +387,7 @@ const PARAMS = {
   grove: ['kind', 'n'],
   arch: [],
   archway: ['kind', 'n', 'at', 'journal'],
-  level: ['biome', 'seed', 'r', 'dist', 'kind', 'n'],
+  level: ['biome', 'seed', 'r', 'dist', 'kind', 'n', 'at'],
   sealife: ['kind'],
 };
 /** The keys in `q` that the subject `show` doesn't read (`also`: the page's own parameters). */
@@ -368,7 +396,7 @@ export function unknownParams(show, q, also) {
   return Object.keys(q).filter((k) => !known.has(k));
 }
 
-const PIECE_KINDS = ['block', 'bridge', 'column', 'disc', 'ledge', 'vista', 'plank', 'stone', 'stack', 'arch', 'log'];
+const PIECE_KINDS = ['block', 'bridge', 'column', 'disc', 'ledge', 'vista', 'plank', 'stone', 'stack', 'arch', 'log', 'palm', 'pool', 'rope'];
 const TIERS = ['0', '1', '2', '3', '4', '5'];
 /** The parameters a subject takes, as [key, choices] pairs, for the page's menus. */
 export function controlsFor(show) {

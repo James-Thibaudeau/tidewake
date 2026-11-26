@@ -6,7 +6,7 @@ work, and update it in the same pull request as the change.**
 - Designs for work that hasn't started: [feature-plan.md](feature-plan.md)
 - Original designs of what has shipped (reference only): [shipped-plans.md](shipped-plans.md)
 
-Updated 2026-11-25.
+Updated 2026-11-26.
 
 ## Done
 
@@ -621,7 +621,64 @@ Updated 2026-11-25.
           and could end up inside its overhang. The cave is wider and
           deeper, its lintel high and solid, and the camera looks straight
           in while you're at it (a `faces` entry).
-  - [ ] 4.6 Tropical islands and 4.7 the Sunken Temple
+  - [x] 4.6 Tropical islands ([#57](https://github.com/James-Thibaudeau/tidewake/pull/57)). `tropical` is in `ASHORE_BIOMES`, so the coral
+    flukes refit (tier 2) is live: it's offered once you own Hull 2 (the
+    Copper-Clad Hull), and its fitting, a bronze casting, waits on a rocky
+    island (Briar Point from Port Haven). Until it's fitted, tropical shores
+    say "Your anchor drags in the coral sand. Ask the shipwright." Once it
+    is, you can drop anchor at up to 8 kn (was 6).
+    - Tropical levels (`modules.js` `POOLS.tropical`, art in the new
+      `ashore/tropical-art.js`): three new ways up. Palm-top hops are frond
+      crowns on bowed, ringed trunks a step out from the wall. Tide pools are
+      basins of pale coral rock that step up the face like terraces, with
+      water in them spilling over the front; there is a wide kind for
+      islands near home. Rope bridges are slatted decks hung along the face,
+      with a sagging handrope on the open side and ropes up to pegs in the
+      rock. The moat is crossed on a rope bridge (near home) or between rock
+      pools; the chest sits on frond pads round a giant palm. Pale coral sand,
+      lush grass, warm coral-brown rock, palms on the beach and the meadow.
+    - Difficulty sits near temperate (rocky stays the harder biome):
+      tropical islands count 300 m nearer home (`BIOME_EASE`) and their walls
+      and summits are a little lower (×0.95). Over 300 islands: medium 25.4
+      jumps (temperate 25.2, rocky 27.4), hard 31.2 (31.8, 33.6); the widest
+      required gap 1.59 m on medium, 1.65 m on hard (limit 1.9). The world's
+      tropical islands: Ivy Isle and Tern Crag easy; Thorn Cove, Copper Cay
+      and Lagoon Atoll medium; the rest hard.
+    - A rope bridge's deck is long and straight, so it stands off the
+      wall's furthest point along its length (the climb check found the
+      climber pinned where the cliff bulged into one).
+    - Sound: parrots, doves and songbirds by day, tree frogs and crickets at
+      night (`AMBIENCE.tropical`); the frogs keep singing in the rain.
+      Rendered offline and measured against the other voices (peaks
+      0.027-0.045, songbird 0.044); nobody has listened yet.
+    - Sable's relic scramble is on Thorn Cove now, and waits until the coral
+      flukes are fitted. A save that had already found Sable waiting on the
+      old island (before this change) keeps the scramble there
+      (`flags.relicsIsle`); a save that hadn't moves to Thorn Cove. A
+      scramble already won or lost is untouched.
+    - Gallery: `level` takes `at=moat|cliff|mesa|chest` with `view=spot`
+      for a close look from outside the island; new sheets `islands` (every
+      landable biome near, mid and far) and `island-places` (those four
+      places at three distances).
+    - A tropical level is about 162k triangles with outlines on High
+      (temperate ~100k, rocky ~69k), mostly palm fronds; frame time on
+      2048×1536 High is the same as the others (2.5-2.9 ms).
+    - Played in the preview through the real game: Thorn Cove blocked at
+      tier 1 with the coral line; Hull 2 bought → the offer → the casting
+      picked up at Briar Point's vault → fitted at Lanternfall; landing at
+      7 kn (and "Slow down" at 9 kn); Thorn Cove (easy) and Saffron Reach
+      (hard) climbed to the summit by a scripted climber driving the game's
+      own controller in the live level (decor colliders included); the
+      relic scramble on Thorn Cove from Sable's hail to a 3-0 win; a save
+      caught mid-scramble keeps Fern Atoll; a save from before this change
+      loads; desktop and phone sizes.
+    - Fix, on every island: "Row back to your ship" stayed on screen after
+      you were back aboard. The island kept updating its prompts during the
+      fade to the ship and showed it again, and nothing at sea hid it
+      (`ashore.js`: no prompts once you've set off).
+    - Not done: a play by hand, a listen to the new voices, and the pacing
+      check (the scramble now needs Hull 2 and the coral flukes).
+  - [ ] 4.7 the Sunken Temple
   - [ ] 4.8 Volcanic islands (with the steam-vent launch) and 4.9 Mount
     Cinderhorn
   - [ ] 4.10 Cold islands and 4.11 Frostspire
@@ -1038,8 +1095,8 @@ Updated 2026-11-25.
     the top of `kraken.js`.
   - [ ] Sable's writing (`rival-text.js`) is a first draft: review it like
     the journals were.
-  - [ ] Move the relic scramble to a tropical island when that biome can be
-    landed on (Phase 4).
+  - [x] Move the relic scramble to a tropical island when that biome can be
+    landed on (Phase 4.6, [#57](https://github.com/James-Thibaudeau/tidewake/pull/57)).
   - [x] Hand encounter delivery to the Phase 7 event director
     ([#46](https://github.com/James-Thibaudeau/tidewake/pull/46)).
   - [ ] Sounds for the kraken, the buoys' bells and the flare (they reuse

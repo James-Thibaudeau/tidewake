@@ -16,6 +16,8 @@ const PALETTE = {
   temperate: { sand: '#ecd9a0', wet: '#c9b27a', grass: '#6cc24a', grass2: '#58b043', rock: '#8f877d', rock2: '#7d756b', seabed: '#b9a77a' },
   // rocky: grey shingle, thin turf broken by scree, darker banded walls
   rocky: { sand: '#cfc6b2', wet: '#a99f8c', grass: '#86ab55', grass2: '#76984b', scree: '#a39a8d', rock: '#8a8178', rock2: '#6a625a', seabed: '#a2967f' },
+  // tropical: pale coral sand, lush green, warm coral-brown rock, a bright seabed
+  tropical: { sand: '#f6e4ae', wet: '#dcc58c', grass: '#78cf55', grass2: '#5fbd48', rock: '#b39377', rock2: '#957659', seabed: '#e8d8a6' },
 };
 
 // What grows (or lies about) on each biome's land. density scales the tree
@@ -26,6 +28,8 @@ const DECOR = {
   temperate: { trees: TREES, density: 1, tufts: 1, flowers: 1, boulders: [4.5, 4], seaStacks: 0 },
   rocky: { trees: [['pine', 0.36], ['rock', 0.3], ['bush', 0.2], ['deadTree', 0.07], ['birch', 0.04], ['flower', 0.03]],
     density: 0.5, tufts: 0.55, flowers: 0.3, boulders: [3.2, 3], seaStacks: 16 },
+  tropical: { trees: [['palm', 0.46], ['bush', 0.2], ['berryBush', 0.1], ['fruitTree', 0.06], ['flower', 0.12], ['rock', 0.06]],
+    density: 0.85, tufts: 0.9, flowers: 1.6, boulders: [5.5, 5], seaStacks: 0, beachPalms: 14 },
 };
 
 // ----------------------------------------------------------------- terrain
@@ -104,7 +108,7 @@ function buildTerrain(T, pal, seed) {
 }
 
 // ------------------------------------------------------------------ decor
-const TALL = new Set(['roundTree', 'pine', 'birch', 'fruitTree', 'deadTree']);
+const TALL = new Set(['roundTree', 'pine', 'birch', 'fruitTree', 'deadTree', 'palm']);
 
 function buildDecor(L, group, colliders, quality, seed) {
   const { T, keepOut, walks } = L, D = DECOR[L.biome] || DECOR.temperate;
@@ -159,6 +163,8 @@ function buildDecor(L, group, colliders, quality, seed) {
   // beach: rocks and bushes; flowers along the outer moat bank
   scatter(Math.round(10 * k), (a) => T.moatOut(a) + 0.5, (a) => T.Rs(a) - 1, [['rock', 0.6], ['bush', 0.4]], 0.6, 0.3);
   scatter(Math.round(10 * k * D.flowers), (a) => T.moatOut(a) - 1.2, (a) => T.moatOut(a) + 0.8, [['flower', 1]], 0.5, 0.2);
+  // palms leaning out over the beach
+  if (D.beachPalms) scatter(Math.round(D.beachPalms * k), (a) => T.moatOut(a) + 1.5, (a) => T.Rb(a) + 1, [['palm', 1]], 0.8, 0.6);
   if (!low) {
     scatter(40, (a) => T.Rb(a) - 2, (a) => T.Rs(a) - 0.6, [['pebble', 1]], 1, 0.1);
     scatter(Math.round(130 * D.tufts), meadowIn, (a) => T.moatIn(a) - 0.6, [['grassTuft', 1]], 1, 0.1);

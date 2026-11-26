@@ -1,8 +1,10 @@
 // Geometry for ashore level pieces: vertex-coloured primitives in the props
 // style, built straight into level space so they can all be merged into one
 // mesh (plus one ink-outline mesh). Each builder returns an array of parts.
+// Tropical islands' pieces are drawn in tropical-art.js.
 import * as THREE from 'three';
 import { part, jitter } from '../props.js';
+import { palmTopParts, tidePoolParts, ropeDeckParts, poolRimParts, ropeBridgeParts, lookoutPalmParts, palmDiscParts } from './tropical-art.js';
 
 const C = {
   earth: '#a39484', earthTop: '#6cc24a', earthDark: '#857766',
@@ -39,8 +41,10 @@ function railParts(p, side) {
 }
 
 export function pieceParts(p) {
+  // the rope bridge over the moat hangs its own handropes
+  if (p.style === 'ropeBridge') return ropeBridgeParts(p);
   const P = pieceBody(p);
-  if (p.rail) P.push(...railParts(p, -1));
+  if (p.rail && p.kind !== 'rope') P.push(...railParts(p, -1)); // a rope bridge draws its own handrope
   if (p.rails2) P.push(...railParts(p, -1), ...railParts(p, 1));
   return P;
 }
@@ -49,6 +53,9 @@ function pieceBody(p) {
   const P = [];
   const h = p.top - (p.base ?? 0);
   switch (p.kind) {
+    case 'palm': return palmTopParts(p);
+    case 'pool': return tidePoolParts(p);
+    case 'rope': return ropeDeckParts(p);
     case 'block': {
       const H = h + 0.6, w = p.hx * 2, d = p.hz * 2;
       if (p.carved) {
@@ -89,6 +96,7 @@ function pieceBody(p) {
       break;
     }
     case 'disc': {
+      if (p.palm) return palmDiscParts(p);
       if (p.tag === 'stone') {
         // a rock shelf jutting from a spire (rocky islands' lookout)
         P.push(placed(new THREE.CylinderGeometry(p.r, p.r * 0.78, 0.42, 9), C.crag, p, { y: p.top - 0.21, ry: p.cx }, { c2: C.cragDark, split: 0.5 }));
@@ -155,6 +163,7 @@ function pieceBody(p) {
       break;
     }
     case 'stone': {
+      if (p.style === 'pools') return poolRimParts(p);
       const H = p.top + 2.4;
       P.push(placed(new THREE.CylinderGeometry(p.r * 0.95, p.r * 1.08, H, 7), C.stone, p, { y: p.top - H / 2, ry: p.cz }, { c2: '#7d766d', split: 0.75 }));
       P.push(placed(new THREE.CylinderGeometry(p.r * 0.8, p.r * 0.95, 0.12, 7), C.stoneTop, p, { y: p.top + 0.02, ry: p.cz }));
@@ -216,11 +225,12 @@ function pieceBody(p) {
 /**
  * The lookout tree's trunk, branches out to each disc, and a crown of leaves;
  * or, on bare rock (tree.spire), a stacked rock spire with brackets to each
- * shelf and a pointed cap.
+ * shelf and a pointed cap; in the tropics (tree.palm), a giant palm.
  */
 export function lookoutTreeParts(tree, discs) {
   const P = [];
   const H = tree.top - tree.base + 0.5;
+  if (tree.palm) return lookoutPalmParts(tree, discs);
   const at = (g, color, t, extra = {}) => { const q = part(g, color, { ...t, ...extra }); q.translate(tree.x, 0, tree.z); return q; };
   if (tree.spire) {
     // drums that narrow as they rise, each a little off true
