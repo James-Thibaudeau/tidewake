@@ -334,6 +334,14 @@ export class World {
         I.rocks.push({ x: I.archPos.x + px * off * s, z: I.archPos.z + pz * off * s, r: 6 * ARCH.scale, h: 0, type: 'hidden' });
       }
     }
+    // Where the landmark stands, for the sea view (buildLandmark) and the chart
+    // (ui/landmarks.js) alike: the arch at the bay's mouth, the rest at the
+    // island's heart (the grove's tree faces Port Haven). No rng() here, so
+    // nothing else in the world moves.
+    if (I.landmark) {
+      const H = this.islands[0];
+      I.landmarkAt = I.archPos || { x: I.x, z: I.z, rot: I.landmark === 'grove' ? Math.atan2(H.x - I.x, H.z - I.z) : 0 };
+    }
   }
 
   key(cx, cz) { return (cx + 1000) * 4096 + (cz + 1000); }
@@ -801,13 +809,14 @@ export class IslandStreamer {
   }
 
   buildLandmark(I, group, exclusions) {
+    const P = I.landmarkAt, ox = P.x - I.x, oz = P.z - I.z; // where it stands, in island space
     if (I.landmark === 'grove') {
       this.buildGrove(I, group);
-      exclusions.push([0, 0, 80]);
+      exclusions.push([ox, oz, 80]);
     } else if (I.landmark === 'ruins') {
       for (let k = 0; k < 10; k++) {
         const a = (k / 10) * TAU;
-        const lx = Math.cos(a) * I.r * 0.32, lz = Math.sin(a) * I.r * 0.32;
+        const lx = ox + Math.cos(a) * I.r * 0.32, lz = oz + Math.sin(a) * I.r * 0.32;
         const o = this.placeOnGround(I, group, 'pillar', lx, lz, a, 1.6);
         o.scale.y = k % 3 === 1 ? 0.6 : 1.6;
         exclusions.push([lx, lz, 6]);
@@ -824,10 +833,10 @@ export class IslandStreamer {
     } else if (I.landmark === 'volcano') {
       const geo = new THREE.IcosahedronGeometry(1, 1);
       const mat = toonMaterial({ color: 0x8d8a8a, gradientMap: toonGradient() });
-      const top = islandHeight(I, I.x + I.r * 0.2, I.z);
+      const top = islandHeight(I, P.x + I.r * 0.2, P.z);
       for (let k = 0; k < 9; k++) {
         const m = new THREE.Mesh(geo, mat);
-        m.userData.base = { y: top + 10 + k * 14, x: Math.sin(k * 1.7) * 8, z: Math.cos(k * 2.3) * 8, s: 10 + k * 3.5, k };
+        m.userData.base = { y: top + 10 + k * 14, x: ox + Math.sin(k * 1.7) * 8, z: oz + Math.cos(k * 2.3) * 8, s: 10 + k * 3.5, k };
         group.add(m);
         this.smoke.push({ owner: I, mesh: m });
       }
@@ -836,7 +845,7 @@ export class IslandStreamer {
 
   /** The great arch standing off Archway Isle (sea-arch.js), with its surf, gulls and crabs. */
   buildArch(I, group) {
-    const P = I.archPos, S = ARCH.scale, cr = Math.cos(P.rot) * S, sr = Math.sin(P.rot) * S;
+    const P = I.landmarkAt, S = ARCH.scale, cr = Math.cos(P.rot) * S, sr = Math.sin(P.rot) * S;
     const A = buildSeaArch({ world: (x, z) => [P.x + x * cr + z * sr, P.z - x * sr + z * cr], glowMap: glowTexture() });
     A.group.position.set(P.x - I.x, 0, P.z - I.z);
     A.group.rotation.y = P.rot;
@@ -849,14 +858,13 @@ export class IslandStreamer {
 
   /** The Elder Tree on the hilltop, facing Port Haven, in a ring of old giants. */
   buildGrove(I, group) {
-    const H = this.world.home;
-    const ry = Math.atan2(H.x - I.x, H.z - I.z); // tree space +z towards home
+    const P = I.landmarkAt, ry = P.rot; // tree space +z towards home
     const cr = Math.cos(ry), sr = Math.sin(ry);
-    const base = islandHeight(I, I.x, I.z);
+    const base = islandHeight(I, P.x, P.z);
     const S = 1.25; // the model is authored a little small; this is the size that dominates the skyline
-    const ground = (x, z) => (islandHeight(I, I.x + (x * cr + z * sr) * S, I.z + (-x * sr + z * cr) * S) - base) / S;
+    const ground = (x, z) => (islandHeight(I, P.x + (x * cr + z * sr) * S, P.z + (-x * sr + z * cr) * S) - base) / S;
     const T = buildElderTree({ ground, glowMap: glowTexture() });
-    T.group.position.y = base;
+    T.group.position.set(P.x - I.x, base, P.z - I.z);
     T.group.rotation.y = ry;
     T.group.scale.setScalar(S);
     for (const o of T.outlines) o.userData.lod = 'outline';

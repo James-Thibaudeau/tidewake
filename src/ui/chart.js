@@ -1,7 +1,7 @@
 // UI part: the minimap, the full-screen sea chart, and the markers drawn on
 // both (fog of war, islands, quests, the Redwing). Methods are mixed into UI
 // (see ../ui.js), so `this` is the UI instance. Rough water's hatching and
-// names on the chart are chart-seas.js.
+// names on the chart are chart-seas.js; the landmarks' pictures, landmarks.js.
 import { MAP_RES, MAP_CELL, WORLD_HALF } from '../config.js';
 import { bearingDeg } from '../util.js';
 import { $, TAU, clampN } from './shared.js';
@@ -81,6 +81,7 @@ export class ChartUI {
     }
     const Wk = game.world.wreck;
     if (Wk && Math.abs(Wk.x - bx) < MINI_RANGE + 50 && Math.abs(Wk.z - bz) < MINI_RANGE + 50) this.drawWreck(g, X(Wk.x), Y(Wk.z), Math.max(5, Sz / 22));
+    this.drawMiniLandmarks(g, X, Y, Math.max(5, Sz / 22), bx, bz, MINI_RANGE); // the ones you have found (landmarks.js)
     // treasure glints & ports
     const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 250);
     for (const I of game.world.islands) {
@@ -384,6 +385,8 @@ export class ChartUI {
     // world border
     g.strokeStyle = 'rgba(90,60,30,0.6)'; g.lineWidth = 3 * dpr; g.setLineDash([10 * dpr, 8 * dpr]);
     g.strokeRect(x0, y0, ws, ws); g.setLineDash([]);
+    // the landmarks you have found, over the fog (landmarks.js)
+    this.drawLandmarks(g, X, Y, z, dpr);
 
     // labels, treasures, ports
     const fs = Math.round(clampN(11 + m.zoom * 18, 11, 17) * dpr);
@@ -409,7 +412,8 @@ export class ChartUI {
         if (save) this.drawStar(g, X(px) + 10 * dpr, Y(pz) - 10 * dpr, 6 * dpr);
       }
       if (known) {
-        const ty = sy - I.r * 0.9 * z - 4 * dpr;
+        let ty = sy - I.r * 0.9 * z - 4 * dpr;
+        if (I.landmarkAt) ty = Math.min(ty, this.landmarkTop(I, Y, z, dpr) - 3 * dpr); // above its picture
         g.lineWidth = 4 * dpr; g.strokeStyle = 'rgba(255,248,231,0.9)'; g.lineJoin = 'round';
         g.strokeText(I.name, sx, ty);
         g.fillStyle = I.port ? '#12284a' : '#3a2a14';
