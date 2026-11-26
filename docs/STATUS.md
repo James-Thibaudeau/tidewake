@@ -1218,7 +1218,80 @@ Updated 2026-11-26.
     the game? Do the two kinds of change (home to coastal, coastal to
     open) sound smooth? Is the reverb too wet? The on-foot mallet line
     now plays through the reverb instead of the echo: is it still right?
-  - [ ] 12.2 Sea music, 12.3 island music, 12.4 Sable's theme.
+  - [x] **12.2 Sea music** ([#61](https://github.com/James-Thibaudeau/tidewake/pull/61)):
+    - **Twelve more cues** (`src/music/themes.js`), fifteen in all:
+      - `storm`: a reel in a hurry in B minor, 126 bpm. Squeezebox tune,
+        a guitar hammering the root, drums that never stop, a fiddle on
+        top at its worst. Replaces the old storm score (the drone, the
+        heartbeat thuds and the sour swells are gone from `audio.js`).
+      - `reach`, `rip`, `swell`: one rolling theme in six, played by each
+        rough zone in its own key and on its own instruments: bells over
+        low strings (B minor), marimbas and hand drums (C minor), a
+        fiddle over the deep (D minor).
+      - `reach-storm`, `rip-storm`, `swell-storm`: the zone's cue, a
+        fifth quicker, over the storm's drums.
+      - `fog`: D Lydian, no pulse. A bowed drone, a celesta, a far bell.
+      - `harbour` (squeezebox) and `haven` (guitar, Port Haven only): the
+        main theme taken easily. `title`: the main theme with everything.
+      - `ghost`: no bed at all, so the score falls silent, and a music
+        box a third of a semitone out of tune with itself plays a phrase
+        of grandfather's tune now and then.
+    - **Colours.** In the rain a cue loses its drums, and a major cue
+      turns to the Dorian on the same note. At night a calm cue (home,
+      coastal, the ports) slows to 85%, loses its drums and gains a
+      celesta on the tune. Both come on the next bar line.
+    - **The director's priorities** (`src/music-cues.js`), first that
+      applies: the title; ashore (no score yet); in port; the ghost ship;
+      rough water in a storm; a storm (from 0.3); rough water (from
+      half way into a zone); thick fog; then the band. A storm's and
+      rough water's intensity go by how bad it is, not by speed. The
+      numbers are `MUSIC` in `config.js`.
+    - **A cue can play its theme in another key** (`key:` on the cue),
+      and can have no bed.
+    - **The whale's phrase:** a breach in earshot is answered by five
+      long low notes on the strings, in the key of the cue playing
+      (`STINGS`, `audio.musicPhrase`).
+    - **Music volume** in the pause screen's settings, 0 to 1.5, saved
+      with the other settings.
+    - **Jukebox:** every new cue, Rain and Night ticks, the whale's
+      phrase. `jukebox.measure(seconds, cues, colour)`.
+      `debug.music('?')` lists the cues.
+    - **Check:** the `music` group now also holds every cue in another
+      key to its theme, every colour to its mode and range, the
+      director's table of 21 situations in priority order, the phrases
+      to their instrument's range in any key, and the ghost's silence.
+      9,000 bars on paper.
+    - **Measured**, 30 s of each cue at full intensity: all fourteen
+      that are meant to be heard lie between −39.8 and −42.5 dB (fog the
+      quietest), none clips, peaks −21 dB or lower. The ghost's music
+      box is −53.8 dB on purpose. In the rain and at night home and
+      coastal stay within 0.3 dB of themselves.
+    - **In the game** (preview): the director asked for the right cue at
+      home in rain and at night, in a storm and in fog on the coast, in
+      each rough zone, in the Reach in a storm, with the ghost ship out,
+      docked at Port Haven and at Saltmarsh Harbor, and ashore. The
+      storm's cue was heard to start by the player's own state
+      (B minor, six layers). No console errors.
+    - **A storm doesn't wait.** Asked for after the first build: the
+      storm's cues are `urgent`. They need 1.5 s of hold, not 8, come
+      in from 0.3 of a storm, not 0.4, and cross between keys in one
+      bar, not two. Timed in the game on the coast: the weather turns
+      at 0 s, the held note between the keys is sounding by about 5 s
+      and the storm's first bar starts at 7.8 s. Before, it was 15–20 s.
+    - A grace note could step out of its instrument's range (the open
+      sea's whistle, to E7): fixed.
+    - Decided against the plan: the rain colour is the Dorian, not the
+      plain minor, after the listening on 12.1 (sad was wrong; the
+      Dorian keeps a bright fourth chord). The open sea is not a calm
+      cue, so it keeps its pace at night.
+  - [ ] Only a person can do, 12.2: **listen to it.** Nobody has heard a
+    note of the new cues. In `jukebox.html`: is the storm a thrill
+    rather than a noise? Do the three rough zones sound like three
+    places? Is the fog still without being dull? Tick Rain and Night on
+    `home`: are the colours a change of mood, or just wrong notes? Is
+    the ghost's music box eerie, and is the whale's phrase too much? In
+    the game: does the storm's music now arrive with the storm?
+  - [ ] 12.3 island music, 12.4 Sable's theme.
 
 ## Known issues
 

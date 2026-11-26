@@ -46,7 +46,7 @@ const HELP = `tidewake.debug
                            no argument = what's out there, the next roll, bounties, the log, the ghost's chain.
                            at: { ahead, side } puts it that many metres ahead and to the right instead
   music(cue?, intensity?)  the score: no argument = what's playing (cue, intensity, layers, key, bar); a cue's name
-                           (home | coastal | open) plays it whatever the game wants, at intensity 0-3 if given;
+                           (music('?') lists them) plays it whatever the game wants, at intensity 0-3 if given;
                            music(null) = silence; music('game') hands it back. Changes come on the next bar line
   ashore(where?)           go ashore on an island (async); no argument = grandfather's wreck
   weather(type)            clear | breezy | cloudy | rain | storm | fog
@@ -260,12 +260,13 @@ export function installDebug(game) {
     music(cue, intensity) {
       const A = g.audio;
       if (!A.ctx) return 'No sound yet: click or press a key in the game first.';
+      if (cue === '?') return Object.keys(CUES);
       if (cue === 'game') A.forceMusic();
       else if (cue !== undefined) {
         if (cue !== null && !CUES[cue]) return `No cue called "${cue}". Choose from: ${Object.keys(CUES).join(', ')}, null (silence), 'game'.`;
         A.forceMusic(cue, intensity);
       }
-      return { ...A.musicState(), wants: cueFor({ band: bandAt(g.boat.pos.x, g.boat.pos.z), ashore: g.mode === 'ashore', speed: g.boat.speed }) };
+      return { ...A.musicState(), wants: cueFor(g.musicNow()) };
     },
     time(t) { g.state.dayT = ((t % 1) + 1) % 1; return g.state.dayT; },
 

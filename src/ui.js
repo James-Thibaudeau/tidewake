@@ -32,7 +32,7 @@ export class UI {
       'sailGauge', 'speedText', 'prompt', 'banner', 'bannerSub', 'bannerTitle', 'btnAction', 'btnActionLabel', 'btnSpy',
       'vignette', 'damageFlash', 'fade', 'loading', 'loadingText', 'title', 'btnContinue', 'btnNew', 'titleHint',
       'portScreen', 'portName', 'portGold', 'portHull', 'btnRepair', 'upgradeGrid', 'btnSetSail', 'mapScreen', 'mapCanvas',
-      'mapStats', 'pauseScreen', 'setSound', 'setMusic', 'setQuality', 'setEffects', 'controlsHelp', 'wreckScreen', 'wreckText',
+      'mapStats', 'pauseScreen', 'setSound', 'setMusic', 'setMusicVol', 'setQuality', 'setEffects', 'controlsHelp', 'wreckScreen', 'wreckText',
       'btnRespawn', 'confirm', 'confirmText', 'confirmYes', 'confirmNo', 'portTabs', 'paneShipwright', 'paneTailor',
       'tailorGrid', 'btnWardrobe', 'creatorScreen', 'questTracker', 'qtTitle', 'qtArrow', 'qtLabel', 'qtDist', 'compassQuest',
       'btnJournal', 'paneQuests', 'questCount', 'questOffers', 'questBadge', 'journalScreen', 'journalBody', 'journalClose',
@@ -123,6 +123,7 @@ export class UI {
     this.on('btnReturnShip', () => { g.setPaused?.(false); g.ashore?.leave(); });
     this.on('setSound', () => { g.setSetting?.('sound', !g.settings?.sound); this.refreshSettings(); });
     this.on('setMusic', () => { g.setSetting?.('music', !g.settings?.music); this.refreshSettings(); });
+    this.el.setMusicVol?.addEventListener('input', (e) => g.setSetting?.('musicVol', Number(e.target.value)));
     this.on('setEffects', () => { if (g.settings?.quality === 'low') return; g.setSetting?.('effects', g.settings?.effects === false); this.refreshSettings(); });
     this.on('setQuality', () => { g.setSetting?.('quality', g.settings?.quality === 'low' ? 'high' : 'low'); this.refreshSettings(); });
     this.on('btnReset', async () => {
@@ -501,6 +502,7 @@ export class UI {
     const set = (el, on, label) => { if (!el) return; el.textContent = label; el.classList.toggle('off', !on); };
     set(this.el.setSound, s.sound !== false, `Sound: ${s.sound !== false ? 'On' : 'Off'}`);
     set(this.el.setMusic, s.music !== false, `Music: ${s.music !== false ? 'On' : 'Off'}`);
+    if (this.el.setMusicVol) { this.el.setMusicVol.value = s.musicVol ?? 1; this.el.setMusicVol.disabled = s.music === false; }
     set(this.el.setQuality, s.quality !== 'low', `Quality: ${s.quality === 'low' ? 'Low' : 'High'}`);
     const fxOn = s.quality !== 'low' && s.effects !== false;
     set(this.el.setEffects, fxOn, `Effects: ${fxOn ? 'On' : 'Off'}`);

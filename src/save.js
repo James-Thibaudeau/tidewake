@@ -77,7 +77,7 @@ export function decodeBytes(str, len) {
 }
 
 export function loadSettings() {
-  const def = { quality: isTouch ? 'low' : 'high', sound: true, music: true, effects: true };
+  const def = { quality: isTouch ? 'low' : 'high', sound: true, music: true, musicVol: 1, effects: true };
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
     return raw ? { ...def, ...JSON.parse(raw) } : def;

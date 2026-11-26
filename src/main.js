@@ -67,6 +67,7 @@ async function boot() {
   const audio = new SoundSystem();
   audio.setSound(settings.sound);
   audio.setMusic(settings.music);
+  audio.setMusicVolume(settings.musicVol);
   audio.musicLow = low;
 
   const game = new Game({ renderer, scene, camera, world, streamer, ocean, env, weather, boat, input, audio, fx });

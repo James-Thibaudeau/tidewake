@@ -32,8 +32,9 @@ in the shaders, always arrives and costs the right share of the hull, `rogue`),
 climber (the real controller) that walks 12 generated islands per biome to
 the summit, the living sea's rules (what turns up where, bounties, 3,000
 placements in a toy sea), the score (themes parse and stay in key, every
-note is in its instrument's range, changes of cue, no flip-flopping at a
-band's edge, `music`), the Elder Grove (its limits, and the climber from the beach
+note is in its instrument's range, changes of cue, the rain and night
+colours, which cue each situation gets, no flip-flopping at a band's edge,
+`music`), the Elder Grove (its limits, and the climber from the beach
 to the crown) and Archway Isle (its limits, and the climber from the cove
 over the arch and up the stack). One group at a time:
 `node tools/check.mjs imports`.
@@ -56,7 +57,7 @@ tidewake.debug.sea('whale')               // a sea event now: whale | dolphins |
 tidewake.debug.zone()                     // the sea at the boat: band (home | coastal | open), zone, wave and swell factors
 tidewake.debug.rogue(50)                  // a rogue wave now, from 50° off the starboard bow (negative = port); rogue('state') says what's out there
 tidewake.debug.cross({ badly: true })     // a test pilot sails one crossing of the Reach and says what it cost the hull, and where it went
-tidewake.debug.music()                    // the score: cue, intensity, layers, key, bar; music('open', 3) forces a cue, music('game') hands it back
+tidewake.debug.music()                    // the score: cue, intensity, layers, key, bar, and what the game wants; music('storm', 3) forces a cue, music('?') lists them, music('game') hands it back
 tidewake.debug.step(30)                   // 30 s of game time in well under a second
 tidewake.debug.frame()                    // draw a frame before a screenshot
 tidewake.debug.profile()                  // what a frame draws: calls, triangles, lights, by kind
@@ -78,7 +79,8 @@ tidewake.debug.restoreSave()              // when you're done: real save back, r
   The sea's large features likewise: `?sea=0`, or `?sea=shallows,gusts,shade`.
 - The score is written onto the audio clock, which runs in real time: after
   `step()`, `await` a few real seconds before reading `debug.music()`. A
-  change of cue takes the 8 s hold (game time), then up to three bars.
+  change of cue takes the 8 s hold (game time), then up to three bars; a
+  storm's takes 1.5 s and up to two.
 - Sound can't be heard from here. `SoundSystem` builds on any audio context,
   so render a sound through an `OfflineAudioContext` (`A.ctx = ctx;
   A.build(); A._play(name, opts)`) and measure it against one that exists;
@@ -134,10 +136,15 @@ the same dev server plays one cue at a time and never touches the save.
 jukebox.help()
 jukebox.play('home', 3)                    // a cue at intensity 0-3; another play() changes on the next bar line
 jukebox.set({ rests: true, low: true })    // the long rests between statements, as in the game; the Low quality score
+jukebox.set({ rain: true, night: true })   // a cue's colours (a cue without one plays as it is)
+jukebox.sting('whale')                     // a one-off phrase over whatever is on
 jukebox.note('fiddle', 'A4')               // one instrument; no note = a run up its range
-await jukebox.measure()                    // every cue, 60 s, offline: loudness, peak, clipped. Works hidden
+await jukebox.measure(30, ['storm', 'fog'])   // those cues (default: all, 60 s each), offline: loudness, peak, clipped
 ```
 
+- `measure()` works hidden but is slow there: about 15 s a cue. Measure a
+  few at a time, or start it without `await`, keep the rows on `window`
+  and read them back in a later call.
 - You can't hear it. After changing a theme, an instrument or a level, run
   `jukebox.measure()` and keep the cues within about 2 dB of each other
   with no clipping, then say in the PR that nobody has listened. Every
@@ -169,7 +176,7 @@ game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, 
   gives Sable their cue (`rival.spawn()`), so only one thing is out there.
   The grandparents are never named.
 - **The score**: `music-cues.js` says which cue the game wants
-  (`cueFor`), `music/score.js` turns the cue into bars of notes,
+  (`cueFor`, from `game.musicNow()`), `music/score.js` turns the cue into bars of notes,
   `audio/music.js` writes them onto the audio clock and
   `audio/instruments.js` plays them. The game never plays a note itself.
 - **`UI`, `Boat` and `SoundSystem` are each one class split over several

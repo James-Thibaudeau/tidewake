@@ -1270,6 +1270,18 @@ sliders come with those colours in 12.2, and so should the music volume
 setting, which has no PR of its own above. What was measured is under 12.1
 in [STATUS.md](STATUS.md).)
 
+(As built in 12.2: the three rough zones share one theme, each in its own
+key and on its own instruments, so a cue can now name a key. The rain
+colour is the Dorian on the same note, not the plain minor: after the
+listening on 12.1, sad was the wrong direction. Night only colours the
+cues marked calm (home, coastal and the ports); the open sea keeps its
+pace. Docked comes above the weather in the priorities, and the title
+above everything. The ghost ship's cue has no bed, so its rests are
+silence. Fog also needs no rain, or the tail of a storm would bring it
+on. The whale's phrase is a one-off played over the cue, not a cue. A
+storm's cues are urgent: a 1.5 s hold instead of 8, and one bar between
+keys instead of two, so the music arrives with the storm.)
+
 **Done when:** each band, weather and rough zone at sea has its own music,
 and you can hear where you are; every biome and landmark has a theme you
 could hum; Sable's theme comes before their sails; music changes on the bar

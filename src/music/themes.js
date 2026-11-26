@@ -76,10 +76,64 @@ export const THEMES = {
       },
     },
   },
+
+  // The storm: a reel in a hurry. The tune runs, falls back on its first
+  // note and runs again; the middle climbs a step at a time, like the seas.
+  tempest: {
+    key: 'B minor', steps: 8, beats: 4,
+    phrases: {
+      gale: {
+        chords: 'Bm | G | A | Bm',
+        tune: 'B4 - F#5 - E5 D5 C#5 D5 | B4 - G5 - F#5 E5 D5 E5 | C#5 - A5 - G5 F#5 E5 C#5 | D5 - B4 - B4 - - -',
+      },
+      surge: {
+        chords: 'G | A | Bm | F#m',
+        tune: 'D5 - G5 - B5 - A5 G5 | E5 - A5 - C#6 - B5 A5 | F#5 - B5 - D6 - C#6 B5 | A5 - F#5 - C#5 - F#5 -',
+      },
+    },
+  },
+
+  // Rough water: heavy and rolling, in six. Each zone plays it in a key and
+  // on instruments of its own.
+  rollers: {
+    key: 'E minor', steps: 6, beats: 2,
+    phrases: {
+      heave: {
+        chords: 'Em | D | C | D',
+        tune: 'E5 - - G5 - A5 | F#5 - - D5 - A4 | G5 - - E5 - C5 | D5 - - F#5 - A5',
+      },
+      haul: {
+        chords: 'Em | G | D | Em',
+        tune: 'B5 - - A5 - G5 | D5 - - G5 - B5 | A5 - - F#5 - D5 | E5 - - - - -',
+      },
+    },
+  },
+
+  // Fog: still and uncertain. D Lydian, whose first four notes are all a
+  // whole tone apart, so nothing in it settles. Few notes, far between.
+  mist: {
+    key: 'D lydian', steps: 8, beats: 4,
+    phrases: {
+      drift: {
+        chords: 'D | E | D | E',
+        tune: 'A5 - - - . . G#5 - | F#5 - - - - - . . | . . D5 - - - E5 - | G#5 - - - - - - -',
+      },
+      listen: {
+        chords: 'D | Bm | E | D',
+        tune: '. . F#5 - - - E5 - | D5 - - - - - . . | . . G#5 - - - B5 - | A5 - - - - - - -',
+      },
+    },
+  },
 };
 
 // A cue: a theme as it is played somewhere.
 //
+//   key      the key it is played in, if not the theme's own (the same mode)
+//   calm     true: at night it slows, loses its drums and gains a celesta
+//   plain    true: no colours for rain or night (a storm, the fog)
+//   quiet    true: meant to be faint, so not held to the others' loudness
+//   urgent   true: it can't wait (a storm): it comes after a short hold and by
+//            the quick way between keys
 //   form     the phrases of one full statement, in order
 //   pick     instead of the whole form, how many of its phrases a statement
 //            plays, chosen afresh each time (fragments)
@@ -97,7 +151,7 @@ export const CUES = {
   // Home waters: warm and bright, the main theme in full, at a walking pace
   // with the guitar rolling along under it.
   home: {
-    theme: 'tidewake', tempo: 100, gain: 0.85,
+    theme: 'tidewake', tempo: 100, gain: 0.85, calm: true,
     form: ['a', 'a2', 'b', 'a3'], rest: [20, 50],
     drift: 'D | D | G | D',
     layers: {
@@ -112,7 +166,7 @@ export const CUES = {
   // The coastal sea: lighter than home and with more air in it, two phrases
   // of the main theme at a time on the harp.
   coastal: {
-    theme: 'tidewake', tempo: 90, gain: 1.05,
+    theme: 'tidewake', tempo: 90, gain: 1.05, calm: true,
     form: ['a', 'a2', 'b', 'a3'], pick: 2, rest: [25, 60],
     drift: 'D | G | D | Bm',
     layers: {
@@ -142,4 +196,148 @@ export const CUES = {
       descant: { voice: 'whistle', vol: 0.45, from: 3, shift: 12 },
     },
   },
+
+  // The title screen: the main theme in full, with everything on it.
+  title: {
+    theme: 'tidewake', tempo: 96, gain: 0.9, plain: true,
+    form: ['a', 'a2', 'b', 'a3'], rest: [6, 14],
+    drift: 'D | G | D | A',
+    layers: {
+      bed: { voice: 'strings', vol: 0.3, oct: 3 },
+      bass: { voice: 'guitar', vol: 0.7, from: 1, oct: 2, pattern: '1 - - 5 8 - 5 -' },
+      melody: { voice: 'flute', vol: 1, from: 1 },
+      counter: { voice: 'harp', vol: 0.5, from: 1, oct: 3, pattern: '1 5 8 5 3 5 8 5' },
+      descant: { voice: 'celesta', vol: 0.4, from: 2, shift: 12 },
+      rhythm: { vol: 0.3, from: 2, pattern: '. . s . . s s .' },
+    },
+  },
+
+  // In port: the main theme taken easily on the squeezebox, as someone on
+  // the quay might play it.
+  harbour: {
+    theme: 'tidewake', tempo: 80, gain: 1, calm: true,
+    form: ['a', 'a2', 'b', 'a3'], rest: [12, 30],
+    drift: 'D | G | D | A',
+    layers: {
+      bed: { voice: 'strings', vol: 0.24, oct: 3 },
+      bass: { voice: 'guitar', vol: 0.7, from: 1, oct: 2, pattern: '1 - - - 5 - - -' },
+      melody: { voice: 'squeezebox', vol: 1.5, from: 1 },
+      counter: { voice: 'guitar', vol: 0.45, from: 1, oct: 3, pattern: '. 5 8 5 . 5 8 5' },
+    },
+  },
+
+  // Port Haven: the same, but on the guitar. Home.
+  haven: {
+    theme: 'tidewake', tempo: 80, gain: 1.3, calm: true,
+    form: ['a', 'a2', 'b', 'a3'], rest: [12, 30],
+    drift: 'D | G | D | A',
+    layers: {
+      bed: { voice: 'strings', vol: 0.24, oct: 3 },
+      bass: { voice: 'guitar', vol: 0.7, from: 1, oct: 2, pattern: '1 - - - 5 - - -' },
+      melody: { voice: 'guitar', vol: 1.5, from: 1 },
+      counter: { voice: 'harp', vol: 0.45, from: 1, oct: 3, pattern: '. 5 8 5 . 5 8 5' },
+    },
+  },
+
+  // A storm: driving and dark, and a thrill. The squeezebox has the tune,
+  // the guitar hammers the root, and the drums never stop.
+  storm: {
+    theme: 'tempest', tempo: 126, gain: 0.8, plain: true, urgent: true,
+    form: ['gale', 'gale', 'surge', 'gale'], rest: [8, 20],
+    drift: 'Bm | Bm | G | A',
+    layers: {
+      bed: { voice: 'strings', vol: 0.4, oct: 2 },
+      bass: { voice: 'guitar', vol: 0.8, from: 0, oct: 2, pattern: '1 1 . 1 1 . 1 5' },
+      rhythm: { vol: 0.4, from: 0, pattern: 'd . . d . . d .' },
+      melody: { voice: 'squeezebox', vol: 1.6, from: 1, shift: -12 },
+      counter: { voice: 'squeezebox', vol: 0.9, from: 1, oct: 3, pattern: '. . 5 . . . 5 .' },
+      drums: { vol: 0.36, from: 2, pattern: '. b s b . b s b' },
+      descant: { voice: 'fiddle', vol: 0.7, from: 3 },
+    },
+  },
+
+  // Fog: no pulse. A bowed drone, a celesta a long way off, and a bell.
+  fog: {
+    theme: 'mist', tempo: 60, gain: 1.4, plain: true,
+    form: ['drift', 'listen'], pick: 1, rest: [10, 25],
+    drift: 'D | D | E | D',
+    layers: {
+      bed: { voice: 'strings', vol: 0.7, oct: 2 },
+      melody: { voice: 'celesta', vol: 1, from: 1 },
+      counter: { voice: 'musicbox', vol: 0.5, from: 1, oct: 5, pattern: '. . . . . . 5 -' },
+    },
+  },
+
+  // The Frostspire Reach: glassy and cold. Bells over low strings.
+  reach: {
+    theme: 'rollers', key: 'B minor', tempo: 58, gain: 1,
+    form: ['heave', 'haul'], rest: [10, 25],
+    drift: 'Em | Em | C | D',
+    layers: {
+      bed: { voice: 'strings', vol: 0.4, oct: 2 },
+      bass: { voice: 'harp', vol: 0.8, from: 0, oct: 2, pattern: '1 - - 5 - -' },
+      melody: { voice: 'celesta', vol: 1.2, from: 1 },
+      counter: { voice: 'harp', vol: 0.45, from: 1, oct: 3, pattern: '. 5 8 . 5 3' },
+      descant: { voice: 'musicbox', vol: 0.5, from: 2, shift: 12 },
+      rhythm: { vol: 0.35, from: 2, pattern: 'd . . b . .' },
+    },
+  },
+
+  // The Cinder Rip: hot and low. Marimbas and hand drums.
+  rip: {
+    theme: 'rollers', key: 'C minor', tempo: 66, gain: 0.9,
+    form: ['heave', 'haul'], rest: [10, 25],
+    drift: 'Em | Em | C | D',
+    layers: {
+      bed: { voice: 'strings', vol: 0.36, oct: 2 },
+      bass: { voice: 'marimba', vol: 0.9, from: 0, oct: 2, pattern: '1 - 1 5 - 1' },
+      melody: { voice: 'marimba', vol: 1.2, from: 1, shift: -12 },
+      counter: { voice: 'marimba', vol: 0.5, from: 1, oct: 3, pattern: '. 5 8 . 5 8' },
+      rhythm: { vol: 0.4, from: 1, pattern: 'd . b d b .' },
+      drums: { vol: 0.3, from: 2, pattern: '. s s . s s' },
+    },
+  },
+
+  // The Outer Swell: wide and slow, a long way from anywhere. A fiddle over the deep.
+  swell: {
+    theme: 'rollers', key: 'D minor', tempo: 50, gain: 1,
+    form: ['heave', 'haul'], rest: [10, 25],
+    drift: 'Em | Em | C | D',
+    layers: {
+      bed: { voice: 'strings', vol: 0.42, oct: 2 },
+      bass: { voice: 'harp', vol: 0.8, from: 0, oct: 2, pattern: '1 - - 5 - -' },
+      melody: { voice: 'fiddle', vol: 1, from: 1 },
+      counter: { voice: 'harp', vol: 0.45, from: 1, oct: 3, pattern: '1 5 8 5 3 5' },
+      rhythm: { vol: 0.3, from: 3, pattern: 'd . . . . .' },
+    },
+  },
+
+  // The ghost ship: the score falls silent, and somewhere out there a music
+  // box plays grandfather's tune, slightly out of tune with itself.
+  ghost: {
+    theme: 'tidewake', tempo: 66, gain: 0.5, plain: true, quiet: true,
+    form: ['a', 'a2', 'b', 'a3'], pick: 1, rest: [8, 20],
+    drift: 'D | D | D | D',
+    layers: {
+      melody: { voice: 'musicbox', vol: 1, from: 0, shift: 12.3 },
+      descant: { voice: 'musicbox', vol: 0.6, from: 0, shift: 11.8 },
+    },
+  },
+};
+
+// Rough water in a storm: the zone's cue, quicker, over the storm's drums.
+for (const zone of ['reach', 'rip', 'swell']) {
+  const Z = CUES[zone];
+  CUES[zone + '-storm'] = {
+    ...Z, tempo: Math.round(Z.tempo * 1.2), plain: true, urgent: true,
+    layers: { ...Z.layers, rhythm: { vol: 0.42, from: 0, pattern: 'd . b d . b' }, drums: { vol: 0.34, from: 0, pattern: '. s s . s s' } },
+  };
+}
+
+// A phrase played once over whatever cue is on, in its key: `steps` are
+// steps of the key's scale above its tonic in octave `oct` (7 = the octave),
+// each held `each` seconds.
+export const STINGS = {
+  // a whale breaching: long and low
+  whale: { voice: 'strings', oct: 2, steps: [0, 4, 5, 4, 0], each: 1.7, vol: 1.6 },
 };

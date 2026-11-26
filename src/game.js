@@ -509,6 +509,7 @@ export class Game {
     saveSettings(this.settings);
     if (k === 'sound') this.audio.setSound(v);
     if (k === 'music') this.audio.setMusic(v);
+    if (k === 'musicVol') this.audio.setMusicVolume(v);
     if (k === 'effects') this.fx?.setEnabled(v);
   }
 
@@ -654,9 +655,21 @@ export class Game {
       speed: Math.abs(boat.speed), wind: w.windStrength, rain: w.p.rain, storm: w.p.storm,
       inPort: this.mode === 'docked', night: this.env.night,
       ashore: this.mode === 'ashore' ? this.ashore.island.biome || 'rocky' : null, // (the wreck lies on bare rock)
-      music: cueFor({ band: bandAt(boat.pos.x, boat.pos.z), ashore: this.mode === 'ashore', speed: boat.speed }),
+      music: cueFor(this.musicNow()),
     });
     this.ui.update(dt);
+  }
+
+  /** Where the player is and what the sea and sky are doing, as the music's director reads it (cueFor in music-cues.js). */
+  musicNow() {
+    const b = this.boat.pos, w = this.weather.p, sea = seaAt(b.x, b.z, this._musicSea ||= {});
+    return {
+      title: this.mode === 'title', ashore: this.mode === 'ashore',
+      docked: this.mode === 'docked', homePort: this.dockedIsland === this.world.home,
+      ghost: this.seaEvents?.live?.kind === 'ghostShip',
+      band: bandAt(b.x, b.z), zone: sea.rough >= 0.5 ? sea.roughZone : null, rough: sea.rough,
+      storm: w.storm, rain: w.rain, fog: w.fog, night: this.env.night, speed: this.boat.speed,
+    };
   }
 
   updateSailingChecks(dt, acts) {

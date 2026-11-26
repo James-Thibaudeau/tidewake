@@ -3,7 +3,7 @@
 // gesture.
 //
 // SoundSystem is one class split over several files. This one holds the
-// core: the buses, the sea's beds, the storm's score and the one-shots heard
+// core: the buses, the sea's beds and the one-shots heard
 // at sea. Mixed in from audio/:
 //   ashore.js       footsteps, jump and land, the coin chime, the chest
 //                   fanfare, an island's ambience and the on-foot score
@@ -22,6 +22,7 @@ export class SoundSystem {
     this.ctx = null;
     this.soundOn = true;
     this.musicOn = true;
+    this.musicVol = 1;
     this.time = 0;
     this.nextNote = 2;
     this.melody = 2;
@@ -51,8 +52,16 @@ export class SoundSystem {
 
   setMusic(on) {
     this.musicOn = !!on;
-    if (this.ctx) this.musicBus.gain.setTargetAtTime(on ? 0.5 : 0, this.ctx.currentTime, 0.3);
+    if (this.ctx) this.musicBus.gain.setTargetAtTime(this.musicLevel(), this.ctx.currentTime, 0.3);
   }
+
+  /** The music's volume setting: 1 is as it was made, 0 silent, up to 1.5. */
+  setMusicVolume(v) {
+    this.musicVol = Math.min(1.5, Math.max(0, Number.isFinite(v) ? v : 1));
+    if (this.ctx) this.musicBus.gain.setTargetAtTime(this.musicLevel(), this.ctx.currentTime, 0.1);
+  }
+
+  musicLevel() { return this.musicOn ? 0.5 * this.musicVol : 0; }
 
   build() {
     const c = this.ctx;
@@ -67,7 +76,7 @@ export class SoundSystem {
     this.amb = c.createGain(); this.amb.gain.value = 1; this.amb.connect(this.master);
 
     // music bus, with a room round it
-    this.musicBus = c.createGain(); this.musicBus.gain.value = this.musicOn ? 0.5 : 0;
+    this.musicBus = c.createGain(); this.musicBus.gain.value = this.musicLevel();
     this.musicBus.connect(this.master);
     this.musicIn = c.createGain(); this.musicIn.gain.value = 1;
     const room = this.musicReverb();
@@ -118,26 +127,6 @@ export class SoundSystem {
     this.rainLevel = 0;
     this.rainSeed = Math.random() * 100;
 
-    // ---- storm score: a dark drone, swells and a slow pulse on their own bus
-    this.stormBus = c.createGain(); this.stormBus.gain.value = 0;
-    this.stormBus.connect(this.musicBus);
-    const droneF = c.createBiquadFilter(); droneF.type = 'lowpass'; droneF.frequency.value = 260; droneF.Q.value = 3;
-    this.droneFilter = droneF;
-    const droneG = c.createGain(); droneG.gain.value = 0.11;
-    droneF.connect(droneG); droneG.connect(this.stormBus);
-    this.drones = [];
-    // A1 + a slightly sour fifth + a minor-second rub, detuned saws
-    for (const [n, det] of [[33, -7], [33, 6], [40, -3], [34, 9], [45, 0]]) {
-      const o = c.createOscillator(); o.type = 'sawtooth';
-      o.frequency.value = midi(n); o.detune.value = det;
-      const g = c.createGain(); g.gain.value = n === 34 ? 0.25 : n === 45 ? 0.35 : 0.6;
-      o.connect(g); g.connect(droneF); o.start();
-      this.drones.push(o);
-    }
-    this.nextStormHit = 3;
-    this.nextSwell = 6;
-    this.nextStormNote = 2;
-    this.stormMix = 0;
     this.buildAshore();
     this.buildMusic();
   }
@@ -159,17 +148,14 @@ export class SoundSystem {
     this.windFilter.frequency.setTargetAtTime(500 + wind * 400 + gust * 300 + storm * 500, t, 0.5);
     this.updateRain(dt, t, rain, wind, storm, p.inPort);
 
-    // music: the score (audio/music.js) gives way to the storm's own, and on foot to
-    // the old wandering line on a mallet (audio/ashore.js), until each has its cues
-    this.stormMix += (Math.min(1, Math.max(0, (storm - 0.25) / 0.55)) - this.stormMix) * Math.min(1, dt * 0.4);
-    this.stormBus.gain.setTargetAtTime(this.stormMix * 0.7, t, 0.8);
+    // music: the score (audio/music.js) gives way on foot to the old wandering line on
+    // a mallet (audio/ashore.js), until the islands have their cues
     this.updateMusic(dt, t, p.music || null);
     this.nextNote -= dt;
     if (this.nextNote <= 0) {
       this.nextNote = (0.8 + Math.random() * 1.7) * (this.night > 0.5 ? 1.5 : 1);
-      if (this.musicOn && this.landMix > 0.5 && Math.random() > this.stormMix) this.landNote(storm);
+      if (this.musicOn && this.landMix > 0.5) this.landNote(storm);
     }
-    if (this.stormMix > 0.05 && this.musicOn) this.updateStormScore(dt, t);
   }
 
   updateRain(dt, t, rain, wind, storm, inPort) {
@@ -227,55 +213,6 @@ export class SoundSystem {
     let k = 0, p = 1;
     do { k++; p *= Math.random(); } while (p > L);
     return k - 1;
-  }
-
-  // Dark, tense storm score: drone breathing, irregular low pulses,
-  // dissonant swells and a creeping minor-key line.
-  updateStormScore(dt, t) {
-    const c = this.ctx, m = this.stormMix;
-    // the drone's filter opens and closes like a heavy breath
-    this.droneFilter.frequency.setTargetAtTime(180 + 260 * (0.5 + 0.5 * Math.sin(this.time * 0.23)) * m, t, 0.5);
-    // slowly bend the minor-second voice for an uneasy beating
-    this.drones[3].detune.setTargetAtTime(9 + 25 * Math.sin(this.time * 0.13), t, 1.0);
-
-    this.nextStormHit -= dt;
-    if (this.nextStormHit <= 0) {
-      this.nextStormHit = 1.4 + Math.random() * 1.6 + (Math.random() < 0.25 ? 2.5 : 0);
-      // heartbeat-like double thud
-      for (const [o, v] of [[0, 1], [0.32, 0.6]]) {
-        const tt = t + o;
-        this.tone(58, tt, 0.9, { type: 'sine', vol: 0.22 * v * m, glide: 36, dest: this.stormBus });
-        this.noiseTo(tt, 0.25, { type: 'lowpass', freq: 180, vol: 0.12 * v * m, buf: this.brown }, this.stormBus);
-      }
-    }
-    this.nextSwell -= dt;
-    if (this.nextSwell <= 0) {
-      this.nextSwell = 7 + Math.random() * 7;
-      // a cluster of close, sour intervals swelling up and dying away
-      const root = [45, 44, 46, 41][(Math.random() * 4) | 0];
-      for (const iv of [0, 1, 6, 12]) {
-        const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = midi(root + iv);
-        o.detune.value = (Math.random() - 0.5) * 18;
-        const f = c.createBiquadFilter(); f.type = 'lowpass';
-        f.frequency.setValueAtTime(300, t); f.frequency.linearRampToValueAtTime(1400, t + 3); f.frequency.linearRampToValueAtTime(250, t + 6);
-        const g = c.createGain(); g.gain.value = 0; g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(0.03 * m, t + 3);
-        g.gain.linearRampToValueAtTime(0.0, t + 6.5);
-        o.connect(f); f.connect(g); g.connect(this.stormBus);
-        o.start(t); o.stop(t + 6.6);
-      }
-    }
-    this.nextStormNote -= dt;
-    if (this.nextStormNote <= 0) {
-      this.nextStormNote = 2.2 + Math.random() * 3;
-      // phrygian-ish: root, b2, b3, 4, b5, 5, b6
-      const SCALE = [0, 1, 3, 5, 6, 7, 8];
-      const deg = SCALE[(Math.random() * SCALE.length) | 0];
-      const n = 57 + deg + (Math.random() < 0.3 ? 12 : 0);
-      this.tone(midi(n), t, 2.6, { type: 'sine', vol: 0.06 * m, attack: 0.35, dest: this.stormBus });
-      this.tone(midi(n) * 1.004, t, 2.6, { type: 'triangle', vol: 0.025 * m, attack: 0.4, dest: this.stormBus });
-      if (Math.random() < 0.35) this.tone(midi(n - 1), t + 0.9, 2.2, { type: 'sine', vol: 0.045 * m, attack: 0.3, dest: this.stormBus });
-    }
   }
 
   noiseTo(t, dur, opts, dest) {

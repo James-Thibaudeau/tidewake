@@ -232,9 +232,20 @@ export const ASHORE = {
 
 // The score (music-cues.js, audio/music.js).
 //   hold     seconds a newly wanted cue must stay wanted before the music follows it,
-//            so it never flips back and forth at the edge of a zone
+//            so it never flips back and forth at the edge of a zone; urgentHold: the
+//            same for a cue that can't wait (a storm breaking)
 //   brisk, fast   boat speeds (m/s) from which a cue plays its second and third
 //            levels: more layers the faster she sails
+//   storm    how much of a storm (weather.p.storm, 0-1) brings on the storm's cue;
+//            stormLevels: from where it plays its second and third levels
+//   roughLevels   how far into rough water (0-1) its cue plays its second and third
+//   fog      the weather's fog number below which the fog's cue plays (clear is 1,
+//            thick fog 0.18)
+//   rain     how much rain (0-1) turns a cue to its rain colour
 //   ahead    seconds ahead of the audio clock that the next bar is written out
 //   level    the score's own level on the music bus, under the sea
-export const MUSIC = { hold: 8, brisk: 7, fast: 14, ahead: 0.25, level: 1 };
+export const MUSIC = {
+  hold: 8, urgentHold: 1.5, brisk: 7, fast: 14,
+  storm: 0.3, stormLevels: [0.6, 0.85], roughLevels: [0.7, 0.9], fog: 0.4, rain: 0.3,
+  ahead: 0.25, level: 1,
+};
