@@ -55,18 +55,24 @@ export const THEMES = {
     },
   },
 
-  // The open sea: the main theme's opening, turned to the minor and slowed
-  // until it is mostly long notes.
+  // The open sea: a journey into the unknown. E Dorian, the minor with a
+  // bright fourth chord, which is where sea songs live: bold, not sad. The
+  // tune leaps up a fifth and a fourth and then drives on repeated notes; its
+  // third phrase climbs to the top of the fiddle before it comes home.
   farwater: {
-    key: 'B minor', steps: 8, beats: 4,
+    key: 'E dorian', steps: 8, beats: 4,
     phrases: {
       out: {
-        chords: 'Bm | G | D | A',
-        tune: 'B4 - - - D5 - - - | E5 - - - D5 - B4 - | A4 - - - - - F#4 - | E4 - - - - - - -',
+        chords: 'Em | D | G | A',
+        tune: 'E4 - B4 E5 - E5 D5 E5 | F#5 - D5 A4 - A4 D5 F#5 | G5 - D5 B4 - B4 D5 G5 | A5 - G5 E5 C#5 - E5 -',
       },
       back: {
-        chords: 'Bm | Em | F#m | Bm',
-        tune: 'B4 - - - D5 - - - | G5 - - - F#5 - E5 - | C#5 - - - - - A4 - | B4 - - - - - - -',
+        chords: 'Em | G | D A | Em',
+        tune: 'E4 - B4 E5 - E5 F#5 G5 | B5 - A5 G5 - D5 G5 B5 | A5 - F#5 D5 E5 - C#5 A4 | E5 - - B4 E5 - - -',
+      },
+      crest: {
+        chords: 'G | A | Bm | A',
+        tune: 'G5 - B5 - D6 - B5 G5 | A5 - C#6 - A5 - E5 A5 | B5 - D6 - F#5 - B5 D6 | C#6 - A5 - E5 - A5 -',
       },
     },
   },
@@ -80,50 +86,60 @@ export const THEMES = {
 //   rest     seconds of bed only between statements, shortest and longest
 //   drift    the chords the bed wanders through while the tune rests
 //   gain     the whole cue's level, set by measuring (jukebox.measure())
-//   layers   bed, bass, melody, counter and rhythm. Each plays from the
-//            intensity in `from` upwards (0 = always), on `voice`, at `vol`.
-//            The bed holds each bar's chord with its root in octave `oct`;
-//            bass and counter play a `pattern` of chord tones; the melody
-//            plays the phrase's tune, moved by `shift` semitones.
+//   layers   bed, bass, melody, counter and rhythm, and where a cue wants
+//            them `drums` (a second rhythm) and `descant` (a second
+//            instrument on the tune). Each plays from the intensity in `from`
+//            upwards (0 = always), on `voice`, at `vol`. The bed holds each
+//            bar's chord with its root in octave `oct`; a layer with a
+//            `pattern` plays it, in chord tones or in drum letters; a layer
+//            without one plays the phrase's tune, moved by `shift` semitones.
 export const CUES = {
-  // Home waters: warm and bright, the main theme in full.
+  // Home waters: warm and bright, the main theme in full, at a walking pace
+  // with the guitar rolling along under it.
   home: {
-    theme: 'tidewake', tempo: 84, gain: 0.85,
-    form: ['a', 'a2', 'b', 'a3'], rest: [30, 90],
+    theme: 'tidewake', tempo: 100, gain: 0.85,
+    form: ['a', 'a2', 'b', 'a3'], rest: [20, 50],
     drift: 'D | D | G | D',
     layers: {
       bed: { voice: 'strings', vol: 0.3, oct: 3 },
-      bass: { voice: 'guitar', vol: 0.75, from: 1, oct: 2, pattern: '1 - - - 5 - - -' },
+      bass: { voice: 'guitar', vol: 0.75, from: 1, oct: 2, pattern: '1 - - 5 8 - 5 -' },
       melody: { voice: 'flute', vol: 1, from: 1 },
-      counter: { voice: 'guitar', vol: 0.5, from: 2, oct: 3, pattern: '1 5 8 5 3 5 8 5' },
-      rhythm: { vol: 0.35, from: 3, pattern: '. . s . . s s .' },
+      counter: { voice: 'guitar', vol: 0.5, from: 1, oct: 3, pattern: '1 5 8 5 3 5 8 5' },
+      rhythm: { vol: 0.35, from: 2, pattern: 'd . s . . s s .' },
     },
   },
 
-  // The coastal sea: sparse and wandering, a piece of the main theme at a time.
+  // The coastal sea: lighter than home and with more air in it, two phrases
+  // of the main theme at a time on the harp.
   coastal: {
-    theme: 'tidewake', tempo: 72, gain: 1.25,
-    form: ['a', 'a2', 'b', 'a3'], pick: 1, rest: [40, 90],
+    theme: 'tidewake', tempo: 90, gain: 1.05,
+    form: ['a', 'a2', 'b', 'a3'], pick: 2, rest: [25, 60],
     drift: 'D | G | D | Bm',
     layers: {
       bed: { voice: 'squeezebox', vol: 0.34, oct: 3 },
-      bass: { voice: 'harp', vol: 0.8, from: 1, oct: 2, pattern: '1 - - - - - - -' },
+      bass: { voice: 'harp', vol: 0.8, from: 1, oct: 2, pattern: '1 - - - 5 - - -' },
       melody: { voice: 'harp', vol: 1.5, from: 1 },
-      counter: { voice: 'harp', vol: 0.6, from: 2, oct: 3, pattern: '. . 5 - 8 - 3 -' },
-      rhythm: { vol: 0.25, from: 3, pattern: '. . . . s . . .' },
+      counter: { voice: 'harp', vol: 0.6, from: 1, oct: 3, pattern: '. 5 8 - 3 5 8 -' },
+      rhythm: { vol: 0.3, from: 2, pattern: '. . s . . . s s' },
     },
   },
 
-  // The open sea: wider and lonelier. Long notes, lower, more space, no pulse.
+  // The open sea: a journey into the unknown. The fiddle's tune at a run
+  // over a driving guitar and a rolling harp; a hand drum counts three, three
+  // and two from the start, more drums join at speed, and at full sail a tin
+  // whistle takes the tune up an octave.
   open: {
-    theme: 'farwater', tempo: 58, gain: 1,
-    form: ['out', 'back'], rest: [45, 90],
-    drift: 'Bm | Bm | G | Bm',
+    theme: 'farwater', tempo: 108, gain: 1,
+    form: ['out', 'back', 'crest', 'back'], rest: [20, 45],
+    drift: 'Em | Em | D | Em',
     layers: {
       bed: { voice: 'strings', vol: 0.36, oct: 2 },
-      bass: { voice: 'harp', vol: 0.5, from: 2, oct: 2, pattern: '1 - - - - - - -' },
+      bass: { voice: 'guitar', vol: 0.7, from: 1, oct: 2, pattern: '1 - 1 - 5 - 1 -' },
       melody: { voice: 'fiddle', vol: 1, from: 1 },
-      counter: { voice: 'harp', vol: 0.35, from: 3, oct: 3, pattern: '. . . . 1 - 5 -' },
+      counter: { voice: 'harp', vol: 0.45, from: 1, oct: 3, pattern: '1 5 8 5 3 5 8 5' },
+      rhythm: { vol: 0.3, from: 1, pattern: 'b . . b . . b .' },
+      drums: { vol: 0.32, from: 2, pattern: 'd . s . . s . s' },
+      descant: { voice: 'whistle', vol: 0.45, from: 3, shift: 12 },
     },
   },
 };

@@ -19,6 +19,9 @@ import { parseKey, parseChords, parseTune, parseBars, chordTone, stepAbove } fro
 
 const compiled = new Map();
 
+// The layers Low quality leaves out: everything but the bed, the bass and the tune.
+export const EXTRAS = ['counter', 'rhythm', 'drums', 'descant'];
+
 /** A cue with its notation parsed: what nextBar() reads. Throws if the cue or its theme is badly written. */
 export function compileCue(name) {
   if (compiled.has(name)) return compiled.get(name);
@@ -79,7 +82,7 @@ export class Score {
    * The next bar: { cue, key, bar, seconds, phase, layers, events }. An event
    * is { voice, midi, at, dur, vol, layer } with `at` and `dur` in seconds
    * from the bar line (a drum has no midi). `intensity` 0-3 picks the layers;
-   * `low` drops the counter-melody and the rhythm; `rests: false` plays
+   * `low` drops the layers in EXTRAS; `rests: false` plays
    * statements back to back (for listening and measuring).
    */
   nextBar(intensity = 1, { low = false, rests = true } = {}) {
@@ -146,11 +149,11 @@ export class Score {
 
     const P = C.phrases[st.phrase];
     const chords = P.chords[st.i], chordAt = (step) => chords[Math.min(chords.length - 1, Math.floor((step / C.steps) * chords.length))];
-    const on = Object.keys(L).filter((id) => L[id].from <= intensity && !(low && (id === 'counter' || id === 'rhythm')));
+    const on = Object.keys(L).filter((id) => L[id].from <= intensity && !(low && EXTRAS.includes(id)));
     for (const id of on) {
       const Y = L[id], vol = Y.vol * C.gain * k;
       if (id === 'bed') this.chord(Y, chords, C.barSec, vol, events);
-      else if (id === 'melody') {
+      else if (!Y.steps) { // the tune, or a second instrument doubling it
         for (const n of P.tune[st.i]) {
           const midi = n.midi + Y.shift, at = n.step * C.stepSec + this.rnd() * 0.012;
           const v = vol * (0.88 + this.rnd() * 0.2) * (n.step === 0 ? 1.08 : 1);
@@ -158,7 +161,7 @@ export class Score {
           if (n.step > 0 && n.len >= 2 && this.rnd() < 0.12) events.push({ voice: Y.voice, midi: stepAbove(midi, C.keyInfo), at: at - 0.08, dur: 0.08, vol: v * 0.55, layer: id });
           events.push({ voice: Y.voice, midi, at, dur: n.len * C.stepSec * 0.96, vol: v, layer: id });
         }
-      } else if (id === 'rhythm') {
+      } else if (Y.steps.every((n) => DRUMS[n.what])) {
         for (const n of Y.steps) events.push({ voice: DRUMS[n.what], midi: null, at: n.step * C.stepSec, dur: 0, vol: vol * (0.8 + this.rnd() * 0.3), layer: id });
       } else {
         for (const n of Y.steps) {
@@ -191,7 +194,7 @@ export class Score {
   }
 
   pickPhrases(C) {
-    const from = Math.floor(this.rnd() * C.form.length);
+    const from = Math.floor(this.rnd() * (C.form.length - C.pick + 1));
     return C.form.slice(from, from + C.pick);
   }
 }

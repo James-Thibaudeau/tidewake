@@ -472,7 +472,7 @@ const checks = {
     const expect = (ok, msg) => { if (!ok) errors.push(msg); };
     const N = await load('music/notation.js');
     const { THEMES, CUES, RANGES, DRUMS } = await load('music/themes.js');
-    const { Score, compileCue } = await load('music/score.js');
+    const { Score, compileCue, EXTRAS } = await load('music/score.js');
     const { cueFor, CueHold } = await load('music-cues.js');
     const { VOICES } = await load('audio/instruments.js');
     const { MUSIC } = await load('config.js');
@@ -531,7 +531,7 @@ const checks = {
             inRange(name, b);
             for (const e of b.events) heard.add(e.layer);
           }
-          const want = Object.keys(C.layers).filter((id) => level >= 1 && C.layers[id].from <= level && !(low && (id === 'counter' || id === 'rhythm')));
+          const want = Object.keys(C.layers).filter((id) => level >= 1 && C.layers[id].from <= level && !(low && EXTRAS.includes(id)));
           if (!want.includes('bed')) want.push('bed');
           expect([...heard].sort().join() === want.sort().join(), `cue ${name} at intensity ${level}${low ? ' on Low' : ''}: heard ${[...heard].sort().join(', ')}, expected ${want.join(', ')}`);
         }

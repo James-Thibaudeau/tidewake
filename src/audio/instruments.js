@@ -11,16 +11,18 @@ import { hz } from '../music/notation.js';
 
 // kind: which method below plays it. level: its volume against the others,
 // so a score can write every layer's `vol` near 1.
-//   pluck   ring: seconds a low note rings; soft: 0 a bright pick, 1 a dull thumb
+//   pluck   ring: seconds a low note rings; soft: 0 a bright pick, 1 a dull thumb;
+//           bright: how many times the note's own pitch the tone reaches once it
+//           has settled; body: Hz of the wood's resonance
 //   bell    ratio, index: the FM pair (how far above the note the second
 //           sine sits, and how hard it bends the first); ring: seconds;
 //           knock: a mallet's tap
 //   pipe    breath: how much air is in the note; attack: seconds; vibrato: cents
 //   drum    from, to: the skin's pitch as it falls, Hz; ring: seconds; slap: Hz of the hand's noise
 export const VOICES = {
-  guitar: { kind: 'pluck', ring: 2.2, soft: 0.62, level: 0.1 },
-  harp: { kind: 'pluck', ring: 3.2, soft: 0.35, level: 0.09 },
-  ukulele: { kind: 'pluck', ring: 0.9, soft: 0.2, level: 0.09 },
+  guitar: { kind: 'pluck', ring: 2.2, soft: 0.8, bright: 4, body: 190, level: 0.1 },
+  harp: { kind: 'pluck', ring: 3.2, soft: 0.8, bright: 3.5, body: 260, level: 0.09 },
+  ukulele: { kind: 'pluck', ring: 0.9, soft: 0.78, bright: 3.5, body: 380, level: 0.09 },
   celesta: { kind: 'bell', ratio: 4, index: 1.1, ring: 1.6, level: 0.06 },
   musicbox: { kind: 'bell', ratio: 7, index: 0.7, ring: 1.2, level: 0.05 },
   marimba: { kind: 'bell', ratio: 4, index: 1.6, ring: 0.55, knock: 0.5, level: 0.09 },
@@ -112,8 +114,11 @@ export class Instruments {
     const D = sr / f - 0.5, P = Math.floor(D), frac = D - P; // the averaging below is half a sample of delay
     const loss = Math.pow(10, -3 / (f * ring));
     const buf = c.createBuffer(1, n, sr), out = buf.getChannelData(0), rnd = mulberry32(midi * 131 + V.name.length);
+    // the pluck: noise smoothed there and back again, so it is a soft finger, not a hiss
     let y = 0, mean = 0;
-    for (let i = 0; i < P + 2; i++) { y += (rnd() * 2 - 1 - y) * (1 - V.soft); out[i] = y; mean += y; }
+    for (let i = 0; i < P + 2; i++) { y += (rnd() * 2 - 1 - y) * (1 - V.soft); out[i] = y; }
+    y = out[P + 1];
+    for (let i = P + 1; i >= 0; i--) { y += (out[i] - y) * (1 - V.soft); out[i] = y; mean += y; }
     mean /= P + 2;
     for (let i = 0; i < P + 2; i++) out[i] -= mean;
     for (let i = P + 2; i < n; i++) {
@@ -121,12 +126,13 @@ export class Instruments {
       const b = out[i - P - 1] * (1 - frac) + out[i - P - 2] * frac;
       out[i] = loss * (a + b) * 0.5;
     }
-    // every note as loud as the next over its first moments, whatever the burst was like
+    // every note as loud as the next over its first moments, whatever the burst was like,
+    // but never so loud that the burst is clipped: a clipped pluck is all hiss
     const head = Math.min(n, Math.floor(sr * 0.15)), tail = Math.floor(sr * 0.05);
-    let sum = 0;
-    for (let i = 0; i < head; i++) sum += out[i] * out[i];
-    const k = 0.3 / (Math.sqrt(sum / head) || 1);
-    for (let i = 0; i < n; i++) out[i] = clamp(out[i] * k, -1, 1) * Math.min(1, (n - i) / tail);
+    let sum = 0, peak = 0;
+    for (let i = 0; i < n; i++) { peak = Math.max(peak, Math.abs(out[i])); if (i < head) sum += out[i] * out[i]; }
+    const k = Math.min(0.3 / (Math.sqrt(sum / head) || 1), 1 / (peak || 1));
+    for (let i = 0; i < n; i++) out[i] *= k * Math.min(1, (n - i) / tail);
     this.plucks.set(key, buf);
     return buf;
   }
@@ -134,8 +140,14 @@ export class Instruments {
   playPluck(V, midi, t, dur, vol, dest) {
     const c = this.ctx, buf = this.pluckBuffer(V, midi);
     const s = c.createBufferSource(); s.buffer = buf;
+    // the instrument's body: the top of the note is there as it is plucked and gone
+    // soon after, and the wood adds a little low down
+    const f = hz(midi), top = c.createBiquadFilter(); top.type = 'lowpass'; top.Q.value = 0.6;
+    top.frequency.setValueAtTime(clamp(f * V.bright * 2, 900, 4000), t);
+    top.frequency.setTargetAtTime(clamp(f * V.bright, 600, 2200), t, 0.09);
+    const body = c.createBiquadFilter(); body.type = 'peaking'; body.frequency.value = V.body; body.Q.value = 1; body.gain.value = 4;
     const g = c.createGain(); g.gain.value = vol;
-    s.connect(g); g.connect(dest);
+    s.connect(top); top.connect(body); body.connect(g); g.connect(dest);
     s.start(t);
   }
 
@@ -194,9 +206,9 @@ export class Instruments {
   // A bowed saw through the body of the instrument, with a vibrato that comes in late.
   playBow(V, midi, t, dur, vol, dest) {
     const c = this.ctx, f = hz(midi), end = t + dur + 0.6;
-    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3600; lp.Q.value = 0.5;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = Math.min(2800, f * 4.5); lp.Q.value = 0.5;
     const body = c.createBiquadFilter(); body.type = 'peaking'; body.frequency.value = 480; body.Q.value = 1.4; body.gain.value = 5;
-    const nose = c.createBiquadFilter(); nose.type = 'peaking'; nose.frequency.value = 2600; nose.Q.value = 1.8; nose.gain.value = 4;
+    const nose = c.createBiquadFilter(); nose.type = 'peaking'; nose.frequency.value = 2400; nose.Q.value = 1.8; nose.gain.value = 1.5;
     const g = this.noteGain(t, dur, vol, 0.08, 0.18, dest);
     lp.connect(body); body.connect(nose); nose.connect(g);
     const a = this.osc('sawtooth', f, t, end), b = this.osc('sawtooth', f, t, end, 4);

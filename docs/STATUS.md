@@ -1126,16 +1126,18 @@ Updated 2026-11-26.
   - [x] **12.1 The music engine** ([#59](https://github.com/James-Thibaudeau/tidewake/pull/59)):
     - **A score is data.** Tunes are written in a small text notation
       (`src/music/notation.js`) in `src/music/themes.js`: the Tidewake
-      theme (D major, sixteen bars) and an open-sea theme made from its
-      opening (B minor). A cue says how a theme is played somewhere: its
+      theme (D major, sixteen bars) and an open-sea theme of its own (E
+      Dorian, sixteen bars). A cue says how a theme is played somewhere: its
       tempo, its instruments, its layers and how long it rests.
     - **Three cues**, by band: `home` (the theme in full: flute over
       guitar and a strings bed), `coastal` (one phrase of it at a time on
-      harp, over a squeezebox) and `open` (slow fiddle over low strings).
-      A cue plays a statement, then 30–90 s of its bed alone.
-    - **Layers by intensity**, from the boat's speed for now: the tune and
-      bass at any speed, the counter-melody from 7 m/s, the rhythm from 14
-      (`MUSIC` in `config.js`). Low quality drops the last two.
+      harp, over a squeezebox) and `open` (fiddle at a run over a driving guitar, a rolling harp and
+      hand drums).
+      A cue plays a statement, then 20–60 s of its bed alone.
+    - **Layers by intensity**, from the boat's speed for now: the tune,
+      bass and counter-melody at any speed, the rhythm from 7 m/s (the open
+      sea's from the start) (`MUSIC` in `config.js`). Low quality drops the
+      counter-melody and the rhythm.
     - **Changes on the bar** (`src/music/score.js`, pure). In the same key
       the old bed dies away under the new cue over two bars. To another
       key the tune drops out, the bed holds a bar, one note both keys
@@ -1175,6 +1177,33 @@ Updated 2026-11-26.
       time, so a note that began between two samples let one sample
       through at full level. Every note's gain now starts at 0 by value
       too, in the old `tone` and `noise` helpers as well.
+    - **After the first listen** ("the strings sound tinny"): the plucked
+      strings had most of their energy above 2.5 kHz, and the pick's burst
+      of noise was being clipped. The pluck is now smoothed, never
+      clipped, and played through a body (a low-pass that closes as the
+      note rings, and a low resonance). Energy above 2.5 kHz against the
+      whole note: guitar D3 from −4 dB to −17, harp D5 from −5 to −10,
+      harp D3 from −1 to −18. The fiddle lost some of its top too (−8 to
+      −10 at D5). Cue levels after: home −41.0, coastal −41.3, open −42.4.
+    - **After the second listen** ("a bit sleepy"): quicker and with a
+      pulse, still gentle. Tempos up (home 84 to 100, coastal 72 to 90,
+      open 58 to 76); the guitar or harp's rolling accompaniment plays
+      from the start instead of only at speed; the bass walks; a soft
+      drum and shaker come in at 7 m/s; the coastal cue plays two phrases
+      at a time, not one; the open sea's long notes are walked up to and
+      it has a harp keeping step. Rests are 20–60 s, where the plan said
+      30–90.
+    - **After the third listen** (open "too sad, not adventurous enough"):
+      the open sea's theme was rewritten. It was B minor and mostly long
+      notes; it is now E Dorian (a minor with a bright fourth chord, as
+      sea songs have), opens on a leap up a fifth and has a third phrase
+      that climbs. A fourth listen asked for more excitement still, "a
+      journey into the unknown", and dropped the plan's "wider and
+      lonelier": 108 bpm, a tune that drives on repeated notes, a driving
+      guitar bass, a bodhrán counting three, three and two from the
+      start, more drums from 7 m/s and a tin whistle on the tune an
+      octave up from 14. Cues can now have `drums` and `descant` layers.
+      Cue levels after: home −40.5, coastal −41.0, open −40.6.
     - Not built: the music volume slider (the plan gives it no PR; 12.2 is
       the place), and the jukebox's night and rain sliders, which wait
       for those colours in 12.2. Not measured on Low quality.

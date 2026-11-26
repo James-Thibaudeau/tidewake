@@ -1253,8 +1253,15 @@ goes in the story follows [rival-captain.md](rival-captain.md).
 play every cue through on paper. Intensity comes from the boat's speed
 alone so far. The plucked strings are worked out in plain code, a note at a
 time, and kept: an audio graph can't loop a delay as short as a string's
-period. The open sea's theme is in B minor, which has D major's notes, so
-it also exercises the change between keys. The title screen and the ports
+period. The open sea's theme is in E Dorian, which has D major's notes but is
+another key to the player, so it also exercises the change between keys.
+The "wider and lonelier" of the table above is dropped (decided
+2026-11-26): the open sea is the most exciting of the three bands, a
+journey into the unknown, fast and driving. The first version, slow and
+in B minor, was judged too sad. After a listen the cues were
+made livelier than the tables above describe: quicker, with a rolling
+accompaniment from the start, and rests of 20–60 s rather than 30–90. The
+title screen and the ports
 play the cue of the band they are in until 12.2 gives them their own. The
 old storm score and the on-foot line still play, with the new score
 giving way to them, until 12.2 and 12.3. The jukebox has intensity, volume,
