@@ -20,7 +20,7 @@ import { toon } from '../toon.js';
 import { initProps } from '../props.js';
 import { clamp, lerp } from '../util.js';
 import { SUBJECTS, controlsFor, unknownParams } from './subjects.js';
-import { LIGHTS, VIEWS, WEATHERS, SEA_PLACES, FIT_FOV } from './presets.js';
+import { LIGHTS, VIEWS, WEATHERS, SEA_PLACES, ROUGH_PLACES, seaPlace, FIT_FOV } from './presets.js';
 import { SHEETS, propSheet } from './sheets.js';
 
 const HELP = `gallery
@@ -37,13 +37,14 @@ Other parameters: sun=<degrees> turns the light round the subject, ink=studio dr
 lines of the character creator, phase=<0-1> holds a walk or run at one point of the stride,
 play=0 stops the animation, weather=<${WEATHERS.join('|')}> swaps the light's weather,
 waves=<0-1> calms the sea, sea=0 (or sea=${SEA_FEATURES.join(',')}) picks the sea's large features,
-zone=<${Object.keys(SEA_PLACES).join('|')}> is where on the map the sea is (shallows: the clear home waters),
+zone=<${Object.keys(SEA_PLACES).join('|')}> is where on the map the sea is (shallows: the clear home waters;
+rough: the worst of rough water, offing: just outside it looking in, with severity=<${Object.keys(ROUGH_PLACES).join('|')}> for which zone),
 fx=0 (or fx=edges,bloom) as in the game.`;
 
 const $ = (id) => document.getElementById(id);
 const rad = (deg) => ((parseFloat(deg) || 0) * Math.PI) / 180;
 // Parameters that change how a subject is seen, not what is built.
-const SEEN = new Set(['view', 'light', 'weather', 'sun', 'ink', 'play', 'waves', 'sea', 'zone', 'sheet', 'fx']);
+const SEEN = new Set(['view', 'light', 'weather', 'sun', 'ink', 'play', 'waves', 'sea', 'zone', 'severity', 'sheet', 'fx']);
 const size = () => [Math.max(1, window.innerWidth), Math.max(1, window.innerHeight)]; // a hidden tab can report 0
 
 function boot() {
@@ -205,13 +206,16 @@ function boot() {
     if (!q.show) q.show = 'outfit';
     warnings = [];
     const key = subjectKey(q);
-    stage.rotation.y = rad(q.sun);
     applyLight(q.light || 'noon', q.weather);
     for (const f of q.sea && q.sea !== '0' ? q.sea.split(',') : []) if (!SEA_FEATURES.includes(f)) warn(`sea=${f} is not one of ${SEA_FEATURES.join(', ')} (or 0 for none)`);
     ocean.setFeatures(q.sea);
     // the subject stands at (0, 0), which in the game is Port Haven: say where it is instead
     if (q.zone && !SEA_PLACES[q.zone]) warn(`zone=${q.zone} is not a place (${Object.keys(SEA_PLACES).join(', ')})`);
-    setSeaOrigin(...(SEA_PLACES[q.zone] || SEA_PLACES.coastal));
+    const inRough = q.zone === 'rough' || q.zone === 'offing';
+    if (q.severity != null && !(inRough && ROUGH_PLACES[q.severity])) warn(inRough ? `severity=${q.severity} is not one of ${Object.keys(ROUGH_PLACES).join(', ')}` : `severity=${q.severity} only means something with zone=rough or zone=offing`);
+    const [seaX, seaZ, seaTurn] = seaPlace(q.zone, q.severity) || seaPlace(SEA_PLACES[q.zone] ? q.zone : 'coastal');
+    setSeaOrigin(seaX, seaZ);
+    stage.rotation.y = rad(q.sun) + seaTurn; // (a place in rough water also says which way to face)
     stub.creator = q.ink === 'studio' ? { scene } : null; // fx.js thins the ink for the creator's scene
     playing = q.play !== '0' && q.phase == null;
     if (key !== builtKey || !subject) {
@@ -280,6 +284,7 @@ function boot() {
     menu('light', Object.keys(LIGHTS), q.light, (v) => set({ light: v }));
     menu('weather', WEATHERS, q.weather, (v) => set({ weather: v }));
     menu('zone', Object.keys(SEA_PLACES), q.zone, (v) => set({ zone: v }));
+    if (q.zone === 'rough' || q.zone === 'offing') menu('severity', Object.keys(ROUGH_PLACES), q.severity, (v) => set({ severity: v }));
     for (const [key, choices] of controlsFor(q.show)) menu(key, choices, q[key], (v) => set({ [key]: v }));
     menu('sheet', [...Object.keys(SHEETS), 'props'], '', (v) => { if (v) sheet(v); });
   }

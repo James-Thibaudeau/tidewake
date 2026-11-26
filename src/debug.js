@@ -10,7 +10,8 @@
 // Always finish with restoreSave(): it puts the save back and reloads, and
 // without it the test voyage is saved over the real one when the tab closes.
 import { UPGRADES, SAVE_KEY, REFITS, ASHORE_BIOMES } from './config.js';
-import { bandAt, seaAt } from './sea-zones.js';
+import { SEA_ZONES, bandAt, seaAt, swellAt, roughDamage } from './sea-zones.js';
+import { SEAS } from './story-text.js';
 
 const BACKUP_KEY = SAVE_KEY + '.debug-backup';
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
@@ -21,8 +22,10 @@ const HELP = `tidewake.debug
   start(profile?)          new voyage from the title, prologue skipped (backs up the save first)
   step(seconds, dt?)       advance the simulation without waiting for frames; returns state()
   frame()                  render one frame (do this before a screenshot when the tab is hidden)
-  teleport(where, off?)    where: island id, island name, or { x, z }; puts the boat in open water nearby
-  zone()                   the sea where the boat is: band (home | coastal | open), zone, and what it does to the waves
+  teleport(where, off?)    where: island id, island name, or { x, z }; puts the boat in open water nearby.
+                           A rough zone's id (reach | rip | swell) puts it in the worst of that zone, bow to the island
+  zone()                   the sea where the boat is: band (home | coastal | open), zone, what it does to the waves,
+                           and in rough water its name, severity, swell and what it costs the hull a second
   give({ gold, cargo, health, upgrades })   upgrades: 'max' or { sail: 3, hull: 2, … }
   journals(n, { anchor })  story: the first n journals found (0-7); anchor: true fits grandfather's anchor
   refit(tier, { open })    grandfather's anchor at refit tier 0-4 (fits the anchor too); open: biomes to
@@ -119,6 +122,15 @@ export function installDebug(game) {
     },
 
     teleport(where, off = 120) {
+      // a rough zone: the middle of its worst water, on the side nearest Port Haven
+      const Z = typeof where === 'string' ? SEA_ZONES.find((r) => r.severity && r.id === where) : null;
+      if (Z) {
+        const mid = (Z.inner + Z.outer) / 2;
+        const c = Z.edge ? { x: 300, z: Z.inner + 150 } : { x: Z.x - (Z.x / Math.hypot(Z.x, Z.z)) * mid, z: Z.z - (Z.z / Math.hypot(Z.x, Z.z)) * mid };
+        api.teleport(c, 0);
+        g.boat.heading = Z.edge ? 0 : Math.atan2(Z.x - c.x, Z.z - c.z);
+        return api.state();
+      }
       const at = island(where);
       const reach = (at.bound || at.r || 0) + off;
       const to = at.dock || null;
@@ -142,8 +154,11 @@ export function installDebug(game) {
       const b = g.boat.pos, s = seaAt(b.x, b.z);
       return {
         band: bandAt(b.x, b.z), zone: s.zone, fromPortHaven: Math.round(Math.hypot(b.x, b.z)),
-        shallow: round(s.shallow, 2), rough: round(s.rough, 2), severity: s.severity,
-        wave: round(s.wave, 2), swell: round(s.swell, 2),
+        shallow: round(s.shallow, 2), open: round(s.open, 2),
+        rough: round(s.rough, 2), severity: s.severity, roughZone: s.roughZone, name: s.roughZone ? SEAS[s.roughZone] : null,
+        wave: round(s.wave, 2), swell: round(s.swell, 2), swellFloor: round(s.floor, 2),
+        swellNow: round(swellAt(s, g.weather.p.swell), 2), // what the bow slams and the camera feel
+        hullPerSecond: round(roughDamage(s, g.boat.sailLevel, g.upv.keel), 3),
         weather: g.weather.type, weatherFor: Math.round(g.weather.timer),
       };
     },

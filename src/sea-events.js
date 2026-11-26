@@ -86,7 +86,7 @@ export class SeaEvents {
   /** Where and when, for the weights. */
   conditions() {
     const g = this.game;
-    return { z: g.boat.pos.z, night: g.env.night, weather: g.weather.type, chapter: g.story?.chapter ?? g.state.story?.chapter ?? 0 };
+    return { z: g.boat.pos.z, night: g.env.night, weather: g.weather.type, chapter: g.story?.chapter ?? g.state.story?.chapter ?? 0, sea: g.sea };
   }
 
   /** Sightings a quest board has asked for, still to be made: [{ kind, x, z, r }]. */

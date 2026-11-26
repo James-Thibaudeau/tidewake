@@ -173,6 +173,19 @@ export const LINES = {
   souwester: "An oilskin storm hat, stiff with salt. Somebody sat out a squall up here. Try it on at any port's Tailor.",
 };
 
+// The sea zones (sea-zones.js), by id: the name shown on sailing in, and the warnings
+// while you are in rough water.
+export const SEAS = {
+  home: 'Home waters',
+  reach: 'The Frostspire Reach',
+  rip: 'The Cinder Rip',
+  swell: 'The Outer Swell',
+  rough: 'Rough water',
+  reef: 'Rough water: reef your sails',
+  beating: 'Rough water: hull taking a beating',
+  haul: 'Hauled out of rough water!',
+};
+
 // Report quests (reports.js): you see something at sea, and somebody ashore
 // wants it written down. {port} is where they live, {captain} the player's name.
 export const REPORTS = {

@@ -55,25 +55,28 @@ export function regionAt(z) {
 
 /**
  * How likely each kind is here and now (0 = can't happen).
- * ctx: { z, night (0-1), weather ('clear' | 'breezy' | 'cloudy' | 'rain' | 'storm' | 'fog'), chapter (the main story's) }
+ * ctx: { z, night (0-1), weather ('clear' | 'breezy' | 'cloudy' | 'rain' | 'storm' | 'fog'), chapter (the main story's),
+ *   sea (optional: the sea zones' reading here, from seaAt in sea-zones.js: { shallow, rough }) }
  */
 export function eventWeights(ctx) {
   const region = regionAt(ctx.z), w = ctx.weather, night = ctx.night > 0.6, day = ctx.night < 0.3;
+  // the clear shallows of home waters, and how far into rough water this is (0-1 each)
+  const home = (ctx.sea?.shallow || 0) > 0.5, rough = ctx.sea?.rough || 0;
   return {
     // whales keep to cool water, and stay down in a storm
     whale: w === 'storm' ? 0 : { cold: 1.4, temperate: 1, tropical: 0 }[region],
     // dolphins like warm water and fine weather
     dolphins: w === 'clear' || w === 'breezy' ? { cold: 0, temperate: 1, tropical: 1.3 }[region] : 0,
-    // turtles: tropical water, by day, and not in rain or a storm
-    turtles: region === 'tropical' && day && w !== 'rain' && w !== 'storm' ? 1 : 0,
+    // turtles: tropical water, or the clear shallows of home, where they show best; by day, and not in rain or a storm
+    turtles: (region === 'tropical' || home) && day && w !== 'rain' && w !== 'storm' ? (home ? 1.5 : 1) : 0,
     // a bottle can wash up anywhere, now and then, but you'd never spot one in a storm
     bottle: w === 'storm' ? 0 : 0.35,
-    // the glowing bloom: warm water, at night
-    bloom: night && w !== 'storm' ? { cold: 0, temperate: 0.5, tropical: 1 }[region] : 0,
+    // the glowing bloom: warm water, at night, and twice as likely over the home shallows
+    bloom: night && w !== 'storm' ? { cold: 0, temperate: 0.5, tropical: 1 }[region] * (home ? 2 : 1) : 0,
     // icebergs calve in the cold north, in any weather
     iceberg: region === 'cold' ? 1.2 : 0,
-    // waterspouts come with storms, and little else does
-    waterspout: w === 'storm' ? 3 : 0,
+    // waterspouts come with storms, and little else does; a storm over rough water breeds them twice as fast
+    waterspout: w === 'storm' ? 3 * (1 + rough) : 0,
     // the ghost ship: any water, only at night, likelier in fog, and not before the first journal
     ghostShip: night && (ctx.chapter || 0) >= 2 ? (w === 'fog' ? 0.9 : 0.3) : 0,
   };

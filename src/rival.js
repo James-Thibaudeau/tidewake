@@ -19,7 +19,7 @@ import { WORLD_HALF } from './config.js';
 import { mulberry32, headingOf, bearingDeg, clamp, TAU } from './util.js';
 import { glowBoost } from './toon.js';
 import { Boat } from './boat.js';
-import { AutoHelm, planCourse, SeaRace } from './race.js';
+import { AutoHelm, planCourse, raceWater, SeaRace } from './race.js';
 import { TowLine } from './tow.js';
 import { Kraken } from './kraken.js';
 import { SPEAKER, CRIMSON, SABLE_PROFILE, SABLE_LIVERY, ENCOUNTERS, LETTER, DEEP, CARDS, REWARDS, TITLE, FRIEND, LINES } from './rival-text.js';
@@ -176,6 +176,8 @@ export class Rival {
       for (const I of W.islands) room = Math.min(room, Math.hypot(I.x - x, I.z - z) - I.bound);
       for (const F of W.reefs) room = Math.min(room, Math.hypot(F.x - x, F.z - z) - F.bound);
       if (W.wreck) room = Math.min(room, Math.hypot(W.wreck.x - x, W.wreck.z - z) - W.wreck.bound);
+      // …that is neither rough water nor home waters, anywhere in the trench (300 m: the most its r can be)
+      if ([[0, 0], [300, 0], [-300, 0], [0, 300], [0, -300]].some(([ox, oz]) => !raceWater(x + ox, z + oz))) continue;
       if (!best || room > best.room) best = { x, z, room };
     }
     P.deep = { x: best.x, z: best.z, r: clamp(best.room - 120, 220, 300) };

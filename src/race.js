@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { WORLD_HALF } from './config.js';
 import { clamp, damp, lerp, wrapAngle, bearingDeg, TAU } from './util.js';
 import { waveHeight, waveUniforms } from './waves.js';
+import { bandAt, seaAt } from './sea-zones.js';
 import { part, merge, propMaterial, thinOutline } from './props.js';
 
 // ------------------------------------------------------------------ helm
@@ -127,8 +128,14 @@ export class AutoHelm {
 const GATE_R = 24;
 const EDGE = WORLD_HALF - 500;
 
+/** Open water a race can use: clear of land, rocks and the edge, and of rough water and home waters too. */
 function clearAt(world, x, z, rad = 30) {
-  return Math.abs(x) < EDGE && Math.abs(z) < EDGE && world.heightAt(x, z) < -6 && !world.rockHit(x, z, rad);
+  return Math.abs(x) < EDGE && Math.abs(z) < EDGE && world.heightAt(x, z) < -6 && !world.rockHit(x, z, rad) && raceWater(x, z);
+}
+const seaHere = {};
+/** Races (and the kraken's trench, rival.js) keep out of rough water, where the sea would decide them, and out of home waters. */
+export function raceWater(x, z) {
+  return seaAt(x, z, seaHere).rough === 0 && bandAt(x, z) !== 'home';
 }
 
 /** Is the water open from A to B? `fan` also checks the diamond a tacking boat sails in. */
@@ -149,7 +156,8 @@ function legClear(world, A, B, fan = false) {
 
 /**
  * Lay a race course in open water near `from`. Every leg is clear of land,
- * rocks and the world's edge, and every buoy stands well off any island.
+ * rocks and the world's edge, of rough water and of home waters (sea-zones.js),
+ * and every buoy stands well off any island.
  * opts: { legs, legLen: [min, max], heading (preferred first leg), windAngle,
  *   rng, upwind (with 3+ legs, the second is a beat to windward),
  *   finish ({ x, z }: the last buoy goes exactly here) }

@@ -1,5 +1,6 @@
 // The look-dev gallery's fixed choices: poses, lighting and cameras. Plain
 // data with no three.js, so tools/check.mjs can read it in Node.
+import { SEA_ZONES } from '../sea-zones.js';
 
 // On-foot poses: what the explorer's animation is told each step.
 export const POSES = {
@@ -22,11 +23,31 @@ export const LIGHTS = {
 // Weathers a light's own can be swapped for (`weather=storm`), from weather.js.
 export const WEATHERS = ['clear', 'breezy', 'cloudy', 'rain', 'storm', 'fog'];
 
+// Rough water (sea-zones.js) by severity, 1-3: `worst` is in the middle of a zone's worst
+// water, looking along it; `offing` is 500 m outside it, looking in, to see what shows
+// of it from plain sea. Each is [x, z, turn]: the turn (radians, as a heading) is which
+// way the subject and the cameras face there. A ring is seen from the side nearest Port Haven.
+function roughPlaces(Z) {
+  if (Z.edge) return { worst: [300, Z.inner + 150, Math.PI / 2], offing: [300, Z.inner - (Z.fadeIn ?? Z.fade) - 500, 0] };
+  const l = Math.hypot(Z.x, Z.z), ux = -Z.x / l, uz = -Z.z / l, mid = (Z.inner + Z.outer) / 2, out = Z.outer + Z.fade + 500;
+  const inward = Math.atan2(-ux, -uz);
+  return { worst: [Z.x + ux * mid, Z.z + uz * mid, inward + Math.PI / 2], offing: [Z.x + ux * out, Z.z + uz * out, inward] };
+}
+export const ROUGH_PLACES = Object.fromEntries(SEA_ZONES.filter((Z) => Z.severity).map((Z) => [Z.severity, roughPlaces(Z)]));
+
 // Where on the map the subject sits, for the sea round it (sea-zones.js): metres east
 // and south of Port Haven. `shallows` is the middle of home waters and `bank` their
 // edge. `coastal` is the plain sea of the coast, far enough off that no zone shows even
 // on the horizon of the highest camera, so its pictures only change when the sea does.
-export const SEA_PLACES = { coastal: [100000, 0], shallows: [0, 0], bank: [1190, 0] };
+// `open` is the open sea, clear of every zone. `rough` and `offing` are rough water from
+// inside and from outside: which zone is `severity` (1-3; the roughest unless said).
+export const SEA_PLACES = { coastal: [100000, 0], shallows: [0, 0], bank: [1190, 0], open: [-4700, -500], rough: ROUGH_PLACES[3].worst, offing: ROUGH_PLACES[3].offing };
+
+/** Where a `zone` (and, in rough water, a `severity`) puts the subject: [x, z, turn], or null if there's no such place. */
+export function seaPlace(zone, severity) {
+  const P = (zone === 'rough' || zone === 'offing') && severity != null ? ROUGH_PLACES[severity]?.[zone === 'rough' ? 'worst' : 'offing'] : SEA_PLACES[zone || 'coastal'];
+  return P ? [P[0], P[1], P[2] || 0] : null;
+}
 
 // Cameras. yaw 0 looks at the subject's front, pitch is radians above level.
 //   fit    frame the whole subject (a 30° lens, so little distortion)
