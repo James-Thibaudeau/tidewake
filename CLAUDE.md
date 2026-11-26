@@ -23,7 +23,9 @@ node tools/check.mjs
 About a second, no browser. Run it after every change. It checks syntax,
 that every import resolves to a real export and is used, that no helper was
 left behind when code moved between files, text keys (`LINES.x`), element
-ids, save migration, how the boat rides the wave set (pitch and bow slams,
+ids, save migration, the sea zones (home waters hold Port Haven and the
+wreck; the CPU and the shaders agree, `seazones`), how the boat rides the
+wave set in plain sea and in home waters (pitch and bow slams,
 `ride`), 150 generated ashore layouts per landable biome, a test
 climber (the real controller) that walks 12 generated islands per biome to
 the summit, the living sea's rules (what turns up where, bounties, 3,000
@@ -47,6 +49,7 @@ tidewake.debug.start()                    // new voyage, prologue skipped; backs
 tidewake.debug.give({ gold: 5000, upgrades: 'max' })
 tidewake.debug.teleport('Frostspire')     // id, name or { x, z }
 tidewake.debug.sea('whale')               // a sea event now: whale | dolphins | turtles | bottle | bloom | iceberg | waterspout | ghostShip; sea() says what's out there
+tidewake.debug.zone()                     // the sea at the boat: band (home | coastal | open), zone, wave and swell factors
 tidewake.debug.step(30)                   // 30 s of game time in well under a second
 tidewake.debug.frame()                    // draw a frame before a screenshot
 tidewake.debug.profile()                  // what a frame draws: calls, triangles, lights, by kind
@@ -84,6 +87,7 @@ gallery.show({ show: 'outfit', top: 'coat', extra: 'satchel', view: 'back' })
 gallery.set({ light: 'sunset' })           // change some parameters, keep the rest
 gallery.show({ show: 'ship', tier: 4, view: 'sail' })   // the game's own lens and distance
 gallery.set({ weather: 'storm', sea: '0' })             // any weather; the sea without its large features
+gallery.set({ zone: 'shallows' })                       // the clear home waters (default 'coastal': plain sea; 'bank': their edge)
 await gallery.sheet('tops-back')           // contact sheet: every top with every bag, from behind
 gallery.frame()                            // draw before a screenshot when the tab is hidden
 ```
@@ -93,7 +97,7 @@ gallery.frame()                            // draw before a screenshot when the 
   a close look at one place (`show=archway&at=keystone&view=spot`). The
   same parameters work in the URL: `gallery.html?show=ship&tier=4&light=night`.
 - **After changing how something looks, take the contact sheet that covers
-  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `sealife`, `sea`…, or
+  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `sealife`, `sea`, `shallows`…, or
   `views` / `lights` / `distance` for the subject showing) and read every
   cell, not only the one you were fixing. A sheet takes the parameters
   already showing, so `gallery.set({ bottom: 'skirt' })` first narrows it.
@@ -135,7 +139,7 @@ game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, 
   called as `this.method()` wherever they live, so grep the method name to
   find it. New methods go in the part file that fits.
 - **Pure modules stay pure**: `ashore/modules.js`, `ashore/grove-layout.js`, `ashore/archway-layout.js`, `collide.js`,
-  `controller.js`, `shapes.js`, `save.js`, `config.js`, `util.js`,
+  `controller.js`, `shapes.js`, `save.js`, `config.js`, `util.js`, `sea-zones.js`, `waves.js`,
   `cosmetics.js`, `sightings.js` and the text files import no three.js and touch no DOM at
   load, so `tools/check.mjs` can run them in Node. Keep it that way.
 - Tuning numbers live in `src/config.js`; on-foot limits are `ASHORE` there,

@@ -308,8 +308,12 @@ the timer runs out.
   general version of today's `calmTimer`, which keeps the first 5 minutes of
   a new voyage calm. Keep `calmTimer` for the prologue.
 - **Coastal sea:** today's table (`NEXT`).
-- **Open sea and rough water:** storm and rain weights × 2; a storm lasts
+- **Open sea and rough water:** storm and rain weights × 1.5; a storm lasts
   120–220 s instead of 80–170 s. Fog is likelier in the Frostspire Reach.
+  (As built in 9.1. The first plan was × 2, but with the longer storms that
+  measured 21% of the time in a storm against the coast's 7.7%, nearer
+  three times than the "about double" below; × 1.5 gives 16%. The numbers
+  are `BANDS` in `sea-zones.js`.)
 - **Storms blow out at home:** sail into home waters during a storm and its
   timer drops to at most 40 s, then it eases to rain or overcast. The swell
   there is already halved, so the relief is immediate. Running for home in a
@@ -437,12 +441,14 @@ well, but a careless run still costs half the hull.
     never a port: moving islands changes the world;
   - the generated GLSL includes the zone code, and the CPU and GLSL tables
     match.
-- **`tidewake.debug.sea()`** reports the band, the zone and the factors at
-  the boat. `debug.teleport('Frostspire')` and `debug.weather('storm')`
+- **`tidewake.debug.zone()`** reports the band, the zone and the factors at
+  the boat (built in 9.1; `debug.sea()` is Phase 7's, for spawning sea
+  events). `debug.teleport('Frostspire')` and `debug.weather('storm')`
   already exist.
-- **Gallery:** a `sea` subject, a patch of water with `zone: 'shallows' |
-  'coastal' | 'rough'` and `severity`, and a sheet of all of them under
-  every light. The shallows are judged there, not in the game.
+- **Gallery:** a `zone` parameter for any subject at sea, `zone: 'shallows'
+  | 'bank' | 'coastal'` (built in 9.1, with the `shallows` and `sea-zones`
+  sheets), then `'rough'` and `severity` in 9.2, and a sheet of all of them
+  under every light. The shallows are judged there, not in the game.
 
 ### Phase 9 in smaller PRs
 

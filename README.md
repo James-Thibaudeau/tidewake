@@ -126,10 +126,11 @@ src/
   wake.js         the wake ribbons behind a boat
   explorer.js     the anime explorer character: rig, poses (helm / on foot), animation
   outfits.js      geometry for every wearable style, and the face texture
-  ocean.js        toon water shader; the shallows, gusts and cloud shadows; the map of the world's shores
+  ocean.js        toon water shader; the shallows, gusts and cloud shadows; the clear shallows of home waters; the map of the world's shores
   sky.js          sky dome, sun/moon/stars, clouds, lighting
   weather.js      weather states, wind, rain, lightning, wind streaks
   waves.js        shared CPU/GPU wave function (the wave set itself is WAVE_DEFS in config.js)
+  sea-zones.js    where the sea changes with place: home waters, the bands that weight the weather (pure)
   toon.js         cel-shading gradient, rim-lit toon material, outline materials
   fx.js           post-processing (ink edges, bloom, grade, SMAA) and cascaded cel shadows
   ui.js           the UI class: HUD, banners and toasts, title, pause and wreck screens

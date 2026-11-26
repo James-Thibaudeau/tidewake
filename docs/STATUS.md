@@ -630,6 +630,67 @@ Updated 2026-11-25.
     The item waits at the level's vault (on generated islands, by the summit)
     and goes back to the island if you're wrecked.
   - [ ] 4.12 Harmless obstacles (crabs, gulls)
+- [ ] **Phase 9, sea zones:** the map gets a shape you can feel at the
+  helm. Three PRs, 9.1 to 9.3: see *Phase 9* in
+  [feature-plan.md](feature-plan.md).
+  - [x] **9.1 Home waters**
+    ([#48](https://github.com/James-Thibaudeau/tidewake/pull/48)):
+    - **`src/sea-zones.js`** (pure): the zone table (`SEA_ZONES`, one row
+      so far), `bandAt(x, z)` (home, coastal or open) and `seaAt(x, z)` →
+      `{ shallow, rough, severity, zone, wave, swell }`. Home waters reach
+      1,000 m from Port Haven and fade out over the next 400; the open sea
+      starts at 3,500 m. `rough` stays 0 until 9.2 adds its rows.
+    - **Calmer waves at home:** the wave scale and the swell are halved
+      inside, on the CPU (`waveHeight` in `waves.js`) and in the shaders
+      (the same table written out as GLSL, so shore foam and the other
+      wave-aware materials follow). The ocean works the factor out once a
+      vertex and hands it to the pixels. Bow slams and the camera's roll
+      use the swell where the boat is.
+    - **Storms by distance** (`weather.js`, `BANDS` in `sea-zones.js`):
+      the next weather is weighted by the band the boat is in. No storm
+      starts in home waters and rain is half as likely; a storm blows out
+      40 s after you sail home. In the open sea storms and rain are 1.5
+      times as likely and a storm lasts 120–220 s. `calmTimer` still keeps
+      a new voyage's first five minutes fair.
+    - **The clear shallows** (`ocean.js`, `SHALLOWS_GLSL`, a block of its
+      own): turquoise water with sand, beds of weed, ripple bands and slow
+      caustic lines showing through near the camera, shallower close to a
+      shore (it reads the Phase 5 shore map, not a second one). The edge
+      is a lumpy bank with a paler lip. Fades at night, under rain and
+      with distance. `?sea=0` hides it with the other large features.
+    - **Ashore and in the gallery** the sea is drawn round (0, 0), so
+      `setSeaOrigin` (`waves.js`) says where that is on the map: a level
+      gets the sea of where its island lies.
+    - **Tools:** `tidewake.debug.zone()`; a `seazones` group in
+      `tools/check.mjs` and a home-waters case in `ride`; the gallery's
+      `zone` parameter (`shallows`, `bank`, `coastal`) and the `shallows`
+      and `sea-zones` sheets.
+    - **Measured:**
+      - Share of time in a storm, over 2,000,000 s of the weather machine
+        in each band: 7.8% before, everywhere; now 0% at home, 7.8% on the
+        coast, 16.4% in the open sea. An unattended boat in the whole
+        game, 40 hours a band: 0%, 7.2% and 15.2%.
+      - A storm at home (`ride`): pitch 3.7° and 3.5 bow slams a minute,
+        against 7.2° and 7.7 outside. Plain sea is as it was.
+      - A frame at sea on the development Mac, before → after: inside home
+        waters 4.62 → 5.03 ms on High (2048×1536) and 0.94 → 1.03 ms on
+        Low (1024×768); outside them no change (4.75 and 0.95 either way).
+      - The gallery's sea sheets in plain sea (`zone=coastal`) match the
+        old ones cell for cell; the world's islands, reefs and wreck are
+        where they were.
+    - **Not as planned:** the plan's weights of × 2 in the open sea gave
+      21% of the time in a storm, nearly three times the coast's, so they
+      are × 1.5 (one line in `BANDS`). The open sea is not yet "a shade
+      darker".
+  - [ ] 9.2 Rough water: the Reach, the Rip and the Outer Swell as rows in
+    `SEA_ZONES`, with the swell floor, damage, warnings, the name on
+    entering and the chart's hatching. Also the open sea's darker shade,
+    and Phase 7's event director reading `seaAt` (whichever of the two
+    lands second wires it).
+  - [ ] 9.3 Rogue waves and ice growlers
+  - [ ] Only a person can do: judge the shallows on a real screen and
+    sailing (so far: the gallery's sheets and stills from the game); run
+    for home in a storm by hand; frame times on a real phone.
 - [ ] **Phase 5 follow-ups** (after the polish PR; things only a person
   with the game in front of them can do):
   - [ ] Listen to the new sounds on real speakers and set their levels
@@ -690,10 +751,6 @@ Updated 2026-11-25.
 
 - [ ] **Phase 6, anchor refits:** refit grandfather's anchor tier by tier
   to unlock each biome. Ships alongside the Phase 4 biomes.
-- [ ] **Phase 9, sea zones:** clear, calm home waters round Port Haven
-  where storms don't start; more storms in the open sea; rough water in
-  any weather round Frostspire (the Reach) and Mount Cinderhorn (the Rip),
-  with rogue waves. Three PRs, 9.1–9.3.
 - [ ] **Phase 10, things worth buying at the end:** restore grandfather's
   ship stage by stage at Port Haven and sail her; a paint yard for the
   ship (paints, sail cloth, emblems, figureheads); fireworks. Nothing adds

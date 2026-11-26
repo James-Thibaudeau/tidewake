@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { UPGRADES, upgradeValue, MAP_RES, MAP_CELL, WORLD_HALF, DAY_LENGTH, isTouch } from './config.js';
 import { clamp, damp, dampAngle, smoothstep, lerp, wrapAngle, bearingDeg, TAU } from './util.js';
 import { updateWaves, waveHeight } from './waves.js';
+import { bandAt, seaAt } from './sea-zones.js';
 import { ringUniforms } from './world.js';
 import { propMesh } from './props.js';
 import { pointOfSailName } from './boat.js';
@@ -56,6 +57,7 @@ export class Game {
     this.titleAngle = 0.6;
     this.effects = [];
     this.weather.onThunder = (d) => this.audio.play('thunder', { delay: d / 450, volume: clamp(1.2 - d / 1100, 0.3, 1) });
+    this.sea = seaAt(0, 0); // the sea where the boat is, kept up to date in update()
     this._v = new THREE.Vector3();
     this.applyUpgrades();
   }
@@ -532,7 +534,9 @@ export class Game {
     const s = this.state, boat = this.boat, w = this.weather;
     s.dayT += dt / DAY_LENGTH;
     if (s.dayT >= 1) { s.dayT -= 1; s.day++; }
-    w.update(dt, this.camera, boat.group.position);
+    // where the boat is on the map shapes the weather to come and the swell it feels (sea-zones.js)
+    this.sea = seaAt(boat.pos.x, boat.pos.z, this.sea);
+    w.update(dt, this.camera, boat.group.position, bandAt(boat.pos.x, boat.pos.z));
     // Run the sea a bit slower than real time: calmer, rolling swells that
     // don't drag the foam across the screen. CPU + GPU share this clock.
     // ashore, keep the swell gentle so it doesn't wash over the beach
@@ -742,10 +746,11 @@ export class Game {
     const rate = (boat.pitch - (this._lastPitch ?? boat.pitch)) / Math.max(dt, 1e-3);
     this._lastPitch = boat.pitch;
     this._slamCd = (this._slamCd || 0) - dt;
-    if (this.mode !== 'sailing' || w.p.swell < 0.4 || this._slamCd > 0) return;
+    const swell = w.p.swell * this.sea.swell; // the swell here: half the weather's in home waters
+    if (this.mode !== 'sailing' || swell < 0.4 || this._slamCd > 0) return;
     if (boat.pitch > 0.08 && rate > 0.11 && Math.abs(boat.speed) > 2) {
       this._slamCd = 3.5;
-      const k = Math.min(1, (rate - 0.11) * 4 + 0.4) * w.p.swell;
+      const k = Math.min(1, (rate - 0.11) * 4 + 0.4) * swell;
       this.cam.shake = Math.max(this.cam.shake, 0.5 + k * 0.8);
       this.audio.play('slam', { volume: k });
       const sail = [0, 0.5, 1][boat.sailLevel];
@@ -835,7 +840,7 @@ export class Game {
     cam.lookAt(tx, ty, tz);
     if (lookUp > 0) cam.rotateX(lookUp);
     // in heavy seas the horizon tilts a little with the hull
-    const heavy = this.weather.p.swell;
+    const heavy = this.weather.p.swell * this.sea.swell;
     if (heavy > 0.05) cam.rotateZ(-boat.roll * 0.4 * heavy);
     this.setFov(55, dt);
   }

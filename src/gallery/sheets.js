@@ -7,13 +7,13 @@
 // narrowed: `?sheet=tops-back&bottom=skirt&pose=run` is the same grid with a
 // skirt on, mid-stride.
 import { stylesFor } from '../cosmetics.js';
-import { POSES, LIGHTS, VIEWS, WEATHERS } from './presets.js';
+import { POSES, LIGHTS, VIEWS, WEATHERS, SEA_PLACES } from './presets.js';
 
 const ids = (slot) => stylesFor(slot).map((s) => s.style);
 const PORTRAIT = [250, 330], LANDSCAPE = [420, 300], SQUARE = [300, 300], SMALL = [200, 200];
 
 // A sheet of another subject keeps only how things are lit, not what was showing.
-const LIT = ['light', 'weather', 'sun', 'ink', 'waves', 'sea', 'fx'];
+const LIT = ['light', 'weather', 'sun', 'ink', 'waves', 'sea', 'zone', 'fx'];
 function carry(base, fixed) {
   if (!fixed.show || fixed.show === (base.show || 'outfit')) return { ...base, ...fixed };
   return { ...Object.fromEntries(LIT.filter((k) => k in base).map((k) => [k, base[k]])), ...fixed };
@@ -53,6 +53,8 @@ export const SHEETS = {
   'sea': { about: 'The sea in every weather: from the helm, low over the water, from a tall masthead and from a gull', tile: LANDSCAPE, make: grid('view', ['sail', 'horizon', 'aloft', 'high'], 'weather', WEATHERS, { show: 'ship', tier: '2' }) },
   'sea-lights': { about: 'The sea under every light: from the helm, a tall masthead and a gull', tile: LANDSCAPE, make: grid('view', ['sail', 'aloft', 'high'], 'light', Object.keys(LIGHTS), { show: 'ship', tier: '2' }) },
   'sea-features': { about: "The sea's large features one at a time: none, the shallows, gusts, cloud shadows, all", tile: LANDSCAPE, make: grid('view', ['sail', 'high'], 'sea', ['0', 'shallows', 'gusts', 'shade', 'shallows,gusts,shade'], { show: 'ship', tier: '2', weather: 'breezy' }) },
+  'sea-zones': { about: 'The plain sea, the edge of home waters and the clear shallows under every light, from the helm', tile: LANDSCAPE, make: grid('zone', Object.keys(SEA_PLACES), 'light', Object.keys(LIGHTS), { show: 'ship', tier: '2', view: 'sail' }) },
+  'shallows': { about: 'The clear shallows of home waters under every light: from the helm, low over the water, a tall masthead and a gull', tile: LANDSCAPE, make: grid('view', ['sail', 'horizon', 'aloft', 'high'], 'light', Object.keys(LIGHTS), { show: 'ship', tier: '2', zone: 'shallows' }) },
   // ---- places
   'archway-story': { about: "Archway Isle's story places, close up", tile: LANDSCAPE, make: strip('at', ['cove', 'keystone', 'lantern', 'stack'], { show: 'archway', view: 'spot' }, 2) },
   // ---- anything: the subject already in the URL

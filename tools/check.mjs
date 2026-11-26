@@ -2,14 +2,15 @@
 // Fast checks that need no browser and no dependencies:
 //
 //   node tools/check.mjs            everything (about a second)
-//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | sea | ride | layout | climb | grove | archway
+//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | sea | seazones | ride | layout | climb | grove | archway
 //   node tools/check.mjs layout 500 layouts for 500 synthetic islands (default 150)
 //
 // Run it after every change. It catches the mistakes that otherwise only show
 // up as a blank page: a syntax error, an import of a name the other module
 // doesn't export, a helper left behind when code moved to another file, a
 // text key or element id that doesn't exist, a save that no longer migrates,
-// a sea event that could turn up in the wrong place, a wave set the boat rides
+// a sea event that could turn up in the wrong place, sea zones that leave home
+// out or disagree between the CPU and the shaders, a wave set the boat rides
 // too hard or too gently, and an ashore layout that fails its own validation.
 //
 // The source is read with regular expressions, not a parser. `imports` and
@@ -259,7 +260,7 @@ const checks = {
       }
     }
     const { SHEETS } = await load('gallery/sheets.js');
-    const { POSES, LIGHTS, VIEWS } = await load('gallery/presets.js');
+    const { POSES, LIGHTS, VIEWS, SEA_PLACES } = await load('gallery/presets.js');
     const { SLOTS, styleInfo } = await load('cosmetics.js');
     let count = 0;
     for (const [name, S] of Object.entries(SHEETS)) {
@@ -271,6 +272,7 @@ const checks = {
         if (q.view && !VIEWS[q.view]) bad(`no view "${q.view}"`);
         if (q.light && !LIGHTS[q.light]) bad(`no light "${q.light}"`);
         if (q.pose && !POSES[q.pose]) bad(`no pose "${q.pose}"`);
+        if (q.zone && !SEA_PLACES[q.zone]) bad(`no sea place "${q.zone}"`);
         for (const slot of SLOTS) if (q[slot] && !styleInfo(slot, q[slot])) bad(`no ${slot} style "${q[slot]}"`);
       }
     }
@@ -442,18 +444,109 @@ const checks = {
     return { errors, note: `${kinds.length} kinds; ${placed} of ${count} placements in open water; the ghost ship at most ${longest} rolls apart` };
   },
 
+  // The sea zones (sea-zones.js): home waters hold Port Haven and grandfather's
+  // wreck, the bands lie where the plan puts them, nothing jumps as you sail
+  // across a fade, and the shaders get the same table as the CPU.
+  async seazones() {
+    const errors = [];
+    const Z = await load('sea-zones.js');
+    const { WAVE_GLSL, updateWaves, waveHeight, setSeaOrigin } = await load('waves.js');
+    const home = Z.SEA_ZONES.find((r) => r.id === 'home');
+    if (!home || Z.SEA_ZONES[0] !== home) return { errors: ['home waters must be the first row of SEA_ZONES (bandAt reads it)'], note: 'no home' };
+
+    // Port Haven, and everywhere the wreck can be placed: world.js needs three.js, so
+    // its numbers are read from the source (placeWreck: d = H.r + a + rng() * b).
+    const world = source[join(SRC, 'world.js')];
+    const haven = world.match(/add\(\{ x: 0, z: 0, r: (\d+)[^\n]*port: true/)?.[1];
+    const put = world.match(/const d = H\.r \+ (\d+) \+ rng\(\) \* (\d+);/);
+    const bound = world.match(/wreck: true,[^;]*?bound: (\d+)/s)?.[1];
+    if (!haven || !put || !bound) errors.push("world.js: can't find Port Haven's radius or where the wreck is placed (update this check)");
+    else {
+      const far = Number(haven) + Number(put[1]) + Number(put[2]) + Number(bound);
+      for (let a = 0; a < 16; a++) {
+        const x = Math.cos(a) * far, z = Math.sin(a) * far, S = Z.seaAt(x, z);
+        if (S.shallow < 1 || S.zone !== 'home' || Z.bandAt(x, z) !== 'home') { errors.push(`the wreck can lie ${far} m from Port Haven, which is not fully inside home waters`); break; }
+      }
+    }
+    const at0 = Z.seaAt(0, 0);
+    if (at0.shallow !== 1 || at0.zone !== 'home' || at0.wave !== home.wave || at0.swell !== home.swell) errors.push(`Port Haven is not in home waters: ${JSON.stringify(at0)}`);
+
+    // bands: home, then the coastal sea, then the open sea, where every landmark lies
+    const bands = [[0, 'home'], [home.outer, 'home'], [home.outer + home.fade, 'coastal'], [Z.OPEN_SEA - 1, 'coastal'], [Z.OPEN_SEA, 'open'], [6000, 'open']];
+    for (const [d, want] of bands) if (Z.bandAt(0, d) !== want || Z.bandAt(-d, 0) !== want) errors.push(`${d} m from Port Haven should be ${want}, not ${Z.bandAt(0, d)}`);
+    const plain = Z.seaAt(home.outer + home.fade + 1, 0);
+    if (plain.shallow || plain.rough || plain.zone || plain.wave !== 1 || plain.swell !== 1) errors.push(`past the fade the sea should be plain: ${JSON.stringify(plain)}`);
+    for (const [x, z] of [[5200, 2600], [-900, -6000], [-5300, 700], [2300, 5500], [-3800, -3300]]) if (Z.bandAt(x, z) !== 'open') errors.push(`the landmark at ${x}, ${z} is not in the open sea`);
+
+    // fades are wide, and nothing steps as you cross one
+    const k = [1, 1];
+    for (const R of Z.SEA_ZONES) {
+      if (R.fade < 200) errors.push(`${R.id}: a fade of ${R.fade} m is under 200 m`);
+      let last = Z.waveFactors(R.x, R.z, k)[0], worst = 0;
+      for (let d = 1; d <= R.outer + R.fade + 50; d++) { const v = Z.waveFactors(R.x + d, R.z, k)[0]; worst = Math.max(worst, Math.abs(v - last)); last = v; }
+      if (worst > 0.004) errors.push(`${R.id}: the wave factor steps by ${worst.toFixed(4)} in one metre`);
+    }
+
+    // the waves themselves: half as tall at home as the same water out on the coast
+    updateWaves(12, 1, 0.6);
+    for (const [x, z] of [[10, 20], [-300, 440], [640, -80]]) {
+      setSeaOrigin(0, 0);
+      const here = waveHeight(x, z);
+      setSeaOrigin(1e5, 0);
+      const away = waveHeight(x, z);
+      if (Math.abs(here - away * home.wave) > 1e-9 || Math.abs(away) < 1e-6) errors.push(`waveHeight at ${x}, ${z}: ${here.toFixed(3)} at home, ${away.toFixed(3)} outside; expected ${home.wave} of it`);
+    }
+    setSeaOrigin(0, 0);
+
+    // the weather's odds: no storm starts at home, and the bands rank as they should
+    const draw = (band) => { const n = { storm: 0, rain: 0, cloudy: 0 }; for (let i = 0; i < 3000; i++) n[Z.pickByBand(['storm', 'rain', 'cloudy', 'storm'], band, (i + 0.5) / 3000)]++; return n; };
+    const odds = { home: draw('home'), coastal: draw('coastal'), open: draw('open') };
+    if (odds.home.storm) errors.push('a storm can start in home waters');
+    const per = (n, type) => n[type] / n.cloudy; // against a weather no band touches
+    if (!(per(odds.open, 'storm') > per(odds.coastal, 'storm') && per(odds.home, 'rain') < per(odds.coastal, 'rain') && per(odds.coastal, 'rain') < per(odds.open, 'rain'))) errors.push(`weather odds by band are out of order: ${JSON.stringify(odds)}`);
+    if (odds.coastal.storm !== 1500 || odds.coastal.rain !== 750) errors.push("the coastal sea should leave weather.js's table as it is");
+    for (const [band, B] of Object.entries(Z.BANDS)) if (!(B.stormFor?.[0] > 0 && B.stormFor[1] > B.stormFor[0])) errors.push(`BANDS.${band}: stormFor needs a shortest and a longest storm`);
+
+    // the shaders: the waves include the zone code, with one line a zone that says what the table says
+    const glsl = Z.SEA_ZONE_GLSL;
+    if (!WAVE_GLSL.includes(glsl) || !/waveHeightK\(p, seaWaveK\(p\)\)/.test(WAVE_GLSL)) errors.push('WAVE_GLSL does not include the sea zones (SEA_ZONE_GLSL, seaWaveK)');
+    if (!glsl.includes(`uniform vec2 uSeaZone[${Z.SEA_ZONES.length}];`) || Z.ZONE_AT.length !== Z.SEA_ZONES.length * 2) errors.push('uSeaZone does not have one centre for each zone');
+    const num = '(-?[\\d.]+)';
+    const line = new RegExp(`d = distance\\(w, uSeaZone\\[(\\d+)\\]\\); k \\*= mix\\(vec2\\(1\\.0\\), vec2\\(${num}, ${num}\\), (?:smoothstep\\(${num}, ${num}, d\\) \\* )?\\(1\\.0 - smoothstep\\(${num}, ${num}, d\\)\\)\\); // (\\w+)`, 'g');
+    const rows = [...glsl.matchAll(line)];
+    if (rows.length !== Z.SEA_ZONES.length) errors.push(`the shader has ${rows.length} zone lines for ${Z.SEA_ZONES.length} zones`);
+    const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+    for (const m of rows) {
+      const [i, wave, swell, in0, in1, out0, out1] = m.slice(1, 8).map((v) => (v == null ? null : Number(v)));
+      const R = Z.SEA_ZONES[i];
+      if (!R || R.id !== m[8]) { errors.push(`shader zone line ${i} is "${m[8]}", the table says "${R?.id}"`); continue; }
+      // work the shader's line out by hand and compare it with the CPU's along a line through the zone
+      for (let d = 0; d <= R.outer + R.fade + 100; d += 25) {
+        const s = (in0 == null ? 1 : sstep(in0, in1, d)) * (1 - sstep(out0, out1, d));
+        if (Math.abs(s - Z.zoneStrength(R, d)) > 1e-6) { errors.push(`${R.id}: the shader and the CPU disagree ${d} m out (${s.toFixed(4)} and ${Z.zoneStrength(R, d).toFixed(4)})`); break; }
+      }
+      if (wave !== R.wave || swell !== R.swell || out0 !== R.outer || out1 !== R.outer + R.fade || (R.inner > 0 && (in0 !== R.inner - R.fade || in1 !== R.inner))) errors.push(`${R.id}: the shader's numbers are not the table's`);
+    }
+    const ocean = source[join(SRC, 'ocean.js')];
+    for (const need of ['seaWaveK(wp.xz)', 'seaShallowK(wp.xz)', 'clearShallows(']) if (!ocean.includes(need)) errors.push(`ocean.js no longer calls ${need}`);
+    return { errors, note: `${Z.SEA_ZONES.length} zone (${Z.SEA_ZONES.map((r) => r.id).join(', ')}), home waters to ${home.outer}-${home.outer + home.fade} m, open sea from ${Z.OPEN_SEA} m` };
+  },
+
   // How a boat rides the wave set (WAVE_DEFS in config.js): pitch and bow slams
   // by the same sums as boat/rig.js (animate) and game.js (checkBowSlam), at
   // 9 m/s on eight headings, in clear weather and in a storm (their `wave` and
   // `swell` from weather.js). A retuned sea should stay inside these limits, so
   // that sailing feels about the same and storms cost about as much hull.
+  // Each is sailed twice: out in plain sea, far from any zone (sea-zones.js),
+  // and across home waters from one side to the other, where the sea is calmer.
   async ride() {
     const errors = [];
-    const { updateWaves, waveHeight } = await load('waves.js');
+    const { updateWaves, waveHeight, setSeaOrigin } = await load('waves.js');
+    const { SEA_ZONES, seaAt } = await load('sea-zones.js');
     const damp = (a, b, l, dt) => a + (b - a) * (1 - Math.exp(-l * dt));
-    const sail = (wave, swell, heading, seconds) => {
+    const sail = (wave, swell, heading, seconds, start = 0) => {
       const dt = 1 / 60, fx = Math.sin(heading), fz = Math.cos(heading);
-      let x = 0, z = 0, t = 0, pitch = 0, last = 0, wait = 0, slams = 0, sum = 0, n = 0, crest = -Infinity;
+      let x = -fx * start, z = -fz * start, t = 0, pitch = 0, last = 0, wait = 0, slams = 0, sum = 0, n = 0, crest = -Infinity;
       for (let i = 0; i < seconds * 60; i++) {
         t += dt;
         updateWaves(t * 0.6, wave, swell); // game.js runs the sea at 0.6 of real time
@@ -462,24 +555,37 @@ const checks = {
         pitch = damp(pitch, -Math.atan2(bow - stern, 6) * 0.8, 5, dt);
         const rate = (pitch - last) / dt;
         last = pitch; wait -= dt;
-        if (wait <= 0 && pitch > 0.08 && rate > 0.11) { wait = 3.5; slams++; }
+        // (game.js only counts a slam where the swell is heavy enough: the weather's, times the zone's)
+        if (wait <= 0 && pitch > 0.08 && rate > 0.11 && (start === 0 || swell * seaAt(x, z).swell >= 0.4)) { wait = 3.5; slams++; }
         if (i > 120) { sum += pitch * pitch; n++; crest = Math.max(crest, (bow + stern) / 2); }
       }
       return { pitch: (Math.sqrt(sum / n) * 180) / Math.PI, slams: slams / (seconds / 60), crest };
     };
-    const over = (wave, swell) => {
-      const runs = Array.from({ length: 8 }, (_, h) => sail(wave, swell, (h / 8) * Math.PI * 2, 240));
+    // `start`: 0 = from the origin (of plain sea), or this far short of it, so the run crosses a zone's middle
+    const over = (wave, swell, seconds = 240, start = 0) => {
+      const runs = Array.from({ length: 8 }, (_, h) => sail(wave, swell, (h / 8) * Math.PI * 2, seconds, start));
       const mean = (k) => runs.reduce((a, r) => a + r[k], 0) / runs.length;
       return { pitch: mean('pitch'), slams: mean('slams'), crest: Math.max(...runs.map((r) => r.crest)) };
     };
+    setSeaOrigin(1e5, 0); // plain sea: today's numbers
     const clear = over(0.35, 0), storm = over(1.7, 1);
+    setSeaOrigin(0, 0);   // home waters: 220 s at 9 m/s is its full width, edge to edge
+    const reach = SEA_ZONES[0].outer - 10;
+    const homeClear = over(0.35, 0, (reach * 2) / 9, reach), homeStorm = over(1.7, 1, (reach * 2) / 9, reach);
     const want = (label, v, lo, hi, unit) => { if (!(v >= lo && v <= hi)) errors.push(`${label} is ${v.toFixed(2)}${unit}, outside ${lo}-${hi}${unit}`); };
     want('clear weather: the pitch (rms)', clear.pitch, 0.8, 2, '°');
     want('clear weather: the tallest crest', clear.crest, 0.5, 1.5, ' m');
     want('a storm: the pitch (rms)', storm.pitch, 5, 9, '°');
     want('a storm: bow slams a minute', storm.slams, 5, 11, '');
     want('a storm: the tallest crest', storm.crest, 6, 12, ' m');
-    return { errors, note: `clear: pitch ${clear.pitch.toFixed(1)}°, crests to ${clear.crest.toFixed(1)} m; storm: pitch ${storm.pitch.toFixed(1)}°, ${storm.slams.toFixed(1)} bow slams a minute, crests to ${storm.crest.toFixed(1)} m` };
+    want('home waters, clear weather: the pitch (rms)', homeClear.pitch, 0.4, 1, '°');
+    want('home waters, clear weather: the tallest crest', homeClear.crest, 0.25, 0.75, ' m');
+    want('home waters, a storm: the pitch (rms)', homeStorm.pitch, 2.5, 4.5, '°');
+    want('home waters, a storm: bow slams a minute', homeStorm.slams, 0, 5, '');
+    want('home waters, a storm: the tallest crest', homeStorm.crest, 3, 6, ' m');
+    if (!(homeStorm.pitch < storm.pitch * 0.6 && homeStorm.slams < storm.slams * 0.6)) errors.push('a storm should be much easier to ride in home waters than outside');
+    const told = (r) => `pitch ${r.pitch.toFixed(1)}°, ${r.slams.toFixed(1)} bow slams a minute, crests to ${r.crest.toFixed(1)} m`;
+    return { errors, note: `clear: pitch ${clear.pitch.toFixed(1)}°, crests to ${clear.crest.toFixed(1)} m; storm: ${told(storm)}; home waters, clear: pitch ${homeClear.pitch.toFixed(1)}°, crests to ${homeClear.crest.toFixed(1)} m; home waters, storm: ${told(homeStorm)}` };
   },
 
   // Ashore layouts validate for islands across the whole difficulty range, in
