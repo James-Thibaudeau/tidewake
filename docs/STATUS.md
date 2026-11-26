@@ -1123,7 +1123,7 @@ Updated 2026-11-26.
   code, with real tunes: the main theme, a cue for each band, the weather
   and each rough zone at sea, a theme per biome and landmark, and Sable's
   theme. A `jukebox.html` to listen to it. Four PRs, 12.1–12.4.
-  - [x] **12.1 The music engine** (PR-LINK):
+  - [x] **12.1 The music engine** ([#59](https://github.com/James-Thibaudeau/tidewake/pull/59)):
     - **A score is data.** Tunes are written in a small text notation
       (`src/music/notation.js`) in `src/music/themes.js`: the Tidewake
       theme (D major, sixteen bars) and an open-sea theme made from its
