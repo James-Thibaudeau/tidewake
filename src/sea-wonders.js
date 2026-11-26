@@ -184,7 +184,8 @@ function shard(sides, r, h, { at = [0, 0], lean = [0, 0], slant = 0, tip = 0.3, 
 }
 
 let chunkGeo = null;
-function chunkGeometry() {
+/** Loose ice: one lump, shared by the pieces an iceberg sheds and the growlers of the Reach (rough-water.js). */
+export function chunkGeometry() {
   if (chunkGeo) return chunkGeo;
   // a growler: a flat-topped lump one unit across, scaled to each piece
   chunkGeo = shard(5, 1, 0.75, { tip: 0.6, foot: -0.7, slant: 1, seed: 7 });

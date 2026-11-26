@@ -42,23 +42,72 @@ export const WAVE_DEFS = [
 // Rough water (sea-zones.js gives each zone a severity, 1-3; index 0 is plain sea).
 //   floor    the least the swell is inside, in any weather, where a full storm is 1:
 //            enough from severity 1 up for the bow to slam under a clear sky
-//   batter   hull points a second the sea takes at the zone's worst with bare poles;
-//            `sail` is how many times that under reefed and under full sail
+//   wear     what the sea takes for every kilometre sailed through a zone's worst with
+//            bare poles, as a share of the hull's full strength; `sail` is how many times
+//            that under reefed and under full sail. It goes by the metre and by the share
+//            so that it weighs the same on every ship: counted in hull points a second
+//            (as it first was) a big fast ship was through before it had lost anything.
+//            A boat that is stopped is counted as making `drift` m/s, so heaving to is
+//            no shelter
 //   keel     how much of the keel counts against it: a storm is resisted by 1 - keel,
-//            rough water by 1 - keel × this, so the best keel only halves it and the
-//            hull has to take the rest
+//            rough water by 1 - keel × this, so the best keel takes off well under
+//            two thirds and how you sail has to do the rest
 //   gold     what sunken treasure and salvage are worth at a zone's worst, against the
 //            same find in plain sea: it costs hull to reach, so it pays more
-// The damage targets these are tuned towards are in docs/feature-plan.md (Phase 9);
-// 9.3's rogue waves are meant to make up the rest.
+// The damage targets these are tuned to are in docs/feature-plan.md (Phase 9), with the
+// test pilot that measures them (tidewake.debug.cross).
 export const ROUGH = {
   floor: [0, 0.5, 0.8, 1.1],
-  batter: [0, 0.04, 0.08, 0.12],
-  sail: [1, 2.5, 9],
-  keel: 0.5,
+  wear: [0, 0.07, 0.14, 0.21],
+  sail: [1, 2.5, 4.7],
+  drift: 2,
+  keel: 0.6,
   gold: 1.5,
   warn: 0.3,   // how far into a zone (0-1) before the warning shows
 };
+
+// Rogue waves (rogue.js has the rules, rough-water.js runs them, waves.js draws the ridge).
+//   every    seconds from one to the next at a zone's worst, by severity (rarer in its fades)
+//   first    the first comes this soon after you are well in, so nobody crosses the
+//            Reach without one (in a gentler zone, as much later as its waves are rarer)
+//   from     how far into a zone (0-1) before they come at all
+//   size     how tall, and how costly, by severity (1 = the Reach's)
+//   height   the ridge's full height in metres; `front` and `back` are how far it reaches
+//            ahead of and behind its crest (the front is the steeper), and `reach` how far
+//            along the crest it is full height, and where it has tapered to nothing
+//   speed    m/s it runs at; a boat running before it is still caught, at `close` m/s,
+//            and one running along it finds the crest keeps pace (`follow`, a rate a
+//            second), so no ship is fast enough to sail out from under one
+//   rise     seconds it takes to stand up; it arrives `warn` seconds after the warning,
+//            and is gone `fade` seconds after it has passed
+//   off      it comes from between these angles off the bow (radians), on either side
+//   share    what one costs, as a share of the hull's full strength, met bow-on with
+//            reefed sails; `sail` is how many times that by sail setting (bare poles,
+//            reefed, full), `beam` taken side-on and `stern` taken from astern. `bowOn`:
+//            the sine of the angle off the bow up to which it still counts as end-on,
+//            and from which it is fully side-on. The keel counts as for the battering
+//   shove    m/s it throws the boat sideways when taken side-on under full sail, and
+//            `lurch` how far the camera rolls then (radians)
+export const ROGUE = {
+  every: [null, [70, 120], [40, 70], [20, 40]],
+  first: [10, 18],
+  from: 0.15,
+  size: [0, 0.4, 0.65, 1],
+  height: 8, front: 15, back: 26, reach: [70, 110],
+  speed: 16, close: 14, follow: 3,
+  rise: 4, warn: 4.6, fade: 3,
+  off: [0.45, 1.75],
+  share: 0.015, sail: [0.7, 1, 7.3], beam: 5, stern: 2, bowOn: [0.26, 0.87],
+  shove: 16, lurch: 0.3,
+};
+
+// Ice growlers (rogue.js, rough-water.js): loose ice adrift in one zone. The sea there
+// is cut into squares `cell` metres across; a square holds a growler `chance` of the
+// time where the zone is at its worst, none where it is weaker than `from`. Each
+// reaches `r` metres from its middle and wanders up to `drift` metres round its place,
+// once in `period` seconds. `see`: how far from the boat they are drawn; `shore`: none nearer
+// an island than this.
+export const GROWLERS = { zone: 'reach', cell: 60, chance: 0.5, from: 0.3, r: [1.8, 3.2], drift: 14, period: [90, 160], see: 380, shore: 70 };
 
 export const UPGRADES = [
   {

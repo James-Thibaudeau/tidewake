@@ -126,11 +126,13 @@ src/
   wake.js         the wake ribbons behind a boat
   explorer.js     the anime explorer character: rig, poses (helm / on foot), animation
   outfits.js      geometry for every wearable style, and the face texture
-  ocean.js        toon water shader; the shallows, gusts and cloud shadows; the clear shallows of home waters; rough water's whitecaps; the map of the world's shores
+  ocean.js        toon water shader; the shallows, gusts and cloud shadows; the clear shallows of home waters; rough water's whitecaps; a rogue wave's dark wall; the map of the world's shores
   sky.js          sky dome, sun/moon/stars, clouds, lighting
   weather.js      weather states, wind, rain, lightning, wind streaks
-  waves.js        shared CPU/GPU wave function (the wave set itself is WAVE_DEFS in config.js)
+  waves.js        shared CPU/GPU wave function (the wave set itself is WAVE_DEFS in config.js), and a rogue wave's ridge
   sea-zones.js    where the sea changes with place: home waters, rough water round the far landmarks and along the edge, the bands that weight the weather (pure)
+  rogue.js        rough water's hazards as rules: when a rogue wave comes, where from and what it costs; where the Reach's ice growlers lie (pure)
+  rough-water.js  those hazards in the game: the wave's clock, warning and strike, and the growlers you can run into
   toon.js         cel-shading gradient, rim-lit toon material, outline materials
   fx.js           post-processing (ink edges, bloom, grade, SMAA) and cascaded cel shadows
   ui.js           the UI class: HUD, banners and toasts, title, pause and wreck screens
@@ -144,6 +146,7 @@ src/
   config.js       tuning constants and upgrade catalogue
   util.js         math and noise helpers
   debug.js        console helpers for testing (tidewake.debug)
+  debug-pilot.js  the test pilot behind tidewake.debug.cross(): one crossing of a rough zone, and what it cost the hull
   gallery/        the look-dev gallery: main.js (the page: scene, cameras, lighting, window.gallery),
                   subjects.js (what it can show), presets.js (poses, lights, views), sheets.js (contact sheets)
 tools/

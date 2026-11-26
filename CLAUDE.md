@@ -25,8 +25,10 @@ that every import resolves to a real export and is used, that no helper was
 left behind when code moved between files, text keys (`LINES.x`), element
 ids, save migration, the sea zones (home waters hold Port Haven and the
 wreck; the CPU and the shaders agree, `seazones`), how the boat rides the
-wave set in plain sea and in home waters (pitch and bow slams,
-`ride`), 150 generated ashore layouts per landable biome, a test
+wave set in plain sea, in home waters and over a rogue wave (pitch and bow slams,
+`ride`), rough water's rogue waves and ice (the wave is the same on the CPU as
+in the shaders, always arrives and costs the right share of the hull, `rogue`),
+150 generated ashore layouts per landable biome, a test
 climber (the real controller) that walks 12 generated islands per biome to
 the summit, the living sea's rules (what turns up where, bounties, 3,000
 placements in a toy sea), the Elder Grove (its limits, and the climber from the beach
@@ -50,6 +52,8 @@ tidewake.debug.give({ gold: 5000, upgrades: 'max' })
 tidewake.debug.teleport('Frostspire')     // id, name or { x, z }
 tidewake.debug.sea('whale')               // a sea event now: whale | dolphins | turtles | bottle | bloom | iceberg | waterspout | ghostShip; sea() says what's out there
 tidewake.debug.zone()                     // the sea at the boat: band (home | coastal | open), zone, wave and swell factors
+tidewake.debug.rogue(50)                  // a rogue wave now, from 50° off the starboard bow (negative = port); rogue('state') says what's out there
+tidewake.debug.cross({ badly: true })     // a test pilot sails one crossing of the Reach and says what it cost the hull, and where it went
 tidewake.debug.step(30)                   // 30 s of game time in well under a second
 tidewake.debug.frame()                    // draw a frame before a screenshot
 tidewake.debug.profile()                  // what a frame draws: calls, triangles, lights, by kind
@@ -88,6 +92,7 @@ gallery.set({ light: 'sunset' })           // change some parameters, keep the r
 gallery.show({ show: 'ship', tier: 4, view: 'sail' })   // the game's own lens and distance
 gallery.set({ weather: 'storm', sea: '0' })             // any weather; the sea without its large features
 gallery.set({ zone: 'shallows' })                       // the clear home waters (default 'coastal': plain sea; 'bank': their edge)
+gallery.set({ zone: 'rough', rogue: 2 })                // rough water, with a rogue wave 2 s from the ship
 await gallery.sheet('tops-back')           // contact sheet: every top with every bag, from behind
 gallery.frame()                            // draw before a screenshot when the tab is hidden
 ```
@@ -97,12 +102,15 @@ gallery.frame()                            // draw before a screenshot when the 
   a close look at one place (`show=archway&at=keystone&view=spot`). The
   same parameters work in the URL: `gallery.html?show=ship&tier=4&light=night`.
 - **After changing how something looks, take the contact sheet that covers
-  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `sealife`, `sea`, `shallows`…, or
+  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `sealife`, `sea`, `shallows`, `rough`, `rogue`…, or
   `views` / `lights` / `distance` for the subject showing) and read every
   cell, not only the one you were fixing. A sheet takes the parameters
   already showing, so `gallery.set({ bottom: 'skirt' })` first narrows it.
 - The same URL always draws the same picture, so a screenshot before and one
-  after show only your change. Take the "before" first.
+  after show only your change. Take the "before" first. To compare a whole
+  sheet before and after, open the page on a different subject first
+  (`gallery.html?show=prop&play=0`): a sheet of the subject already showing
+  starts from however long the page has been animating.
 - `state()` and `sheet()` return `warnings` for anything not understood (an
   unknown style, a misspelt parameter). Check it is empty.
 - Sheets are big; use the screenshot zoom to read cells and labels.
@@ -117,7 +125,7 @@ which the other systems hang off:
 
 ```
 game.world  .streamer  .boat  .ocean  .env (sky)  .weather  .input  .audio  .fx
-game.ui  .creator  .story  .ashore  .quests  .rival  .refits  .reports  .seaEvents  .debug
+game.ui  .creator  .story  .ashore  .quests  .rival  .refits  .reports  .seaEvents  .rough  .debug
 game.state     everything that is saved (see below)
 game.mode      title | sailing | docking | docked | landing | ashore | wrecking | wrecked
 game.view      { scene, camera } being drawn: the sea, or the ashore level
@@ -139,7 +147,7 @@ game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, 
   called as `this.method()` wherever they live, so grep the method name to
   find it. New methods go in the part file that fits.
 - **Pure modules stay pure**: `ashore/modules.js`, `ashore/grove-layout.js`, `ashore/archway-layout.js`, `collide.js`,
-  `controller.js`, `shapes.js`, `save.js`, `config.js`, `util.js`, `sea-zones.js`, `waves.js`,
+  `controller.js`, `shapes.js`, `save.js`, `config.js`, `util.js`, `sea-zones.js`, `waves.js`, `rogue.js`,
   `cosmetics.js`, `sightings.js` and the text files import no three.js and touch no DOM at
   load, so `tools/check.mjs` can run them in Node. Keep it that way.
 - Tuning numbers live in `src/config.js`; on-foot limits are `ASHORE` there,

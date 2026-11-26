@@ -13,7 +13,7 @@ const ids = (slot) => stylesFor(slot).map((s) => s.style);
 const PORTRAIT = [250, 330], LANDSCAPE = [420, 300], SQUARE = [300, 300], SMALL = [200, 200];
 
 // A sheet of another subject keeps only how things are lit, not what was showing.
-const LIT = ['light', 'weather', 'sun', 'ink', 'waves', 'sea', 'zone', 'severity', 'fx'];
+const LIT = ['light', 'weather', 'sun', 'ink', 'waves', 'sea', 'zone', 'severity', 'rogue', 'from', 'fx'];
 function carry(base, fixed) {
   if (!fixed.show || fixed.show === (base.show || 'outfit')) return { ...base, ...fixed };
   return { ...Object.fromEntries(LIT.filter((k) => k in base).map((k) => [k, base[k]])), ...fixed };
@@ -67,6 +67,7 @@ export const SHEETS = {
   'sea-features': { about: "The sea's large features one at a time: none, the shallows, gusts, cloud shadows, all", tile: LANDSCAPE, make: grid('view', ['sail', 'high'], 'sea', ['0', 'shallows', 'gusts', 'shade', 'shallows,gusts,shade'], { show: 'ship', tier: '2', weather: 'breezy' }) },
   'sea-zones': { about: 'Every kind of sea under every light, from the helm: the plain coast, home waters and their edge, the open sea, and the three rough zones at their worst', tile: LANDSCAPE, make: rows(ZONES, 'light', Object.keys(LIGHTS), { show: 'ship', tier: '2', view: 'sail' }) },
   'rough': { about: 'Rough water in clear weather, from inside each zone and from 500 m outside it: from the helm, low over the water, a tall masthead and a gull', tile: LANDSCAPE, make: rows(ROUGH_VIEWS, 'view', ['sail', 'horizon', 'aloft', 'high'], { show: 'ship', tier: '2' }) },
+  'rogue': { about: 'A rogue wave in the Frostspire Reach, coming in off the starboard bow: 4, 3, 2 and 1 seconds out, on the ship, and a second past; from the helm, low over the water and a tall masthead', tile: LANDSCAPE, make: grid('view', ['sail', 'horizon', 'aloft'], 'rogue', ['4', '3', '2', '1', '0', '-1'], { show: 'ship', tier: '2', zone: 'rough' }) },
   'shallows': { about: 'The clear shallows of home waters under every light: from the helm, low over the water, a tall masthead and a gull', tile: LANDSCAPE, make: grid('view', ['sail', 'horizon', 'aloft', 'high'], 'light', Object.keys(LIGHTS), { show: 'ship', tier: '2', zone: 'shallows' }) },
   // ---- places
   'archway-story': { about: "Archway Isle's story places, close up", tile: LANDSCAPE, make: strip('at', ['cove', 'keystone', 'lantern', 'stack'], { show: 'archway', view: 'spot' }, 2) },

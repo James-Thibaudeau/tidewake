@@ -1,7 +1,7 @@
 // Weather state machine (clear → rain → storm …), wind, rain, lightning and
 // cartoon wind streaks. There is one weather for the whole world, but where the boat is
 // weights what comes next (sea-zones.js, BANDS): no storm starts in home waters, and
-// storms are commoner and longer in the open sea.
+// storms are commoner and longer in the open sea, and fog gathers in the Frostspire Reach.
 import * as THREE from 'three';
 import { clamp, TAU, noise2 } from './util.js';
 import { BANDS, pickByBand } from './sea-zones.js';
@@ -165,8 +165,11 @@ export class Weather {
     if (this.onThunder) this.onThunder(d);
   }
 
-  /** `band` is where the boat is: 'home', 'coastal' or 'open' (sea-zones.js, bandAt). */
-  update(dt, camera, boatPos, band = 'coastal') {
+  /**
+   * `band` is where the boat is: 'home', 'coastal' or 'open' (sea-zones.js, bandAt);
+   * `more` is what the zone it is in does to the odds, if anything (zoneWeather).
+   */
+  update(dt, camera, boatPos, band = 'coastal', more = null) {
     this.time += dt;
     this.calmTimer -= dt;
     // state transitions
@@ -174,7 +177,7 @@ export class Weather {
     // a storm blows itself out soon after you sail into home waters
     if (band === 'home' && this.type === 'storm') this.timer = Math.min(this.timer, 40);
     if (this.timer <= 0) {
-      let next = pickByBand(NEXT[this.type], band, Math.random());
+      let next = pickByBand(NEXT[this.type], band, Math.random(), more);
       // (the first minutes of a new voyage stay fair wherever you sail them)
       if (this.calmTimer > 0 && (next === 'storm' || next === 'rain')) next = 'breezy';
       this.set(next);

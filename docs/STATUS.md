@@ -630,7 +630,7 @@ Updated 2026-11-25.
     The item waits at the level's vault (on generated islands, by the summit)
     and goes back to the island if you're wrecked.
   - [ ] 4.12 Harmless obstacles (crabs, gulls)
-- [ ] **Phase 9, sea zones:** the map gets a shape you can feel at the
+- [x] **Phase 9, sea zones:** the map gets a shape you can feel at the
   helm. Three PRs, 9.1 to 9.3: see *Phase 9* in
   [feature-plan.md](feature-plan.md).
   - [x] **9.1 Home waters**
@@ -803,8 +803,149 @@ Updated 2026-11-25.
       Thorn Atoll (temperate) and Echo Cove in the Rip. The bonus is the
       same × 1.5 in every zone, though the Reach costs far more hull than
       the Outer Swell: one number a zone would fix that, if it matters.
-  - [ ] 9.3 Rogue waves and ice growlers, and tuning to the damage targets
-    (see the table under 9.2)
+  - [x] **9.3 Rogue waves and ice growlers** (branch `feature/rogue-waves`):
+    - **Rogue waves** in every rough zone (`src/rogue.js` has the rules,
+      `src/rough-water.js` runs them, the numbers are `ROGUE` in
+      `config.js`). One every 20–40 s in the Reach; every 40–70 s and
+      two thirds the size in the Rip; every 70–120 s and 0.4 the size in the
+      Outer Swell. The clock only runs in rough water, slower in a zone's
+      fades, and the first wave comes 10–18 s after you are well in, so
+      nobody crosses the Reach without meeting one.
+    - **Each is announced:** a warning that says where it is ("◀ Big wave
+      off the port bow!"), a low roar that swells for four seconds, and a
+      dark band on the sea that grows into a dark wall 8 m tall with a
+      breaking white top. It rises for 4 s and arrives 4.6 s after the
+      call. The warning follows the wave as you turn: bow-on, it reads
+      "Big wave dead ahead!".
+    - **The wave is one ridge added to `waveHeight`** (`waves.js`:
+      `rogueShape`, `rogueHeight`, `setRogueWave`, and `rogueWave()` in
+      the GLSL written from the same numbers), so the ocean, the shore foam
+      and the boat all have it, and the boat rides it like any other wave.
+      The ocean's shader darkens it and breaks its top (`ocean.js`).
+    - **What a strike costs is a share of the hull's full strength**, by
+      how it was met: 1.5% bow-on with reefed sails; × 5 taken side-on,
+      × 2 from astern; × 7.3 under full sail (× 0.7 with bare poles); less
+      the keel, as for the wear below. So bow-on and reefed is 1.5% of any
+      hull, side-on reefed 7.5%, bow-on under full sail 11%, and side-on
+      under full sail 55% of a hull with no keel (24% with the best).
+      Within 15° of the bow counts as bow-on. Taken side-on it also shoves
+      the boat the way it runs (16 m/s, about 6 m), knocks a third off her
+      speed and rolls the camera over (0.3 rad, easing back), with spray
+      and the whale's splash for a sound. "Bow-on, and over the top." /
+      "The wave caught you side-on!" / "Too much sail up for a wave like
+      that!"
+    - **It can't be sailed out from under:** a boat running before it is
+      still caught (it closes at 14 m/s whatever the boat does), and the
+      crest keeps its middle on a boat running along it. Running before it
+      costs twice what meeting it does.
+    - **The steady battering now goes by the metre sailed and as a share of
+      the hull** (`roughWear` in `sea-zones.js`, `ROUGH.wear`): 7%, 14% and
+      21% of the hull for each kilometre through a zone's worst with bare
+      poles, × 2.5 reefed, × 4.7 under full sail, less `keel × 0.6`. A
+      stopped boat counts as making 2 m/s. **Why:** rogue waves alone, as a
+      share of the hull, could not reach the targets. With 9.2's battering
+      left as it was, a wave cheap enough for the starting boat (38–51%
+      sailed well) left hull 3 at 8–12% and the best boat at 2–7%; a wave
+      dear enough to bring hull 3 to 25% (10% of the hull, bow-on) put the
+      starting boat at 75%. Hull points a second weigh on a slow small boat
+      and hardly at all on a fast big one, so the battering had to change
+      as well. For the starting boat it costs what it did (26–34% reefed
+      with the waves held off, against 9.2's 25–35%).
+    - **Ice growlers, the Reach only** (`GROWLERS` in `config.js`): about
+      450 of them, about 40 in sight at once, 3.6–6.4 m across, each wandering up
+      to 14 m round its own place. They are the loose ice of Phase 7's
+      iceberg (`chunkGeometry` in `sea-wonders.js`, drawn as two instanced
+      meshes) and striking one is the same knock (`seaEvents.bump`): 40
+      hull points at 11 m/s. Where they lie is worked out by hashing, so
+      nothing is saved and the world's `rng()` is not touched. None in the
+      calm pocket, and none within 70 m of a shore (Plover Spire lies in
+      the Reach's worst).
+    - **Fog more often in the Reach** (`weather: { fog: 3 }` on its row,
+      `zoneWeather`): fog is three times as likely to be the next weather
+      while the boat is anywhere inside the Reach's outer edge, pocket and
+      island included. Over 300,000 s of the weather machine: fog 12.1% of
+      the time there, against 5.6% in the open sea (storms 12.6% against
+      15.7%).
+    - **Also from 9.2's list:** the minimap hatches rough water you have
+      charted, like the chart; the shipwright says a word about the Reach
+      when you buy Hull 3; and journal VI's clue, which sends you to
+      Frostspire, now ends "The water round the spire never sleeps:
+      shorten sail, and turn your bow into the big waves." (It is VI's
+      clue, not chapter VII: VII is found at Frostspire, after the
+      crossing.) **Not built:** flying spray on the band, and a sound for
+      sailing in.
+    - **Tools:** `tidewake.debug.rogue(50)` sends a wave now, from 50° off
+      the starboard bow (`rogue('state')` says what is out there);
+      `tidewake.debug.cross({ badly })` is the test pilot
+      (`src/debug-pilot.js`): one crossing of the Reach or the Rip, and
+      what it cost, by cause. `debug.zone()` gives the wear in hull points
+      a kilometre. The gallery takes `rogue=<seconds before it arrives>`
+      and `from=<degrees>` for anything at sea, with a `rogue` sheet (18
+      cells). `node tools/check.mjs` has a `rogue` group (the ridge on the
+      CPU against the shader at 5,400 points; every wave reaches its boat,
+      sailing on, running before it or along it; the damage rule; the wear;
+      the ice; the fog) and `ride` gains a rogue wave met bow-on and on the
+      beam.
+    - **Measured:**
+      - One crossing of the Reach in clear weather, wind on the beam, the
+        test pilot sailing the real game in from three sides with four
+        seeds each (share of the hull lost; the plan's target in brackets):
+
+        | Boat | Sailed well: reefed, bow-on to each wave | Sailed badly: full sail, side-on |
+        | --- | --- | --- |
+        | Starting hull, no keel (100) | 37–51%, mean 44 (35–50%) | wrecked, 12 of 12, three quarters of the way in (wrecked) |
+        | Hull 3, keel 2, sails 2 (320) | 20–26%, mean 22 (20–30%) | 68–71%, mean 70 (60–80%) |
+        | Everything at its best (600) | 12.7–14.2%, mean 13 (10–15%) | 47–48%, mean 47 (35–50%) |
+
+        Every cell is inside its target but for one crossing in twelve of
+        the starting boat, at 50.7%. Where it went, on average: the
+        starting boat sailed well, 29 wear, 9 bow slams, 6 waves (3.8
+        met); hull 3 sailed well, 18 wear, 3 from waves; the best boat, 12
+        wear, 1 from waves. Sailed badly each met one wave: 55, 35 and 24 points of
+        the hull, on top of 40 (to the wreck), 34 and 23 of wear.
+      - The Rip, nine crossings a cell: the starting boat 15–20% sailed
+        well (9.2: 14%); sailed badly 59–68% when its wave strikes (eight
+        of nine), 26% when none does (9.2: 24%). Hull 3: 9–10% and 15%
+        (40% with a wave). The best boat: 5–7% and 10–11%.
+      - `ride`: a rogue wave in the Reach lifts the boat 8.0 m; met bow-on
+        it pitches her 19° (6° without it), on the beam it rolls her 13°
+        (5°). Everything else in `ride` reads as it did.
+      - A frame in the Reach on the development Mac, `main` → this branch,
+        back to back: High (2048×1536) 7.94 → 7.99 ms with 42 growlers in
+        view (four more draw calls: they cast no shadows); Low (1024×768)
+        1.37 → 1.33 ms. With a wave out, in the same view: 8.07 against
+        8.10 ms on High, 1.50 against 1.43 ms on Low.
+      - The gallery's sea sheets (`sea`, `sea-lights`, `sea-features`,
+        `shallows`, `sea-zones`, `rough`: 114 cells) match `main` cell for
+        cell, to 0.03 in 255, with no rogue wave. The world's 110 islands,
+        50 reefs and the wreck are where they were.
+      - The warning sound, rendered offline and measured, never heard: it
+        peaks at 0.15 after 3.2 s and lasts 4.3 s (the whale's splash, which
+        is the strike's sound, peaks at 0.165).
+    - **Not as planned:**
+      - The battering by the metre, above. The keel now takes off
+        `keel × 0.6` of rough water's damage, not `keel × 0.5`: with 0.5
+        the best boat sat above its targets while hull 3 sat below.
+      - The wave is 8 m tall, not just "tall": the Reach's own sea already
+        crests at 6.3 m.
+      - A side-on wave under full sail takes over half of a hull with no
+        keel in one blow. That is what the targets ask of a careless
+        crossing, and it keeps the careless cost in the thing you can see
+        coming rather than in the steady wear; it is also the number to
+        turn down first if it feels unfair (`ROGUE.sail[2]`, then raise
+        `ROUGH.sail[2]` to keep the table).
+      - The test pilot turns at once and never misjudges. It steered round
+        every growler in clear weather; in a first run, before it looked
+        for ice while turning for a wave, it struck one in about one
+        crossing in six.
+  - [ ] Only a person can do, 9.3: meet a rogue wave by hand in the
+    starting boat (is 4.6 s enough to reef and turn bow-on with the old
+    tiller? does the shove and the camera's roll feel like a blow, or like
+    a glitch?); whether half a hull for one wave taken side-on is fair;
+    listen to the warning sound and set its level (`case 'rogue'` in
+    `audio.js`); steer through the growlers in fog and at night; read the
+    new lines (port and starboard with an arrow, the shipwright, journal
+    VI's clue); frame times on a real phone.
   - [ ] Only a person can do, 9.2: sail each zone by hand (how it feels at
     the helm, whether reefing feels worth it); judge on a real screen
     whether the band reads from the deck before you reach it, the Rip and

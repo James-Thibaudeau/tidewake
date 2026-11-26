@@ -6,9 +6,11 @@
 // Home waters (sea-zones.js) are the shallows at their strongest: clear turquoise water
 // with the sand showing through (SHALLOWS_GLSL below, kept in a block of its own).
 // The zones also darken the open sea a shade, and rough water more, with whitecaps that
-// still show from outside it as a pale broken line.
+// still show from outside it as a pale broken line. A rogue wave (the ridge is waves.js)
+// is drawn as a dark wall of water with a breaking top.
 import * as THREE from 'three';
 import { WAVE_GLSL, WAVE_LOD_GLSL, NOISE_GLSL, waveUniforms } from './waves.js';
+import { ROGUE } from './config.js';
 import { clamp, smoothstep } from './util.js';
 
 /**
@@ -231,6 +233,17 @@ void main() {
   vec2 tilt;
   float hC = waveLod(pw, vSeaK, tilt) * waveK;
   vec3 n = normalize(vec3(-tilt.x * waveK, 1.0, -tilt.y * waveK));
+  // a rogue wave: its slope leans the light with the rest. rogueTop is how near its crest
+  // line this is (0 anywhere else, and always when there is none), rogueUp how far it has
+  // grown, and rogueDark the dark band it draws on the sea: there from the moment it
+  // starts to rise, so it is seen coming while it is still low
+  vec3 rogue = rogueWave(p);
+  float rogueTop = 0.0, rogueDark = 0.0, rogueUp = uRogueH * ${(1 / ROGUE.height).toFixed(6)};
+  if (rogue.x > 0.0) {
+    n = normalize(vec3(-tilt.x * waveK - rogue.y, 1.0, -tilt.y * waveK - rogue.z));
+    rogueTop = rogue.x / uRogueH;
+    rogueDark = smoothstep(0.12, 0.7, rogueTop) * smoothstep(0.0, 0.18, rogueUp);
+  }
   float amp = max(seaWave * 1.25 + seaSwell * 3.2, 0.05);
   float hn = hC / amp;
   vec3 v = normalize(cameraPosition - vWorld);
@@ -279,6 +292,8 @@ void main() {
   col = mix(col, uMid, shelf * 0.32);
   col *= 1.0 - gust * 0.28;
   glow *= (1.0 - gust * 0.7) * (1.0 - shade * 0.55);
+  // no light comes through a rogue wave: it is a dark wall
+  glow *= 1.0 - rogueDark * 0.85;
   col = mix(col, uFace, glow * 0.9);
   col = mix(col, uCrest, smoothstep(0.55, 1.0, hn) * glow * 0.6);
   // back slopes fall off into shade
@@ -286,6 +301,7 @@ void main() {
   col *= 1.0 + clamp(rel * 1.6, -0.16, 0.08);
   // the open sea is a shade darker than the coast's, and rough water darker again
   col *= 1.0 - openK * 0.1 - rough * 0.2;
+  col *= 1.0 - rogueDark * 0.5;
   // close to a shore the sand shows through: turquoise, fading with the daylight
   col = mix(col, uShallow, shoal * 0.5 * (1.0 - uLantern.w * 0.7));
   // home waters: clear water over sand (SHALLOWS_GLSL)
@@ -330,6 +346,8 @@ void main() {
   float capThr = 1.24 - smoothstep(0.3, 1.4, seaWave) * 0.42 - clamp(uWindStr - 0.8, 0.0, 0.8) * 0.08 - rough * 0.3; // fewer caps in fair weather, same in storms; rough water breaks under any sky
   float cap = smoothstep(capThr - 0.3, capThr + 0.1, hn + (capN - 0.5) * 0.55) * (1.0 - smoothstep(400.0, 900.0, dist));
   float foam = cel(field + cap * 0.2, 0.94 - A * 0.085) * detail;
+  // ...and a rogue wave's top breaks white along its crest: a ragged line, wider as it grows
+  if (rogueTop > 0.5) foam = max(foam, cel(rogueTop + (rag - 0.5) * 0.12, mix(1.03, 0.94, smoothstep(0.1, 0.9, rogueUp))) * (1.0 - smoothstep(500.0, 1100.0, dist)));
 
 #ifndef LOW_Q
   // scattered flecks trailing off the streaks
