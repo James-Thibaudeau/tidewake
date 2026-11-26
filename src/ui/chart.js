@@ -50,6 +50,8 @@ export class ChartUI {
     g.fillStyle = '#2f74d0'; g.fillRect(0, 0, Sz, Sz);
     g.strokeStyle = 'rgba(255,255,255,0.12)'; g.lineWidth = Math.max(1, Sz / 170);
     g.beginPath(); g.arc(R, R, R * 0.5, 0, TAU); g.stroke();
+    // rough water you have charted, hatched as on the chart (chart-seas.js)
+    this.drawMiniSeas(g, X, Y, k, Math.min(window.devicePixelRatio || 1, 2), bx, bz, MINI_RANGE);
 
     // fog of war cells + outside world
     const rev = game.state.revealed;

@@ -9,9 +9,10 @@
 // overwrite the save in localStorage, so start() backs the real one up first.
 // Always finish with restoreSave(): it puts the save back and reloads, and
 // without it the test voyage is saved over the real one when the tab closes.
-import { UPGRADES, SAVE_KEY, REFITS, ASHORE_BIOMES } from './config.js';
-import { SEA_ZONES, bandAt, seaAt, swellAt, roughDamage } from './sea-zones.js';
+import { UPGRADES, SAVE_KEY, REFITS, ASHORE_BIOMES, ROUGH } from './config.js';
+import { SEA_ZONES, bandAt, seaAt, swellAt, roughWear } from './sea-zones.js';
 import { SEAS } from './story-text.js';
+import { crossing, openSides } from './debug-pilot.js';
 
 const BACKUP_KEY = SAVE_KEY + '.debug-backup';
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
@@ -25,12 +26,19 @@ const HELP = `tidewake.debug
   teleport(where, off?)    where: island id, island name, or { x, z }; puts the boat in open water nearby.
                            A rough zone's id (reach | rip | swell) puts it in the worst of that zone, bow to the island
   zone()                   the sea where the boat is: band (home | coastal | open), zone, what it does to the waves,
-                           and in rough water its name, severity, swell and what it costs the hull a second
+                           and in rough water its name, severity, swell and what it costs the hull a kilometre and a second
   give({ gold, cargo, health, upgrades })   upgrades: 'max' or { sail: 3, hull: 2, … }
   journals(n, { anchor })  story: the first n journals found (0-7); anchor: true fits grandfather's anchor
   refit(tier, { open })    grandfather's anchor at refit tier 0-4 (fits the anchor too); open: biomes to
                            treat as having levels, e.g. ['rocky'], so their refit is offered (until reload)
   rival(chapter)           the rival captain: jump to a chapter (same as tidewake.rival.debug)
+  rogue(from?, { severity })  send a rogue wave at the boat now, anywhere: from = degrees off the bow it comes
+                           from (negative = port; none = picked), severity 1-3 = how big. rogue('state') =
+                           the wave out there, the clock, what the last one cost, growlers in sight
+  cross({ zone, from, badly, seed, waves })   a test pilot sails one crossing of a rough zone (reach | rip) and says
+                           what it cost: the share of the hull, and how much of it was waves, battering, bow slams
+                           and ice. badly: full sail and side-on to the waves (else reefed and bow-on); from: the
+                           side to come in from, in degrees (cross({ zone, sides: true }) lists the open ones); waves: false = none
   sea(kind?, { at })       the living sea: bring on whale | dolphins | turtles | bottle | bloom | iceberg |
                            waterspout | ghostShip now (the bloom and the ghost ship make it night first);
                            no argument = what's out there, the next roll, bounties, the log, the ghost's chain.
@@ -158,7 +166,9 @@ export function installDebug(game) {
         rough: round(s.rough, 2), severity: s.severity, roughZone: s.roughZone, name: s.roughZone ? SEAS[s.roughZone] : null,
         wave: round(s.wave, 2), swell: round(s.swell, 2), swellFloor: round(s.floor, 2),
         swellNow: round(swellAt(s, g.weather.p.swell), 2), // what the bow slams and the camera feel
-        hullPerSecond: round(roughDamage(s, g.boat.sailLevel, g.upv.keel), 3),
+        // what the sea takes here with this sail up: hull points a kilometre, and a second at this speed
+        hullPerKm: round(roughWear(s, g.boat.sailLevel, g.upv.keel) * 1000 * g.boat.maxHealth, 1),
+        hullPerSecond: round(roughWear(s, g.boat.sailLevel, g.upv.keel) * Math.max(Math.abs(g.boat.speed), ROUGH.drift) * g.boat.maxHealth, 3),
         weather: g.weather.type, weatherFor: Math.round(g.weather.timer),
       };
     },
@@ -201,6 +211,24 @@ export function installDebug(game) {
     },
 
     rival(chapter) { return g.rival.debug(chapter); },
+
+    /** A rogue wave now (rough-water.js). It needs open water all the way in. */
+    rogue(from = null, { severity = 3 } = {}) {
+      const R = g.rough;
+      if (from === 'state') return R.debugState();
+      R.clear();
+      if (!R.launch(severity, from == null ? null : (from * Math.PI) / 180)) throw new Error('No room for a rogue wave here: land in the way.');
+      api.step(1 / 60);
+      return R.debugState();
+    },
+
+    /** The test pilot (debug-pilot.js): one crossing of a rough zone, and what it cost the hull. */
+    cross(opts = {}) {
+      if (opts === 'sides') opts = { sides: true };
+      const Z = SEA_ZONES.find((r) => r.id === (opts.zone || 'reach'));
+      if (opts.sides) return openSides(g, Z).map((a) => Math.round((a * 180) / Math.PI));
+      return crossing(g, { ...opts, from: opts.from == null ? undefined : (opts.from * Math.PI) / 180, zone: Z?.id });
+    },
 
     sea(kind, { at = null } = {}) {
       const se = g.seaEvents;

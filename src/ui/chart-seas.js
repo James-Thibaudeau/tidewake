@@ -1,13 +1,16 @@
 // UI part: rough water on the sea chart. Once you have charted part of a rough zone
 // (sea-zones.js), the chart hatches what you have seen of it and writes its name there.
 // Nothing new is saved: it is drawn from the fog-of-war cells already charted.
+// The minimap draws the same hatching, paler, when rough water is in range.
 // Methods are mixed into UI (see ../ui.js), so `this` is the UI instance.
 import { MAP_RES, MAP_CELL, WORLD_HALF } from '../config.js';
-import { SEA_ZONES, seaAt } from '../sea-zones.js';
+import { SEA_ZONES, seaAt, zoneDistance } from '../sea-zones.js';
 import { SEAS } from '../story-text.js';
 
 const NAMED = 12;   // charted cells of a zone's worst water before its name is written
 const HATCH = 7;    // pixels between the hatching's lines
+// how the hatching is drawn: on the chart's pale sea, and on the minimap's darker one
+const ON_CHART = { key: 'chart', color: '#27496b', alpha: 0.8, step: 1 }, ON_MINIMAP = { key: 'mini', color: '#dbe9ff', alpha: 0.5, step: 0.8 };
 
 /** The rough water in every chart cell, worked out once: how strong, and which zone's. */
 function roughCells() {
@@ -69,11 +72,28 @@ export class SeasUI {
     }
   }
 
+  /** Is any rough water within `range` metres of (x, z)? */
+  roughNear(x, z, range) {
+    return SEA_ZONES.some((Z, i) => {
+      if (!Z.severity) return false;
+      const d = zoneDistance(i, x, z), inside = Z.inner - (Z.fadeIn ?? Z.fade);
+      return d > inside - range && (Z.edge || d < Z.outer + Z.fade + range);
+    });
+  }
+
+  /** The minimap's share: the same hatching, kept up with what has been charted (it is drawn ten times a second). */
+  drawMiniSeas(g, X, Y, z, dpr, x, z0, range) {
+    if (!this.roughNear(x, z0, range)) return;
+    this.miniSeasIn = (this.miniSeasIn || 0) - 1;
+    if (!this.seaMask || this.miniSeasIn <= 0) { this.miniSeasIn = 20; this.buildSeas(); }
+    this.drawSeaHatch(g, X, Y, z, dpr, ON_MINIMAP);
+  }
+
   /** The hatching, under the islands and the fog. X/Y project world → canvas; `z` is pixels a metre. */
-  drawSeaHatch(g, X, Y, z, dpr) {
+  drawSeaHatch(g, X, Y, z, dpr, look = ON_CHART) {
     if (!this.seaMask || !this.seaLabels) return;
     const W = g.canvas.width, H = g.canvas.height;
-    const sc = (this.seaScratch ||= document.createElement('canvas'));
+    const sc = ((this.seaScratch ||= {})[look.key] ||= document.createElement('canvas'));
     if (sc.width !== W || sc.height !== H) { sc.width = W; sc.height = H; }
     const s = sc.getContext('2d');
     s.setTransform(1, 0, 0, 1, 0, 0);
@@ -83,24 +103,24 @@ export class SeasUI {
     s.drawImage(this.seaMask, X(-WORLD_HALF), Y(-WORLD_HALF), WORLD_HALF * 2 * z, WORLD_HALF * 2 * z);
     // keep the mask's shape, fill it with slanting lines that stay put on the chart as it is dragged
     s.globalCompositeOperation = 'source-in';
-    const step = HATCH * dpr;
-    if (!this.seaHatch || this.seaHatchStep !== step) {
+    const step = HATCH * dpr * look.step, made = ((this.seaHatch ||= {})[look.key] ||= {});
+    if (made.step !== step) {
       const p = document.createElement('canvas');
       p.width = p.height = Math.round(step);
       const c = p.getContext('2d');
-      c.strokeStyle = '#27496b'; c.lineWidth = 1.3 * dpr; c.lineCap = 'square';
+      c.strokeStyle = look.color; c.lineWidth = 1.3 * dpr * look.step; c.lineCap = 'square';
       c.beginPath();
       for (const o of [-p.width, 0, p.width]) { c.moveTo(o, p.height); c.lineTo(o + p.width, 0); }
       c.stroke();
-      this.seaHatch = s.createPattern(p, 'repeat');
-      this.seaHatchStep = step;
+      made.pattern = s.createPattern(p, 'repeat');
+      made.step = step;
     }
     const period = Math.round(step), ox = ((X(0) % period) + period) % period, oy = ((Y(0) % period) + period) % period;
     s.translate(ox, oy);
-    s.fillStyle = this.seaHatch;
+    s.fillStyle = made.pattern;
     s.fillRect(-period, -period, W + period * 2, H + period * 2);
     g.save();
-    g.globalAlpha = 0.8;
+    g.globalAlpha = look.alpha;
     g.drawImage(sc, 0, 0);
     g.restore();
   }

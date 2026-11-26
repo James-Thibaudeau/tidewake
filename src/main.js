@@ -18,6 +18,7 @@ import { Story } from './story.js';
 import { Refits } from './refits.js';
 import { Reports } from './reports.js';
 import { SeaEvents } from './sea-events.js';
+import { RoughWater } from './rough-water.js';
 import { Ashore } from './ashore/ashore.js';
 import { Rival } from './rival.js';
 import { loadSettings } from './save.js';
@@ -78,6 +79,7 @@ async function boot() {
   game.refits = new Refits(game);
   game.reports = new Reports(game);
   game.seaEvents = new SeaEvents(game);
+  game.rough = new RoughWater(game);
 
   loadingText('Raising the sails…');
   await nextFrame();

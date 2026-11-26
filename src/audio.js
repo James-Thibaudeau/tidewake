@@ -468,6 +468,15 @@ export class SoundSystem {
         this.noise(t + 0.15, 1.8, { type: 'lowpass', freq: 240, vol: 0.3 * v, attack: 0.1, buf: this.brown });
         break;
       }
+      case 'rogue': {
+        // a rogue wave standing up: a low roar that swells for four seconds, with a hiss of
+        // breaking water coming in over the top of it
+        const v = Math.min(1, opts.volume ?? 1);
+        this.noise(t, 4.6, { type: 'lowpass', freq: 110, sweep: 340, vol: 0.32 * v, attack: 3.6, buf: this.brown });
+        this.noise(t + 1.2, 3.4, { type: 'bandpass', freq: 500, sweep: 1700, q: 0.7, vol: 0.1 * v, attack: 2.6 });
+        this.tone(55, t, 4.4, { type: 'sine', vol: 0.13 * v, attack: 3.4, glide: 82 });
+        break;
+      }
       case 'chirp': {
         // dolphins: a few quick rising whistles
         const v = Math.min(1, opts.volume ?? 1);

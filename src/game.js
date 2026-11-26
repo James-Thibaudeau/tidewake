@@ -1,10 +1,10 @@
 // Game rules: sailing loop, economy, discovery, treasure, docking/saving,
 // storms and shipwrecks, camera.
 import * as THREE from 'three';
-import { UPGRADES, upgradeValue, MAP_RES, MAP_CELL, WORLD_HALF, DAY_LENGTH, ROUGH, isTouch } from './config.js';
+import { UPGRADES, REFITS, upgradeValue, MAP_RES, MAP_CELL, WORLD_HALF, DAY_LENGTH, ROUGH, isTouch } from './config.js';
 import { clamp, damp, dampAngle, smoothstep, lerp, wrapAngle, bearingDeg, TAU } from './util.js';
 import { updateWaves, waveHeight } from './waves.js';
-import { bandAt, seaAt, swellAt, roughDamage, goldBonus } from './sea-zones.js';
+import { bandAt, seaAt, swellAt, roughWear, goldBonus, zoneWeather } from './sea-zones.js';
 import { ringUniforms } from './world.js';
 import { propMesh } from './props.js';
 import { pointOfSailName } from './boat.js';
@@ -44,7 +44,7 @@ export class Game {
     this.paused = false;
     this.state = this.freshState();
     this.saveData = {};
-    this.cam = { yaw: 0, pitch: 0.3, dist: 30, lastLook: -10, shake: 0, fov: 55, spyYaw: 0, spyPitch: 0 };
+    this.cam = { yaw: 0, pitch: 0.3, dist: 30, lastLook: -10, shake: 0, lurch: 0, fov: 55, spyYaw: 0, spyPitch: 0 };
     this.spyOn = false;
     this.elapsed = 0;
     this.sailEfficiency = 0;
@@ -273,6 +273,8 @@ export class Game {
     if (key === 'hull') s.health += this.boat.maxHealth - oldMax;
     this.audio.play('upgrade');
     this.ui.toast(`${U.tiers[lvl + 1].label} installed!`, 'gold');
+    // the hull that landing at Frostspire asks for comes with a word about the water round it
+    if (key === 'hull' && lvl + 1 === REFITS[REFITS.length - 1].needs.lvl) this.ui.toast(SEAS.shipwright, 'info');
     this.events.emit('upgrade', key, lvl + 1);
     this.savePortState();
     this.ui.refreshPort();
@@ -345,8 +347,9 @@ export class Game {
       this.ui.flashDamage(amount);
       this.audio.play('crash');
       this.cam.shake = Math.min(1.5, 0.3 + amount / 15);
-      this.ui.toast({ rock: 'Crunch! You struck a rock.', ice: SIGHTINGS.hitIce, spout: SIGHTINGS.hitSpout, whale: SIGHTINGS.hitWhale, breach: SIGHTINGS.hitBreach }[kind] || 'You ran aground!', 'warn');
-    } else if (Math.random() < amount * 0.6) {
+      this.ui.toast({ rock: 'Crunch! You struck a rock.', ice: SIGHTINGS.hitIce, spout: SIGHTINGS.hitSpout, whale: SIGHTINGS.hitWhale, breach: SIGHTINGS.hitBreach, rogue: SEAS.waveBeam, rogueSail: SEAS.waveSail }[kind] || 'You ran aground!', 'warn');
+    } else if (Math.random() < (kind === 'rough' ? (amount * 100) / this.boat.maxHealth : amount) * 0.6) {
+      // (rough water takes a share of the hull, so its flicker goes by the share: a big hull loses more points to the same sea)
       this.ui.flashDamage(2);
       this.cam.shake = 0.25;
     }
@@ -539,7 +542,7 @@ export class Game {
     if (s.dayT >= 1) { s.dayT -= 1; s.day++; }
     // where the boat is on the map shapes the weather to come and the swell it feels (sea-zones.js)
     this.sea = seaAt(boat.pos.x, boat.pos.z, this.sea);
-    w.update(dt, this.camera, boat.group.position, bandAt(boat.pos.x, boat.pos.z));
+    w.update(dt, this.camera, boat.group.position, bandAt(boat.pos.x, boat.pos.z), zoneWeather(boat.pos.x, boat.pos.z));
     // Run the sea a bit slower than real time: calmer, rolling swells that
     // don't drag the foam across the screen. CPU + GPU share this clock.
     // ashore, keep the swell gentle so it doesn't wash over the beach
@@ -547,6 +550,8 @@ export class Game {
     // (and of rough water's own swell, less still: an island inside it would otherwise stand
     // in a storm's surf for good. This leaves it a rainy day's sea.)
     updateWaves(this.elapsed * 0.6, w.p.wave * ashoreSea, w.p.swell * ashoreSea, ashoreSea * ashoreSea);
+    // rough water's rogue wave and loose ice (rough-water.js): the wave is part of the sea from here on
+    if (this.mode !== 'title') this.rough?.update(dt);
     const wind = { angle: w.windAngle, strength: w.windStrength };
     const up = this.upv;
 
@@ -569,8 +574,12 @@ export class Game {
         const sf = [0, 0.5, 1][boat.sailLevel];
         this.damage(storm * (0.15 + 1.4 * sf * sf) * (1 - up.keel) * dt, 'storm'); // slams add the rest
       }
-      // rough water does the same under any sky, and the keel is only half the answer to it
-      if (this.sea.rough > 0 && this.mode === 'sailing') this.damage(roughDamage(this.sea, boat.sailLevel, up.keel) * dt, 'rough');
+      // rough water does the same under any sky, by the metre sailed and as a share of the hull,
+      // so it weighs the same on every ship; the keel is only part of the answer to it
+      if (this.sea.rough > 0 && this.mode === 'sailing') {
+        const metres = Math.max(Math.hypot(boat.pos.x - px, boat.pos.z - pz), ROUGH.drift * dt);
+        this.damage(roughWear(this.sea, boat.sailLevel, up.keel) * metres * boat.maxHealth, 'rough');
+      }
       this.announceSea();
       this.updateSailingChecks(dt, acts);
     } else if (this.mode === 'docking') {
@@ -740,7 +749,8 @@ export class Game {
     // warnings
     const hf = s.health / boat.maxHealth;
     let warn = null;
-    if (boat.atEdge) warn = 'The currents of the world’s edge push you back';
+    if (this.rough?.warn) warn = this.rough.warn; // a rogue wave on its way comes before everything
+    else if (boat.atEdge) warn = 'The currents of the world’s edge push you back';
     else if (w.p.storm > 0.5 && boat.sailLevel === 2) warn = 'Storm! Lower your sails to ride it out';
     else if (w.p.storm > 0.5) warn = 'Storm: hull taking a beating';
     else if (this.sea.rough > ROUGH.warn && boat.sailLevel === 2) warn = SEAS.reef;
@@ -860,9 +870,11 @@ export class Game {
     cam.position.set(x, y, z);
     cam.lookAt(tx, ty, tz);
     if (lookUp > 0) cam.rotateX(lookUp);
-    // in heavy seas the horizon tilts a little with the hull
+    // in heavy seas the horizon tilts a little with the hull, and a rogue wave taken on the side throws it over
     const heavy = swellAt(this.sea, this.weather.p.swell);
-    if (heavy > 0.05) cam.rotateZ(-boat.roll * 0.4 * heavy);
+    const tilt = (heavy > 0.05 ? boat.roll * 0.4 * heavy : 0) + c.lurch;
+    if (tilt) cam.rotateZ(-tilt);
+    c.lurch = Math.abs(c.lurch) < 0.002 ? 0 : damp(c.lurch, 0, 1.6, dt);
     this.setFov(55, dt);
   }
 

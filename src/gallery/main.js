@@ -14,7 +14,9 @@ import * as THREE from 'three';
 import { Environment } from '../sky.js';
 import { Ocean, SEA_FEATURES } from '../ocean.js';
 import { WEATHER } from '../weather.js';
-import { updateWaves, waveHeight, setSeaOrigin } from '../waves.js';
+import { updateWaves, waveHeight, setSeaOrigin, setRogueWave } from '../waves.js';
+import { launchRogue, stepRogue } from '../rogue.js';
+import { ROGUE } from '../config.js';
 import { FX, fxFlags } from '../fx.js';
 import { toon } from '../toon.js';
 import { initProps } from '../props.js';
@@ -39,12 +41,14 @@ play=0 stops the animation, weather=<${WEATHERS.join('|')}> swaps the light's we
 waves=<0-1> calms the sea, sea=0 (or sea=${SEA_FEATURES.join(',')}) picks the sea's large features,
 zone=<${Object.keys(SEA_PLACES).join('|')}> is where on the map the sea is (shallows: the clear home waters;
 rough: the worst of rough water, offing: just outside it looking in, with severity=<${Object.keys(ROUGH_PLACES).join('|')}> for which zone),
+rogue=<seconds> is a rogue wave that many seconds before it reaches the subject (${ROGUE.warn} = just called, 0 = on it; -1 = a second
+past), coming from from=<degrees> off the bow (50, to starboard, unless said; negative = port); its size follows severity,
 fx=0 (or fx=edges,bloom) as in the game.`;
 
 const $ = (id) => document.getElementById(id);
 const rad = (deg) => ((parseFloat(deg) || 0) * Math.PI) / 180;
 // Parameters that change how a subject is seen, not what is built.
-const SEEN = new Set(['view', 'light', 'weather', 'sun', 'ink', 'play', 'waves', 'sea', 'zone', 'severity', 'sheet', 'fx']);
+const SEEN = new Set(['view', 'light', 'weather', 'sun', 'ink', 'play', 'waves', 'sea', 'zone', 'severity', 'rogue', 'from', 'sheet', 'fx']);
 const size = () => [Math.max(1, window.innerWidth), Math.max(1, window.innerHeight)]; // a hidden tab can report 0
 
 function boot() {
@@ -188,6 +192,21 @@ function boot() {
     }
   }
 
+  /**
+   * The rogue wave, if one is asked for: launched at the subject as the game launches one
+   * at the boat (rogue.js), and run on until it is `rogue` seconds short of arriving.
+   */
+  function rogueWave(seaX, seaZ) {
+    setRogueWave();
+    if (q.rogue == null) { if (q.from != null) warn(`from=${q.from} only means something with rogue=<seconds>`); return; }
+    const secs = parseFloat(q.rogue), from = q.from == null ? 50 : parseFloat(q.from);
+    if (!Number.isFinite(secs) || !Number.isFinite(from)) { warn(`rogue=${q.rogue}${q.from == null ? '' : `, from=${q.from}`}: both are numbers (seconds before it arrives, degrees off the bow)`); return; }
+    const boat = { x: seaX, z: seaZ, heading: stage.rotation.y, vx: 0, vz: 0 };
+    const W = launchRogue(boat, () => 0.5, ROUGH_PLACES[q.severity] ? Number(q.severity) : 3, rad(from));
+    for (let t = 0; t < ROGUE.warn - secs && !W.done; t += 1 / 120) stepRogue(W, 1 / 120, boat);
+    setRogueWave(W.x, W.z, W.dx, W.dz, W.h);
+  }
+
   function applyLight(name, weather) {
     let P = LIGHTS[name];
     if (!P) { warn(`light=${name} is not a light (${Object.keys(LIGHTS).join(', ')})`); P = LIGHTS.noon; }
@@ -216,6 +235,7 @@ function boot() {
     const [seaX, seaZ, seaTurn] = seaPlace(q.zone, q.severity) || seaPlace(SEA_PLACES[q.zone] ? q.zone : 'coastal');
     setSeaOrigin(seaX, seaZ);
     stage.rotation.y = rad(q.sun) + seaTurn; // (a place in rough water also says which way to face)
+    rogueWave(seaX, seaZ);
     stub.creator = q.ink === 'studio' ? { scene } : null; // fx.js thins the ink for the creator's scene
     playing = q.play !== '0' && q.phase == null;
     if (key !== builtKey || !subject) {
@@ -285,6 +305,7 @@ function boot() {
     menu('weather', WEATHERS, q.weather, (v) => set({ weather: v }));
     menu('zone', Object.keys(SEA_PLACES), q.zone, (v) => set({ zone: v }));
     if (q.zone === 'rough' || q.zone === 'offing') menu('severity', Object.keys(ROUGH_PLACES), q.severity, (v) => set({ severity: v }));
+    menu('rogue', ['4', '3', '2', '1', '0', '-1'], q.rogue, (v) => set({ rogue: v }));
     for (const [key, choices] of controlsFor(q.show)) menu(key, choices, q[key], (v) => set({ [key]: v }));
     menu('sheet', [...Object.keys(SHEETS), 'props'], '', (v) => { if (v) sheet(v); });
   }

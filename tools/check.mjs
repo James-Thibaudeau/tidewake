@@ -2,7 +2,7 @@
 // Fast checks that need no browser and no dependencies:
 //
 //   node tools/check.mjs            everything (about a second)
-//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | sea | seazones | ride | layout | climb | grove | archway
+//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | sea | seazones | rogue | ride | layout | climb | grove | archway
 //   node tools/check.mjs layout 500 layouts for 500 synthetic islands (default 150)
 //
 // Run it after every change. It catches the mistakes that otherwise only show
@@ -11,8 +11,10 @@
 // text key or element id that doesn't exist, a save that no longer migrates,
 // a sea event that could turn up in the wrong place, sea zones that leave home
 // out, put rough water over a port or a landing, or disagree between the CPU
-// and the shaders, a wave set the boat rides too hard or too gently, and an
-// ashore layout that fails its own validation.
+// and the shaders, a rogue wave that the boat and the shaders see differently,
+// that never arrives or costs the wrong share of the hull, ice outside the
+// Reach, a wave set the boat rides too hard or too gently, and an ashore
+// layout that fails its own validation.
 //
 // The source is read with regular expressions, not a parser. `imports` and
 // `names` rely on the house style: one-line `import { … } from '…';` and
@@ -279,6 +281,7 @@ const checks = {
         if (q.pose && !POSES[q.pose]) bad(`no pose "${q.pose}"`);
         if (q.zone && !SEA_PLACES[q.zone]) bad(`no sea place "${q.zone}"`);
         if (q.severity != null && !(ROUGH_PLACES[q.severity] && (q.zone === 'rough' || q.zone === 'offing'))) bad(`severity "${q.severity}" needs zone rough or offing, and a zone of that severity`);
+        if (q.rogue != null && !Number.isFinite(Number(q.rogue))) bad(`rogue "${q.rogue}" is not a number of seconds`);
         for (const slot of SLOTS) if (q[slot] && !styleInfo(slot, q[slot])) bad(`no ${slot} style "${q[slot]}"`);
       }
     }
@@ -522,7 +525,7 @@ const checks = {
     for (const key of ['rough', 'reef', 'beating']) if (!SEAS[key]) errors.push(`SEAS.${key} is missing (story-text.js)`);
     for (const R of rough) {
       const name = SEAS[R.id] || R.id;
-      if (!(ROUGH.floor[R.severity] > 0 && ROUGH.batter[R.severity] > 0)) errors.push(`${name}: severity ${R.severity} has no swell floor or battering in ROUGH (config.js)`);
+      if (!(ROUGH.floor[R.severity] > 0 && ROUGH.wear[R.severity] > 0)) errors.push(`${name}: severity ${R.severity} has no swell floor or wear in ROUGH (config.js)`);
       if (ROUGH.floor[R.severity] < 0.4) errors.push(`${name}: a swell floor of ${ROUGH.floor[R.severity]} is under the 0.4 a bow slam needs (game.js, checkBowSlam)`);
       const at = Z.seaAt(...worstOf(R));
       if (at.rough !== 1 || at.severity !== R.severity || at.roughZone !== R.id || at.zone !== R.id || Math.abs(at.floor - ROUGH.floor[R.severity]) > 1e-9) errors.push(`${name}: its worst water should be fully rough: ${JSON.stringify(at)}`);
@@ -660,6 +663,209 @@ const checks = {
     return { errors, note: `${Z.SEA_ZONES.length} zones (${Z.SEA_ZONES.map((r) => r.id).join(', ')}), home waters to ${home.outer}-${home.outer + home.fade} m, open sea from ${Z.OPEN_SEA} m, ${rough.length} rough zones clear of all ${ports.length + 1} ports; the shader and the CPU agree at ${compared} points` };
   },
 
+  // Rough water's hazards (rogue.js; the ridge is in waves.js): the rogue wave is the
+  // same on the CPU as in the shaders, comes when and from where it should, always
+  // reaches the boat, and costs a share of the hull by how it was met; the steady wear
+  // goes by the metre; the growlers lie only in the Reach, clear of its calm pocket;
+  // fog gathers there; and on paper one crossing of the Reach costs each of the plan's
+  // three boats about what the plan asks (the real table is measured in the game, by
+  // tidewake.debug.cross).
+  async rogue() {
+    const errors = [];
+    const { ROGUE, ROUGH, GROWLERS, UPGRADES } = await load('config.js');
+    const Wv = await load('waves.js');
+    const R = await load('rogue.js');
+    const Z = await load('sea-zones.js');
+    const { SEAS } = await load('story-text.js');
+    const { mulberry32 } = await load('util.js');
+    const expect = (ok, what) => { if (!ok) errors.push(what); };
+    const rng = mulberry32(930);
+    const reach = Z.SEA_ZONES.find((r) => r.id === 'reach'), rip = Z.SEA_ZONES.find((r) => r.id === 'rip');
+    const worst = [reach.x + (reach.inner + reach.outer) / 2, reach.z];
+
+    // ---- the ridge: the shader's lines, read back and run by hand, against the CPU
+    const G = Wv.WAVE_GLSL, num = '(-?[\\d.]+)';
+    const widths = G.match(new RegExp(`float w = a > 0\\.0 \\? ${num} : ${num};`));
+    const taper = G.match(new RegExp(`float h = uRogueH \\* exp\\(-a \\* a / \\(w \\* w\\)\\) \\* \\(1\\.0 - smoothstep\\(${num}, ${num}, abs\\(b\\)\\)\\);`));
+    const framed = G.includes('if (uRogueH <= 0.0) return vec3(0.0);') && G.includes('vec2 q = p + uSeaOrigin - uRogue.xy;')
+      && G.includes('float a = dot(q, uRogue.zw); float b = dot(q, vec2(-uRogue.w, uRogue.z));') && G.includes('+ hs * swellAt(k) + rogueWave(p).x;');
+    let compared = 0;
+    if (!widths || !taper || !framed) errors.push('WAVE_GLSL: the rogue wave is not written as this check reads it (rogueWave, added in waveHeightK)');
+    else {
+      const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+      const gpu = (px, pz) => {
+        const u = Wv.waveUniforms, r = u.uRogue.value, o = u.uSeaOrigin.value;
+        if (u.uRogueH.value <= 0) return 0;
+        const qx = px + o[0] - r[0], qz = pz + o[1] - r[1];
+        const a = qx * r[2] + qz * r[3], b = qx * -r[3] + qz * r[2], w = a > 0 ? +widths[1] : +widths[2];
+        return u.uRogueH.value * Math.exp((-a * a) / (w * w)) * (1 - sstep(+taper[1], +taper[2], Math.abs(b)));
+      };
+      Wv.updateWaves(7, 0.35, 0);
+      shader: for (const [ox, oz] of [[0, 0], worst, [3100, -420]]) {
+        for (let k = 0; k < 6; k++) {
+          const ang = rng() * 6.283, cx = ox + (rng() - 0.5) * 80, cz = oz + (rng() - 0.5) * 80, tall = 1 + rng() * 7;
+          Wv.setSeaOrigin(ox, oz);
+          for (let i = 0; i < 300; i++) {
+            const x = (rng() - 0.5) * 320, z = (rng() - 0.5) * 320;
+            Wv.setRogueWave();
+            const flat = Wv.waveHeight(x, z);
+            Wv.setRogueWave(cx, cz, Math.cos(ang), Math.sin(ang), tall);
+            const cpu = Wv.waveHeight(x, z) - flat, g = gpu(x, z);
+            compared++;
+            if (Math.abs(cpu - g) > 1e-6 || Math.abs(cpu - Wv.rogueHeight(x + ox, z + oz)) > 1e-9) { errors.push(`the rogue wave: the shader and the CPU disagree at ${x.toFixed(0)}, ${z.toFixed(0)} (${g.toFixed(4)} and ${cpu.toFixed(4)})`); break shader; }
+          }
+        }
+      }
+      Wv.setRogueWave(40, 0, 1, 0, ROGUE.height);
+      Wv.setSeaOrigin(0, 0);
+      expect(Math.abs(Wv.rogueHeight(40, 0) - ROGUE.height) < 1e-9 && Wv.rogueHeight(40 + ROGUE.front, 0) < Wv.rogueHeight(40 - ROGUE.front, 0), 'the ridge should be full height on its crest line, and steeper in front than behind');
+      expect(Wv.rogueHeight(40, ROGUE.reach[0] - 1) === ROGUE.height && Wv.rogueHeight(40, ROGUE.reach[1] + 1) === 0, 'the ridge should be full height along its crest to ROGUE.reach[0], and gone by ROGUE.reach[1]');
+      Wv.setRogueWave();
+      expect(Wv.rogueHeight(40, 0) === 0 && Wv.waveUniforms.uRogueH.value === 0, 'setRogueWave() with nothing should leave no wave');
+    }
+    const ocean = source[join(SRC, 'ocean.js')];
+    for (const need of ['vec3 rogue = rogueWave(p);', 'if (rogue.x > 0.0)', 'rogueDark']) if (!ocean.includes(need)) errors.push(`ocean.js no longer has ${need} (the rogue wave's look)`);
+
+    // ---- when they come
+    for (let i = 0; i < 300; i++) {
+      for (const sev of [1, 2, 3]) {
+        const t = R.rogueGap(sev, rng), first = R.rogueGap(sev, rng, true);
+        const k = ROGUE.every[sev][0] / ROGUE.every[3][0]; // a gentler zone's first wave waits as much longer as its waves are rarer
+        expect(t >= ROGUE.every[sev][0] && t <= ROGUE.every[sev][1] && first >= ROGUE.first[0] * k && first <= ROGUE.first[1] * k && first < ROGUE.every[sev][0], `severity ${sev}: a gap of ${t.toFixed(0)} s (first ${first.toFixed(0)} s) is outside ROGUE.every and ROGUE.first`);
+      }
+      if (errors.length > 10) break;
+    }
+    expect(R.rogueGap(0, rng) === Infinity && R.rogueGap(0, rng, true) === Infinity, 'plain sea should have no rogue waves');
+    expect(ROGUE.every[3][0] === 20 && ROGUE.every[3][1] === 40, 'the Reach should have a rogue wave every 20-40 s (the plan)');
+    expect(ROGUE.every[2][0] >= ROGUE.every[3][1] && ROGUE.every[1][0] >= ROGUE.every[2][1] && ROGUE.size[1] < ROGUE.size[2] && ROGUE.size[2] < ROGUE.size[3], 'rogue waves should be rarer and smaller at lower severity');
+    expect(ROGUE.first[1] < ROGUE.every[3][0] && ROGUE.rise <= ROGUE.warn && ROGUE.rise >= 3.5 && ROGUE.rise <= 4.5, 'the first wave should come sooner than the rest, and a wave should take about 4 s to rise, no longer than its warning');
+
+    // ---- where from, and that it arrives: boats of every speed, sailing on, running before it, and running along it
+    const stb = (h) => [-Math.cos(h), Math.sin(h)]; // starboard, as boat.js has it
+    for (let i = 0; i < 400 && errors.length < 10; i++) {
+      const h = rng() * 6.283, v = rng() * 30, start = { x: (rng() - 0.5) * 9000, z: (rng() - 0.5) * 9000, heading: h, vx: Math.sin(h) * v, vz: Math.cos(h) * v };
+      const W = R.launchRogue(start, rng, 3);
+      const off = Math.abs(W.rel), [sx, sz] = stb(h);
+      expect(off >= ROGUE.off[0] && off <= ROGUE.off[1], `a wave launched ${off.toFixed(2)} rad off the bow: outside ROGUE.off`);
+      expect(Math.sign(-W.dx * sx - W.dz * sz) === Math.sign(W.rel) && W.side.startsWith(W.rel > 0 ? 'starboard' : 'port'), 'a wave from a positive bearing should come from starboard, and be called so');
+      expect(Math.abs(Math.hypot(W.dx, W.dz) - 1) < 1e-9 && W.full === ROGUE.height && W.h === 0, 'a new wave should have a unit direction, the full height to grow to, and no height yet');
+      // three ways to sail once it is called
+      const ways = { on: [start.vx, start.vz], 'before it': [W.dx * 30, W.dz * 30], 'along it': [-W.dz * 30, W.dx * 30] };
+      for (const [way, [vx, vz]] of Object.entries(ways)) {
+        const w = { ...W }, b = { x: start.x, z: start.z, vx, vz };
+        let t = 0, struck = false;
+        while (!w.done && t < 40) { b.x += vx / 60; b.z += vz / 60; t += 1 / 60; if (R.stepRogue(w, 1 / 60, b)) { struck = t; break; } }
+        if (!struck) errors.push(`a boat sailing ${way} at ${Math.hypot(vx, vz).toFixed(0)} m/s was never reached by its wave`);
+        else if (way === 'on' && Math.abs(struck - ROGUE.warn) > 0.15) errors.push(`a boat sailing on was reached after ${struck.toFixed(2)} s, not the ${ROGUE.warn} s of warning`);
+        else if (struck < ROGUE.rise * 0.75 || w.hitK < 0.8 || struck > ROGUE.warn * 5) errors.push(`a boat sailing ${way} was struck after ${struck.toFixed(1)} s, ${w.hitK.toFixed(2)} squarely: it should have fair warning and be caught under the crest`);
+      }
+    }
+    // it runs out afterwards, and is never left standing
+    const still = { x: 0, z: 0, heading: 0, vx: 0, vz: 0 }, gone = R.launchRogue(still, rng, 3, 0.8);
+    let life = 0, strikes = 0, top = 0;
+    while (!gone.done && life < 60) { strikes += R.stepRogue(gone, 1 / 60, still) ? 1 : 0; top = Math.max(top, gone.h); life += 1 / 60; expect(gone.h >= 0, 'a wave below the sea'); }
+    expect(gone.done && gone.h === 0 && strikes === 1 && Math.abs(top - ROGUE.height) < 0.01 && Math.abs(life - ROGUE.warn - ROGUE.fade) < 0.2, `a wave should rise, strike once and be gone ${ROGUE.fade} s later (${life.toFixed(1)} s, ${strikes} strikes, ${top.toFixed(1)} m)`);
+    expect(R.launchRogue(still, rng, 1).full < R.launchRogue(still, rng, 3).full, 'a gentler zone should have smaller waves');
+    // the words: one for every way it can lie, and the right hand
+    for (let rel = -3.14; rel <= 3.14; rel += 0.02) {
+      const key = R.bearingKey(rel), text = SEAS.wave?.[key];
+      if (!text || (/port|starboard/.test(key) && !text.includes(rel < 0 ? 'port' : 'starboard')) || (rel < 0 ? text.includes('▶') : text.includes('◀'))) { errors.push(`SEAS.wave.${key} is missing or names the wrong side`); break; }
+    }
+    expect(R.bearingKey(0.2) === 'ahead' && R.bearingKey(-0.2) === 'ahead' && R.bearingKey(0.8) === 'starboardBow' && R.bearingKey(-1.6) === 'portBeam' && R.bearingKey(2.4) === 'starboardQuarter' && R.bearingKey(3) === 'astern', 'bearingKey names the bearings wrongly');
+    for (const key of ['waveOver', 'waveBeam', 'waveSail']) expect(SEAS[key], `SEAS.${key} is missing (story-text.js)`);
+
+    // ---- what a strike costs: a share of the hull, by how it was met
+    const wave = (rel) => { const w = R.launchRogue({ x: 0, z: 0, heading: 0, vx: 0, vz: 0 }, rng, 3, rel); w.hitK = 1; return w; };
+    const toll = (rel, sail, keel = 0) => R.rogueToll(wave(rel), 0, sail, keel);
+    const little = toll(0, 1).share, lot = toll(Math.PI / 2, 2).share;
+    expect(Math.abs(little - ROGUE.share) < 1e-12 && little <= 0.03, `met bow-on with reefed sails a wave should cost a little: ${(little * 100).toFixed(1)}% of the hull`);
+    expect(Math.abs(lot - ROGUE.share * ROGUE.beam * ROGUE.sail[2]) < 1e-12 && lot >= 0.25 && lot < 0.6, `taken side-on under full sail it should cost a lot, but not a whole hull: ${(lot * 100).toFixed(1)}%`);
+    expect(toll(Math.PI / 2, 1).share >= little * 3 && toll(0, 2).share >= little * 3, 'side-on, or under full sail, should each cost several times as much as bow-on and reefed');
+    for (const sail of [0, 1, 2]) {
+      expect(toll(0, sail).share < toll(Math.PI, sail).share && toll(Math.PI, sail).share < toll(Math.PI / 2, sail).share, `sail ${sail}: bow-on should be cheapest, then stern-on, then side-on`);
+      expect(toll(0.25, sail).share === toll(0, sail).share && toll(1.2, sail).share === toll(Math.PI / 2, sail).share, `sail ${sail}: within 15° of the bow should count as bow-on, and past 60° as side-on`);
+    }
+    for (const rel of [0, 0.7, 1.57]) expect(toll(rel, 0).share < toll(rel, 1).share && toll(rel, 1).share < toll(rel, 2).share, 'more sail should cost more');
+    const keels = UPGRADES.find((u) => u.key === 'keel').tiers.map((t) => t.value), hulls = UPGRADES.find((u) => u.key === 'hull').tiers.map((t) => t.value);
+    const bestKeel = keels[keels.length - 1];
+    expect(Math.abs(toll(1.57, 2, bestKeel).share / lot - (1 - bestKeel * ROUGH.keel)) < 1e-12 && ROUGH.keel >= 0.5 && 1 - bestKeel * ROUGH.keel >= 0.4, `the best keel should take off 1 - keel × ROUGH.keel, and leave at least 40% (it leaves ${((1 - bestKeel * ROUGH.keel) * 100).toFixed(0)}%)`);
+    expect(toll(0, 1).shove === 0 && Math.abs(toll(1.57, 2).shove - ROGUE.shove) < 1e-9 && toll(1.57, 1).shove < ROGUE.shove, 'only a wave taken on the side should shove the boat, hardest under full sail');
+    expect(toll(-1.57, 2).from === 1 && toll(1.57, 2).from === -1, 'a wave from port should say so (from = 1): the camera lurches away from it');
+    const glancing = wave(1.57); glancing.hitK = 0.5;
+    expect(Math.abs(R.rogueToll(glancing, 0, 2, 0).share - lot / 2) < 1e-12, "a wave's cost should follow how squarely it struck");
+    const small = R.launchRogue(still, rng, 1, 1.57); small.hitK = 1;
+    expect(Math.abs(R.rogueToll(small, 0, 2, 0).share - lot * ROGUE.size[1]) < 1e-12, "a smaller wave should cost by its size");
+    // its own random stream, and the storm's rule left alone
+    const run = source[join(SRC, 'rough-water.js')], rules = source[join(SRC, 'rogue.js')], game = source[join(SRC, 'game.js')];
+    expect(/this\.rng = mulberry32\(/.test(run) && !/world\.rng|\brng\(\)\s*[,;)]/.test(run.replace(/this\.rng\(\)/g, '')) && !/Math\.random|world/.test(bare(rules)), 'rogue waves must draw from a random stream of their own, never the world\'s or Math.random');
+    expect(/T\.share \* b\.maxHealth/.test(run), 'rough-water.js should cost a wave as a share of the hull (T.share * b.maxHealth)');
+    expect(game.includes("this.damage(storm * (0.15 + 1.4 * sf * sf) * (1 - up.keel) * dt, 'storm');") && game.includes("this.damage((0.8 + 2.2 * sail) * k * (1 - this.upv.keel), 'storm');"), 'a storm and its bow slams should cost what they did (game.js): resisted by 1 - keel');
+    expect(game.includes('rogue: SEAS.waveBeam, rogueSail: SEAS.waveSail') && game.includes('this.rough.warn'), 'game.js should show the wave\'s warning and tell its strikes');
+    const debug = source[join(SRC, 'debug.js')];
+    expect(debug.includes('  rogue(from?') && debug.includes('  cross({'), 'debug.help() should list rogue() and cross()');
+
+    // ---- the steady wear: by the metre sailed, a share of the hull
+    const seaAtWorst = Z.seaAt(...worst);
+    expect(Z.roughWear(Z.seaAt(2400, 300), 2, 0) === 0 && Z.roughWear(Z.seaAt(0, 0), 2, 0) === 0, 'plain sea and home waters should not wear the hull');
+    expect(Math.abs(Z.roughWear(seaAtWorst, 0, 0) * 1000 - ROUGH.wear[3]) < 1e-12, 'bare poles in the worst of the Reach should cost ROUGH.wear[3] of the hull a kilometre');
+    expect(Z.roughWear(seaAtWorst, 0, 0) < Z.roughWear(seaAtWorst, 1, 0) && Z.roughWear(seaAtWorst, 1, 0) < Z.roughWear(seaAtWorst, 2, 0), 'more sail should wear the hull faster');
+    expect(Math.abs(Z.roughWear(seaAtWorst, 1, bestKeel) / Z.roughWear(seaAtWorst, 1, 0) - (1 - bestKeel * ROUGH.keel)) < 1e-12, 'the keel should count against the wear as it does against a wave');
+    expect(game.includes('roughWear(this.sea, boat.sailLevel, up.keel) * metres * boat.maxHealth') && game.includes('ROUGH.drift * dt'), 'game.js should take the wear by the metre sailed and as a share of the hull, with a stopped boat counted as drifting');
+    // one crossing on paper: straight in through the worst, 1 m at a time
+    const paper = (zone, sail, keel) => { let lost = 0; for (let d = zone.outer + zone.fade; d > zone.inner - (zone.fadeIn ?? zone.fade); d--) lost += Z.roughWear(Z.seaAt(zone.x + d, zone.z), sail, keel); return lost * 100; };
+    const boats = { 'the starting boat': [0, 0], 'hull 3 and keel 2': [3, 2], 'the best boat': [hulls.length - 1, keels.length - 1] };
+    const told = [];
+    const bands = { 'the starting boat': [[22, 34], [100, 999]], 'hull 3 and keel 2': [[15, 27], [60, 80]], 'the best boat': [[9, 15], [35, 50]] };
+    for (const [name, [, keelTier]] of Object.entries(boats)) {
+      const keel = keels[keelTier], reefed = paper(reach, 1, keel), full = paper(reach, 2, keel);
+      // sailed well: the wear alone (bow-on waves add a few points, and bow slams on a boat with no keel);
+      // sailed badly: the wear and one wave taken side-on under full sail
+      const badly = full + toll(1.57, 2, keel).share * 100 + (keelTier === 0 ? 6 : 0);
+      const [[w0, w1], [b0, b1]] = bands[name];
+      if (!(reefed >= w0 && reefed <= w1)) errors.push(`${name}, reefed: the wear of one crossing of the Reach is ${reefed.toFixed(1)}% of the hull, outside ${w0}-${w1}% (the plan's targets, less what waves and slams add)`);
+      if (!(badly >= b0 && badly <= b1)) errors.push(`${name}, full sail and one wave side-on: ${badly.toFixed(1)}% of the hull, outside ${b0}-${b1 === 999 ? 'wrecked' : b1 + '%'}`);
+      told.push(`${name} ${reefed.toFixed(0)}% reefed, ${Math.min(badly, 100).toFixed(0)}% careless`);
+    }
+    expect(paper(rip, 1, 0) < paper(reach, 1, 0) * 0.7, 'the Rip should wear the hull less than the Reach');
+    for (const hull of hulls) expect(Math.abs((toll(1.57, 2).share * hull) / hull - lot) < 1e-12, 'a wave should take the same share of every hull');
+
+    // ---- the growlers: only in their zone, clear of its calm pocket, and not too many to draw
+    const zoneOf = Z.SEA_ZONES.find((r) => r.id === GROWLERS.zone);
+    if (!zoneOf || zoneOf.id !== 'reach') errors.push('the growlers should drift in the Frostspire Reach');
+    else {
+      const all = R.growlersNear(zoneOf.x, zoneOf.z, zoneOf.outer + zoneOf.fade + 200), sea = {}, P = {};
+      const pocket = zoneOf.inner - (zoneOf.fadeIn ?? zoneOf.fade);
+      expect(all.length > 400, `only ${all.length} growlers in the whole Reach`);
+      for (const Gr of all) {
+        Z.seaAt(Gr.x, Gr.z, sea);
+        const d = Math.hypot(Gr.x - zoneOf.x, Gr.z - zoneOf.z);
+        if (sea.roughZone !== 'reach' || sea.rough < GROWLERS.from || d - Gr.drift - Gr.r < pocket) { errors.push(`a growler at ${Gr.x.toFixed(0)}, ${Gr.z.toFixed(0)} is outside the Reach's rough water or in its calm pocket`); break; }
+        if (Gr.r < GROWLERS.r[0] || Gr.r > GROWLERS.r[1] || Gr.drift > GROWLERS.drift) { errors.push('a growler is the wrong size, or wanders too far'); break; }
+        for (const t of [0, 37, 911]) { R.growlerAt(Gr, t, P); if (Math.hypot(P.x - Gr.x, P.z - Gr.z) > Gr.drift * 1.4143) { errors.push('a growler strays from its place'); break; } }
+      }
+      expect(JSON.stringify(R.growlersNear(...worst, 300).map((g) => g.id).sort()) === JSON.stringify(R.growlersNear(...worst, 300).map((g) => g.id).sort()), 'the ice should lie in the same places every time');
+      const maxIce = Number(run.match(/const MAX_ICE = (\d+);/)?.[1]);
+      let most = 0;
+      for (let a = 0; a < 24; a++) for (const d of [700, 900, 1100, 1300]) most = Math.max(most, R.growlersNear(zoneOf.x + Math.cos(a * 0.26) * d, zoneOf.z + Math.sin(a * 0.26) * d).length);
+      expect(most <= maxIce && most >= 20, `${most} growlers within sight at the thickest: rough-water.js draws up to ${maxIce}, and there should be an ice field to see`);
+      // thick enough to matter, thin enough to steer through: about one in the way every 150 m of a careless straight line
+      const per = (R.growlersNear(...worst, 250).length / (Math.PI * 250 * 250)) * 1e6;
+      expect(per > 60 && per < 220, `${per.toFixed(0)} growlers a square kilometre in the worst of the Reach (expected 60-220)`);
+      for (const [x, z, where] of [[0, 0, 'Port Haven'], [rip.x + 900, rip.z, 'the Cinder Rip'], [2400, 300, 'the coast'], [zoneOf.x, zoneOf.z, 'Frostspire itself']]) expect(R.growlersNear(x, z, 400).length === 0, `growlers off ${where}`);
+      expect(/chunkGeometry\(\)/.test(run) && /export function chunkGeometry/.test(source[join(SRC, 'sea-wonders.js')]) && /bump\(P\.x, P\.z, G\.r \* 0\.95, 'ice'\)/.test(run) && /clearOfShore/.test(run), "rough-water.js should draw the growlers with the iceberg's loose ice, strike them through the director's bump(), and keep them off the shores");
+      told.push(`${all.length} growlers, at most ${most} in sight`);
+    }
+
+    // ---- fog gathers in the Reach: out to its edge and in to the island, and nowhere else
+    const fog = Z.zoneWeather(...worst)?.fog;
+    expect(fog > 1 && Z.zoneWeather(reach.x, reach.z)?.fog === fog && Z.zoneWeather(reach.x + reach.inner - 300, reach.z)?.fog === fog, 'fog should be likelier all through the Reach, its calm pocket and the island included');
+    expect(Z.zoneWeather(reach.x + reach.outer + reach.fade, reach.z) === null && Z.zoneWeather(0, 0) === null && Z.zoneWeather(rip.x + 900, rip.z) === null, 'only the Reach should change the weather\'s odds');
+    const draws = (more) => { let n = 0; for (let i = 0; i < 7000; i++) if (Z.pickByBand(['breezy', 'cloudy', 'fog', 'clear', 'breezy'], 'open', (i + 0.5) / 7000, more) === 'fog') n++; return n / 7000; };
+    expect(Math.abs(draws(null) - 0.2) < 1e-3 && Math.abs(draws({ fog }) - fog / (4 + fog)) < 1e-3, 'after clear weather fog should come one time in five in the open sea, and by its weight in the Reach');
+    expect(/pickByBand\(NEXT\[this\.type\], band, Math\.random\(\), more\)/.test(source[join(SRC, 'weather.js')]) && /zoneWeather\(boat\.pos\.x, boat\.pos\.z\)/.test(game), 'weather.js should weight the next weather by the zone the boat is in');
+    return { errors, note: `the ridge on the shader and the CPU agree at ${compared} points; a wave costs ${(little * 100).toFixed(1)}% of the hull bow-on and reefed, ${(lot * 100).toFixed(0)}% side-on under full sail; one crossing of the Reach on paper: ${told.join('; ')}; fog × ${fog} in the Reach` };
+  },
+
   // How a boat rides the wave set (WAVE_DEFS in config.js): pitch and bow slams
   // by the same sums as boat/rig.js (animate) and game.js (checkBowSlam), at
   // 9 m/s on eight headings, in clear weather and in a storm (their `wave` and
@@ -669,10 +875,13 @@ const checks = {
   // and across home waters from one side to the other, where the sea is calmer.
   // Then through the worst of each rough zone under a clear sky, where the
   // swell's floor should make a sea of its own, and the roughest in a storm.
+  // No rogue wave is out in any of those, so they stay as they were; one is then
+  // met in the Reach, bow-on and on the beam.
   async ride() {
     const errors = [];
-    const { updateWaves, waveHeight, setSeaOrigin } = await load('waves.js');
+    const { updateWaves, waveHeight, setSeaOrigin, setRogueWave, rogueHeight, waveUniforms } = await load('waves.js');
     const { SEA_ZONES, seaAt, swellAt } = await load('sea-zones.js');
+    setRogueWave(); // none, for everything up to the rogue wave's own case
     const damp = (a, b, l, dt) => a + (b - a) * (1 - Math.exp(-l * dt));
     let origin = [1e5, 0], plain = true; // where on the map a run's (0, 0) is, and whether that is plain sea
     const sea = {};
@@ -712,8 +921,45 @@ const checks = {
       rough[R.id] = over(0.35, 0, 40, 180);
       if (R.severity === 3) rough.storm = over(1.7, 1, 40, 180);
     }
+    // a rogue wave (rogue.js) in the worst of the Reach under a clear sky, at 9 m/s: met
+    // bow-on the boat climbs it and pitches hard; taken on the beam it rolls her instead.
+    // The same 12 s are sailed without one, to see what the wave alone adds.
+    const { ROGUE } = await load('config.js');
+    const { launchRogue, stepRogue } = await load('rogue.js');
+    const reachZ = SEA_ZONES.find((r) => r.severity === 3);
+    const meet = (rel) => {
+      place(reachZ.x + (reachZ.inner + reachZ.outer) / 2, reachZ.z);
+      const dt = 1 / 60, boat = { x: 0, z: 0, heading: 0, vx: 0, vz: 9 };
+      const out = { pitch: 0, roll: 0, lift: 0, calmPitch: 0, calmRoll: 0 };
+      for (const withWave of [false, true]) {
+        const Wv = withWave ? launchRogue({ ...boat, x: origin[0], z: origin[1] }, () => 0.5, 3, rel) : null;
+        let z = 0, pitch = 0, roll = 0;
+        for (let i = 0; i < 12 * 60; i++) {
+          updateWaves(i * dt * 0.6, 0.35, 0);
+          z += 9 * dt;
+          if (Wv) { stepRogue(Wv, dt, { x: origin[0], z: origin[1] + z, vx: 0, vz: 9 }); setRogueWave(Wv.x, Wv.z, Wv.dx, Wv.dz, Wv.h); }
+          // the same sums as boat/rig.js (animate): starboard is -x when the bow points along +z
+          const bow = waveHeight(0, z + 3), stern = waveHeight(0, z - 3), port = waveHeight(1.4, z), star = waveHeight(-1.4, z);
+          pitch = damp(pitch, -Math.atan2(bow - stern, 6) * 0.8, 5, dt);
+          roll = damp(roll, Math.atan2(port - star, 2.8) * 0.7, 5, dt);
+          const key = withWave ? ['pitch', 'roll'] : ['calmPitch', 'calmRoll'];
+          out[key[0]] = Math.max(out[key[0]], Math.abs(pitch)); out[key[1]] = Math.max(out[key[1]], Math.abs(roll));
+          if (Wv) out.lift = Math.max(out.lift, rogueHeight(origin[0], origin[1] + z));
+        }
+        setRogueWave();
+      }
+      for (const k of ['pitch', 'roll', 'calmPitch', 'calmRoll']) out[k] = (out[k] * 180) / Math.PI;
+      return out;
+    };
+    const bowOn = meet(0), beamOn = meet(Math.PI / 2);
     setSeaOrigin(0, 0);
     const want = (label, v, lo, hi, unit) => { if (!(v >= lo && v <= hi)) errors.push(`${label} is ${v.toFixed(2)}${unit}, outside ${lo}-${hi}${unit}`); };
+    if (waveUniforms.uRogueH.value !== 0) errors.push('a rogue wave was left standing after the ride');
+    want('a rogue wave met bow-on: the steepest pitch', bowOn.pitch, 14, 30, '°');
+    want('a rogue wave met bow-on: how high it lifts the boat', bowOn.lift, ROGUE.height * 0.9, ROGUE.height * 1.001, ' m');
+    want('a rogue wave taken on the beam: the steepest roll', beamOn.roll, 10, 32, '°');
+    if (!(bowOn.pitch > bowOn.calmPitch * 1.4 && beamOn.roll > beamOn.calmRoll * 1.6)) errors.push(`a rogue wave should throw the boat about more than the Reach's own sea does (pitch ${bowOn.pitch.toFixed(1)}° against ${bowOn.calmPitch.toFixed(1)}°, roll ${beamOn.roll.toFixed(1)}° against ${beamOn.calmRoll.toFixed(1)}°)`);
+    if (!(beamOn.roll > bowOn.roll * 1.5 && bowOn.pitch > beamOn.pitch)) errors.push('met bow-on a rogue wave should pitch the boat, taken on the beam it should roll her');
     want('clear weather: the pitch (rms)', clear.pitch, 0.8, 2, '°');
     want('clear weather: the tallest crest', clear.crest, 0.5, 1.5, ' m');
     want('a storm: the pitch (rms)', storm.pitch, 5, 9, '°');
@@ -738,7 +984,7 @@ const checks = {
     if (rough.storm && !(rough.storm.pitch > storm.pitch && rough.storm.slams > storm.slams)) errors.push('a storm in the roughest zone should be the worst water there is');
     const told = (r) => `pitch ${r.pitch.toFixed(1)}°, ${r.slams.toFixed(1)} bow slams a minute, crests to ${r.crest.toFixed(1)} m`;
     const roughTold = Object.entries(rough).map(([id, r]) => `${id === 'storm' ? 'the roughest in a storm' : id}: ${told(r)}`).join('; ');
-    return { errors, note: `clear: pitch ${clear.pitch.toFixed(1)}°, crests to ${clear.crest.toFixed(1)} m; storm: ${told(storm)}; home waters, clear: pitch ${homeClear.pitch.toFixed(1)}°, crests to ${homeClear.crest.toFixed(1)} m; home waters, storm: ${told(homeStorm)}; rough water, clear: ${roughTold}` };
+    return { errors, note: `clear: pitch ${clear.pitch.toFixed(1)}°, crests to ${clear.crest.toFixed(1)} m; storm: ${told(storm)}; home waters, clear: pitch ${homeClear.pitch.toFixed(1)}°, crests to ${homeClear.crest.toFixed(1)} m; home waters, storm: ${told(homeStorm)}; rough water, clear: ${roughTold}; a rogue wave in the Reach: bow-on it lifts the boat ${bowOn.lift.toFixed(1)} m and pitches her ${bowOn.pitch.toFixed(0)}° (${bowOn.calmPitch.toFixed(0)}° without it), on the beam it rolls her ${beamOn.roll.toFixed(0)}° (${beamOn.calmRoll.toFixed(0)}°)` };
   },
 
   // Ashore layouts validate for islands across the whole difficulty range, in

@@ -89,7 +89,7 @@ export const JOURNALS = [
       "The letter caught up with me three months later. I read it on this very ridge. I remember thinking: I'll be home before the little one can walk.\n\n" +
       "I was wrong about that.\n\n" +
       "Still counting",
-    clue: "There is one place left I have never been: an icy spire at the far north, the very top of the chart. The seas up there are rough, so a sturdier hull and a heavier keel would be wise.",
+    clue: "There is one place left I have never been: an icy spire at the far north, the very top of the chart. The seas up there are rough, so a sturdier hull and a heavier keel would be wise. The water round the spire never sleeps: shorten sail, and turn your bow into the big waves.",
   },
   {
     id: 'VII',
@@ -184,6 +184,19 @@ export const SEAS = {
   reef: 'Rough water: reef your sails',
   beating: 'Rough water: hull taking a beating',
   haul: 'Hauled out of rough water!',
+  // a rogue wave (rough-water.js): the warning says where it is, by bearingKey() in
+  // rogue.js, and changes as you turn; then what came of meeting it
+  wave: {
+    ahead: 'Big wave dead ahead!', astern: 'Big wave astern!',
+    portBow: '◀ Big wave off the port bow!', starboardBow: 'Big wave off the starboard bow! ▶',
+    portBeam: '◀ Big wave on the port beam!', starboardBeam: 'Big wave on the starboard beam! ▶',
+    portQuarter: '◀ Big wave on the port quarter!', starboardQuarter: 'Big wave on the starboard quarter! ▶',
+  },
+  // the shipwright, on fitting the hull that landing at Frostspire asks for
+  shipwright: 'The shipwright: “That hull will stand the Frostspire Reach. Reef your sails up there, and take the big waves bow-on.”',
+  waveOver: 'Bow-on, and over the top.',
+  waveBeam: 'The wave caught you side-on!',
+  waveSail: 'Too much sail up for a wave like that!',
 };
 
 // Report quests (reports.js): you see something at sea, and somebody ashore

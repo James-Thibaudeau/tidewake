@@ -7,7 +7,8 @@
 //   zones   patches of sea with waves of their own (SEA_ZONES). Home waters are clear,
 //           shallow and half as rough. Rough water is the opposite: a ring round each of
 //           the two hardest landmarks to reach, and a band along the world's edge, where
-//           the swell runs high under any sky (the least it can be is ROUGH.floor).
+//           the swell runs high under any sky (the least it can be is ROUGH.floor)
+//           and the sea wears at the hull for every metre sailed (roughWear).
 //
 // The waves ask here on the CPU (waveFactors, from waves.js) and on the GPU
 // (SEA_ZONE_GLSL, written out from the same table), so the boat sits on the water
@@ -31,6 +32,8 @@ import { ROUGH, WORLD_HALF } from './config.js';
 //                 world's centre along the further axis, so `inner` is where the band is
 //                 full. An edge band gives way inside the calm pocket of a ring listed
 //                 before it, so edge rows go last
+//   weather       how much likelier a weather is to come next while the boat is anywhere
+//                 inside the zone's outer edge, its calm pocket included (zoneWeather)
 // A rough ring's hole is its calm pocket: it holds the whole island and the water you
 // land from. The Reach is worst 900 m out and rough from 600 m to 1,500 m; the Rip from
 // 600 m to 1,200 m. The Outer Swell fills in over the 200 m before `inner` and is full
@@ -38,7 +41,7 @@ import { ROUGH, WORLD_HALF } from './config.js';
 // 100 m further out than first planned, to stay clear of Windrest.
 export const SEA_ZONES = [
   { id: 'home', x: 0, z: 0, inner: 0, outer: 1000, fade: 400, wave: 0.5, swell: 0.5, shallow: 1, severity: 0 },
-  { id: 'reach', landmark: 'frost', x: -900, z: -6000, inner: 850, fadeIn: 250, outer: 950, fade: 550, wave: 1.25, swell: 1, severity: 3 },
+  { id: 'reach', landmark: 'frost', x: -900, z: -6000, inner: 850, fadeIn: 250, outer: 950, fade: 550, wave: 1.25, swell: 1, severity: 3, weather: { fog: 3 } },
   { id: 'rip', landmark: 'volcano', x: 5200, z: 2600, inner: 850, fadeIn: 250, outer: 950, fade: 250, wave: 1.5, swell: 1, severity: 2 },
   { id: 'swell', edge: true, x: 0, z: 0, inner: WORLD_HALF - 550, fadeIn: 200, outer: WORLD_HALF + 200, fade: 200, wave: 1, swell: 1, severity: 1 },
 ];
@@ -154,12 +157,13 @@ export function seaAt(x, z, out = {}) {
 export const swellAt = (sea, weatherSwell) => Math.max(weatherSwell * sea.swell, sea.floor);
 
 /**
- * Hull points a second that rough water takes: `sea` from seaAt, `sailLevel` 0-2 (less
- * with the sails reefed), `keel` the keel's resistance (0-1), of which only part counts.
+ * What rough water takes for each metre sailed, as a share of the hull's full strength:
+ * `sea` from seaAt, `sailLevel` 0-2 (less with the sails reefed), `keel` the keel's
+ * resistance (0-1), of which only part counts.
  */
-export function roughDamage(sea, sailLevel, keel) {
+export function roughWear(sea, sailLevel, keel) {
   if (!sea.severity) return 0;
-  return ROUGH.batter[sea.severity] * sea.rough * ROUGH.sail[sailLevel] * (1 - keel * ROUGH.keel);
+  return (ROUGH.wear[sea.severity] / 1000) * sea.rough * ROUGH.sail[sailLevel] * (1 - keel * ROUGH.keel);
 }
 
 const goldSea = {};
@@ -179,12 +183,26 @@ export function bandAt(x, z) {
 }
 
 /**
- * The next weather, from a list of choices (a weather may be listed twice to make it
- * likelier), weighted by the band the boat is in. `rnd` is a random number in 0-1.
+ * What the zone round a point does to the weather's odds: the `weather` of the first zone
+ * whose outer edge (the middle of its fade) holds the point, or null. The Frostspire
+ * Reach breeds fog, out to its edge and in to the island itself.
  */
-export function pickByBand(options, band, rnd) {
+export function zoneWeather(x, z) {
+  for (let i = 0; i < SEA_ZONES.length; i++) {
+    const Z = SEA_ZONES[i];
+    if (Z.weather && !Z.edge && zoneDistance(i, x, z) < Z.outer + Z.fade / 2) return Z.weather;
+  }
+  return null;
+}
+
+/**
+ * The next weather, from a list of choices (a weather may be listed twice to make it
+ * likelier), weighted by the band the boat is in and, if it is in a zone with weather of
+ * its own, by that too (`more`, from zoneWeather). `rnd` is a random number in 0-1.
+ */
+export function pickByBand(options, band, rnd, more = null) {
   const B = BANDS[band] || BANDS.coastal;
-  const weight = (type) => B[type] ?? 1;
+  const weight = (type) => (B[type] ?? 1) * (more?.[type] ?? 1);
   let total = 0;
   for (const o of options) total += weight(o);
   if (!(total > 0)) return options[0];

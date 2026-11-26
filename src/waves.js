@@ -3,8 +3,11 @@
 // How big they are changes with place as well as weather: sea-zones.js says by how
 // much at each point (half as big in home waters, and a swell that never drops below a
 // floor in rough water), to the CPU and the GPU alike.
-import { WAVE_DEFS } from './config.js';
-import { TAU } from './util.js';
+// A rogue wave (rogue.js) is one more thing added to the sum: a single tall ridge that
+// runs across the sea, written out for the CPU and the GPU from the same numbers
+// (ROGUE in config.js), so a boat rides it like any other wave.
+import { WAVE_DEFS, ROGUE } from './config.js';
+import { TAU, smoothstep } from './util.js';
 import { SEA_ZONE_GLSL, ZONE_AT, waveFactors } from './sea-zones.js';
 
 // Long, tall storm swells: only present when uSwellScale > 0 (rain/storms).
@@ -31,6 +34,8 @@ export const waveUniforms = {
   uSeaOrigin: { value: new Float32Array(2) }, // where the drawn space's origin is in the world (setSeaOrigin)
   uSeaZone: { value: ZONE_AT },               // the sea zones' centres (sea-zones.js)
   uSeaFloor: { value: 1 },                    // how much of rough water's swell floor is let through (updateWaves)
+  uRogue: { value: new Float32Array([0, 0, 1, 0]) }, // a rogue wave's crest (setRogueWave): its middle on the map (x, z) and the way it runs (x, z)
+  uRogueH: { value: 0 },                      // its height now, in metres; 0 = there is none
 };
 
 /**
@@ -59,6 +64,34 @@ export function updateWaves(time, scale, swell = 0, floor = 1) {
   waveUniforms.uTime.value = time % 3600;
 }
 
+/**
+ * The rogue wave, if there is one: the middle of its crest on the map, the way it runs
+ * (a unit vector) and how tall it stands now, in metres. No arguments = there is none.
+ */
+export function setRogueWave(x = 0, z = 0, dx = 1, dz = 0, height = 0) {
+  const r = waveUniforms.uRogue.value;
+  r[0] = x; r[1] = z; r[2] = dx; r[3] = dz;
+  waveUniforms.uRogueH.value = height;
+}
+
+/**
+ * A rogue wave's shape: its height, as a share of its full height, `a` metres ahead of
+ * its crest line (behind it if negative) and `b` metres along the crest from its middle.
+ * The face it runs behind is the steeper; along the crest it tapers to nothing.
+ */
+export function rogueShape(a, b) {
+  const e = a / (a > 0 ? ROGUE.front : ROGUE.back);
+  return Math.exp(-e * e) * (1 - smoothstep(ROGUE.reach[0], ROGUE.reach[1], Math.abs(b)));
+}
+
+/** How high the rogue wave stands at a point on the map, in metres (0 if there is none). */
+export function rogueHeight(wx, wz) {
+  const h = waveUniforms.uRogueH.value;
+  if (!(h > 0)) return 0;
+  const r = waveUniforms.uRogue.value, qx = wx - r[0], qz = wz - r[1];
+  return h * rogueShape(qx * r[2] + qz * r[3], qz * r[2] - qx * r[3]);
+}
+
 const zoneK = [1, 1, 0];
 export function waveHeight(x, z) {
   const ph = waveUniforms.uWavePhase.value, o = waveUniforms.uSeaOrigin.value;
@@ -70,7 +103,8 @@ export function waveHeight(x, z) {
     if (w.swell) hs += v; else h += v;
   }
   waveFactors(x + o[0], z + o[1], zoneK);
-  return h * waveUniforms.uWaveScale.value * zoneK[0] + hs * Math.max(waveUniforms.uSwellScale.value * zoneK[1], zoneK[2] * waveUniforms.uSeaFloor.value);
+  return h * waveUniforms.uWaveScale.value * zoneK[0] + hs * Math.max(waveUniforms.uSwellScale.value * zoneK[1], zoneK[2] * waveUniforms.uSeaFloor.value)
+    + rogueHeight(x + o[0], z + o[1]);
 }
 
 const f = (v) => v.toFixed(6);
@@ -84,10 +118,22 @@ ${SEA_ZONE_GLSL}
 // waves more than once works it out once (a vertex, a pixel) and passes it in.
 // The swell there: the weather's, as the zones scale it, or rough water's floor if that is more.
 float swellAt(vec3 k) { return max(uSwellScale * k.y, k.z); }
+// The rogue wave at p, if there is one (uRogueH > 0). x: how high it stands there, in
+// metres; yz: its slope there, for the colouring. As rogueShape() above.
+uniform vec4 uRogue;
+uniform float uRogueH;
+vec3 rogueWave(vec2 p) {
+  if (uRogueH <= 0.0) return vec3(0.0);
+  vec2 q = p + uSeaOrigin - uRogue.xy;
+  float a = dot(q, uRogue.zw); float b = dot(q, vec2(-uRogue.w, uRogue.z));
+  float w = a > 0.0 ? ${f(ROGUE.front)} : ${f(ROGUE.back)};
+  float h = uRogueH * exp(-a * a / (w * w)) * (1.0 - smoothstep(${f(ROGUE.reach[0])}, ${f(ROGUE.reach[1])}, abs(b)));
+  return vec3(h, uRogue.zw * (-2.0 * a * h / (w * w)));
+}
 float waveHeightK(vec2 p, vec3 k) {
   float h = 0.0; float hs = 0.0; float s;
 ${WAVES.map((w, i) => `  s = (sin(dot(p, vec2(${f(w.dx * w.k)}, ${f(w.dz * w.k)})) + uWavePhase[${i}]) + 1.0) * 0.5; ${w.swell ? 'hs' : 'h'} += ${f(w.a)} * (2.0 * s * s - 0.75);`).join('\n')}
-  return h * uWaveScale * k.x + hs * swellAt(k);
+  return h * uWaveScale * k.x + hs * swellAt(k) + rogueWave(p).x;
 }
 float waveHeight(vec2 p) { return waveHeightK(p, seaWaveK(p)); }
 `;

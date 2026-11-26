@@ -363,6 +363,13 @@ in shows the name like a discovery: *"The Frostspire Reach"*.
   a max keel only halves it and the hull's strength does the rest. That is
   what keeps it treacherous for a maxed ship. The hull becomes the rough
   water stat; the keel stays the storm stat.
+  (As built in 9.3: the battering goes by the metre sailed and as a share of
+  the hull, 21% of it for each kilometre through the Reach's worst with bare
+  poles, and the keel takes off `keel × 0.6`. Counted in hull points a second
+  it weighed on a slow small boat and hardly at all on a fast big one, and
+  the targets below could not be reached. So a bigger hull no longer buys a
+  smaller share: it buys more points to lose, and the keel and how you sail
+  decide the share.)
 - **Rogue waves** (9.3): one every 20–40 s in the Reach, rarer at lower
   severity. Each is announced: a warning (*"Big wave off the port bow!"*), a
   sound, and a tall dark crest rising for about 4 s before it arrives. Meet
@@ -370,9 +377,18 @@ in shows the name like a discovery: *"The Frostspire Reach"*.
   under full sail and it costs a lot, shoves you sideways and rolls the
   camera. This is where skill beats upgrades. The wave is one moving ridge
   added to `waveHeight`, so the boat rides it like any other wave.
+  (As built: a strike costs a share of the hull, 1.5% bow-on and reefed, 55%
+  side-on under full sail with no keel. The first comes 10–18 s after you
+  are well in. A wave can't be outrun: it closes on a boat running before
+  it, which costs twice what meeting it does, and keeps its crest on a boat
+  running along it. The warning follows the wave as you turn. The Rip and
+  the Outer Swell have them too, rarer and smaller. `ROGUE` in `config.js`.)
 - **Ice growlers** (9.3, the Reach only): small chunks of floating ice
   drifting in the band. Hitting one is a rock strike (the existing collision
   damage). Easy to steer round in clear weather, hard in fog.
+  (As built: Phase 7's loose ice, about 40 in sight, placed by hashing so
+  nothing is saved; none in the calm pocket or within 70 m of a shore. Fog
+  is three times as likely to come next while you are in the Reach.)
 - **Warnings:** *"Rough water: reef your sails"* under full sail, *"Rough
   water: hull taking a beating"* otherwise.
 - **Wrecking** there works as anywhere else: back to your last port, cargo
@@ -395,6 +411,11 @@ the time, so the two bigger boats cannot reach their rows by tuning it.
 9.3's rogue waves need to cost a share of the hull, or the battering needs
 to go by the metre sailed. The numbers are `ROUGH` in `config.js`; the full
 table is under 9.2 in [STATUS.md](STATUS.md).)
+
+(As measured in 9.3, which did both: 37–51% and wrecked for the starting
+hull, 20–26% and 68–71% for hull 3 and keel 2, 13–14% and 47–48% for the
+best of everything. The test pilot is `tidewake.debug.cross()`; the table
+and where each share went are under 9.3 in [STATUS.md](STATUS.md).)
 
 So a starting boat can get in, chart Frostspire and get out again only with
 no mistakes and no storm. A maxed boat gets through comfortably if sailed
@@ -461,7 +482,9 @@ well, but a careless run still costs half the hull.
 - **`tidewake.debug.zone()`** reports the band, the zone and the factors at
   the boat (built in 9.1; `debug.sea()` is Phase 7's, for spawning sea
   events). `debug.teleport('Frostspire')` and `debug.weather('storm')`
-  already exist.
+  already exist. `debug.rogue()` sends a rogue wave now and `debug.cross()`
+  is the test pilot (built in 9.3, with the `rogue` group in
+  `tools/check.mjs` and the gallery's `rogue` parameter and sheet).
 - **Gallery:** a `zone` parameter for any subject at sea, `zone: 'shallows'
   | 'bank' | 'coastal'` (built in 9.1, with the `shallows` and `sea-zones`
   sheets), then `'open'`, `'rough'` and `'offing'` with `severity` (built in
