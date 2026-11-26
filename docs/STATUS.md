@@ -803,7 +803,8 @@ Updated 2026-11-25.
       Thorn Atoll (temperate) and Echo Cove in the Rip. The bonus is the
       same × 1.5 in every zone, though the Reach costs far more hull than
       the Outer Swell: one number a zone would fix that, if it matters.
-  - [x] **9.3 Rogue waves and ice growlers** (branch `feature/rogue-waves`):
+  - [x] **9.3 Rogue waves and ice growlers**
+    ([#55](https://github.com/James-Thibaudeau/tidewake/pull/55)):
     - **Rogue waves** in every rough zone (`src/rogue.js` has the rules,
       `src/rough-water.js` runs them, the numbers are `ROGUE` in
       `config.js`). One every 20–40 s in the Reach; every 40–70 s and
