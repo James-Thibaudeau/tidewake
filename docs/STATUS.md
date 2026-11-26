@@ -958,7 +958,8 @@ Updated 2026-11-25.
 - [ ] **Phase 11, islands with shapes:** four PRs, 11.1–11.4: see
   *Phase 11* in [feature-plan.md](feature-plan.md). 11.4 is built; 11.1–11.3
   are not started.
-  - [x] **11.4 Landmarks on the chart** (PR to come):
+  - [x] **11.4 Landmarks on the chart**
+    ([#56](https://github.com/James-Thibaudeau/tidewake/pull/56)):
     - **A picture for each landmark you have found**, on the sea chart and
       the minimap, from the moment it is discovered (`state.discovered`;
       nothing new is saved, so an old save shows the ones it has found).
