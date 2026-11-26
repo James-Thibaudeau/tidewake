@@ -682,7 +682,8 @@ Updated 2026-11-25.
       21% of the time in a storm, nearly three times the coast's, so they
       are × 1.5 (one line in `BANDS`). The open sea is not yet "a shade
       darker".
-  - [x] **9.2 Rough water** (branch `feature/rough-water`):
+  - [x] **9.2 Rough water**
+    ([#53](https://github.com/James-Thibaudeau/tidewake/pull/53)):
     - **Three zones**, as rows in `SEA_ZONES`: the Frostspire Reach
       (severity 3, rough from 600 to 1,500 m from the island's centre,
       worst at 850–950), the Cinder Rip (severity 2, 600 to 1,200 m) and
