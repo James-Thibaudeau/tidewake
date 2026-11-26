@@ -883,6 +883,10 @@ Updated 2026-11-25.
   crescent you can sail into. Landmarks, ports, islands and treasure angles
   don't move or change. Found landmarks show their picture on the chart
   (the Elder Tree, the arch…). Four PRs, 11.1–11.4.
+- [ ] **Phase 12, music that knows where you are:** a score written in
+  code, with real tunes: the main theme, a cue for each band, the weather
+  and each rough zone at sea, a theme per biome and landmark, and Sable's
+  theme. A `jukebox.html` to listen to it. Four PRs, 12.1–12.4.
 
 ## Known issues
 
