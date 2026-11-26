@@ -223,8 +223,9 @@ Updated 2026-11-25.
     2 s; the spyglass reaches 340 m at tier 1 and 850 m at tier 5.
   - The eight kinds:
     - **Whale** (temperate and cold, not in storms; `src/sea-life.js`),
-      about 15 m: blows every 8 s, breaches, and goes down flukes-up. Keep
-      within 75 m at under 8 kn and it stays up (to about 3 minutes).
+      about 30 m, four lengths of the starting boat: blows every 8 s,
+      breaches, and goes down flukes-up. Keep within 95 m at under 8 kn and
+      it stays up (to about 3 minutes).
     - **Dolphins** (tropical and temperate, clear or breezy): 4-8 leaping.
       Come within 75 m at over 12 kn and they ride your bow wave: 8% more
       drive from the sail while they stay (up to 45 s).
@@ -241,7 +242,10 @@ Updated 2026-11-25.
       night): a patch about 350 m across where the sea shines blue, drawn
       by the ocean shader (`uBloom`), and your wake shines while you are
       in it. Nothing to do but look.
-    - **An iceberg** (cold water; `src/sea-wonders.js`): a slab breaks off
+    - **An iceberg** (cold water; `src/sea-wonders.js`), built from flat-
+      faced blades of ice: a great spire 21 m tall, a second spire, a
+      shoulder and a low shelf, white on top and blue in the shade. A slab
+      breaks off
       with a crack and leaves five pieces of loose ice for about 100 s,
       then the berg rolls over and sinks. The berg and the ice are solid:
       a hard knock costs hull as a rock does.
@@ -250,8 +254,14 @@ Updated 2026-11-25.
       that wanders across your bow for 60-85 s. Within 7.5 m it takes 13
       hull (less with a better keel) and throws the boat clear.
     - **The ghost ship** (night only, three times likelier in fog, not
-      before Journal I; `src/ghost-ship.js`): see-through, green lanterns
-      that carry through fog, no wake. She fades within 38 m and at first
+      before Journal I; `src/ghost-ship.js`, her model in
+      `src/ghost-model.js`): see-through, green lanterns
+      that carry through fog, no wake. She is a three-master with a poop,
+      quarterdeck and forecastle, wales, gun ports, lit stern windows, a
+      figurehead, an anchor at the cathead, the wheel, a boat and a capstan
+      on deck, shrouds with ratlines, torn and holed sails, staysails, a
+      spanker, pennants and a ragged ensign; her cloth stirs while she holds
+      still. She fades within 38 m and at first
       light. Stay within 340 m and she leads you 650-950 m to a strongbox
       under a beam (110-190 gold; it waits 4 minutes).
   - **Sightings**, a new tab in the journal (`J`): a card for each kind
@@ -317,8 +327,8 @@ Updated 2026-11-25.
     ghost ship is in fog, how hard ice and waterspouts hit, and how often
     boards ask for sightings. The phone-size look covered the first four
     cards only.
-  - Known: the iceberg is rounder than it should be (lumps, not blades).
-    The whale, the dolphins and the turtles don't collide with the boat.
+  - Known: the whale, the dolphins and the turtles don't collide with the
+    boat, which shows more now that the whale is 30 m long.
     Reports go to the nearest port even if you haven't charted it, as the
     crabs' does. The fish's outline is heavy for its size. A bounty's
     kind can only be seen in its hour and weather, so a "glowing sea"

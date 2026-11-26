@@ -97,7 +97,8 @@ src/
   sea-life.js     the whale, the dolphin pod and the sea turtles, and the spray they throw up
   sea-wonders.js  the waterspout, the iceberg that calves, the glowing bloom and the bottle
   sea-ambient.js  always-on life: gulls that follow the boat near land, seabirds over reefs, jumping fish
-  ghost-ship.js   the ghost ship
+  ghost-ship.js   the ghost ship: how she sails, leads you and fades
+  ghost-model.js  her model: hull, decks, rig, torn sails, and the two passes that draw her see-through
   ghost-chain.js  her side chain: follow her to an island and find her captain's log
   story-text.js   all story writing (journals, cards, letters), kept apart from logic
   rival.js        the rival captain: chapters, where and when Sable appears, the Redwing, rewards

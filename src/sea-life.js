@@ -88,10 +88,11 @@ export class Puffs {
 
 // ------------------------------------------------------------------ whale
 const WHALE = { back: '#46668a', belly: '#d9e6ec', fin: '#34506e', eye: '#141c28' };
-const WHALE_DEEP = -3.4;   // swimming depth of the body's centre (the back is under water)
-const WHALE_UP = -0.3;     // …and when it comes up to blow (the back shows)
+const WHALE_SIZE = 2;                  // the model is built at half size: she is 30 m, four boat lengths
+const WHALE_DEEP = -3.4 * WHALE_SIZE;  // swimming depth of the body's centre (the back is under water)
+const WHALE_UP = -0.12 * WHALE_SIZE;   // …and when it comes up to blow (the back shows)
 
-/** A whale about 16 m long: { group, tail } with the tail on a pivot so the flukes can beat. */
+/** A whale about 30 m long: { group, tail } with the tail on a pivot so the flukes can beat. */
 export function buildWhale() {
   const body = [
     part(sph(1, 18, 12), WHALE.back, { z: 0.6, sx: 1.75, sy: 1.5, sz: 5.3, c2: WHALE.belly, split: 0.36, soft: 0.05 }),
@@ -110,6 +111,7 @@ export function buildWhale() {
   const group = new THREE.Group();
   const model = new THREE.Group();
   model.rotation.order = 'YXZ';
+  model.scale.setScalar(WHALE_SIZE);
   const tailPivot = inked(tail);
   tailPivot.position.set(0, 0, -3.3);
   model.add(inked(body), tailPivot);
@@ -127,7 +129,7 @@ export class Whale {
     Object.assign(this, buildWhale());
     this.puffs = puffs;
     this.pos = { x: 0, z: 0 };
-    this.size = 9;
+    this.size = 9 * WHALE_SIZE;
     this.done = true;
     this.group.visible = false;
     scene.add(this.group);
@@ -166,10 +168,11 @@ export class Whale {
     const b = ctx.boat, d = Math.hypot(b.x - this.pos.x, b.z - this.pos.z);
     this.age += dt; this.t += dt;
     // company: a boat keeping pace, slowly, holds it at the surface
-    const company = d < 75 && Math.abs(b.speed) < 6.5;
+    const company = d < 95 && Math.abs(b.speed) < 6.5;
     if (!company) this.life -= dt;
     const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
-    let speed = 2.6, tailBeat = Math.sin(this.age * 1.5) * 0.22;
+    const S = WHALE_SIZE;
+    let speed = 3.4, tailBeat = Math.sin(this.age * 1.1) * 0.22;
 
     if (this.phase === 'swim') {
       this.heading += Math.sin(this.age * 0.13 + this.wander) * 0.035 * dt;
@@ -182,34 +185,34 @@ export class Whale {
       this.roll = damp(this.roll, 0, 3, dt);
       if (u >= 0.12 && (before < 0.12 || before > u)) this.blow(ctx);
       this.breachIn -= dt;
-      const ahead = openWater(this.sea, this.pos.x + fx * 70, this.pos.z + fz * 70, 30);
+      const ahead = openWater(this.sea, this.pos.x + fx * 110, this.pos.z + fz * 110, 45);
       if (this.life <= 0 || this.age > 170 || !ahead) this.leave();
-      else if (this.breachIn <= 0 && u > 0.7 && d > 26) { this.phase = 'breach'; this.t = 0; this.wet = false; }
+      else if (this.breachIn <= 0 && u > 0.7 && d > 50) { this.phase = 'breach'; this.t = 0; this.wet = false; }
     } else if (this.phase === 'breach') {
       // up and out, nose first; hang; fall back on its side
-      const k = this.t / 3.4;
-      speed = 4.2;
-      this.y = lerp(WHALE_DEEP, 0, smoothstep(0, 0.2, k)) + Math.sin(clamp((k - 0.12) / 0.62, 0, 1) * PI) * 4.9 - smoothstep(0.74, 1, k) * 2;
+      const k = this.t / 4.6;
+      speed = 5.5;
+      this.y = lerp(WHALE_DEEP, 0, smoothstep(0, 0.2, k)) + Math.sin(clamp((k - 0.12) / 0.62, 0, 1) * PI) * 4.9 * S - smoothstep(0.74, 1, k) * 2 * S;
       this.pitch = lerp(-1.15, 0.25, smoothstep(0.15, 0.8, k));
       this.roll = smoothstep(0.38, 0.75, k) * 1.25 * (1 - smoothstep(0.85, 1, k));
       tailBeat = 0.3;
-      if (!this.out && k > 0.14) { this.out = true; this.puffs.splash(this.pos.x + fx * 5, this.pos.z + fz * 5, 12, 5, 7, 0.7); ctx.play('splash', this.pos.x, this.pos.z); }
+      if (!this.out && k > 0.14) { this.out = true; this.puffs.splash(this.pos.x + fx * 5 * S, this.pos.z + fz * 5 * S, 16, 7, 9, 1.0); ctx.play('splash', this.pos.x, this.pos.z); }
       if (!this.wet && k > 0.7) {
         this.wet = true;
-        this.puffs.splash(this.pos.x + fx * 2, this.pos.z + fz * 2, 26, 12, 12, 1.0);
-        this.puffs.splash(this.pos.x - fx * 3, this.pos.z - fz * 3, 12, 6, 7, 0.75);
+        this.puffs.splash(this.pos.x + fx * 2 * S, this.pos.z + fz * 2 * S, 34, 16, 16, 1.5);
+        this.puffs.splash(this.pos.x - fx * 3 * S, this.pos.z - fz * 3 * S, 16, 9, 10, 1.1);
         ctx.play('breach', this.pos.x, this.pos.z);
       }
       if (k >= 1) { this.phase = 'swim'; this.out = false; this.cycle = 5; this.breachIn = 30 + Math.random() * 16; }
     } else {
       // sounding: nose down, the flukes lift clear of the water, and it slides under
-      const k = this.t / 5.5;
-      speed = lerp(2.4, 0.6, smoothstep(0, 0.4, k));
+      const k = this.t / 7;
+      speed = lerp(3, 0.8, smoothstep(0, 0.4, k));
       this.pitch = damp(this.pitch, 1.15, 1.8, dt);
       this.roll = damp(this.roll, 0, 3, dt);
-      this.y = damp(this.y, lerp(-1.4, -14, smoothstep(0.42, 1, k)), 3, dt);
+      this.y = damp(this.y, lerp(-1.4 * S, -14 * S, smoothstep(0.42, 1, k)), 3, dt);
       tailBeat = 0.3 * smoothstep(0.1, 0.4, k) * (1 - smoothstep(0.6, 0.9, k));
-      if (!this.flick && k > 0.45) { this.flick = true; this.puffs.splash(this.pos.x - fx * 2, this.pos.z - fz * 2, 10, 3, 4, 0.5); ctx.play('splash', this.pos.x, this.pos.z); }
+      if (!this.flick && k > 0.45) { this.flick = true; this.puffs.splash(this.pos.x - fx * 2 * S, this.pos.z - fz * 2 * S, 14, 5, 6, 0.8); ctx.play('splash', this.pos.x, this.pos.z); }
       if (k >= 1) { this.flick = false; this.stop(); return; }
     }
 
@@ -221,10 +224,10 @@ export class Whale {
   /** The spout: a column of mist from the top of the head, and the sound of it. */
   blow(ctx) {
     const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
-    const x = this.pos.x + fx * 3.6, z = this.pos.z + fz * 3.6, y = waveHeight(x, z) + 0.8;
-    for (let i = 0; i < 18; i++) {
-      const a = Math.random() * TAU, r = Math.random() * 1.3;
-      this.puffs.emit(x, y, z, Math.cos(a) * r, 6.5 + Math.random() * 6, Math.sin(a) * r, 0.28 + Math.random() * 0.42, 1.4 + Math.random() * 0.9, 6);
+    const S = WHALE_SIZE, x = this.pos.x + fx * 3.6 * S, z = this.pos.z + fz * 3.6 * S, y = waveHeight(x, z) + 0.8 * S;
+    for (let i = 0; i < 24; i++) {
+      const a = Math.random() * TAU, r = Math.random() * 1.8;
+      this.puffs.emit(x, y, z, Math.cos(a) * r, 9 + Math.random() * 8, Math.sin(a) * r, 0.4 + Math.random() * 0.6, 1.6 + Math.random() * 1.1, 6);
     }
     ctx.play('spout', x, z);
   }

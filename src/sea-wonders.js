@@ -9,12 +9,12 @@
 // and the bloom lights the water through it:
 //   ctx.glow(x, z, r, k)          a patch of glowing sea (the ocean shader's uBloom)
 import * as THREE from 'three';
-import { part, merge, jitter, propMaterial, propOutline, thinOutline } from './props.js';
+import { part, merge, propMaterial, propOutline, thinOutline } from './props.js';
 import { toonGradient, toonMaterial } from './toon.js';
 import { glowTexture } from './world.js';
 import { waveHeight } from './waves.js';
 import { SIGHTINGS } from './story-text.js';
-import { clamp, damp, lerp, smoothstep, TAU } from './util.js';
+import { clamp, damp, lerp, smoothstep, mulberry32, TAU } from './util.js';
 
 const PI = Math.PI;
 
@@ -141,22 +141,54 @@ export class Waterspout {
 }
 
 // ------------------------------------------------------------------ iceberg
-const ICE = { top: '#f1f9ff', low: '#a3d2ea', deep: '#7fb9d9' };
+const ICE = { top: '#f7fcff', lit: '#dcf0fa', shade: '#7fbcdd', deep: '#4f9fca' };
 
-/** A lump of ice: a roughed-up ball, paler on top. */
-function iceLump(seed, t) {
-  const g = new THREE.IcosahedronGeometry(1, 1);
-  jitter(g, 0.16, seed);
+/**
+ * A blade of ice: a prism of a few flat sides, narrowing to a slanted top.
+ * Every face is flat and takes its own tone: white on top, pale where it
+ * faces the light, blue in the shade and bluer towards the water. `at` is
+ * where it stands, `lean` how far its top is pushed over, `slant` which way
+ * the top slopes down, `tip` how small the top is beside the foot (0 = a point).
+ */
+function shard(sides, r, h, { at = [0, 0], lean = [0, 0], slant = 0, tip = 0.3, foot = -2.5, seed = 1 } = {}) {
+  const rnd = mulberry32(seed * 7919 + 11);
+  const turn = rnd() * TAU, rings = [[foot, 1.06, 0, 0], [h * 0.42, 0.86, 0.45, 0], [h, tip, 1, 0.34]];
+  // each corner keeps its own bearing and reach all the way up, so the edges run straight
+  const corner = Array.from({ length: sides }, (_, i) => [turn + ((i + (rnd() - 0.5) * 0.5) / sides) * TAU, 0.8 + rnd() * 0.4]);
+  const ring = ([y, k, push, drop]) => corner.map(([a, reach]) => new THREE.Vector3(
+    at[0] + lean[0] * push + Math.cos(a) * r * reach * k,
+    y - drop * h * (0.5 + 0.5 * Math.cos(a - slant)),
+    at[1] + lean[1] * push + Math.sin(a) * r * reach * k));
+  const R = rings.map(ring), tris = [];
+  for (let k = 0; k < R.length - 1; k++) for (let i = 0; i < sides; i++) {
+    const j = (i + 1) % sides;
+    tris.push([R[k][i], R[k + 1][i], R[k][j]], [R[k][j], R[k + 1][i], R[k + 1][j]]);
+  }
+  // the top: a fan from its middle (a single slanted face when the top is flat)
+  const top = R[R.length - 1], mid = top.reduce((m, v) => m.add(v), new THREE.Vector3()).multiplyScalar(1 / sides);
+  for (let i = 0; i < sides; i++) tris.push([top[i], mid, top[(i + 1) % sides]]);
+  const pos = [], col = [], n = new THREE.Vector3(), e1 = new THREE.Vector3(), e2 = new THREE.Vector3();
+  const cTop = new THREE.Color(ICE.top), cLit = new THREE.Color(ICE.lit), cShade = new THREE.Color(ICE.shade), cDeep = new THREE.Color(ICE.deep), c = new THREE.Color();
+  for (const [p0, p1, p2] of tris) {
+    n.crossVectors(e1.subVectors(p1, p0), e2.subVectors(p2, p0)).normalize();
+    const y = (p0.y + p1.y + p2.y) / 3;
+    if (n.y > 0.55) c.copy(cTop);
+    else c.copy(cShade).lerp(cLit, smoothstep(-0.5, 0.6, n.x * 0.75 + n.z * 0.45 + n.y * 0.5)).lerp(cDeep, (1 - smoothstep(0, 4.5, y)) * 0.55);
+    for (const v of [p0, p1, p2]) { pos.push(v.x, v.y, v.z); col.push(c.r, c.g, c.b); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.computeVertexNormals();
-  return part(g, ICE.top, { c2: ICE.low, split: 0.42, soft: 0.1, ...t });
+  return g;
 }
 
 let chunkGeo = null;
 function chunkGeometry() {
   if (chunkGeo) return chunkGeo;
-  const p = iceLump(7, { sy: 0.62, y: 0.12 });
-  chunkGeo = merge([p]);
-  p.dispose();
+  // a growler: a flat-topped lump one unit across, scaled to each piece
+  chunkGeo = shard(5, 1, 0.75, { tip: 0.6, foot: -0.7, slant: 1, seed: 7 });
+  chunkGeo.computeBoundingSphere();
   return chunkGeo;
 }
 
@@ -169,19 +201,20 @@ function inkedIce(parts, outline) {
 }
 
 // the berg's solid parts, as circles in its own space: [x, z, r]
-const BERG_ROCKS = [[0, 0, 10.5], [6.5, -3, 6.5]];
-const SLAB = { x: 11.5, z: 1, r: 4 };
+const BERG_ROCKS = [[0, 0, 8.5], [-6, 2.5, 7], [6.5, -4, 4.5], [2, 6, 7.5], [-8.5, -5.5, 3.2]];
+const SLAB = { x: 11.5, z: 1, r: 3.6 };
 const CHUNKS = 5;
 
 /** The iceberg's model: { group, berg, slab } with the slab on a pivot at the waterline, ready to fall away. */
 export function buildIceberg() {
   const berg = inkedIce([
-    iceLump(1, { y: 4, sx: 10.5, sy: 9, sz: 8.5 }),
-    iceLump(2, { x: 6.5, y: 2, z: -3, sx: 6.5, sy: 6, sz: 6 }),
-    iceLump(3, { x: -3, y: 9.5, z: 2, sx: 4.2, sy: 8, sz: 4.4 }),
-    iceLump(4, { x: -6, y: 1, z: -4, sx: 5, sy: 3.4, sz: 5 }),
+    shard(5, 7.8, 21, { lean: [1.6, -1.2], slant: 0.6, tip: 0.16, seed: 1 }),                  // the great blade
+    shard(6, 7.6, 10.5, { at: [-6, 2.5], lean: [-1.2, 0.4], slant: 3.4, tip: 0.5, seed: 2 }),   // its shoulder
+    shard(4, 4.6, 15, { at: [6.5, -4], lean: [0.8, -0.6], slant: 5, tip: 0.1, seed: 3 }),       // a second spire
+    shard(6, 8.2, 3.4, { at: [2, 6], slant: 1.6, tip: 0.72, seed: 4 }),                         // a low shelf at its foot
+    shard(4, 3.3, 6.5, { at: [-8.5, -5.5], lean: [-0.6, -0.4], slant: 2.2, tip: 0.2, seed: 5 }),
   ], propOutline);
-  const slab = inkedIce([iceLump(5, { y: 5.2, sx: 3.1, sy: 7.6, sz: 5.2 })], propOutline);
+  const slab = inkedIce([shard(4, 3.5, 14, { at: [1.2, 0], lean: [0.5, 0], slant: 0, tip: 0.42, foot: -1.3, seed: 6 })], propOutline);
   slab.position.set(SLAB.x - 1.2, -1.2, SLAB.z);
   const group = new THREE.Group();
   group.rotation.order = 'YXZ';

@@ -36,7 +36,7 @@ import { buildSeaArch, ARCH } from '../sea-arch.js';
 import { buildWhale, buildDolphin, buildTurtle } from '../sea-life.js';
 import { buildWaterspout, buildIceberg, buildBottle } from '../sea-wonders.js';
 import { buildGull, buildFish } from '../sea-ambient.js';
-import { buildGhostShip } from '../ghost-ship.js';
+import { buildGhostShip } from '../ghost-model.js';
 import { generateLevel } from '../ashore/levelgen.js';
 import { layoutLevel } from '../ashore/modules.js';
 import { pieceParts } from '../ashore/pieces.js';
@@ -317,10 +317,10 @@ function sealife(q, stage) {
     };
   }
   const W = buildWhale();
-  W.group.position.y = 1.75;
+  W.group.position.y = -new THREE.Box3().setFromObject(W.group).min.y + 0.1; // belly on the floor, whatever her size
   stage.add(W.group);
   return {
-    group: W.group, ground: 'floor', warnings, look: { y: 1.7 },
+    group: W.group, ground: 'floor', warnings, look: { y: W.group.position.y },
     update(dt, t) { W.tail.rotation.x = Math.sin(t * 1.5) * 0.22; },
     dispose() { W.group.traverse((o) => o.geometry?.dispose()); },
   };

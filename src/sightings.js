@@ -18,7 +18,7 @@ import { TAU, clamp } from './util.js';
 // `place` changes where one appears (see placeEvent); `near` is how close
 // counts as seeing it, where that isn't NEAR.
 export const EVENTS = {
-  whale: {},
+  whale: { place: { min: 180, max: 320, clear: 80 } },            // she is 30 m long and needs sea room
   dolphins: {},
   turtles: {},
   bottle: { place: { min: 90, max: 170, clear: 30 } },           // small: it has to be close to be noticed at all
