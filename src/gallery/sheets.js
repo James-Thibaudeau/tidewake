@@ -7,13 +7,13 @@
 // narrowed: `?sheet=tops-back&bottom=skirt&pose=run` is the same grid with a
 // skirt on, mid-stride.
 import { stylesFor } from '../cosmetics.js';
-import { POSES, LIGHTS, VIEWS } from './presets.js';
+import { POSES, LIGHTS, VIEWS, WEATHERS } from './presets.js';
 
 const ids = (slot) => stylesFor(slot).map((s) => s.style);
 const PORTRAIT = [250, 330], LANDSCAPE = [420, 300], SQUARE = [300, 300], SMALL = [200, 200];
 
 // A sheet of another subject keeps only how things are lit, not what was showing.
-const LIT = ['light', 'sun', 'ink', 'waves', 'fx'];
+const LIT = ['light', 'weather', 'sun', 'ink', 'waves', 'sea', 'fx'];
 function carry(base, fixed) {
   if (!fixed.show || fixed.show === (base.show || 'outfit')) return { ...base, ...fixed };
   return { ...Object.fromEntries(LIT.filter((k) => k in base).map((k) => [k, base[k]])), ...fixed };
@@ -47,6 +47,10 @@ export const SHEETS = {
   // ---- ships
   'ships': { about: 'Every upgrade tier, from the bow quarter and the side', tile: LANDSCAPE, make: grid('view', ['quarter', 'side'], 'tier', ['0', '1', '2', '3', '4', '5'], { show: 'ship' }) },
   'anchors': { about: 'Every anchor refit, close on the bow', tile: LANDSCAPE, make: strip('anchor', ['0', '1', '2', '3', '4'], { show: 'ship', view: 'bow', canvas: '0' }) },
+  // ---- the sea
+  'sea': { about: 'The sea in every weather: from the helm, low over the water, from a tall masthead and from a gull', tile: LANDSCAPE, make: grid('view', ['sail', 'horizon', 'aloft', 'high'], 'weather', WEATHERS, { show: 'ship', tier: '2' }) },
+  'sea-lights': { about: 'The sea under every light: from the helm, a tall masthead and a gull', tile: LANDSCAPE, make: grid('view', ['sail', 'aloft', 'high'], 'light', Object.keys(LIGHTS), { show: 'ship', tier: '2' }) },
+  'sea-features': { about: "The sea's large features one at a time: none, the shallows, gusts, cloud shadows, all", tile: LANDSCAPE, make: grid('view', ['sail', 'high'], 'sea', ['0', 'shallows', 'gusts', 'shade', 'shallows,gusts,shade'], { show: 'ship', tier: '2', weather: 'breezy' }) },
   // ---- places
   'archway-story': { about: "Archway Isle's story places, close up", tile: LANDSCAPE, make: strip('at', ['cove', 'keystone', 'lantern', 'stack'], { show: 'archway', view: 'spot' }, 2) },
   // ---- anything: the subject already in the URL

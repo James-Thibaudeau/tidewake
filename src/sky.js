@@ -218,6 +218,7 @@ export class Environment {
     );
     this.sky.renderOrder = -2;
     this.sky.frustumCulled = false;
+    this.sky.name = 'sky';
     scene.add(this.sky);
 
     this.sun = new THREE.DirectionalLight(0xffffff, 2);
@@ -252,6 +253,7 @@ export class Environment {
       uniforms: this.cloudUniforms, vertexShader: cloudVert, fragmentShader: cloudFrag,
       defines: { OCT: oct }, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false,
     }));
+    this.clouds.name = 'clouds';
     this.clouds.frustumCulled = false;
     this.clouds.renderOrder = 5;
     scene.add(this.clouds);

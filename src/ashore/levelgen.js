@@ -197,7 +197,8 @@ function buildDecor(L, group, colliders, quality, seed) {
     (buckets.arch ||= []).push(m.compose(v, q, sc).clone());
   }
   // sea stacks standing off the shore, in water too deep to wade
-  for (let n = 0, placed = 0; n < D.seaStacks * 5 && placed < D.seaStacks; n++) {
+  const stacks = Math.round(D.seaStacks * k);
+  for (let n = 0, placed = 0; n < stacks * 5 && placed < stacks; n++) {
     const a = rng() * TAU, p = T.at(T.Rs(a) + 7 + rng() * 26, a);
     if (T.heightAt(p.x, p.z) > -3) continue;
     const w = 1.6 + rng() * 2.6, hgt = 4 + rng() * 11;
@@ -224,6 +225,8 @@ function buildDecor(L, group, colliders, quality, seed) {
     group.add(mesh);
     made.push(mesh);
     if (type === 'grassTuft' || type === 'pebble') continue;
+    // on Low, flowers and bushes go without an ink line (it draws every one of them twice)
+    if (low && (type === 'flower' || type.includes('ush'))) continue;
     const small = type === 'flower' || type.includes('ush') || type === 'rock';
     const ol = new THREE.InstancedMesh(PROPS[type], small ? thinOutline : propOutline, mats.length);
     ol.instanceMatrix = mesh.instanceMatrix;

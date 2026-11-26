@@ -26,9 +26,17 @@
 //   summit: { x, y, z },                // the top of the route (for the map/hints)
 //   vault: { x, y, z } | null,          // where a quest item waits while a quest targets
 //                                       // this island (generated levels: by the summit)
+//   shoal: { x, z, r, fade } | absent,  // the sea's shallows round the island (see shoalOf)
 //   dispose(),
 // }
 // Positions are where the pickup/marker sits (its base), in level space.
+
+/**
+ * The shallows round a level's island, for the sea's depth tint: turquoise
+ * out to `r`, fading to open water over `fade` metres. A level can set its
+ * own (`level.shoal`); otherwise it is the ring just inside its bounds.
+ */
+export const shoalOf = (level) => level.shoal || { x: 0, z: 0, r: level.bounds.r * 0.94, fade: 300 };
 
 export const box = (x0, y0, z0, x1, y1, z1, tag = 'stone') => ({
   type: 'box', min: [Math.min(x0, x1), Math.min(y0, y1), Math.min(z0, z1)], max: [Math.max(x0, x1), Math.max(y0, y1), Math.max(z0, z1)], tag,

@@ -1,6 +1,14 @@
 // Fully procedural WebAudio: ocean/wind/rain beds, sparse ambient music and
 // one-shot effects. Everything is a safe no-op until unlock() is called from a
 // user gesture.
+//
+// SoundSystem is one class split over two files. This one holds the core: the
+// buses, the sea's beds, the score and the one-shots heard at sea. The
+// on-foot sounds (footsteps, jump and land, the coin chime, the chest fanfare,
+// an island's ambience and the on-foot score) are mixed in from
+// audio/ashore.js.
+import { mixin } from './util.js';
+import { AshoreSounds } from './audio/ashore.js';
 
 const PENTA = [0, 2, 4, 7, 9]; // major pentatonic degrees
 const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
@@ -127,6 +135,7 @@ export class SoundSystem {
     this.nextSwell = 6;
     this.nextStormNote = 2;
     this.stormMix = 0;
+    this.buildAshore();
   }
 
   update(dt, p = {}) {
@@ -136,7 +145,9 @@ export class SoundSystem {
     const speed = p.speed || 0, wind = p.wind ?? 1, rain = p.rain || 0, storm = p.storm || 0;
     if (p.night != null) this.night = p.night;
     const swell = 0.75 + 0.25 * Math.sin(this.time * 0.45) * Math.sin(this.time * 0.17 + 1);
-    const port = p.inPort ? 0.6 : 1;
+    // in port, and from an island's paths, the sea is further off
+    this.updateAshore(dt, t, p.ashore || null, rain);
+    const port = (p.inPort ? 0.6 : 1) * (1 - this.landMix * 0.4);
     this.oceanGain.gain.setTargetAtTime((0.16 + 0.08 * wind + 0.01 * Math.min(speed, 25) + storm * 0.12) * swell * port, t, 0.3);
     this.oceanFilter.frequency.setTargetAtTime(280 + wind * 220 + Math.min(speed, 25) * 18 + storm * 300, t, 0.3);
     const gust = 0.7 + 0.3 * Math.sin(this.time * 0.9) * Math.sin(this.time * 0.37);
@@ -150,8 +161,10 @@ export class SoundSystem {
     this.nextNote -= dt;
     if (this.nextNote <= 0) {
       const calm = this.night > 0.5 ? 1.5 : 1;
-      this.nextNote = (1.1 + Math.random() * 2.6) * calm;
-      if (this.musicOn && Math.random() > this.stormMix) this.musicNote(storm);
+      // on foot the same line moves along a little quicker, on a mallet (audio/ashore.js)
+      const land = this.landMix > 0.5;
+      this.nextNote = (land ? 0.8 + Math.random() * 1.7 : 1.1 + Math.random() * 2.6) * calm;
+      if (this.musicOn && Math.random() > this.stormMix) { if (land) this.landNote(storm); else this.musicNote(storm); }
     }
     if (this.stormMix > 0.05 && this.musicOn) this.updateStormScore(dt, t);
   }
@@ -416,7 +429,9 @@ export class SoundSystem {
         this.noise(t + 0.12, 0.12, { type: 'bandpass', freq: 900, q: 2, vol: 0.12 });
         break;
       default:
+        this.playAshore(name, opts, t);
         break;
     }
   }
 }
+mixin(SoundSystem, AshoreSounds);

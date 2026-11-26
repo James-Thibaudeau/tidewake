@@ -70,9 +70,10 @@ float vnoise(vec2 p) {
 `;
 
 // Colouring-only version of waveHeight for the ocean's fragment shader (include after
-// WAVE_GLSL). Each wave is weighted by gWaveK, set once per pixel by setWaveLod(): a wave
-// fades out as a pixel grows to cover a good part of its length (so far water can't shimmer
-// into stripes), and loses most of its contrast with distance, short waves first.
+// WAVE_GLSL): the height and its slope in one pass, so a pixel pays for each wave once.
+// Each wave is weighted by gWaveK, set once per pixel by setWaveLod(): a wave fades out as
+// a pixel grows to cover a good part of its length (so far water can't shimmer into
+// stripes), and loses most of its contrast with distance, short waves first.
 // The boat and the water's shape still use the full waveHeight.
 export const WAVE_LOD_GLSL = /* glsl */ `
 float gWaveK[${WAVES.length}];
@@ -82,9 +83,10 @@ float waveLodK(float len, float px, float dist) {
 void setWaveLod(float px, float dist) {
 ${WAVES.map((w, i) => `  gWaveK[${i}] = waveLodK(${f(TAU / w.k)}, px, dist);`).join('\n')}
 }
-float waveHeightLod(vec2 p) {
-  float h = 0.0; float hs = 0.0; float s;
-${WAVES.map((w, i) => `  s = (sin(dot(p, vec2(${f(w.dx * w.k)}, ${f(w.dz * w.k)})) + uWavePhase[${i}]) + 1.0) * 0.5; ${w.swell ? 'hs' : 'h'} += ${f(w.a)} * (2.0 * s * s - 0.75) * gWaveK[${i}];`).join('\n')}
+float waveLod(vec2 p, out vec2 slope) {
+  float h = 0.0; float hs = 0.0; vec2 g = vec2(0.0); vec2 gs = vec2(0.0); float th; float s; float a;
+${WAVES.map((w, i) => `  th = dot(p, vec2(${f(w.dx * w.k)}, ${f(w.dz * w.k)})) + uWavePhase[${i}]; s = sin(th) * 0.5 + 0.5; a = ${f(w.a)} * gWaveK[${i}]; ${w.swell ? 'hs' : 'h'} += a * (2.0 * s * s - 0.75); ${w.swell ? 'gs' : 'g'} += vec2(${f(w.dx * w.k)}, ${f(w.dz * w.k)}) * (2.0 * a * s * cos(th));`).join('\n')}
+  slope = g * uWaveScale + gs * uSwellScale;
   return h * uWaveScale + hs * uSwellScale;
 }
 `;

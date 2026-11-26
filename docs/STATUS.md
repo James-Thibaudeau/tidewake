@@ -110,6 +110,101 @@ Updated 2026-11-25.
   - Not yet done: live sliders, and before/after in one image (see
     [feature-plan.md](feature-plan.md)).
 
+- [x] **Phase 5, polish:** sound on foot, the sea's larger features and a
+  retuned wave set, bigger touch targets, and a performance pass. One PR.
+  The design, and what was built instead where they differ, is in
+  [shipped-plans.md](shipped-plans.md). Earlier pieces: the quest board and
+  Tailor hints ([#25](https://github.com/James-Thibaudeau/tidewake/pull/25)),
+  the first-landing hint and the on-foot controls in the README
+  ([#11](https://github.com/James-Thibaudeau/tidewake/pull/11)), and the
+  first water pass ([#38](https://github.com/James-Thibaudeau/tidewake/pull/38)).
+  - **Sound on foot** (`src/audio/ashore.js`, mixed into `SoundSystem`; all
+    made from oscillators and noise, like the rest):
+    - A footfall each time a foot comes down, by what you're standing on:
+      sand, grass, stone, wood or leaf (the surface tags on colliders and
+      `groundTag`). Louder at a run.
+    - A jump, and a landing that grows with the fall. They replace the sail
+      and bow-slam sounds that stood in for them.
+    - Coins chime, and the note climbs the scale while you keep collecting
+      (it starts again after 1.6 s without one). A chest has its own
+      fanfare.
+    - Each island has its own air: songbirds by day and crickets at night
+      on temperate islands; far-off gulls and wind whistling in the rocks on
+      rocky ones (and aboard the wreck). Birds and crickets go quiet in
+      rain. A new biome adds a line to `AMBIENCE`. The sea's own sound
+      drops back while you're ashore.
+    - The score on foot is the same wandering line as at sea, a fourth
+      lower on a soft mallet, a little quicker, with a bass note under
+      every few.
+    - Checked through the real game loop (which sound plays when, on every
+      surface) and by rendering each sound offline and measuring it against
+      the existing ones. **Nobody has listened to them yet.**
+  - **The sea** (`src/ocean.js`, `src/waves.js`, `WAVE_DEFS`):
+    - The wave set is retuned: seven waves instead of five, the three
+      biggest close in size and within 36° of each other (all seven within
+      52°), no wavelength a simple multiple of another. Crests run long and weave instead of crossing into a grid.
+      The storm swell is unchanged.
+    - This changes how the boat rides. Measured by `node tools/check.mjs
+      ride` (new: the boat's own pitch and bow-slam sums, eight headings at
+      9 m/s): heave and crest heights are the same as before; pitch and roll
+      now depend on your heading (in clear weather 0.7° running along the
+      crests to 1.7° head-on; it was 1.4° on every heading); in a storm the
+      bow slams 7.7 times a minute on average, where it was 9.7 (the worst
+      heading is as bad as before, about 12). The check fails if a later
+      wave change moves these far.
+    - Three things larger than a wave, all colouring only: **shallows**
+      (paler water over the wide shelf round every island, turquoise close
+      in, and a pale patch over every reef, from a map of the world's
+      shores built at load; ashore, a ring round the island you're on);
+      **gusts** (darker, ruffled bands running downwind, stronger in a
+      fresh breeze); **cloud shadows** (the sky's own cloud pattern, thrown
+      where the sun would put it; they fade under an overcast sky, at night
+      and as the sun gets low).
+    - `?sea=0` in the URL turns the three off, `?sea=gusts,shade` picks
+      some (`shallows`, `gusts`, `shade`), like `?fx=`.
+    - Cost: the colouring pass now gets a wave's height and slope from one
+      evaluation instead of four, which pays for the two extra waves and
+      the new features; cloud shadows are worked out at the grid's corners.
+      The sea's shader costs the same as on `main` within the noise of the
+      measurement, on High and on Low.
+    - Gallery: `weather=` swaps a light's weather; views `horizon`, `aloft`
+      and `high`; sheets `sea`, `sea-lights` and `sea-features`.
+    - Shore foam and the kraken read the same wave function and sit on the
+      new water (looked at: an island's shore, and the start of the rescue).
+      The rescue was not played through.
+  - **Phones:** the stick, Jump, the spyglass button and the HUD's icon
+    buttons are bigger; the stick and Jump also take a press that lands a
+    little outside them; every button, tab and chip in the menus is at
+    least 44 px tall on touch. Looked at on a 375×812 screen. The stick's
+    dead zone and run threshold are `TOUCH` in `config.js`; **not tuned on
+    a real phone.** On Low, generated islands also drop half their sea
+    stacks and the ink line on flowers and bushes (Low already halved the
+    trees and left out grass tufts and pebbles).
+  - **Performance** (`tidewake.debug.profile()` counts a frame: draw calls,
+    triangles, lights and what is in view by kind, ink outlines apart;
+    `debug.bench()` times frames):
+    - Leaving an island already frees what it made: geometry, texture and
+      shader counts come back to the same number after every visit (three
+      visits each to a temperate island, a rocky one, the grove, Archway
+      Isle and the wreck).
+    - The sea is drawn after everything else that is solid, so its shader,
+      the dearest thing on screen, no longer runs for water hidden under an
+      island or behind the hull.
+    - Lantern posts share two lights (Low) or three (High) instead of
+      having one each: the nearest posts get them. A light costs every
+      pixel of the island whether it reaches it or not, and a different
+      number of lights has every shader built again. The lantern you carry
+      keeps its light in the scene by day (dark), for the same reason: it
+      used to be added at dusk.
+    - Ashore on Low, at 1024×768 on the development Mac, ms a frame before
+      → after: a temperate island 0.71 → 0.50 by day and 0.82 → 0.49 at
+      night; a rocky one 0.75 → 0.36 and 0.74 → 0.40; the Elder Grove 0.60
+      → 0.46 and 0.94 → 0.38. On High, where the effects are most of the
+      frame, it is about the same (2.6–3.0 ms before, 2.4–3.1 after).
+    - Platforms were already one mesh and one outline per level. Ink
+      outlines are about a quarter of the triangles ashore on Low; the
+      explorer's and the platforms' stay.
+
 ## Next up
 
 - [ ] **Phase 4, ashore content and fetch quests:**
@@ -398,30 +493,27 @@ Updated 2026-11-25.
     The item waits at the level's vault (on generated islands, by the summit)
     and goes back to the island if you're wrecked.
   - [ ] 4.12 Harmless obstacles (crabs, gulls)
-- [ ] **Phase 5, polish:**
-  - [ ] Sound: footsteps by surface, jump and land, coins, chest fanfare,
-    biome ambience, an on-foot music variant
-  - [x] Tutorial hints for the quest board and the Tailor: a one-time note
-    at the top of each tab ([#25](https://github.com/James-Thibaudeau/tidewake/pull/25))
-  - [ ] Phones: bigger buttons, less decor on Low. The joystick already has
-    a 12% dead zone; tune it on a real phone.
-  - [ ] Performance pass, including cleanup when leaving an island
-  - [x] README controls for going ashore (done in #11)
-- [ ] **Water improvements** (`src/ocean.js`, `src/waves.js`; designs under
-  Phase 5 in [feature-plan.md](feature-plan.md)):
-  - [x] Less repetitive water: wave colouring fades with distance (short
-    waves first) and varies by region, so the sea no longer tiles into a
-    checkerboard. Shader only; the boat rides the same waves
-    ([#38](https://github.com/James-Thibaudeau/tidewake/pull/38)).
-  - [ ] Bigger features: cloud shadows, gust bands, a depth tint.
-  - [ ] Retune the wave set for long crests instead of a grid (changes how
-    the boat rides). Rows of crests still show a few hundred metres out.
+- [ ] **Phase 5 follow-ups** (after the polish PR; things only a person
+  with the game in front of them can do):
+  - [ ] Listen to the new sounds on real speakers and set their levels
+    (`STEPS` and the voices in `src/audio/ashore.js`). They have only been
+    rendered offline and measured, never heard.
+  - [ ] Tune the joystick on a real phone (`TOUCH` in `config.js`; or set
+    `tidewake.input.deadZone` on a running game). It is still 12%.
+  - [ ] Sail a storm by hand. The bow slams about a fifth less often than
+    before on average (see the ride numbers under Phase 5 above); if storms
+    feel too easy, raise the damage in `checkBowSlam` (`game.js`), not the
+    waves.
+  - [ ] Frame times on a real phone. Every number so far is from a desktop.
 - [ ] **Visual effects follow-ups** (after #17; `src/fx.js`, `src/toon.js`):
   - [ ] Test High quality on real phones (touch uses 2 shadow cascades,
     1024 maps, medium SMAA). Phones default to Low, which has no effects;
     decide whether High on touch should drop edges or shadows.
-  - [ ] Measure frame time on desktop with effects on and off. The in-app
-    browser was throttled during the prototype, so there's no real number yet.
+  - [x] Measure frame time on desktop with effects on and off:
+    `tidewake.debug.bench()` times frames with the graphics card's work
+    included, in a hidden tab too. At sea off Port Haven, High, 2048×1536
+    on the development Mac: about 5 ms a frame with effects and 4 ms
+    without; the sea's own shader is about 3 ms of either.
   - [ ] Shadows on the ocean: the boat and cliffs cast none on the water
     (the custom water shader needs the shadow chunks and the cel band).
   - [ ] Shadows stop at 220 m (140 m on touch); check whether the cut-off

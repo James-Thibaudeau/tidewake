@@ -5,6 +5,7 @@
 //   'sea'  – sailing: W/S trim the sail, A/D steer, E/Space act
 //   'land' – on foot: WASD move, Space jumps, E acts, Shift runs
 //   'menu' – nothing but map/pause
+import { TOUCH } from './config.js';
 
 const COMMON_KEYS = { KeyM: 'map', KeyJ: 'journal', Escape: 'pause', KeyP: 'pause' };
 const KEYMAPS = {
@@ -39,6 +40,7 @@ export class Input {
     this.spyButton = false;
     this.pointers = new Map();
     this.pinchDist = 0;
+    this.deadZone = TOUCH.deadZone;
 
     if (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches) this.markTouch();
     window.addEventListener('touchstart', () => this.markTouch(), { passive: true, once: true });
@@ -139,7 +141,7 @@ export class Input {
   get run() {
     if (!this.enabled || this.scheme !== 'land') return false;
     return this.runButton || this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ||
-      Math.hypot(this.stick.x, this.stick.y) > 0.92;
+      Math.hypot(this.stick.x, this.stick.y) > TOUCH.runAt;
   }
 
   /** Held jump (for variable jump height); the jump action is the edge. */
@@ -248,7 +250,7 @@ export class Input {
         if (len < 1e-6) { this.setStick(0, 0); return; }
         const ux = dx / len, uy = dy / len, knob = Math.min(1, len);
         // small dead zone so a resting thumb doesn't creep
-        const dz = 0.12, mag = knob < dz ? 0 : (knob - dz) / (1 - dz);
+        const dz = this.deadZone, mag = knob < dz ? 0 : (knob - dz) / (1 - dz);
         this.setStick(ux * mag, uy * mag, ux * knob, uy * knob);
       };
       base.addEventListener('pointerdown', (e) => {

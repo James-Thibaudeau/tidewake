@@ -54,6 +54,7 @@ export class Boat {
     this.dismasted = false;
     this.up = null;        // upgrade values { sail, rudder, keel, hull, lantern }: an NPC's driver reads and writes these
     this.group = new THREE.Group();
+    this.group.name = 'boat';
     this.group.rotation.order = 'YXZ';
     scene.add(this.group);
     this.pos = new THREE.Vector3();
