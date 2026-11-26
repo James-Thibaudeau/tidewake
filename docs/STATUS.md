@@ -76,6 +76,9 @@ Updated 2026-11-26.
     card in the middle of the Quests tab. The talk is saved in
     `state.rival.log`; older saves are given what was said in the
     encounters already behind them (all but the win or lose line).
+  - Fix: bringing the letter to Sable did nothing until a new in-game day
+    had started since you towed them into port, and nothing said to wait.
+    Docking where Sable is refitting now hands it over straight away.
 
 - [x] **Character revamp** (not in the original plan): the explorer has
   roughly real proportions, about four and a half heads tall, with a smaller

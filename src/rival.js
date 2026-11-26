@@ -770,8 +770,10 @@ export class Rival {
       ui.openPort(port);
       return;
     }
-    // the letter: Sable is here, and you have the bundle from the chest
-    if (R.chapter === 6 && R.flags.port === port.id && g.story.S.flags.letters && ((g.state.day || 1) > (R.flags.day || 0) || this.forced)) {
+    // the letter: Sable is here, and you have the bundle from the chest. No
+    // waiting for a new day (unlike the races): the quest says "bring it", so
+    // the next time you tie up beside the Redwing, it's delivered.
+    if (R.chapter === 6 && R.flags.port === port.id && g.story.S.flags.letters) {
       R.chapter = 7;
       R.flags.day = g.state.day || 1;
       R.flags.flare = false;
