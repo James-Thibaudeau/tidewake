@@ -621,7 +621,7 @@ Updated 2026-11-26.
           and could end up inside its overhang. The cave is wider and
           deeper, its lintel high and solid, and the camera looks straight
           in while you're at it (a `faces` entry).
-  - [x] 4.6 Tropical islands. `tropical` is in `ASHORE_BIOMES`, so the coral
+  - [x] 4.6 Tropical islands ([#57](https://github.com/James-Thibaudeau/tidewake/pull/57)). `tropical` is in `ASHORE_BIOMES`, so the coral
     flukes refit (tier 2) is live: it's offered once you own Hull 2 (the
     Copper-Clad Hull), and its fitting, a bronze casting, waits on a rocky
     island (Briar Point from Port Haven). Until it's fitted, tropical shores
@@ -1092,7 +1092,7 @@ Updated 2026-11-26.
   - [ ] Sable's writing (`rival-text.js`) is a first draft: review it like
     the journals were.
   - [x] Move the relic scramble to a tropical island when that biome can be
-    landed on (Phase 4.6).
+    landed on (Phase 4.6, [#57](https://github.com/James-Thibaudeau/tidewake/pull/57)).
   - [x] Hand encounter delivery to the Phase 7 event director
     ([#46](https://github.com/James-Thibaudeau/tidewake/pull/46)).
   - [ ] Sounds for the kraken, the buoys' bells and the flare (they reuse
