@@ -5,6 +5,7 @@ import { UPGRADES, REFITS, upgradeValue, MAP_RES, MAP_CELL, WORLD_HALF, DAY_LENG
 import { clamp, damp, dampAngle, smoothstep, lerp, wrapAngle, bearingDeg, TAU } from './util.js';
 import { updateWaves, waveHeight } from './waves.js';
 import { bandAt, seaAt, swellAt, roughWear, goldBonus, zoneWeather } from './sea-zones.js';
+import { cueFor } from './music-cues.js';
 import { ringUniforms } from './world.js';
 import { propMesh } from './props.js';
 import { pointOfSailName } from './boat.js';
@@ -653,6 +654,7 @@ export class Game {
       speed: Math.abs(boat.speed), wind: w.windStrength, rain: w.p.rain, storm: w.p.storm,
       inPort: this.mode === 'docked', night: this.env.night,
       ashore: this.mode === 'ashore' ? this.ashore.island.biome || 'rocky' : null, // (the wreck lies on bare rock)
+      music: cueFor({ band: bandAt(boat.pos.x, boat.pos.z), ashore: this.mode === 'ashore', speed: boat.speed }),
     });
     this.ui.update(dt);
   }

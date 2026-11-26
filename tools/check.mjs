@@ -2,14 +2,15 @@
 // Fast checks that need no browser and no dependencies:
 //
 //   node tools/check.mjs            everything (about a second)
-//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | sea | seazones | rogue | ride | layout | climb | grove | archway
+//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | sea | music | seazones | rogue | ride | layout | climb | grove | archway
 //   node tools/check.mjs layout 500 layouts for 500 synthetic islands (default 150)
 //
 // Run it after every change. It catches the mistakes that otherwise only show
 // up as a blank page: a syntax error, an import of a name the other module
 // doesn't export, a helper left behind when code moved to another file, a
 // text key or element id that doesn't exist, a save that no longer migrates,
-// a sea event that could turn up in the wrong place, sea zones that leave home
+// a sea event that could turn up in the wrong place, a tune with a note out
+// of its key or its instrument's range, music that flips at a zone's edge, sea zones that leave home
 // out, put rough water over a port or a landing, or disagree between the CPU
 // and the shaders, a rogue wave that the boat and the shaders see differently,
 // that never arrives or costs the wrong share of the hull, ice outside the
@@ -457,6 +458,168 @@ const checks = {
       expect(SIGHTINGS.rewards[k]?.title && SIGHTINGS.rewards[k]?.text, `SIGHTINGS.rewards.${k} needs a title and text`);
     }
     return { errors, note: `${kinds.length} kinds; ${placed} of ${count} placements in open water; the ghost ship at most ${longest} rolls apart` };
+  },
+
+  // The score (music/, music-cues.js): every theme is written properly and
+  // stays in its key, every cue plays through with each note inside its
+  // instrument's range, the layers come in by intensity, a statement is
+  // followed by a rest on the bed, changes of cue happen as designed (in the
+  // same key, to another key, to silence), each band of the sea gets its cue,
+  // and sailing back and forth across a band's edge never makes the music
+  // flip more than once a crossing. It can't hear any of it.
+  async music() {
+    const errors = [];
+    const expect = (ok, msg) => { if (!ok) errors.push(msg); };
+    const N = await load('music/notation.js');
+    const { THEMES, CUES, RANGES, DRUMS } = await load('music/themes.js');
+    const { Score, compileCue } = await load('music/score.js');
+    const { cueFor, CueHold } = await load('music-cues.js');
+    const { VOICES } = await load('audio/instruments.js');
+    const { MUSIC } = await load('config.js');
+    const Z = await load('sea-zones.js');
+    const throws = (fn) => { try { fn(); return false; } catch { return true; } };
+
+    // the notation itself
+    expect(N.noteMidi('A4') === 69 && N.noteMidi('C4') === 60 && N.noteMidi('F#4') === 66 && N.noteMidi('Bb3') === 58, 'noteMidi: A4 is 69, C4 60, F#4 66, Bb3 58');
+    expect(Math.abs(N.hz(69) - 440) < 1e-9 && Math.abs(N.hz(57) - 220) < 1e-9, 'hz: A4 is 440 Hz');
+    for (const [key, want] of [['D major', 0], ['B minor', 0], ['E dorian', 0], ['G mixolydian', -2], ['A dorian', 5], ['C phrygian', 6]]) {
+      expect(N.keyShift(key) === want, `keyShift('${key}') is ${N.keyShift(key)}, not ${want}: one-shots would be played in the wrong key`);
+    }
+    expect(throws(() => N.parseBars('D4 . .', 4)), 'parseBars must refuse a bar with the wrong number of steps');
+    expect(throws(() => N.parseBars('. - D4 .', 4)), 'parseBars must refuse a hold with no note before it');
+    expect(throws(() => N.parseChord('H')) && throws(() => N.noteMidi('D')), 'a bad chord or note name must throw');
+
+    // themes: bars of chords match bars of tune, and nothing strays from the key
+    for (const [id, T] of Object.entries(THEMES)) {
+      let key;
+      try { key = N.parseKey(T.key); } catch (e) { errors.push(`theme ${id}: ${e.message}`); continue; }
+      for (const [pid, P] of Object.entries(T.phrases)) {
+        try {
+          const chords = N.parseChords(P.chords), tune = N.parseTune(P.tune, T.steps);
+          expect(chords.length === tune.length, `theme ${id}, phrase ${pid}: ${chords.length} bars of chords, ${tune.length} of tune`);
+          for (const n of tune.flat()) expect(key.scale.includes(n.midi % 12), `theme ${id}, phrase ${pid}: ${N.noteName(n.midi)} is not in ${T.key}`);
+          for (const c of chords.flat()) expect(key.scale.includes(c.root), `theme ${id}, phrase ${pid}: the chord ${c.name} is not in ${T.key}`);
+        } catch (e) { errors.push(`theme ${id}, phrase ${pid}: ${e.message}`); }
+      }
+    }
+    for (const v of [...Object.keys(RANGES), ...Object.values(DRUMS)]) expect(VOICES[v], `"${v}" has a range or a drum letter but audio/instruments.js has no such voice`);
+    for (const [v, V] of Object.entries(VOICES)) expect(RANGES[v] || Object.values(DRUMS).includes(v), `the voice "${v}" (${V.kind}) has no range in music/themes.js and is not a drum`);
+
+    // every cue, played through on paper
+    let bars = 0;
+    const inRange = (name, b) => {
+      for (const e of b.events) {
+        if (e.midi == null) { expect(Object.values(DRUMS).includes(e.voice), `cue ${name}: a note without a pitch on "${e.voice}"`); continue; }
+        const R = RANGES[e.voice];
+        if (!R) { errors.push(`cue ${name}: no range for "${e.voice}"`); continue; }
+        const [lo, hi] = R.map(N.noteMidi);
+        expect(e.midi >= lo && e.midi <= hi, `cue ${name}, ${e.layer}: ${N.noteName(e.midi)} is outside the ${e.voice}'s range (${R.join(' to ')})`);
+        expect(e.at >= 0 && e.at < b.seconds && e.vol > 0, `cue ${name}, ${e.layer}: a note at ${e.at.toFixed(2)} s in a bar of ${b.seconds.toFixed(2)} s, volume ${e.vol}`);
+      }
+    };
+    for (const name of Object.keys(CUES)) {
+      let C;
+      try { C = compileCue(name); } catch (e) { errors.push(e.message); continue; }
+      for (let level = 0; level <= 3; level++) {
+        for (const low of [false, true]) {
+          const S = new Score(11 + level);
+          S.setCue(name);
+          const heard = new Set();
+          for (let i = 0; i < 60; i++) {
+            const b = S.nextBar(level, { low, rests: false });
+            bars++;
+            inRange(name, b);
+            for (const e of b.events) heard.add(e.layer);
+          }
+          const want = Object.keys(C.layers).filter((id) => level >= 1 && C.layers[id].from <= level && !(low && (id === 'counter' || id === 'rhythm')));
+          if (!want.includes('bed')) want.push('bed');
+          expect([...heard].sort().join() === want.sort().join(), `cue ${name} at intensity ${level}${low ? ' on Low' : ''}: heard ${[...heard].sort().join(', ')}, expected ${want.join(', ')}`);
+        }
+      }
+      // a statement, then a rest on the bed alone for about as long as the cue says
+      const S = new Score(5);
+      S.setCue(name);
+      const rests = [];
+      let run = 0, played = false;
+      for (let t = 0; t < 1200; ) {
+        const b = S.nextBar(2);
+        t += b.seconds;
+        if (b.phase === 'play') { if (played && run) rests.push(run); run = 0; played = true; } else { run += b.seconds; expect(b.layers.join() === 'bed', `cue ${name}: ${b.layers.join(', ')} playing during a rest`); }
+      }
+      expect(rests.length >= 2, `cue ${name}: only ${rests.length} rests in twenty minutes`);
+      for (const r of rests) expect(r >= C.rest[0] - 0.01 && r <= C.rest[1] + C.barSec, `cue ${name}: a rest of ${r.toFixed(0)} s, outside ${C.rest.join('-')} s`);
+    }
+
+    // changes of cue, on the bar line
+    const same = Object.keys(CUES).filter((a) => CUES[a] && THEMES[CUES[a].theme]);
+    const pair = (alike) => {
+      for (const a of same) for (const b of same) if (a !== b && (THEMES[CUES[a].theme].key === THEMES[CUES[b].theme].key) === alike) return [a, b];
+      return null;
+    };
+    const run = (from, to, n) => {
+      const S = new Score(3), out = [];
+      S.setCue(from);
+      for (let i = 0; i < 4; i++) S.nextBar(2, { rests: false });
+      S.setCue(to);
+      for (let i = 0; i < n; i++) out.push(S.nextBar(2, { rests: false }));
+      return out;
+    };
+    const near = pair(true), far = pair(false);
+    if (near) {
+      const [a, b] = near, out = run(a, b, 3), old = CUES[a].layers.bed.voice;
+      expect(out[0].cue === b, `${a} to ${b} (the same key): the new cue should start on the next bar, not "${out[0].cue}"`);
+      if (old !== CUES[b].layers.bed.voice) {
+        expect(out[0].events.some((e) => e.voice === old) && out[1].events.some((e) => e.voice === old), `${a} to ${b}: the old bed (${old}) should die away under the new cue for two bars`);
+        expect(!out[2].events.some((e) => e.voice === old && e.layer === 'bed'), `${a} to ${b}: the old bed (${old}) is still there in the third bar`);
+      }
+    }
+    if (far) {
+      const [a, b] = far, out = run(a, b, 3), ka = N.parseKey(THEMES[CUES[a].theme].key), kb = N.parseKey(THEMES[CUES[b].theme].key);
+      expect(out.map((x) => `${x.cue}:${x.phase}`).slice(0, 2).join() === `${a}:leaving,${a}:pivot` && out[2].cue === b, `${a} to ${b} (another key): expected a bar of bed, a pivot bar, then ${b}; got ${out.map((x) => `${x.cue}:${x.phase}`).join(', ')}`);
+      expect(out[0].layers.join() === 'bed', `${a} to ${b}: the tune should drop out first`);
+      for (const e of out[1].events) expect(ka.scale.includes(e.midi % 12) && kb.scale.includes(e.midi % 12), `${a} to ${b}: the pivot note ${N.noteName(e.midi)} is not in both keys`);
+      inRange(`${a} to ${b}`, out[1]);
+    }
+    const first = Object.keys(CUES)[0];
+    if (first) {
+      const out = run(first, null, 3);
+      expect(out[0].phase === 'out' && out[1].cue === null && !out[1].events.length, `${first} to silence: expected one bar going out, then nothing; got ${out.map((x) => `${x.cue}:${x.phase}`).join(', ')}`);
+    }
+
+    // the director: each band has a cue, and the table of situations
+    for (const band of Object.keys(Z.BANDS)) expect(CUES[cueFor({ band }).cue], `the ${band} band has no cue: cueFor gives "${cueFor({ band }).cue}"`);
+    for (const [s, cue, intensity] of [
+      [{ band: 'home', speed: 0 }, 'home', 1],
+      [{ band: 'coastal', speed: MUSIC.brisk + 1 }, 'coastal', 2],
+      [{ band: 'open', speed: MUSIC.fast + 1 }, 'open', 3],
+      [{ band: 'open', speed: -(MUSIC.fast + 1) }, 'open', 3],
+      [{ band: 'home', ashore: true, speed: 0 }, null, 1],
+    ]) {
+      const got = cueFor(s);
+      expect(got.cue === cue && got.intensity === intensity, `cueFor(${JSON.stringify(s)}) gives ${got.cue} at ${got.intensity}, not ${cue} at ${intensity}`);
+    }
+
+    // ten minutes back and forth across the edge of home waters, yawing as she goes
+    let edge = 0;
+    while (Z.bandAt(edge, 0) === 'home' && edge < 1e5) edge += 5;
+    const hold = new CueHold(), dt = 0.1, leg = 37.5;
+    let raw = 0, changes = 0, lastBand = null, lastCue = null;
+    for (let t = 0; t < 600; t += dt) {
+      const band = Z.bandAt(edge + 300 * Math.sin((Math.PI * t) / leg) + 25 * Math.sin(t * 5.65), 0);
+      const cue = hold.update(dt, cueFor({ band }).cue);
+      if (lastBand && band !== lastBand) raw++;
+      if (lastCue && cue !== lastCue) changes++;
+      lastBand = band; lastCue = cue;
+    }
+    const legs = Math.round(600 / leg);
+    expect(raw > legs, `the band-edge sail only crossed the edge ${raw} times in ${legs} legs: it isn't testing the hold`);
+    expect(changes <= legs, `the music changed ${changes} times in ${legs} crossings of the home waters' edge (the band itself flipped ${raw} times)`);
+    expect(changes >= legs - 2, `the music only changed ${changes} times in ${legs} crossings: it should follow the boat across`);
+    const quick = new CueHold();
+    quick.update(0.1, 'home');
+    expect(quick.update(0.1, null) === null && quick.update(0.1, 'open') === 'open', 'CueHold: silence (going ashore) and the first cue after it are taken at once');
+
+    return { errors, note: `${Object.keys(THEMES).length} themes, ${Object.keys(CUES).length} cues (${Object.keys(CUES).join(', ')}), ${bars} bars played on paper; ${changes} changes of cue in ${legs} crossings of a band's edge, where the band flipped ${raw} times` };
   },
 
   // The sea zones (sea-zones.js): home waters hold Port Haven and grandfather's

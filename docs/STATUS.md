@@ -1123,6 +1123,70 @@ Updated 2026-11-26.
   code, with real tunes: the main theme, a cue for each band, the weather
   and each rough zone at sea, a theme per biome and landmark, and Sable's
   theme. A `jukebox.html` to listen to it. Four PRs, 12.1–12.4.
+  - [x] **12.1 The music engine** (PR-LINK):
+    - **A score is data.** Tunes are written in a small text notation
+      (`src/music/notation.js`) in `src/music/themes.js`: the Tidewake
+      theme (D major, sixteen bars) and an open-sea theme made from its
+      opening (B minor). A cue says how a theme is played somewhere: its
+      tempo, its instruments, its layers and how long it rests.
+    - **Three cues**, by band: `home` (the theme in full: flute over
+      guitar and a strings bed), `coastal` (one phrase of it at a time on
+      harp, over a squeezebox) and `open` (slow fiddle over low strings).
+      A cue plays a statement, then 30–90 s of its bed alone.
+    - **Layers by intensity**, from the boat's speed for now: the tune and
+      bass at any speed, the counter-melody from 7 m/s, the rhythm from 14
+      (`MUSIC` in `config.js`). Low quality drops the last two.
+    - **Changes on the bar** (`src/music/score.js`, pure). In the same key
+      the old bed dies away under the new cue over two bars. To another
+      key the tune drops out, the bed holds a bar, one note both keys
+      share is held for a bar, and the new cue begins. A wanted cue must
+      hold 8 s first (`CueHold` in `src/music-cues.js`).
+    - **A real clock:** bars are written onto the audio context's clock a
+      quarter of a second ahead (`src/audio/music.js`).
+    - **Fifteen instruments** in `src/audio/instruments.js`, all from
+      oscillators and noise: guitar, harp and ukulele (a plucked-string
+      model, worked out once a note and kept), celesta, music box,
+      marimba and steel drum (FM), squeezebox, flute, tin whistle, fiddle,
+      a strings pad, frame drum, bodhrán and shaker. A reverb from a
+      generated impulse replaces the echo on the music bus.
+    - **One-shots in key:** the discovery, treasure, dock, upgrade and
+      chest sounds move to the key of the cue playing. Every cue so far
+      has D major's notes, so nothing moves yet.
+    - **Retired:** the wandering pluck line at sea (`musicNote`). The
+      storm's score and the on-foot mallet line still play, and the new
+      score gives way to them, until 12.2 and 12.3 replace them.
+    - **`jukebox.html`**: every cue as a button (a change comes on the
+      next bar line), intensity and volume, the long rests on or off, Low
+      quality, and every instrument by itself. `jukebox.measure()` plays
+      each cue through an offline context. `tidewake.debug.music()` says
+      what is playing in the game, or forces a cue.
+    - **`node tools/check.mjs music`**: themes parse and stay in key,
+      every note of every cue is in its instrument's range, layers follow
+      intensity, rests are as long as the cue says, the three kinds of
+      change happen as designed, each band has a cue, and ten minutes
+      back and forth across the edge of home waters changes the music 15
+      times in 16 crossings while the band itself flips 52 times.
+    - **Measured**, 60 s of each cue at full intensity: home −41.1 dB,
+      coastal −42.4, open −42.3 (RMS), peaks −21 dB or lower, no
+      clipping. The sea's own bed is about −33 to −29 dB, so the score
+      sits some 10 dB under it. A frame took 6.8 ms with a full cue
+      playing and 6.6 ms in silence (High quality, the preview tab).
+    - A click fixed on the way: a gain node is 1 until its first event's
+      time, so a note that began between two samples let one sample
+      through at full level. Every note's gain now starts at 0 by value
+      too, in the old `tone` and `noise` helpers as well.
+    - Not built: the music volume slider (the plan gives it no PR; 12.2 is
+      the place), and the jukebox's night and rain sliders, which wait
+      for those colours in 12.2. Not measured on Low quality.
+  - [ ] Only a person can do, 12.1: **listen to it.** Nobody has heard a
+    note. In `jukebox.html`: does each instrument sound like its name
+    (the plucked strings, flute and fiddle matter most)? Is the Tidewake
+    theme a tune you'd hum? Are the three cues level with each other by
+    ear, and is the whole score too loud or too quiet under the sea in
+    the game? Do the two kinds of change (home to coastal, coastal to
+    open) sound smooth? Is the reverb too wet? The on-foot mallet line
+    now plays through the reverb instead of the echo: is it still right?
+  - [ ] 12.2 Sea music, 12.3 island music, 12.4 Sable's theme.
 
 ## Known issues
 

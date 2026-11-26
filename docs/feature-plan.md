@@ -1248,6 +1248,21 @@ goes in the story follows [rival-captain.md](rival-captain.md).
 - 12.1 is the one to get right: if the instruments sound good in the
   jukebox, the rest is composing.
 
+(As built in 12.1: the sequencer is a fourth pure module,
+`src/music/score.js`, beside the notation and the themes, so the check can
+play every cue through on paper. Intensity comes from the boat's speed
+alone so far. The plucked strings are worked out in plain code, a note at a
+time, and kept: an audio graph can't loop a delay as short as a string's
+period. The open sea's theme is in B minor, which has D major's notes, so
+it also exercises the change between keys. The title screen and the ports
+play the cue of the band they are in until 12.2 gives them their own. The
+old storm score and the on-foot line still play, with the new score
+giving way to them, until 12.2 and 12.3. The jukebox has intensity, volume,
+the rests, Low quality and each instrument by itself; its night and rain
+sliders come with those colours in 12.2, and so should the music volume
+setting, which has no PR of its own above. What was measured is under 12.1
+in [STATUS.md](STATUS.md).)
+
 **Done when:** each band, weather and rough zone at sea has its own music,
 and you can hear where you are; every biome and landmark has a theme you
 could hum; Sable's theme comes before their sails; music changes on the bar

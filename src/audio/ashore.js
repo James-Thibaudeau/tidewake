@@ -4,8 +4,10 @@
 // and the on-foot turn of the
 // score. Made from the same oscillators and noise as the rest; no samples.
 
+import { hz } from '../music/notation.js';
+
 const PENTA = [0, 2, 4, 7, 9]; // major pentatonic degrees
-const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
+const midi = hz;
 const rand = (a, b) => a + Math.random() * (b - a);
 
 // A footfall by surface (the tags in ashore/shapes.js). Each is a short burst
@@ -176,9 +178,12 @@ export class AshoreSounds {
     if (knock) this.tone(knock * tune, t, 0.07, { type: 'sine', vol: 0.08 * k, attack: 0.003, glide: knock * 0.6 });
   }
 
-  /** The on-foot one-shots. Returns false for a name it doesn't know. */
-  playAshore(name, opts, t) {
-    const v = Math.min(1.5, opts.volume ?? 1);
+  /**
+   * The on-foot one-shots. Returns false for a name it doesn't know. `shift`
+   * moves the musical ones (written in D) into the key of the cue playing.
+   */
+  playAshore(name, opts, t, shift = 0) {
+    const v = Math.min(1.5, opts.volume ?? 1), midi = (n) => hz(n + shift);
     switch (name) {
       case 'step':
         this.footfall(t, opts.surface, v);
