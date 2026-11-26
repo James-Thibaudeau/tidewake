@@ -233,6 +233,71 @@ export const REPORTS = {
     gold: 'For the story, and for telling it twice.',
     main: 'Tell it again',
   },
+  turtles: {
+    added: 'The cartographer at {port} charts where the turtles travel. Tell them while the news is fresh.',
+    title: 'News of sea turtles',
+    text: "Tell the cartographer at {port} where you saw the turtles. They're charting the routes the turtles take.",
+    label: 'A sighting to report',
+    status: 'Tell the cartographer at {port}',
+    stale: 'Your news of the turtles has gone stale. The next ones you see will be worth telling.',
+    eyebrow: 'The cartographer at {port}',
+    done: 'A line on the turtle chart',
+    pageName: 'A dotted line across the chart',
+    page: '"A whole line of them? All heading the same way?" A row of small dots goes onto the chart, pointing where the turtles were going.',
+    gold: 'For the news, while it was fresh.',
+  },
+  bloom: {
+    added: 'The naturalist at {port} has waited years to hear of the glowing sea.',
+    title: 'The glowing sea',
+    text: 'Tell the naturalist at {port} about the night the sea glowed blue.',
+    label: 'A sighting to report',
+    status: 'Tell the naturalist at {port}',
+    stale: 'Your news of the glowing sea has gone stale. It will have faded by now.',
+    eyebrow: 'The naturalist at {port}',
+    done: 'A jar of seawater',
+    pageName: "A page in the naturalist's book",
+    page: '"Blue? And your wake too?" The naturalist writes down every word, then runs out with a jar to look for it tonight.',
+    gold: 'For the news, while it was fresh.',
+  },
+  iceberg: {
+    added: 'Loose ice sinks ships. The harbormaster at {port} needs to know.',
+    title: 'An ice warning',
+    text: 'Tell the harbormaster at {port} where the iceberg broke up, so other ships can be warned.',
+    label: 'A sighting to report',
+    status: 'Tell the harbormaster at {port}',
+    stale: 'Your ice warning is stale. The ice will have drifted off by now.',
+    eyebrow: 'The harbormaster at {port}',
+    done: 'A warning posted',
+    pageName: 'A pin in the harbor chart',
+    page: '"Loose ice? Out there?" A pin goes into the harbor chart, and a lookout is sent up the tower.',
+    gold: 'For the warning. It may save a ship.',
+  },
+  waterspout: {
+    added: 'The harbormaster at {port} posts warnings for other ships. Tell them about the waterspout.',
+    title: 'A waterspout warning',
+    text: 'Tell the harbormaster at {port} where you saw the waterspout, so other ships can be warned.',
+    label: 'A sighting to report',
+    status: 'Tell the harbormaster at {port}',
+    stale: 'Your waterspout warning is stale. That storm has long blown through.',
+    eyebrow: 'The harbormaster at {port}',
+    done: 'A warning posted',
+    pageName: 'A notice on the harbor wall',
+    page: '"A spout? Out there?" A warning is chalked up on the harbor wall before you have finished telling it.',
+    gold: 'For the warning. It may save a ship.',
+  },
+  // the first bottle you open holds a letter to carry; it keeps, however long you take
+  bottle: {
+    added: 'The letter from the bottle is addressed to the harbormaster at {port}.',
+    title: 'A letter from a bottle',
+    text: 'Carry the letter you found in the bottle to the harbormaster at {port}. It has been at sea a long time.',
+    label: 'A letter to deliver',
+    status: 'Take the letter to the harbormaster at {port}',
+    eyebrow: 'The harbormaster at {port}',
+    done: 'Delivered at last',
+    pageName: 'A very late letter',
+    page: '"I know this hand." The harbormaster reads it twice, standing up. "The catch was good, and home by supper. That was forty years ago. Nobody here ever could resist a bottle."',
+    gold: 'Postage, forty years late.',
+  },
 };
 
 // The living sea (sea-events.js): what you're told when something turns up,
@@ -244,6 +309,7 @@ export const SIGHTINGS = {
     cue: 'A spout of mist, ahead to the {side}!',
     tip: 'Sail slowly alongside and the whale will stay up with you.',
     about: 'It blows, it breaches, and it goes down with a flick of its tail.',
+    wanted: 'a whale',
   },
   dolphins: {
     name: 'Dolphins',
@@ -251,6 +317,45 @@ export const SIGHTINGS = {
     cue: 'Something is leaping, ahead to the {side}!',
     tip: 'Sail fast and the dolphins will ride your bow wave.',
     about: 'Sail fast near a pod and they ride your bow wave, and pull you along.',
+    wanted: 'dolphins',
+  },
+  turtles: {
+    name: 'Sea turtles',
+    hint: 'Seen in warm southern water, by day.',
+    cue: 'Small heads in the water, ahead to the {side}.',
+    tip: "Sail slowly and you can pass among them. Mind you don't bump one.",
+    about: 'A slow line of them, coming up for air. Go gently and they let you pass.',
+    wanted: 'sea turtles',
+  },
+  bottle: {
+    name: 'A message in a bottle',
+    hint: 'Something small that glints on the water. It could be anywhere.',
+    cue: 'Something glints on the water, ahead to the {side}.',
+    tip: 'Stop beside it and haul it up.',
+    about: 'Somebody threw it in, a long time ago. Stop and haul one up to see what it says.',
+  },
+  bloom: {
+    name: 'The glowing sea',
+    hint: 'Seen in warm water, at night.',
+    cue: 'The water is glowing, ahead to the {side}.',
+    tip: 'Sail through it and look behind you.',
+    about: 'On some warm nights the sea lights up blue, and so does your wake.',
+    wanted: 'the glowing sea',
+  },
+  iceberg: {
+    name: 'An iceberg breaking up',
+    hint: 'Seen in the cold north.',
+    cue: 'Ice, ahead to the {side}!',
+    tip: 'Keep clear. The pieces it sheds will hole a hull.',
+    about: 'A slab splits off with a crack like thunder, and leaves loose ice in the water for a while.',
+    wanted: 'an iceberg breaking up',
+  },
+  waterspout: {
+    name: 'A waterspout',
+    hint: 'Seen in storms.',
+    cue: 'A waterspout, ahead to the {side}! Steer clear!',
+    tip: 'Stay well away from it. It wanders.',
+    about: 'A spinning column of water under a storm cloud. Steer round it.',
   },
   ghostShip: {
     name: 'The ghost ship',
@@ -258,6 +363,7 @@ export const SIGHTINGS = {
     cue: 'A pale green light, ahead to the {side}.',
     tip: 'Follow her if you dare, but not too close.',
     about: 'She makes no sound and leaves no wake. Follow her, but keep your distance.',
+    wanted: 'the ghost ship',
   },
   archCrabs: {
     name: 'The crabs under the arch',
@@ -283,6 +389,15 @@ export const SIGHTINGS = {
   cacheSlow: 'Slow down to haul it up',
   cacheTitle: '{gold} gold',
   cacheSub: 'An old strongbox, left by the ghost ship',
+  turtlesBump: 'You bumped a turtle! They all dive.',
+  turtlesFast: 'Too fast. The turtles dive.',
+  turtleFriend: 'One of the turtles swims along beside you.',
+  bloomIn: 'The sea glows blue around you. Look at your wake!',
+  calve: 'The iceberg is breaking up!',
+  bottlePrompt: 'Haul up the bottle',
+  bottleSlow: 'Slow down to pick up the bottle',
+  hitIce: 'Crunch! You struck the ice.',
+  hitSpout: 'The waterspout batters your hull!',
   rewardEyebrow: 'Sightings',
   rewards: {
     whale: { title: 'Five whales', text: "A whale's tail carved from driftwood, on a cord. For someone the whales have got used to. Find it in the Tailor's wardrobe." },
@@ -331,4 +446,65 @@ export const REFIT = {
   needGold: 'The shipwright needs {gold} gold to fit the {label}.',
   maxed: 'It has been everywhere.',
   notYet: 'Nothing more to fit yet.',
+};
+
+// "Sighting wanted" on the quest boards (quests.js). {what} is a kind's
+// `wanted` above, {hint} its `hint`.
+export const BOUNTY = {
+  title: 'Sighting wanted: {what}',
+  text: 'There is talk of {what} {dir} of here, about {dist} out. Go and see for yourself, then tell any harbor. {hint}',
+  search: 'Look for {what} here',
+  seen: 'You saw {what}, as asked. Tell any port for your reward.',
+};
+
+// What turns up in a bottle (sea-events.js): first a letter to carry, then
+// charts of islands you haven't found and scraps of other people's lives, turn
+// about. {port} and {place} are filled in.
+export const BOTTLES = {
+  eyebrow: 'A message in a bottle',
+  letter: { title: 'A letter, sealed with wax', name: 'For the harbormaster at {port}', text: 'The paper inside is dry. It is folded small, sealed, and addressed in faded ink. Somebody ought to deliver it.', main: "I'll take it" },
+  chart: { title: 'A scrap of a chart', name: '{place}', text: 'Somebody drew an island and threw the drawing in the sea. It matches nothing on your chart, so you copy it in: {place}.' },
+  note: { title: 'A note in a bottle', name: 'It says:' },
+  notes: [
+    'In a crooked hand you know: "Testing whether bottles really do float home. If this reaches Port Haven, tell my wife I was right."',
+    'If you are reading this, the bottle floats, and I have won a bet with my brother.',
+    'I am seven. I live at Lanternfall. Please write back. I do not know how you would.',
+    'Day forty at sea. I have named the gull that follows us. The crew say this is a bad sign.',
+    'Reward offered for one hat, blown overboard off Northwatch. It was a very good hat.',
+    'The soup at Brightwater is not as good as they say. Go anyway.',
+    'Went west. Found more sea. I am told there is more beyond it.',
+  ],
+};
+
+// The ghost ship's side chain (ghost-chain.js): see her three times, follow
+// her to where she is going, and find her captain's log ashore. {place} is the
+// island she makes for.
+export const GHOST_LOG = {
+  begin: 'Three times now. Next time you see the ghost ship, follow her all the way and see where she is going.',
+  fades: 'The ghost ship fades off {place}. She was making for the shore.',
+  title: "The ghost ship's captain",
+  text: 'The ghost ship was making for {place}. Go ashore there and climb to the top. Something of hers may still be there.',
+  noAnchor: 'The ghost ship was making for {place}. You will need an anchor that holds there before you can go ashore.',
+  status: 'Go ashore and climb {place}',
+  search: 'Search near {place}',
+  label: 'Where is she going?',
+  item: "Captain's log",
+  found: {
+    eyebrow: 'At the top of {place}',
+    title: "The captain's log",
+    text: "A ship's log wrapped in oilskin, dry as the day it was put away. Tucked in the back is the crew's pay, never drawn.",
+    gold: 'It would be a shame to leave it for the gulls.',
+    main: 'Read the log',
+  },
+  cards: [
+    { art: 'ghost', title: "The captain's log", text: 'The last pages are in a careful hand, and the ink has gone green.' },
+    { art: 'ghost', text: '"A day from home, and the harbor light in sight. I have promised the crew they will sleep ashore tonight. I have promised it every night this week."' },
+    { art: 'ghost', text: '"The light went out an hour ago. Fog, or the keeper asleep. I will not take her in blind onto the rocks. We stand off until we see it lit again."' },
+    { art: 'sunset', text: 'That is the last line. She is standing off still, waiting for a light to bring her in. Perhaps that is why she fades when a ship comes close with its lantern lit: it is never the light she is looking for.' },
+  ],
+  // on her card in the Sightings tab
+  cardFollow: 'You have seen her three times. Next time, follow her all the way.',
+  cardIsland: 'She was making for {place}.',
+  cardDone: "You found her captain's log.",
+  read: 'Read the log again',
 };

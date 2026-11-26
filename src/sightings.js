@@ -1,25 +1,40 @@
 // The living sea's rules (Phase 7): which events can turn up where, how one is
 // picked and placed, what counts as seeing it, and the Sightings log. The
-// director that runs them is sea-events.js; the creatures are sea-life.js and
-// ghost-ship.js. This file imports no three.js and touches no DOM, so
+// director that runs them is sea-events.js; the things themselves are
+// sea-life.js (animals), sea-wonders.js (weather, ice, the bloom, the bottle)
+// and ghost-ship.js. This file imports no three.js and touches no DOM, so
 // tools/check.mjs can run it in Node.
 //
 // state.sightings = {
 //   seen: { [kind]: { n, day, near } },   how often, and when and where first
+//                                         (the bottle's entry also counts those `opened`, and the `notes` read)
 //   miss: { [kind]: n },                  rolls a kind could have won but didn't (the pity timer)
+//   chain: null | { stage, island? },     the ghost ship's side chain (ghost-chain.js)
 // }
 import { WORLD_HALF } from './config.js';
 import { TAU, clamp } from './util.js';
 
-// What the director can roll. `life` is how long one stays, in seconds, if you
-// leave it alone; `rare` kinds get the stronger pity timer.
+// What the director can roll. `rare` kinds get the stronger pity timer;
+// `place` changes where one appears (see placeEvent); `near` is how close
+// counts as seeing it, where that isn't NEAR.
 export const EVENTS = {
-  whale: { life: [70, 100] },
-  dolphins: { life: [60, 90] },
-  ghostShip: { life: [90, 120], rare: true },
+  whale: {},
+  dolphins: {},
+  turtles: {},
+  bottle: { place: { min: 90, max: 170, clear: 30 } },           // small: it has to be close to be noticed at all
+  bloom: { place: { min: 150, max: 210, clear: 40 }, near: 150 }, // a patch 170 m across the middle: you sail into it
+  iceberg: { place: { min: 170, max: 300, clear: 90 } },
+  waterspout: { place: { min: 190, max: 320, clear: 70 } },
+  ghostShip: { rare: true },
 };
 // The Sightings tab's cards, in order (the crabs are seen at Archway Isle, reports.js).
-export const LOG = ['whale', 'dolphins', 'ghostShip', 'archCrabs'];
+export const LOG = ['whale', 'dolphins', 'turtles', 'bottle', 'bloom', 'iceberg', 'waterspout', 'ghostShip', 'archCrabs'];
+// Who ashore wants to hear about each kind: a giver role from quests.js.
+export const HEARS = { whale: 'chart', turtles: 'chart', dolphins: 'deliver', ghostShip: 'salvage', iceberg: 'retrieve', waterspout: 'retrieve',
+  bloom: 'report', archCrabs: 'report', bottle: 'retrieve' };
+// Kinds a quest board can ask for ("Sighting wanted"): the ones you can go looking for.
+export const BOUNTY_KINDS = ['whale', 'dolphins', 'turtles', 'iceberg', 'bloom', 'ghostShip'];
+const BOUNTY_BOOST = 4; // how much likelier a wanted kind is inside its search circle
 // Seeing a kind this often earns a piece for the wardrobe.
 export const MILESTONES = {
   whale: { n: 5, cosmetic: 'neck:whaleTail' },
@@ -43,15 +58,47 @@ export function regionAt(z) {
  * ctx: { z, night (0-1), weather ('clear' | 'breezy' | 'cloudy' | 'rain' | 'storm' | 'fog'), chapter (the main story's) }
  */
 export function eventWeights(ctx) {
-  const region = regionAt(ctx.z), w = ctx.weather, night = ctx.night > 0.6;
+  const region = regionAt(ctx.z), w = ctx.weather, night = ctx.night > 0.6, day = ctx.night < 0.3;
   return {
     // whales keep to cool water, and stay down in a storm
     whale: w === 'storm' ? 0 : { cold: 1.4, temperate: 1, tropical: 0 }[region],
     // dolphins like warm water and fine weather
     dolphins: w === 'clear' || w === 'breezy' ? { cold: 0, temperate: 1, tropical: 1.3 }[region] : 0,
+    // turtles: tropical water, by day, and not in rain or a storm
+    turtles: region === 'tropical' && day && w !== 'rain' && w !== 'storm' ? 1 : 0,
+    // a bottle can wash up anywhere, now and then, but you'd never spot one in a storm
+    bottle: w === 'storm' ? 0 : 0.35,
+    // the glowing bloom: warm water, at night
+    bloom: night && w !== 'storm' ? { cold: 0, temperate: 0.5, tropical: 1 }[region] : 0,
+    // icebergs calve in the cold north, in any weather
+    iceberg: region === 'cold' ? 1.2 : 0,
+    // waterspouts come with storms, and little else does
+    waterspout: w === 'storm' ? 3 : 0,
     // the ghost ship: any water, only at night, likelier in fog, and not before the first journal
     ghostShip: night && (ctx.chapter || 0) >= 2 ? (w === 'fog' ? 0.9 : 0.3) : 0,
   };
+}
+
+/** Can this kind ever turn up at this latitude, given the right hour and weather? */
+export function canHappenAt(kind, z) {
+  for (const night of [0, 1]) for (const weather of ['clear', 'fog', 'storm']) if (eventWeights({ z, night, weather, chapter: 9 })[kind] > 0) return true;
+  return false;
+}
+
+/**
+ * Sightings a board has asked for make their kind likelier inside their
+ * search circle (never where or when it couldn't happen at all). `weights`
+ * is changed in place; bounties: [{ kind, x, z, r }]. Returns true if the
+ * boat at (x, z) is inside one, so the director can look harder.
+ */
+export function applyBounties(weights, bounties, x, z) {
+  let inside = false;
+  for (const b of bounties) {
+    if (Math.hypot(b.x - x, b.z - z) > b.r) continue;
+    inside = true;
+    if (weights[b.kind] > 0) weights[b.kind] *= BOUNTY_BOOST;
+  }
+  return inside;
 }
 
 /**

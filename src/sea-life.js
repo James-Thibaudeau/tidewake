@@ -394,3 +394,135 @@ export class DolphinPod {
     }
   }
 }
+
+// ------------------------------------------------------------------ turtles
+const TURTLE = { shell: '#5d7a4a', plate: '#4a6339', skin: '#d9cf9a', skin2: '#b9ad74', eye: '#141c28' };
+const LINE_MAX = 7;
+
+let turtleGeo = null;
+function turtleGeometry() {
+  if (turtleGeo) return turtleGeo;
+  const parts = [
+    part(sph(1, 12, 8), TURTLE.shell, { sx: 0.56, sy: 0.3, sz: 0.72, c2: TURTLE.skin2, split: 0.3, soft: 0.05 }),
+    part(sph(1, 8, 5), TURTLE.plate, { y: 0.17, sx: 0.36, sy: 0.16, sz: 0.5 }),
+    part(sph(0.17, 8, 6), TURTLE.skin, { y: 0.08, z: 0.82, sz: 1.25 }),
+    part(cone(0.07, 0.26, 5), TURTLE.skin, { y: -0.02, z: -0.8, rx: -PI / 2 }),
+  ];
+  for (const s of [-1, 1]) {
+    parts.push(
+      part(sph(1, 8, 5), TURTLE.skin, { x: s * 0.62, y: -0.06, z: 0.36, sx: 0.46, sy: 0.05, sz: 0.19, ry: s * 0.5, rz: -s * 0.15 }),
+      part(sph(1, 8, 5), TURTLE.skin, { x: s * 0.44, y: -0.08, z: -0.56, sx: 0.24, sy: 0.05, sz: 0.15, ry: -s * 0.7 }),
+      part(sph(0.03, 6, 4), TURTLE.eye, { x: s * 0.12, y: 0.13, z: 0.92 }),
+    );
+  }
+  turtleGeo = merge(parts);
+  for (const p of parts) p.dispose();
+  return turtleGeo;
+}
+
+/** One sea turtle, about 1.6 m long, nose towards +z. */
+export function buildTurtle() {
+  const g = new THREE.Group();
+  g.rotation.order = 'YXZ';
+  g.add(new THREE.Mesh(turtleGeometry(), propMaterial), new THREE.Mesh(turtleGeometry(), thinOutline));
+  return g;
+}
+
+/**
+ * A slow line of sea turtles, coming up for air. Sail among them slowly and
+ * one swims along beside you for a while; come in fast, or bump one, and they
+ * all dive.
+ */
+export class Turtles {
+  constructor(scene) {
+    this.group = new THREE.Group();
+    this.group.visible = false;
+    this.line = [];
+    for (let i = 0; i < LINE_MAX; i++) {
+      const mesh = buildTurtle();
+      mesh.scale.setScalar(1.25);
+      this.group.add(mesh);
+      this.line.push({ mesh });
+    }
+    this.pos = { x: 0, z: 0 };
+    this.size = 14;
+    this.done = true;
+    scene.add(this.group);
+  }
+
+  start({ at, boat, rng, sea }) {
+    this.sea = sea;
+    this.heading = boat.heading + at.side * (0.9 + rng() * 0.6); // across your course, so you meet the line
+    this.n = 5 + Math.floor(rng() * 3);
+    const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
+    this.line.forEach((t, i) => {
+      t.mesh.visible = i < this.n;
+      // strung out along their course, a few metres apart, none quite in line
+      const back = (i - (this.n - 1) / 2) * (6.5 + rng() * 2), off = (rng() - 0.5) * 5;
+      t.x = at.x - fx * back + fz * off; t.z = at.z - fz * back - fx * off;
+      t.phase = rng() * TAU; t.depth = 0; t.yaw = this.heading + (rng() - 0.5) * 0.3;
+    });
+    this.life = 75 + rng() * 30;
+    this.phase = 'swim'; this.t = 0;
+    this.calm = 0;         // seconds a slow boat has been among them
+    this.friend = null;    // the one that comes along with you
+    this.friendT = 0;
+    this.done = false;
+    this.group.visible = true;
+    this.pose(0, boat);
+  }
+
+  leave() { if (!this.done && this.phase !== 'dive') { this.phase = 'dive'; this.t = 0; this.friend = null; } }
+  stop() { this.done = true; this.group.visible = false; }
+
+  /** Move and draw every turtle; returns how near the nearest is to the boat (not counting the one keeping you company). */
+  pose(dt, b) {
+    const fast = Math.abs(b.speed), diving = this.phase === 'dive';
+    let near = Infinity, cx = 0, cz = 0;
+    for (let i = 0; i < this.n; i++) {
+      const t = this.line[i], m = t.mesh;
+      if (t !== this.friend) near = Math.min(near, Math.hypot(t.x - b.x, t.z - b.z));
+      let speed = 1.1, want = this.heading;
+      if (t === this.friend) {
+        // alongside, a few metres off the beam
+        const tx = b.x - Math.cos(b.heading) * 5.5 * t.side + Math.sin(b.heading) * 1.5, tz = b.z + Math.sin(b.heading) * 5.5 * t.side + Math.cos(b.heading) * 1.5;
+        want = Math.atan2(tx - t.x, tz - t.z);
+        speed = Math.min(5.2, Math.hypot(tx - t.x, tz - t.z) * 0.9 + fast * 0.6);
+      }
+      t.yaw = dampAngle(t.yaw, want, 1.6, dt);
+      t.x += Math.sin(t.yaw) * speed * dt; t.z += Math.cos(t.yaw) * speed * dt;
+      // up for a breath, then just under, each in its own time; once they dive they stay down
+      const breath = Math.sin(this.t * 0.55 + t.phase);
+      t.depth = damp(t.depth, diving ? 3.2 : breath > 0.2 ? 0 : 0.42, diving ? 1.1 : 2, dt);
+      m.position.set(t.x, waveHeight(t.x, t.z) - 0.1 - t.depth, t.z);
+      m.rotation.set(diving ? Math.min(0.7, this.t * 0.6) : Math.sin(this.t * 0.9 + t.phase) * 0.06, t.yaw, Math.sin(this.t * 1.3 + t.phase) * 0.08);
+      cx += t.x; cz += t.z;
+    }
+    this.pos.x = cx / this.n; this.pos.z = cz / this.n;
+    return near;
+  }
+
+  update(dt, ctx) {
+    if (this.done) return;
+    const b = ctx.boat, fast = Math.abs(b.speed);
+    this.t += dt;
+    const near = this.pose(dt, b);
+    if (this.phase === 'dive') { if (this.t > 3.5) this.stop(); return; }
+    this.life -= dt;
+    if (near < 2.3) { ctx.say(SIGHTINGS.turtlesBump); ctx.play('splash', b.x, b.z); this.leave(); return; }
+    if (near < 24 && fast > 7) { ctx.say(SIGHTINGS.turtlesFast); this.leave(); return; }
+    // a boat going gently among them: after a moment, one comes along
+    this.calm = near < 15 && fast < 5 && fast > 0.8 ? this.calm + dt : 0;
+    if (!this.friend && this.calm > 3 && this.friendT === 0) {
+      const nearest = (a, t) => (Math.hypot(t.x - b.x, t.z - b.z) < Math.hypot(a.x - b.x, a.z - b.z) ? t : a);
+      this.friend = this.line.slice(0, this.n).reduce(nearest);
+      // which side of the boat it is on already (right is (-cos h, sin h))
+      this.friend.side = Math.sign((this.friend.x - b.x) * -Math.cos(b.heading) + (this.friend.z - b.z) * Math.sin(b.heading)) || 1;
+      this.life += 25;
+      ctx.say(SIGHTINGS.turtleFriend);
+    }
+    if (this.friend) { this.friendT += dt; if (this.friendT > 28 || fast > 7.5) this.friend = null; }
+    const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
+    if (this.life <= 0 || !openWater(this.sea, this.pos.x + fx * 40, this.pos.z + fz * 40, 20)) this.leave();
+  }
+}

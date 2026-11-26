@@ -10,7 +10,7 @@ import { pointOfSailName } from './boat.js';
 import { loadSave, writeSave, clearSave, encodeBytes, decodeBytes, loadSettings, saveSettings, migrate } from './save.js';
 import { Emitter } from './events.js';
 import { STYLES, normalizeProfile } from './cosmetics.js';
-import { LINES } from './story-text.js';
+import { LINES, SIGHTINGS } from './story-text.js';
 
 const SPYGLASS_HINT = LINES.spyglassHint;
 // Sea camera: the lowest it orbits (radians above the boat), and how far past
@@ -76,7 +76,7 @@ export class Game {
       // the rival captain (rival.js)
       rival: { chapter: 0, wins: 0, losses: 0, flags: {}, log: [] },
       // the living sea's log: what you've seen, and the pity counts (sea-events.js)
-      sightings: { seen: {}, miss: {} },
+      sightings: { seen: {}, miss: {}, chain: null },
     };
   }
 
@@ -343,7 +343,7 @@ export class Game {
       this.ui.flashDamage(amount);
       this.audio.play('crash');
       this.cam.shake = Math.min(1.5, 0.3 + amount / 15);
-      this.ui.toast(kind === 'rock' ? 'Crunch! You struck a rock.' : 'You ran aground!', 'warn');
+      this.ui.toast({ rock: 'Crunch! You struck a rock.', ice: SIGHTINGS.hitIce, spout: SIGHTINGS.hitSpout }[kind] || 'You ran aground!', 'warn');
     } else if (Math.random() < amount * 0.6) {
       this.ui.flashDamage(2);
       this.cam.shake = 0.25;
@@ -618,6 +618,7 @@ export class Game {
     const L = ringUniforms.uLight.value.copy(this.env.oceanAmbient).add(this.env.oceanLight);
     L.r = Math.min(L.r, 1.1); L.g = Math.min(L.g, 1.1); L.b = Math.min(L.b, 1.1);
     boat.wakeMat.uniforms.uLight.value.copy(L);
+    this.seaEvents?.tintWake(boat.wakeMat.uniforms.uLight.value); // blue, in the glowing bloom
     boat.wakeMat.uniforms.uScale.value = this.renderer.domElement.height / (2 * Math.tan((this.camera.fov * Math.PI) / 360));
     this.ocean.update(this.camera);
     if (!onLand) {

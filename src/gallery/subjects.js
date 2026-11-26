@@ -32,7 +32,9 @@ import { buildArchwayLevel } from '../ashore/archway.js';
 import { buildArchwayLayout } from '../ashore/archway-layout.js';
 import { pieceArt as archwayPieceArt } from '../ashore/archway-art.js';
 import { buildSeaArch, ARCH } from '../sea-arch.js';
-import { buildWhale, buildDolphin } from '../sea-life.js';
+import { buildWhale, buildDolphin, buildTurtle } from '../sea-life.js';
+import { buildWaterspout, buildIceberg, buildBottle } from '../sea-wonders.js';
+import { buildGull, buildFish } from '../sea-ambient.js';
 import { buildGhostShip } from '../ghost-ship.js';
 import { generateLevel } from '../ashore/levelgen.js';
 import { layoutLevel } from '../ashore/modules.js';
@@ -258,10 +260,12 @@ function arch(q, stage) {
   };
 }
 
-// The living sea (sea-life.js, ghost-ship.js): `kind` is whale, dolphin or
-// ghost. The animals stand on the floor, whole, so the parts the sea hides in
-// the game can be checked; the ghost ship floats on the sea, as she does there.
-const SEALIFE = ['whale', 'dolphin', 'ghost'];
+// The living sea (sea-life.js, sea-wonders.js, sea-ambient.js, ghost-ship.js):
+// `kind` picks one. The animals stand on the floor, whole, so the parts the sea
+// hides in the game can be checked; the ghost ship, the iceberg and the
+// waterspout stand in the sea, as they do there. (The glowing bloom is drawn
+// by the ocean itself, so it can only be looked at in the game.)
+const SEALIFE = ['whale', 'dolphin', 'turtle', 'gull', 'fish', 'bottle', 'berg', 'spout', 'ghost'];
 function sealife(q, stage) {
   initProps();
   const warnings = [];
@@ -277,11 +281,38 @@ function sealife(q, stage) {
       dispose() { G.group.traverse((o) => o.material?.dispose()); }, // her geometry is shared with the game's
     };
   }
-  if (kind === 'dolphin') {
-    const D = buildDolphin();
-    D.position.y = 0.5;
+  if (kind === 'dolphin' || kind === 'turtle' || kind === 'fish') {
+    const D = kind === 'dolphin' ? buildDolphin() : kind === 'turtle' ? buildTurtle() : buildFish();
+    D.position.y = kind === 'fish' ? 0.2 : 0.5;
     stage.add(D);
-    return { group: D, ground: 'floor', warnings, look: { y: 0.5 }, dispose() {} }; // shared geometry
+    return { group: D, ground: 'floor', warnings, look: { y: D.position.y }, dispose() {} }; // shared geometry
+  }
+  if (kind === 'gull') {
+    const G = buildGull();
+    G.group.position.y = 1;
+    stage.add(G.group);
+    return {
+      group: G.group, ground: 'floor', warnings, look: { y: 1 },
+      update(dt, t) { const a = Math.sin(t * 5) * 0.45; G.wings[0].rotation.z = a; G.wings[1].rotation.z = -a; },
+      dispose() {},
+    };
+  }
+  if (kind === 'bottle') {
+    const B = buildBottle();
+    B.tilt.rotation.z = 0.95;
+    B.group.position.y = 0.6;
+    B.glint.scale.setScalar(1.6);
+    stage.add(B.group);
+    return { group: B.group, ground: 'floor', warnings, look: { y: 0.6 }, dispose() { B.glint.material.dispose(); } };
+  }
+  if (kind === 'berg' || kind === 'spout') {
+    const M = kind === 'berg' ? buildIceberg() : buildWaterspout();
+    stage.add(M.group);
+    return {
+      group: M.group, ground: 'sea', warnings, look: { y: kind === 'berg' ? 6 : 30 },
+      update(dt) { if (M.funnel) M.funnel.rotation.y -= dt * 3.4; },
+      dispose() { M.group.traverse((o) => o.geometry?.dispose()); },
+    };
   }
   const W = buildWhale();
   W.group.position.y = 1.75;

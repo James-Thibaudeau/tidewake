@@ -197,10 +197,14 @@ export class PortUI {
       const M = MILESTONES[kind], item = M && STYLES.find((x) => x.id === M.cosmetic);
       if (item) meta.push(`<span class="cos">${esc(put(s.n >= M.n ? SIGHTINGS.earned : SIGHTINGS.toGo, { n: s.n, of: M.n, item: item.name.toLowerCase() }))}</span>`);
       const r = reports[kind], port = r?.state === 'active' ? g.world.islands[r.port] : null;
+      // the ghost ship's card follows her side chain, and keeps her captain's log once you have it
+      const chain = kind === 'ghostShip' ? g.seaEvents?.chain.card() : null;
       return `<div class="card qCard sCard">${art}<div class="qTitle">${esc(T.name)}</div>
         <div class="qText">${esc(T.about)}</div>
         <div class="qText sFirst">${esc(put(SIGHTINGS.firstSeen, { day: s.day || 1 }))}${s.near ? `, ${esc(s.near)}` : ''}.</div>
         <div class="qMeta">${meta.join('')}</div>
+        ${chain ? `<div class="qStatus">${esc(chain.text)}</div>` : ''}
+        ${chain?.read ? `<div class="row2"><button class="btn" data-ghostlog="1">${esc(chain.read)}</button></div>` : ''}
         ${port ? `<div class="qStatus">${esc(put(SIGHTINGS.news, { port: port.name }))}</div>` : ''}</div>`;
     }).join('');
     return `<div class="qEmpty">${esc(SIGHTINGS.intro)}</div><div class="grid sGrid">${cards}</div>`;

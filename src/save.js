@@ -31,7 +31,8 @@ export function migrate(d) {
   d.rival.log = Array.isArray(rv.log) ? rv.log : pastTalk(d.rival.chapter, d.profile?.name || 'Captain');
   // the Sightings log (sea-events.js). Crabs seen before the log was kept go in it.
   const sg = d.sightings && typeof d.sightings === 'object' ? d.sightings : {};
-  d.sightings = { seen: sg.seen && typeof sg.seen === 'object' ? sg.seen : {}, miss: sg.miss && typeof sg.miss === 'object' ? sg.miss : {} };
+  d.sightings = { seen: sg.seen && typeof sg.seen === 'object' ? sg.seen : {}, miss: sg.miss && typeof sg.miss === 'object' ? sg.miss : {},
+    chain: sg.chain && typeof sg.chain === 'object' ? sg.chain : null };
   const crabs = d.quests.reports.archCrabs;
   if (crabs && !d.sightings.seen.archCrabs) d.sightings.seen.archCrabs = { n: 1, day: crabs.day || 1, near: 'at Archway Isle' };
   d.v = SAVE_VERSION;

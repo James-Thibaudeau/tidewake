@@ -6,6 +6,8 @@
 // An actor for the event director (sea-events.js), like the animals in
 // sea-life.js: start(), update(dt, ctx), leave(), pos, size, done. When she has
 // led you somewhere, `cacheAt` is where, and the director puts the find there.
+// Once her side chain has begun (ghost-chain.js) the director hands her a
+// `cove` to make for instead, and `ledTo` says you followed her to it.
 //
 // She is drawn in two passes so that she reads as one see-through shell and
 // not as a tangle of overlapping sails: first her depth alone, then her colour
@@ -174,13 +176,15 @@ export class GhostShip {
     scene.add(this.group);
   }
 
-  start({ at: where, boat, rng, sea }) {
+  start({ at: where, boat, rng, sea, cove = null }) {
     this.pos.x = where.x; this.pos.z = where.z;
     this.sea = sea;
-    this.cacheAt = null;
+    this.cacheAt = null; this.ledTo = null;
     // She sails across your bow and on towards a spot she means to lead you to:
-    // open water some way off, with a clear run to it.
-    this.lead = null;
+    // the island her chain points at, or else open water some way off with a
+    // clear run to it.
+    this.lead = cove;
+    this.toCove = !!cove;
     const across = boat.heading + where.side * (0.5 + rng() * 0.5);
     for (let t = 0; t < 30 && !this.lead; t++) {
       const a = across + (rng() - 0.5) * 1.6, d = 650 + rng() * 300;
@@ -224,11 +228,14 @@ export class GhostShip {
       const fx = Math.sin(this.heading), fz = Math.cos(this.heading);
       this.pos.x += fx * speed * dt; this.pos.z += fz * speed * dt;
       if (d < TOO_CLOSE) this.leave(SIGHTINGS.tooClose, ctx);
-      else if (ctx.night < 0.45) this.leave(SIGHTINGS.dawn, ctx);
+      // (with a ship close behind her she holds on a little into the dawn)
+      else if (ctx.night < (following ? 0.12 : 0.45)) this.leave(SIGHTINGS.dawn, ctx);
       else if (this.lead) {
         if (Math.hypot(this.lead.x - this.pos.x, this.lead.z - this.pos.z) < 14) {
-          if (following) { this.cacheAt = { x: this.lead.x, z: this.lead.z }; this.leave(SIGHTINGS.led, ctx); } else this.leave();
-        } else if (this.age > 300) this.leave();
+          if (!following) this.leave();
+          else if (this.toCove) { this.ledTo = this.lead; this.leave(); }
+          else { this.cacheAt = { x: this.lead.x, z: this.lead.z }; this.leave(SIGHTINGS.led, ctx); }
+        } else if (this.age > (this.toCove ? 420 : 300)) this.leave();
       } else {
         this.life -= dt;
         if (this.life <= 0 || !openWater(this.sea, this.pos.x + fx * 70, this.pos.z + fz * 70, 40)) this.leave();

@@ -181,9 +181,10 @@ export class UI {
     this.el.journalBody?.addEventListener('click', async (e) => {
       const page = e.target.closest('button[data-page]');
       if (page) { if (!page.classList.contains('missing')) { this.click(); this.journalPage = page.dataset.page; this.renderJournal(); } return; }
-      const b = e.target.closest('button[data-pin], button[data-abandon]');
+      const b = e.target.closest('button[data-pin], button[data-abandon], button[data-ghostlog]');
       if (!b) return;
       this.click();
+      if (b.dataset.ghostlog) { this.closeJournal(); g.seaEvents?.chain.read(); return; }
       if (b.dataset.pin) { g.quests?.pin(b.dataset.pin); this.renderJournal(); return; }
       const q = g.quests?.active.find((x) => x.id === b.dataset.abandon);
       if (!q) return;

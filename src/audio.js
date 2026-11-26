@@ -439,6 +439,22 @@ export class SoundSystem {
         this.noise(t, 0.6, { type: 'lowpass', freq: 260, vol: 0.35 * v, buf: this.brown });
         break;
       }
+      case 'whirl': {
+        // a waterspout: a rising and falling rush of wind
+        const v = Math.min(1, opts.volume ?? 1);
+        this.noise(t, 2.6, { type: 'bandpass', freq: 500, sweep: 1100, q: 1.4, vol: 0.3 * v, attack: 0.9 });
+        this.noise(t, 2.6, { type: 'lowpass', freq: 180, vol: 0.28 * v, attack: 0.6, buf: this.brown });
+        break;
+      }
+      case 'crack': {
+        // ice letting go: a sharp report, then a long low groan
+        const v = Math.min(1, opts.volume ?? 1);
+        this.noise(t, 0.16, { type: 'highpass', freq: 2400, vol: 0.5 * v, attack: 0.002 });
+        this.noise(t + 0.05, 0.5, { type: 'bandpass', freq: 900, sweep: 300, q: 0.8, vol: 0.35 * v, attack: 0.005 });
+        this.tone(88, t + 0.1, 1.8, { type: 'sine', vol: 0.3 * v, attack: 0.05, glide: 46 });
+        this.noise(t + 0.15, 1.8, { type: 'lowpass', freq: 240, vol: 0.3 * v, attack: 0.1, buf: this.brown });
+        break;
+      }
       case 'chirp': {
         // dolphins: a few quick rising whistles
         const v = Math.min(1, opts.volume ?? 1);

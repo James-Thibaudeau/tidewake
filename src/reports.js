@@ -1,9 +1,11 @@
 // Report quests: you see something out at sea, and somebody ashore wants to
 // hear about it. The crabs that live upside down under the great arch at
 // Archway Isle are found here, by sailing through the arch, and a naturalist
-// wants them written down. The living sea's whales, dolphins and ghost ship
-// (sea-events.js) each have somebody who cares too: a cartographer, a
-// merchant, an old salt.
+// wants them written down. Everything the living sea turns up (sea-events.js)
+// has somebody who cares too: a cartographer for whales and turtles, a
+// merchant for dolphins, a harbormaster for ice and waterspouts, a naturalist
+// for the glowing sea, an old salt for the ghost ship. A letter found in a
+// bottle is carried the same way.
 //
 // state.quests.reports = { [kind]: { state: 'active' | 'done', port, day } }
 // A report takes no side-quest slot, like a story step: it is listed and
@@ -14,16 +16,22 @@
 // The words are REPORTS in story-text.js.
 import { REPORTS } from './story-text.js';
 import { giversFor } from './quests.js';
+import { HEARS } from './sightings.js';
 import { ARCH } from './sea-arch.js';
 import { damp } from './util.js';
 
-// What each kind of sighting pays when it's reported, who hears it (a giver
-// role from quests.js), and how many days the news keeps.
+// What each kind of sighting pays when it's reported, and how many days the
+// news keeps (none: it never goes stale). Who hears it is HEARS in sightings.js.
 const KINDS = {
-  archCrabs: { gold: 120, cosmetic: 'extra:crabPin', role: 'report' },
-  whale: { gold: 90, role: 'chart', stale: 3 },
-  dolphins: { gold: 60, role: 'deliver', stale: 3 },
-  ghostShip: { gold: 150, role: 'salvage', stale: 3 },
+  archCrabs: { gold: 120, cosmetic: 'extra:crabPin' },
+  whale: { gold: 90, stale: 3 },
+  dolphins: { gold: 60, stale: 3 },
+  turtles: { gold: 70, stale: 3 },
+  bloom: { gold: 80, stale: 3 },
+  iceberg: { gold: 100, stale: 3 },
+  waterspout: { gold: 110, stale: 2 },
+  ghostShip: { gold: 150, stale: 3 },
+  bottle: { gold: 80 },
 };
 const questId = (kind) => `report:${kind}`;
 // the clear water between the arch's legs (their collision rocks are 6 wide, in arch units)
@@ -134,7 +142,7 @@ export class Reports {
     for (const [kind, r] of Object.entries(this.R)) {
       const T = REPORTS[kind], port = this.world.islands[r.port];
       if (r.state !== 'active' || !T || !port || !KINDS[kind]) continue;
-      const who = giversFor(port)[KINDS[kind].role];
+      const who = giversFor(port)[HEARS[kind]];
       out.push({ id: questId(kind), type: 'story', state: 'active', kind, title: T.title, text: fill(T.text, { port: port.name }),
         giver: { name: who.name, role: who.role, label: T.label }, reward: { gold: KINDS[kind].gold } });
     }

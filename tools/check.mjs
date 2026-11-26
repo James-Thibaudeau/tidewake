@@ -284,7 +284,7 @@ const checks = {
     const { SAVE_VERSION } = await load('config.js');
     const v1 = { v: 1, banked: 240, cargo: 0, health: 80, upgrades: { sail: 1 }, discovered: [0, 3], savePort: 0 };
     const cases = { empty: {}, v1, garbage: { quests: 7, story: 'x', rival: null, hold: {}, wardrobe: 'hat', ashore: null } };
-    const objects = { quests: ['active', 'done', 'boards', 'pinned', 'reports'], story: ['chapter', 'journals', 'flags', 'seenCards'], rival: ['chapter', 'wins', 'losses', 'flags', 'log'], ashore: [], sightings: ['seen', 'miss'] };
+    const objects = { quests: ['active', 'done', 'boards', 'pinned', 'reports'], story: ['chapter', 'journals', 'flags', 'seenCards'], rival: ['chapter', 'wins', 'losses', 'flags', 'log'], ashore: [], sightings: ['seen', 'miss', 'chain'] };
     const arrays = ['wardrobe', 'hold'];
     for (const [label, input] of Object.entries(cases)) {
       const d = migrate(structuredClone(input));
@@ -313,8 +313,8 @@ const checks = {
     // crabs reported before the Sightings log was kept go in it; a log already there is left alone
     const crabbed = migrate({ quests: { reports: { archCrabs: { state: 'done', port: 4, day: 6 } } } }).sightings.seen.archCrabs;
     if (crabbed?.n !== 1 || crabbed.day !== 6) errors.push('a save with the crabs reported should have them in the Sightings log');
-    const kept = migrate({ sightings: { seen: { whale: { n: 3, day: 2, near: 'x' } }, miss: { ghostShip: 4 } } }).sightings;
-    if (kept.seen.whale?.n !== 3 || kept.miss.ghostShip !== 4) errors.push('migrate changed the Sightings log');
+    const kept = migrate({ sightings: { seen: { whale: { n: 3, day: 2, near: 'x' } }, miss: { ghostShip: 4 }, chain: { stage: 2, island: 31 } } }).sightings;
+    if (kept.seen.whale?.n !== 3 || kept.miss.ghostShip !== 4 || kept.chain?.island !== 31) errors.push('migrate changed the Sightings log');
     return { errors, note: `${Object.keys(cases).length} saves` };
   },
 
@@ -325,11 +325,12 @@ const checks = {
   async sea(count = 3000) {
     const errors = [];
     const S = await load('sightings.js');
-    const { EVENTS, LOG, MILESTONES, eventWeights, pickKind, placeEvent, openWater, recordSighting, nextRoll } = S;
+    const { EVENTS, LOG, MILESTONES, HEARS, BOUNTY_KINDS, eventWeights, canHappenAt, applyBounties, pickKind, placeEvent, openWater, recordSighting, nextRoll } = S;
     const { mulberry32 } = await load('util.js');
     const { WORLD_HALF } = await load('config.js');
     const { STYLES } = await load('cosmetics.js');
-    const { SIGHTINGS, REPORTS } = await load('story-text.js');
+    const { SIGHTINGS, REPORTS, BOUNTY, BOTTLES, GHOST_LOG } = await load('story-text.js');
+    const ROLES = { chart: 1, deliver: 1, salvage: 1, retrieve: 1, report: 1 }; // the giver roles in quests.js (which needs three.js)
     const expect = (ok, what) => { if (!ok) errors.push(what); };
     const kinds = Object.keys(EVENTS);
 
@@ -346,6 +347,29 @@ const checks = {
     expect(W({ night: 1, chapter: 1 }).ghostShip === 0, 'the ghost ship turns up before the first journal');
     expect(W({ night: 1, weather: 'fog' }).ghostShip > W({ night: 1 }).ghostShip && W({ night: 1 }).ghostShip > 0, 'the ghost ship should turn up at night, likelier in fog');
     expect(W({ night: 1 }).ghostShip < W({ night: 1 }).whale, 'the ghost ship should be rarer than a whale');
+    expect(W({ z: south }).turtles > 0 && W().turtles === 0 && W({ z: north }).turtles === 0, 'turtles should turn up in tropical water only');
+    expect(W({ z: south, night: 1 }).turtles === 0 && W({ z: south, weather: 'rain' }).turtles === 0, 'turtles turn up at night or in the rain');
+    expect(W({ z: south, night: 1 }).bloom > W({ night: 1 }).bloom && W({ night: 1 }).bloom > 0, 'the bloom should be likeliest in tropical water, and found in temperate water');
+    expect(W({ z: south }).bloom === 0 && W({ z: north, night: 1 }).bloom === 0, 'the bloom turns up by day or in cold water');
+    expect(W({ z: north }).iceberg > 0 && W().iceberg === 0 && W({ z: south }).iceberg === 0, 'icebergs should turn up in cold water only');
+    expect(W({ weather: 'storm' }).waterspout > 0 && ['clear', 'breezy', 'cloudy', 'rain', 'fog'].every((w) => W({ weather: w }).waterspout === 0), 'waterspouts should turn up in storms only');
+    expect(W().bottle > 0 && W({ z: north }).bottle > 0 && W({ z: south, night: 1 }).bottle > 0 && W({ weather: 'storm' }).bottle === 0, 'a bottle should turn up anywhere, but not in a storm');
+    expect(W().bottle < W().whale, 'a bottle should be less common than a whale');
+    // in a storm the waterspout is the likeliest thing by far
+    const storm = W({ weather: 'storm', night: 1 });
+    expect(kinds.every((k) => k === 'waterspout' || storm[k] < storm.waterspout), 'the waterspout should be the likeliest thing in a storm');
+
+    // bounties: only kinds you can go looking for, likelier inside the circle, never where they can't happen
+    for (const k of BOUNTY_KINDS) {
+      expect(EVENTS[k] && SIGHTINGS[k]?.wanted, `bounty kind ${k} needs to be an event with a "wanted" name`);
+      expect([north, 0, south].some((z) => canHappenAt(k, z)), `bounty kind ${k} can't happen anywhere`);
+    }
+    expect(!canHappenAt('iceberg', south) && canHappenAt('iceberg', north) && !canHappenAt('turtles', north) && canHappenAt('ghostShip', 0), 'canHappenAt disagrees with the weights');
+    const circle = [{ kind: 'whale', x: 0, z: 0, r: 500 }, { kind: 'iceberg', x: 0, z: 0, r: 500 }];
+    const inC = W(), outC = W();
+    expect(applyBounties(inC, circle, 100, 100) && inC.whale === W().whale * 4 && inC.iceberg === 0, 'a bounty should make its kind 4x likelier inside the circle, and never possible where it is not');
+    expect(!applyBounties(outC, circle, 900, 0) && outC.whale === W().whale, 'a bounty should change nothing outside its circle');
+    for (const key of ['title', 'text', 'search', 'seen']) expect(BOUNTY[key], `BOUNTY.${key} is missing`);
 
     // picking: by weight, never what can't happen, and the pity timer
     const rng = mulberry32(20261125);
@@ -356,10 +380,11 @@ const checks = {
       tally[k] = (tally[k] || 0) + 1;
       if (k === 'ghostShip') { longest = Math.max(longest, gap); gap = 0; } else gap++;
     }
-    expect(kinds.every((k) => tally[k] > 0), `some kind never turned up in 4000 night rolls (${JSON.stringify(tally)})`);
+    expect(['whale', 'dolphins', 'bloom', 'bottle', 'ghostShip'].every((k) => tally[k] > 0) && !tally.turtles && !tally.iceberg && !tally.waterspout,
+      `4000 clear temperate night rolls should bring whales, dolphins, the bloom, bottles and the ghost ship, and nothing else (${JSON.stringify(tally)})`);
     expect(longest <= 8, `the ghost ship stayed away for ${longest} rolls in a row: the pity timer should cap it at 8`);
     for (let i = 0; i < 500; i++) expect(pickKind(rng, W(), {}) !== 'ghostShip', 'the ghost ship was picked by day');
-    expect(pickKind(rng, { whale: 0, dolphins: 0, ghostShip: 0 }, {}) === null, 'something was picked when nothing can happen');
+    expect(pickKind(rng, Object.fromEntries(kinds.map((k) => [k, 0])), {}) === null, 'something was picked when nothing can happen');
     for (let i = 0; i < 50; i++) { const t = nextRoll(rng); expect(t >= 180 && t <= 360, `the next roll in ${t.toFixed(0)} s: should be 3-6 minutes`); }
 
     // placing: a toy sea of round islands with a rock or two off each
@@ -374,15 +399,17 @@ const checks = {
     let placed = 0;
     for (let i = 0; i < count; i++) {
       const boat = { x: (rng() * 2 - 1) * 6200, z: (rng() * 2 - 1) * 6200, heading: rng() * 6.283 };
-      const at = placeEvent(rng, sea, boat);
+      // each kind has its own distances (a bottle is close, a waterspout is not)
+      const P = { min: 150, max: 300, clear: 60, ...EVENTS[kinds[i % kinds.length]].place };
+      const at = placeEvent(rng, sea, boat, EVENTS[kinds[i % kinds.length]].place);
       if (!at) continue;
       placed++;
       const d = Math.hypot(at.x - boat.x, at.z - boat.z);
       const off = Math.abs(Math.atan2(Math.sin(Math.atan2(at.x - boat.x, at.z - boat.z) - boat.heading), Math.cos(Math.atan2(at.x - boat.x, at.z - boat.z) - boat.heading)));
       const where = `placement ${i} (${at.x.toFixed(0)}, ${at.z.toFixed(0)})`;
-      if (d < 149 || d > 301) errors.push(`${where}: ${d.toFixed(0)} m from the boat, should be 150-300`);
+      if (d < P.min - 1 || d > P.max + 1) errors.push(`${where}: ${d.toFixed(0)} m from the boat, should be ${P.min}-${P.max}`);
       if (off < 0.3) errors.push(`${where}: dead ahead (${off.toFixed(2)} rad off the bow)`);
-      if (!openWater(sea, at.x, at.z, 60)) errors.push(`${where}: not open water`);
+      if (!openWater(sea, at.x, at.z, P.clear)) errors.push(`${where}: not open water`);
       if (isles.some((I) => Math.hypot(I.x - at.x, I.z - at.z) < I.r + 30)) errors.push(`${where}: on or against an island`);
       if (Math.abs(at.x) > WORLD_HALF - 350 || Math.abs(at.z) > WORLD_HALF - 350) errors.push(`${where}: outside the world`);
       if (errors.length > 12) break;
@@ -400,9 +427,13 @@ const checks = {
     // the words: every kind has its lines, its card and (the living sea's own) its report
     for (const k of kinds) {
       for (const key of ['name', 'hint', 'cue', 'tip', 'about']) expect(SIGHTINGS[k]?.[key], `SIGHTINGS.${k}.${key} is missing`);
-      for (const key of ['added', 'title', 'text', 'label', 'status', 'stale', 'eyebrow', 'done', 'pageName', 'page', 'gold']) expect(REPORTS[k]?.[key], `REPORTS.${k}.${key} is missing`);
+      for (const key of ['added', 'title', 'text', 'label', 'status', 'eyebrow', 'done', 'pageName', 'page', 'gold']) expect(REPORTS[k]?.[key], `REPORTS.${k}.${key} is missing`);
+      expect(k === 'bottle' || REPORTS[k]?.stale, `REPORTS.${k}.stale is missing`); // the bottle's letter keeps
       expect(LOG.includes(k), `${k} has no card in the Sightings tab (LOG)`);
+      expect(ROLES[HEARS[k]], `${k} has nobody to hear about it (HEARS)`);
     }
+    expect(BOTTLES.notes?.length >= 4 && BOTTLES.letter?.text && BOTTLES.chart?.text && BOTTLES.note?.title, 'BOTTLES needs a letter, a chart, a note title and a few notes');
+    expect(GHOST_LOG.cards?.length >= 3 && GHOST_LOG.cards.every((c) => c.art && c.text) && GHOST_LOG.text && GHOST_LOG.noAnchor && GHOST_LOG.found?.text, "GHOST_LOG needs its steps, its find and the log's cards");
     for (const k of LOG) for (const key of ['name', 'hint', 'about']) expect(SIGHTINGS[k]?.[key], `SIGHTINGS.${k}.${key} is missing`);
     for (const [k, M] of Object.entries(MILESTONES)) {
       expect(STYLES.some((s) => s.id === M.cosmetic), `milestone ${k}: no cosmetic "${M.cosmetic}"`);

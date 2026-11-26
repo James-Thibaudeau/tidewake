@@ -275,7 +275,8 @@ export class Rival {
     this.syncDye();
     this.cool -= dt;
     const b = this.player.pos, act = this.act;
-    if (!act) { if (this.cool <= 0 && g.mode === 'sailing') this.consider(b); }
+    // (with nothing live, the living sea's director asks spawn() whether Sable should appear)
+    if (!act) { /* nothing to drive: spawn() below decides when they turn up */ }
     else if (act.type === 'approach') this.updateApproach(dt, wind, act);
     else if (act.type === 'race') this.updateRace(dt, wind, act);
     else if (act.type === 'depart') this.updateDepart(dt, wind, act);
@@ -324,22 +325,34 @@ export class Rival {
     p.pos.x -= dx * k * (fixed ? 1 : 0.4); p.pos.z -= dz * k * (fixed ? 1 : 0.4);
   }
 
-  /** Nothing is live: should Sable appear? */
-  consider(b) {
+  /**
+   * Nothing of Sable's is live: should they appear? Called by the living
+   * sea's director (sea-events.js) every couple of seconds of sailing. `free`
+   * is false while one of the director's own events is out there: Sable can
+   * still be found waiting in a harbor or off an island, but a meeting at sea
+   * holds off, and 'wait' is returned so the director can clear the water.
+   */
+  spawn(b, free = true) {
     const g = this.game, R = this.R, P = this.places;
     this.cool = 2;
-    if (g.ui.isStoryOpen || g.ui.isFoundOpen) return;
+    if (g.ui.isStoryOpen || g.ui.isFoundOpen) return null;
     const enc = this.ready();
     if (enc) {
-      if (enc.id === 'bows') { this.spawnAcross(enc, b); return; }
+      if (enc.id === 'bows') {
+        const H = this.world.home.dock, d = dist(b, H);
+        if (!free) return d > 170 && d < 1400 ? 'wait' : null;
+        this.spawnAcross(enc, b);
+        return null;
+      }
       const at = P[enc.id];
       if (at && dist(b, at) < SEE) {
+        if (!free && enc.kind !== 'summit' && enc.kind !== 'relics') return 'wait';
         if (R.flags.heard !== R.chapter) { R.flags.heard = R.chapter; g.quests.pin('rival'); }
         if (enc.kind === 'summit' || enc.kind === 'relics') this.anchorOff(g.world.islands[at.island], b);
         else if (enc.kind === 'tow') this.setAdrift(at);
         else this.spawnAt(enc, at);
       }
-      return;
+      return null;
     }
     if (R.chapter === 6 || (R.chapter === 8 && !R.flags.rematch)) {
       const port = R.chapter === 6 ? this.world.islands[R.flags.port] : this.friendPort();
@@ -352,8 +365,10 @@ export class Rival {
       const I = this.world.islands[R.flags.rematch.island];
       if (I && dist(b, I) < SEE) this.anchorOff(I, b);
     } else if (R.chapter === 7 && R.flags.flare && dist(b, P.deep) < P.deep.r + 160 && g.mode === 'sailing') {
+      if (!free) return 'wait';
       this.startKraken();
     }
+    return null;
   }
 
   // ------------------------------------------------------- meeting at sea

@@ -58,6 +58,7 @@ const redwingArt = (x, y, s = 1) => `<g transform="translate(${x} ${y}) scale(${
   <path d="M6 -16 q6 -12 20 -13 l-6 5 5 2 -7 3 4 3 q-9 3 -16 0z" fill="#221c26"/>
   <path d="M0 -54 l10 3 -10 3" fill="#fff4dc" stroke="#2a1d12" stroke-width="1.5"/></g>`;
 export const STORY_ART = {
+  ghost: () => SIGHTING_ART.ghostShip(true),
   redwing: () => sky('#ffd9a8', '#bfe0f2') + `<circle cx="258" cy="42" r="16" fill="#ffd54a" ${INK}/>${redwingArt(150, 116, 1.35)}${smallBoat(262, 118, 0.6)}`,
   deep: () => sky('#2a2a52', '#5a4a7a', '#1d2a55', '#141d40') + `<circle cx="250" cy="34" r="12" fill="#e8ecff" ${INK}/>
     <ellipse cx="150" cy="146" rx="96" ry="16" fill="#0c1230" opacity=".75"/>
@@ -142,5 +143,55 @@ export const SIGHTING_ART = {
       <path d="M0 0 H320 V118 H272 C268 60 222 34 160 34 C98 34 52 60 48 118 H0 Z" fill="${shade(seen, '#a39b91')}" ${inkFor(seen)}/>
       ${seen ? '<path d="M48 118 C52 60 98 34 160 34 C222 34 268 60 272 118 H256 C250 72 212 50 160 50 C108 50 70 72 64 118 Z" fill="#837b73"/>' : ''}
       ${seen ? crab(112, 62, 0.9) + crab(160, 56, 1.1) + crab(208, 62, 0.9) + crab(136, 74, 0.6) + crab(186, 74, 0.6) : ''}`;
+  },
+  turtles: (seen) => {
+    const one = (x, y, s) => `<g transform="translate(${x} ${y}) scale(${s})">
+      <path d="M14 0 C24 4 36 10 42 18 C30 18 18 12 8 4 Z" fill="${shade(seen, '#d9cf9a')}" ${inkFor(seen)}/>
+      <path d="M26 -4 C32 -8 36 -16 44 -19 C52 -21 57 -13 51 -8 C45 -4 36 -1 28 1 Z" fill="${shade(seen, '#d9cf9a')}" ${inkFor(seen)}/>
+      <circle cx="48" cy="-14" r="2.2" fill="${shade(seen, '#141c28')}"/>
+      <path d="M-32 2 C-30 -22 24 -26 32 2 Z" fill="${shade(seen, '#5d7a4a')}" ${inkFor(seen)}/>
+      <path d="M-10 -18 L-4 -8 H8 L14 -18 M-4 -8 L-10 1 M8 -8 L14 1 M-20 -10 L-10 -4 M24 -10 L14 -4" stroke="${shade(seen, '#4a6339')}" stroke-width="2" fill="none" stroke-linecap="round"/></g>`;
+    return sightSky(seen, 'sgTurtles', '#ffe9b8', '#bfe6f6', '#2f9bc0', '#1f7fa6') + (seen ? `<circle cx="276" cy="36" r="15" fill="#ffd54a" ${INK}/>` : '')
+      + one(72, 114, 0.85) + one(160, 118, 1.05) + one(246, 114, 0.8)
+      + foam(seen, 'M38 118 q10 -6 20 0 M118 124 q12 -6 24 0 M214 118 q10 -6 20 0');
+  },
+  bloom: (seen) => {
+    const swirl = 'M30 140 q20 -12 40 0 t40 0 M170 152 q16 -10 32 0 t32 0 M110 126 q12 -7 24 0 M250 132 q12 -7 24 0';
+    const night = seen ? `<circle cx="258" cy="34" r="13" fill="#e8ecff"/>
+      <path d="M40 30 h.1 M96 18 h.1 M150 40 h.1 M200 16 h.1 M300 66 h.1 M24 70 h.1" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+      <ellipse cx="70" cy="140" rx="46" ry="9" fill="#4fd8ff" opacity=".35"/><ellipse cx="206" cy="152" rx="44" ry="8" fill="#4fd8ff" opacity=".3"/><ellipse cx="270" cy="132" rx="28" ry="6" fill="#4fd8ff" opacity=".4"/>
+      <path d="M180 118 Q130 124 70 118 M182 122 Q134 134 84 130" stroke="#4fd8ff" stroke-width="9" fill="none" opacity=".35" stroke-linecap="round"/>
+      <path d="M180 118 Q130 124 70 118 M182 122 Q134 134 84 130" stroke="#9ff4ff" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <g transform="translate(206 114)"><path d="M-26 0 H26 L18 11 H-18 Z" fill="#0a0f24"/><path d="M0 0 V-44" stroke="#0a0f24" stroke-width="3"/><path d="M2 -42 L28 -6 H2 Z" fill="#0a0f24"/></g>
+      <path d="M60 162 h.1 M140 146 h.1 M236 160 h.1 M290 148 h.1 M30 128 h.1" stroke="#9ff4ff" stroke-width="4" stroke-linecap="round"/>` : '';
+    return sightSky(seen, 'sgBloom', '#0f1535', '#232c5c', '#131b40', '#0e1533') + night
+      + `<path d="${swirl}" stroke="${shade(seen, '#9ff4ff')}" stroke-width="3" fill="none" stroke-linecap="round" opacity="${seen ? 0.9 : 0.7}"/>`;
+  },
+  waterspout: (seen) => sightSky(seen, 'sgSpout', '#7f8b98', '#bcc6cf', '#3d5f78', '#2f4c62') + `
+    <ellipse cx="154" cy="114" rx="36" ry="7" fill="${shade(seen, '#dfe8f0')}" opacity=".8"/>
+    <g transform="translate(0 -37) scale(1 1.33)"><path d="M124 40 C138 66 164 74 162 90 C160 100 150 104 146 113 H160 C162 104 172 98 174 88 C178 72 198 64 216 40 Z" fill="${shade(seen, '#e3ecf3')}" ${inkFor(seen)}/>
+    <path d="M136 56 Q170 70 206 54 M148 70 Q170 80 190 68 M158 82 Q168 88 176 80 M152 98 Q160 102 166 96" stroke="${shade(seen, '#8fa2b4')}" stroke-width="2.5" fill="none" stroke-linecap="round"/></g>
+    <path transform="translate(0 -22)" d="M-10 0 H330 V42 C310 58 284 48 268 56 C250 66 228 54 212 60 C190 68 150 66 130 58 C110 50 90 62 70 54 C50 46 30 58 -10 46 Z" fill="${shade(seen, '#434c59')}" ${inkFor(seen)}/>
+    ${foam(seen, 'M124 112 q8 -14 20 -6 M166 112 q8 -12 22 -2 M140 104 q-6 -10 -16 -10 M166 102 q8 -8 16 -6')}
+    ${foam(seen, 'M50 130 q10 -6 20 0 M240 126 q10 -6 20 0')}`,
+  iceberg: (seen) => sightSky(seen, 'sgIceberg', '#cfe6f5', '#f3fbff', '#3a78a8', '#2c6390') + `
+    <path d="M62 112 H226 L212 132 H82 Z" fill="${shade(seen, '#7fb9d9')}" opacity=".85"/>
+    <path d="M70 112 L88 66 L112 54 L130 30 L158 22 L178 44 L196 40 L214 70 L218 112 Z" fill="${shade(seen, '#eaf6ff')}" ${inkFor(seen)}/>
+    <path d="M158 22 L178 44 L196 40 L214 70 L218 112 H176 L168 64 Z" fill="${shade(seen, '#a9d3ea')}" ${inkFor(seen)}/>
+    <path d="M112 54 L118 82 M130 30 L138 60" stroke="${shade(seen, '#a9d3ea')}" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <g transform="rotate(16 240 112)"><path d="M226 112 L228 62 L248 56 L254 112 Z" fill="${shade(seen, '#eaf6ff')}" ${inkFor(seen)}/><path d="M248 56 L254 112 H242 L240 64 Z" fill="${shade(seen, '#a9d3ea')}"/></g>
+    <path d="M38 116 l6 -8 10 2 4 6 Z M278 118 l5 -7 9 1 3 6 Z M106 124 l4 -5 7 1 2 4 Z" fill="${shade(seen, '#eaf6ff')}" ${inkFor(seen)}/>
+    ${foam(seen, 'M222 112 q-4 -16 -14 -20 M246 110 q2 -18 12 -24 M262 114 q8 -12 18 -12 M232 118 q14 -6 28 0')}
+    ${foam(seen, 'M30 140 q10 -6 20 0 M150 146 q10 -6 20 0')}`,
+  bottle: (seen) => {
+    const glint = seen ? '<path d="M0 -11 L2.6 -2.6 L11 0 L2.6 2.6 L0 11 L-2.6 2.6 L-11 0 L-2.6 -2.6 Z" transform="translate(134 72)" fill="#ffffff" stroke="#2a1d12" stroke-width="1.5" stroke-linejoin="round"/>' : '';
+    const paper = seen ? '<rect x="-34" y="-7" width="40" height="14" rx="4" fill="#fff4dc" stroke="#2a1d12" stroke-width="1.5"/><path d="M-26 -7 V7 M-2 -7 V7" stroke="#c9a26a" stroke-width="2"/>' : '';
+    return sightSky(seen, 'sgBottle', '#bfe4ff', '#eef8ff') + `
+    <g transform="translate(160 106) rotate(-24)">
+      <path d="M-46 -15 H12 C24 -15 26 -6 34 -6 H46 V6 H34 C26 6 24 15 12 15 H-46 C-54 15 -54 -15 -46 -15 Z" fill="${shade(seen, '#3f9a6a')}" ${inkFor(seen)}/>
+      ${paper}<path d="M-40 -10 H6" stroke="${shade(seen, '#7fd0a0')}" stroke-width="3.5" stroke-linecap="round"/>
+      <rect x="45" y="-5" width="11" height="10" rx="2" fill="${shade(seen, '#c9a26a')}" ${inkFor(seen)}/></g>
+    <path d="M96 120 q16 -7 32 0 t32 0 t32 0 t32 0 V138 H96 Z" fill="${seen ? '#3f86c9' : DULL[2]}" opacity=".7"/>${glint}
+    ${foam(seen, 'M106 120 q10 -6 20 0 M196 112 q10 -6 20 0 M40 140 q10 -6 20 0 M262 134 q10 -6 20 0')}`;
   },
 };

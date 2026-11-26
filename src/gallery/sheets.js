@@ -48,7 +48,7 @@ export const SHEETS = {
   'ships': { about: 'Every upgrade tier, from the bow quarter and the side', tile: LANDSCAPE, make: grid('view', ['quarter', 'side'], 'tier', ['0', '1', '2', '3', '4', '5'], { show: 'ship' }) },
   'anchors': { about: 'Every anchor refit, close on the bow', tile: LANDSCAPE, make: strip('anchor', ['0', '1', '2', '3', '4'], { show: 'ship', view: 'bow', canvas: '0' }) },
   // ---- the living sea
-  'sealife': { about: 'The whale, a dolphin and the ghost ship', tile: LANDSCAPE, make: strip('kind', ['whale', 'dolphin', 'ghost'], { show: 'sealife', view: 'quarter' }) },
+  'sealife': { about: 'Everything the living sea turns up, one of each', tile: LANDSCAPE, make: strip('kind', ['whale', 'dolphin', 'turtle', 'gull', 'fish', 'bottle', 'berg', 'spout', 'ghost'], { show: 'sealife', view: 'quarter' }, 3) },
   // ---- places
   'archway-story': { about: "Archway Isle's story places, close up", tile: LANDSCAPE, make: strip('at', ['cove', 'keystone', 'lantern', 'stack'], { show: 'archway', view: 'spot' }, 2) },
   // ---- anything: the subject already in the URL

@@ -26,8 +26,9 @@ const HELP = `tidewake.debug
   refit(tier, { open })    grandfather's anchor at refit tier 0-4 (fits the anchor too); open: biomes to
                            treat as having levels, e.g. ['rocky'], so their refit is offered (until reload)
   rival(chapter)           the rival captain: jump to a chapter (same as tidewake.rival.debug)
-  sea(kind?, { at })       the living sea: bring on 'whale' | 'dolphins' | 'ghostShip' now (the ghost ship
-                           makes it night first); no argument = what's out there, the next roll, the log.
+  sea(kind?, { at })       the living sea: bring on whale | dolphins | turtles | bottle | bloom | iceberg |
+                           waterspout | ghostShip now (the bloom and the ghost ship make it night first);
+                           no argument = what's out there, the next roll, bounties, the log, the ghost's chain.
                            at: { ahead, side } puts it that many metres ahead and to the right instead
   ashore(where?)           go ashore on an island (async); no argument = grandfather's wreck
   weather(type)            clear | breezy | cloudy | rain | storm | fog
@@ -174,12 +175,13 @@ export function installDebug(game) {
     sea(kind, { at = null } = {}) {
       const se = g.seaEvents;
       if (kind == null) return se.debugState();
-      if (kind === 'ghostShip' && g.env.night < 0.6) { api.time(0); api.step(0.1); }
+      if ((kind === 'ghostShip' || kind === 'bloom') && g.env.night < 0.6) { api.time(0); api.step(0.1); }
       if (!se.spawn(kind, { say: false })) throw new Error(`No "${kind}" here: unknown kind, or no open water off the bow.`);
       if (at) {
         const b = g.boat, a = se.live.actor, f = at.ahead ?? 120, r = at.side ?? 0;
-        a.pos.x = b.pos.x + Math.sin(b.heading) * f - Math.cos(b.heading) * r;
-        a.pos.z = b.pos.z + Math.cos(b.heading) * f + Math.sin(b.heading) * r;
+        const dx = b.pos.x + Math.sin(b.heading) * f - Math.cos(b.heading) * r - a.pos.x, dz = b.pos.z + Math.cos(b.heading) * f + Math.sin(b.heading) * r - a.pos.z;
+        a.pos.x += dx; a.pos.z += dz;
+        for (const t of a.line || []) { t.x += dx; t.z += dz; } // the turtles are placed one by one
       }
       return se.debugState();
     },
