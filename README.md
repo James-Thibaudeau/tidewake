@@ -119,7 +119,8 @@ src/
                   (its bark, moss and fungus) + grove-life.js (its owl guide and fireflies),
                   archway.js + archway-layout.js + archway-art.js (Archway Isle, hand-built)
                   + archway-life.js (its gulls),
-                  controller.js + collide.js (movement), camera.js, pacer.js (races on foot),
+                  controller.js + collide.js (movement), camera.js, ground-shadow.js (the
+                  spot under the explorer), pacer.js (races on foot),
                   shapes.js (the collider shapes they all share)
   cosmetics.js    wardrobe catalogue: palettes, styles, unlock sources, appearance profile
   creator.js      character creator / port wardrobe (studio scene + panel)

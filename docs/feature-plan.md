@@ -1300,6 +1300,11 @@ depth, and forgiveness at ledges. Each one can be tried on its own; the
 first three are the likeliest wins. Only playing them can say whether they
 help.
 
+(As built: 1–3 are done; what was built is in [STATUS.md](STATUS.md).
+The jump uses the numbers below. Generated islands keep the old jump's
+numbers for their optional climbs, so no island changes. 4–7 are not
+started.)
+
 1. **A shadow straight down under the explorer.** The biggest depth cue in
    a 3D platformer. Today the only shadow is the `shadows` effect
    (`fx.js`): cast at the sun's angle, gone with `?fx=0` and maybe on Low.

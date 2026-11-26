@@ -222,8 +222,11 @@ export const ASHORE = {
   walk: 4.3, run: 7.0,   // top speeds (m/s)
   accel: 45, airAccel: 14, friction: 24,
   gravity: 30,
-  jumpVel: 9.6,          // apex ≈ 1.53 m, a little snappier than floaty
-  jumpCut: 0.45,         // releasing jump early multiplies upward speed by this
+  jumpVel: 9.6,          // a held jump: apex ≈ 1.56 m, 0.66 s in the air (controller.js, jumpArc)
+  // Shares of gravity through a jump (controller.js, gravityScale): falling,
+  // near the top of a held jump (upward or downward speed under hangSpeed),
+  // and rising after jump is let go early (a lower jump)
+  fallGravity: 1.6, hangGravity: 0.6, hangSpeed: 1.5, cutGravity: 2,
   coyote: 0.1, buffer: 0.12,
   maxFall: 32,
   // Level design limits for *required* moves (comfortable, not frame-perfect)

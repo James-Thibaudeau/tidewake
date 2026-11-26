@@ -1280,9 +1280,18 @@ const checks = {
   // islands of every tier in every biome that has levels (`count` per biome).
   async climb(count = 12) {
     const errors = [];
-    const { layoutLevel, routeStats } = await load('ashore/modules.js');
+    const { layoutLevel, routeStats, LIMITS } = await load('ashore/modules.js');
     const { mulberry32 } = await load('util.js');
-    const { ASHORE_BIOMES } = await load('config.js');
+    const { ASHORE_BIOMES, ASHORE } = await load('config.js');
+    const { jumpArc } = await load('ashore/controller.js');
+    // the levels' limits stay inside what a jump really does: the required
+    // moves, and the optional ones (fixed numbers, so islands don't change)
+    const arc = jumpArc(ASHORE), D = ASHORE.design;
+    const reach = (top) => top * arc.air;
+    if (D.jumpUp > arc.up * 0.8) errors.push(`a jump goes ${arc.up.toFixed(2)} m up: too close to design.jumpUp ${D.jumpUp}`);
+    if (D.gapRun > reach(ASHORE.run) * 0.8) errors.push(`a run-jump covers ${reach(ASHORE.run).toFixed(2)} m: too close to design.gapRun ${D.gapRun}`);
+    if (LIMITS.optional.up > arc.up * 0.92) errors.push(`optional climbs up to ${LIMITS.optional.up.toFixed(2)} m, but a jump goes ${arc.up.toFixed(2)} m`);
+    if (LIMITS.optional.gap > reach(ASHORE.walk) * 0.92) errors.push(`optional gaps up to ${LIMITS.optional.gap.toFixed(2)} m, but a walking jump covers ${reach(ASHORE.walk).toFixed(2)} m`);
     const climber = await testClimber();
     const notes = [];
     for (const biome of ASHORE_BIOMES) {
@@ -1299,7 +1308,7 @@ const checks = {
       }
       notes.push(`${biome} ${Math.round(secs / count)} s, ${Math.round(jumps / count)} jumps`);
     }
-    return { errors, note: `${count} islands per biome to the summit, on average ${notes.join('; ')}; ${climber.stats.retries} hops needed a second try` };
+    return { errors, note: `a held jump ${arc.up.toFixed(2)} m up, ${arc.air.toFixed(2)} s in the air; ${count} islands per biome to the summit, on average ${notes.join('; ')}; ${climber.stats.retries} hops needed a second try` };
   },
 
   // The Elder Grove: the layout keeps its design limits, and a test climber
@@ -1313,7 +1322,8 @@ const checks = {
     const v = validateGrove(L);
     const errors = [...v.errors];
     const climber = await testClimber();
-    const climb = (nodes, label) => climber(L, nodes, label, errors);
+    // a missed hop gets a second try at the other pace, as on Archway Isle
+    const climb = (nodes, label) => climber(L, nodes, label, errors, 2);
     // Holding the stick along a ledge must carry you up its little steps without
     // steering: the risers meet you at a slant, and you must not slide off them.
     const R = L.route;
@@ -1334,7 +1344,7 @@ const checks = {
     const main = climb(L.route, 'main');
     const crown = climb(L.crown, 'crown');
     const s = v.stats;
-    return { errors, note: `${s.pieces} pieces, ${s.coins} coins; to the owl bough in ${main.toFixed(0)} s (${s.jumps} jumps), the crown in ${crown.toFixed(0)} s more (${s.crownJumps} jumps)` };
+    return { errors, note: `${s.pieces} pieces, ${s.coins} coins; to the owl bough in ${main.toFixed(0)} s (${s.jumps} jumps), the crown in ${crown.toFixed(0)} s more (${s.crownJumps} jumps); ${climber.stats.retries} hops needed a second try` };
   },
 
   // Archway Isle: the layout keeps its design limits, and a test climber gets
