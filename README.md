@@ -33,6 +33,7 @@ On foot (once grandfather's anchor is fitted):
 - **Lower your sails in storms.** Full sail in a storm batters your hull.
 - **Bank your gold.** Gold in your hold is lost if you're shipwrecked. Docking at a port banks your cargo and saves your progress. Ports are your save points.
 - Glowing golden beams mark sunken treasure. Sail over one slowly and haul it up.
+- **Read the water.** Pale water is shallow: there is a wide pale shelf round every island, and a pale patch in open sea is a reef. Dark bands moving across the water are gusts, and the big soft shadows are clouds.
 - Spend banked gold at any port's shipwright: sails, hull, rudder, keel, lantern and spyglass. Every tier changes how the ship looks.
 - **Grandfather's Journals:** your grandfather's ship lies broken in two on a reef just past Port Haven. Slow down beside it and climb aboard (no anchor needed): cross the wreck to the torn-off stern and his cabin, where his journal and brass spyglass wait on the chart table. His other journals are scattered across the isles. Follow his clues; found pages are kept in the journal (`J`).
 - **Going ashore:** buy the Oak Planking hull and the shipwright tells you about your grandfather's anchor, lying beside his wreck. Haul it up and have it fitted, then slow down by any green (temperate) island and drop anchor. Climb to the summit for gold, light lanterns as checkpoints, and look for each island's hidden chest. Gold found ashore goes in your hold until you bank it.
@@ -57,9 +58,9 @@ After a change, run the quick checks. They need Node and nothing else:
 node tools/check.mjs
 ```
 
-In the browser console, `tidewake.debug.help()` lists helpers for jumping around the game while testing.
+In the browser console, `tidewake.debug.help()` lists helpers for jumping around the game while testing, and for measuring it: `tidewake.debug.profile()` counts what a frame draws, `tidewake.debug.bench()` times it.
 
-Visual effects run on the High quality setting. To compare, add `?fx=0` to the URL to turn them all off, or pick some with `?fx=edges,bloom,grade,smaa,shadows,rim`. In the console, `tidewake.fx.setEnabled(false)` flips them at runtime.
+Visual effects run on the High quality setting. To compare, add `?fx=0` to the URL to turn them all off, or pick some with `?fx=edges,bloom,grade,smaa,shadows,rim`. In the console, `tidewake.fx.setEnabled(false)` flips them at runtime. The sea's large features work the same way: `?sea=0` turns off the shallows, gusts and cloud shadows, `?sea=gusts,shade` picks some.
 
 ## Look at the art
 
@@ -116,17 +117,19 @@ src/
   wake.js         the wake ribbons behind a boat
   explorer.js     the anime explorer character: rig, poses (helm / on foot), animation
   outfits.js      geometry for every wearable style, and the face texture
-  ocean.js        toon water shader
+  ocean.js        toon water shader; the shallows, gusts and cloud shadows; the map of the world's shores
   sky.js          sky dome, sun/moon/stars, clouds, lighting
   weather.js      weather states, wind, rain, lightning, wind streaks
-  waves.js        shared CPU/GPU wave function
+  waves.js        shared CPU/GPU wave function (the wave set itself is WAVE_DEFS in config.js)
   toon.js         cel-shading gradient, rim-lit toon material, outline materials
   fx.js           post-processing (ink edges, bloom, grade, SMAA) and cascaded cel shadows
   ui.js           the UI class: HUD, banners and toasts, title, pause and wreck screens
   ui/             the rest of UI: chart.js (minimap, sea chart), port.js (port screen, journal),
                   story.js (Found! pop-up, story cards, quest tracker, races), icons.js, shared.js
   input.js        keyboard, mouse and touch controls
-  audio.js        procedural WebAudio sound and music
+  audio.js        procedural WebAudio sound and music: the buses, the sea's beds, the score, one-shots
+  audio/          the rest of the sound: ashore.js (footsteps, jump and land, coin chime, chest fanfare,
+                  island ambience, the on-foot score)
   save.js         localStorage save/load and save-version migration
   config.js       tuning constants and upgrade catalogue
   util.js         math and noise helpers
@@ -135,7 +138,7 @@ src/
                   subjects.js (what it can show), presets.js (poses, lights, views), sheets.js (contact sheets)
 tools/
   serve.py        static dev server, caching off
-  check.mjs       quick checks in Node: syntax, imports, text keys, element ids, the gallery, saves, ashore layouts, the grove and Archway climbs
+  check.mjs       quick checks in Node: syntax, imports, text keys, element ids, the gallery, saves, how the boat rides the waves, ashore layouts, the grove and Archway climbs
 docs/
   STATUS.md       what has shipped, what's next, known issues
   feature-plan.md designs for phases not built yet; shipped-plans.md keeps the designs of built ones

@@ -215,7 +215,7 @@ body.touch #prompt { display: none !important; }
   box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); padding: 14px; touch-action: none;
 }
 #sailBtns button [data-icon] { width: 100%; height: 100%; display: block; }
-#sailBtns #btnSpy { width: 46px; height: 46px; padding: 10px; }
+#sailBtns #btnSpy { width: 56px; height: 56px; padding: 13px; }
 #sailBtns #btnSpy.held, #sailBtns button:active { background: rgba(255, 213, 74, 0.45); }
 #btnAction {
   position: absolute; right: calc(var(--sar) + 92px); bottom: calc(var(--sab) + 22px);
@@ -236,7 +236,7 @@ body.scheme-land #tiller, body.scheme-land #sailBtns { display: none; }
 body.scheme-land #stick, body.scheme-land #btnJump { display: block; }
 #stick {
   position: absolute; left: calc(var(--sal) + 20px); bottom: calc(var(--sab) + 20px);
-  width: 132px; height: 132px; border-radius: 50%; background: var(--panel); border: 2px solid var(--border);
+  width: 148px; height: 148px; border-radius: 50%; background: var(--panel); border: 2px solid var(--border);
   box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); touch-action: none;
 }
 #stickKnob {
@@ -246,12 +246,25 @@ body.scheme-land #stick, body.scheme-land #btnJump { display: block; }
 }
 #btnJump {
   position: absolute; right: calc(var(--sar) + 18px); bottom: calc(var(--sab) + 22px);
-  width: 74px; height: 74px; border-radius: 50%; border: 2px solid var(--border); background: var(--panel);
-  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); padding: 18px; touch-action: none;
+  width: 86px; height: 86px; border-radius: 50%; border: 2px solid var(--border); background: var(--panel);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); padding: 22px; touch-action: none;
 }
+/* The stick and Jump are pressed without looking: a press that lands a little outside still counts. */
+#stick::before, #btnJump::before { content: ''; position: absolute; border-radius: 50%; }
+#stick::before { inset: -20px -8px -20px -20px; }
+#btnJump::before { inset: -12px; }
 #btnJump [data-icon] { width: 100%; height: 100%; display: block; }
 #btnJump.held { background: rgba(255, 213, 74, 0.45); }
-body.scheme-land #btnAction { right: calc(var(--sar) + 104px); }
+body.scheme-land #btnAction { right: calc(var(--sar) + 124px); }
+/* Touch: nothing you press is smaller than a fingertip. */
+body.touch .iconBtn { width: 48px; height: 48px; padding: 9px; }
+body.touch .btn, body.touch .tab, body.touch .chip, body.touch .toggle { min-height: 44px; }
+/* Narrow phones: the stick, Jump and the action button still have to fit side by side. */
+@media (max-width: 430px) {
+  #stick { width: 132px; height: 132px; }
+  #btnJump { width: 80px; height: 80px; padding: 20px; }
+  body.scheme-land #btnAction { right: calc(var(--sar) + 112px); }
+}
 @keyframes promptIn2 { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
 /* ------------------------------------------------------- overlays */

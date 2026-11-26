@@ -1,6 +1,6 @@
 # Tidewake: plans that have shipped
 
-The original designs for phases that are now built (0-3 and 8, and the
+The original designs for phases that are now built (0-3, 5 and 8, and the
 look-dev gallery), kept for
 reference: the reasoning behind the data model, the story and its writing
 rules, and the ashore level rules. The code is the source of truth where the
@@ -12,6 +12,7 @@ Contents: [How the codebase fitted](#how-the-codebase-fits-what-we-build-on) ·
 [Phase 1, character customization](#phase-1-character-customization) ·
 [Phase 2, quests and the main story](#phase-2-quest-system-sea-only-quest-types) ·
 [Phase 3, going ashore](#phase-3-going-ashore-core-loop-one-biome) ·
+[Phase 5, polish](#phase-5-polish) ·
 [Phase 8, the rival captain](#phase-8-the-rival-captain) ·
 [The look-dev gallery](#tooling-the-look-dev-gallery) ·
 [File plan](#file-plan)
@@ -426,6 +427,78 @@ fitting it unlocks landing, and you can land on any temperate island, platform t
 collect coins and a cosmetic chest, return to the ship and bank the coins. It
 should run at 60fps on desktop and stay playable on a phone with the touch
 stick.
+
+---
+
+## Phase 5: Polish
+
+The design, as it stood before it was built (2026-11-25):
+
+- **Audio** (`audio.js`, all procedural): footsteps per surface, jump and
+  land sounds, a coin chime, chest fanfare, a biome ambience bed and an
+  ashore music variant of the existing score.
+- **Tutorial hints** the first time you go ashore, the first time you open
+  the quest board and the first time you visit the Tailor.
+- **Mobile:** joystick dead-zone tuning, bigger hit targets, a lower decor
+  budget on `quality: 'low'`.
+- **Performance:** a profile pass covering draw calls per module, outline
+  cost and geometry disposal when you leave an island.
+- **README:** controls table for ashore, plus new tips.
+- **Water improvements** (`src/ocean.js`, `src/waves.js`, `WAVE_DEFS` in
+  `src/config.js`). The sea used to tile into a checkerboard. The first pass
+  fades wave colouring with distance and varies it by region (shader only).
+  Two ideas are left:
+  - **Bigger features to read.** Soft cloud shadows drifting with the wind,
+    darker gust bands running downwind, and a subtle tint for deeper and
+    shallower water, so the eye has something larger than one wave. Shader
+    only; the boat's motion doesn't change. Cloud shadows should follow the
+    weather's cloud cover and fade at night.
+  - **Retune the wave set.** The two biggest waves cross at about 63°,
+    which makes an egg-crate, and rows of crests still show a few hundred
+    metres out. Use more waves, with directions within about 40° of each
+    other and wavelengths that aren't simple multiples, for long rolling
+    crests. `waveHeight` runs on the CPU and the GPU from the same table, so
+    this changes how the boat rides: re-check handling, storm swell, shore
+    foam and the kraken. Each extra wave costs shader time (the ocean
+    samples the waves five times a pixel), so measure on Low.
+
+### As built
+
+One PR. What differs from the design above, and the decisions taken; the
+detail and the measurements are in [STATUS.md](STATUS.md).
+
+- **Sound** lives in `src/audio/ashore.js`, mixed into `SoundSystem` the way
+  `UI` and `Boat` are split. Footsteps come from the explorer's stride (a
+  footfall each time `gait` passes a half) and the controller's `groundTag`,
+  so they match the feet and the surface. The ambience is a table by biome
+  (`AMBIENCE`); only temperate and rocky have entries, and each later biome
+  adds its own line. The "ashore music variant" is the same melody walk on a
+  different voice, not a second score.
+- **Tutorial hints** were already in: the first-landing toast (#11) and the
+  notes at the top of the Quest Board and Tailor tabs (#25).
+- **Mobile:** bigger targets, and a press that lands just outside the stick
+  or Jump still counts. The dead zone moved to `TOUCH` in `config.js` but
+  kept its value: it can't be tuned without a phone in hand.
+- **Performance:** the profile pass found nothing leaking on leaving an
+  island, and platforms already merged into one mesh. What it did find: the
+  sea's shader ran for water hidden behind land (it was drawn first), and
+  every lantern post had a light of its own, paid for by every pixel and
+  rebuilt into every shader when their number changed. Both are fixed. The
+  tools stay: `tidewake.debug.profile()` and `debug.bench()`.
+- **Water, bigger features:** built as designed, shader only. The depth
+  tint needed to know where the shores are, so the world's shores are drawn
+  into a small map at load (`shoreMap`, 1024×1024, one byte a texel); reefs
+  are in it too, which makes them easier to spot from the helm. Cloud
+  shadows use the sky's own cloud pattern and drift, moved to where the sun
+  would throw them. `?sea=0` turns the three off for comparing.
+- **Water, the wave set:** the first try, six waves within 40° led by one
+  big one, got rid of the grid and read as stripes instead. The set that
+  shipped has seven, with the three biggest close in size and within 36° of
+  each other (all seven within 52°), so crests are long but weave and end.
+  The storm swell was left alone. The colouring pass gets height and slope
+  from one evaluation of each wave instead of four, which more than pays for
+  the two extra waves.
+- **How the boat rides** is now checked: `node tools/check.mjs ride`.
 
 ---
 

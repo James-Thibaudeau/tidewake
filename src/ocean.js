@@ -1,7 +1,38 @@
 // Stylised ocean: deep navy water with teal wave faces, bold lacy foam streaks, whitecaps,
 // a little sky reflection and a low-sun glitter path. One centre-weighted grid follows the camera.
+// Three things larger than a wave give the eye something to read: paler water over the
+// shallows round a shore (shoreMap), darker gust bands running downwind, and the shadows of
+// the clouds. All three only colour the water; its shape, and how a boat rides it, is waves.js.
 import * as THREE from 'three';
 import { WAVE_GLSL, WAVE_LOD_GLSL, NOISE_GLSL, waveUniforms } from './waves.js';
+import { clamp, smoothstep } from './util.js';
+
+/**
+ * A map of how near a shore every piece of the sea is, for the depth tint: one byte a
+ * texel, 0 at a shore and 255 in open water. `shores` is a list of
+ * { x, z, reach, shelf, dist(x, z) }: `dist` is the metres from a point to that shore
+ * (0 or less on land), `shelf` how far out its shallows run, `reach` its own radius.
+ * The map covers -half..half on x and z.
+ */
+export function shoreMap(shores, half, res = 1024) {
+  const data = new Uint8Array(res * res).fill(255);
+  const cell = (half * 2) / res;
+  const at = (i) => (i + 0.5) * cell - half;
+  const idx = (v) => clamp(Math.floor((v + half) / cell), 0, res - 1);
+  for (const S of shores) {
+    const R = S.reach + S.shelf;
+    for (let j = idx(S.z - R); j <= idx(S.z + R); j++) {
+      for (let i = idx(S.x - R); i <= idx(S.x + R); i++) {
+        const v = Math.round(clamp(S.dist(at(i), at(j)) / S.shelf, 0, 1) * 255);
+        if (v < data[j * res + i]) data[j * res + i] = v;
+      }
+    }
+  }
+  const tex = new THREE.DataTexture(data, res, res, THREE.RedFormat);
+  tex.magFilter = tex.minFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
 
 function oceanGeometry(size, segs) {
   const n = segs + 1;
@@ -31,14 +62,31 @@ function oceanGeometry(size, segs) {
 
 const vertexShader = /* glsl */ `
 ${WAVE_GLSL}
+${NOISE_GLSL}
 varying vec3 vWorld;
 varying float vH;
+varying float vCloud;
 uniform vec3 uCalm;
+uniform vec4 uCloud;
+uniform vec2 uCloudDir;
 // Ashore, water inside the island (a moat) lies still: no swell within uCalm.z of uCalm.xy.
 float calmK(vec2 p) { return uCalm.z > 0.0 ? smoothstep(uCalm.z, uCalm.z + 4.0, distance(p, uCalm.xy)) : 1.0; }
+// How thick the cloud between a point on the water and the sun is: the sky's own cloud
+// pattern (sky.js: the same frame, drift and warp), with fewer octaves. Clouds are hundreds
+// of metres across, so this is worked out at each corner of the grid, not at every pixel.
+float cloudAt(vec2 p) {
+  vec2 w = p + uCloud.xy;
+  vec2 q = vec2(dot(w, uCloudDir), dot(w, vec2(-uCloudDir.y, uCloudDir.x))) * vec2(0.00085, 0.0027);
+  mat2 r = mat2(1.6, 1.2, -1.2, 1.6);
+  vec2 a = q * 1.6 + 3.1, b = q * 1.6 - 5.7;
+  q += vec2(vnoise(a) * 0.5 + vnoise(r * a) * 0.25, vnoise(b) * 0.5 + vnoise(r * b) * 0.25) * 0.9;
+  vec2 q2 = r * q;
+  return (vnoise(q) * 0.5 + vnoise(q2) * 0.25 + vnoise(r * q2) * 0.125) * 1.107;
+}
 #include <fog_pars_vertex>
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
+  vCloud = uCloud.w > 0.001 ? cloudAt(wp.xz) : 0.0;
   float h = waveHeight(wp.xz) * calmK(wp.xz);
   wp.y += h;
   vWorld = wp.xyz;
@@ -64,8 +112,15 @@ uniform float uRain;
 uniform vec2 uWindDir;
 uniform float uWindStr;
 uniform vec3 uCalm;
+uniform vec3 uShallow;
+uniform sampler2D uShoreMap;
+uniform float uShore;
+uniform vec3 uBig;
+uniform vec4 uShoal;
+uniform vec4 uCloud;
 varying vec3 vWorld;
 varying float vH;
+varying float vCloud;
 ${WAVE_GLSL}
 ${WAVE_LOD_GLSL}
 ${NOISE_GLSL}
@@ -87,7 +142,6 @@ float cel(float field, float thr) {
 }
 void main() {
   vec2 p = vWorld.xz;
-  float e = 0.5;
   float calm = uCalm.z > 0.0 ? smoothstep(uCalm.z, uCalm.z + 4.0, distance(p, uCalm.xy)) : 1.0;
   float dist = length(cameraPosition - vWorld);
   // Far water: waves too small for a pixel drop out, and the rest lose contrast with distance.
@@ -101,13 +155,33 @@ void main() {
   // ...and let the sea run livelier in some stretches and flatter in others.
   float lively = vnoise(p * 0.0052 + 11.0 + drift * 2.0) * 0.6 + vnoise(p.yx * 0.0127 + 3.0 - drift * 2.0) * 0.4;
   float waveK = calm * mix(0.3, 1.35, smoothstep(0.25, 0.75, lively));
-  float hL = waveHeightLod(pw - vec2(e, 0.0)) * waveK, hR = waveHeightLod(pw + vec2(e, 0.0)) * waveK;
-  float hD = waveHeightLod(pw - vec2(0.0, e)) * waveK, hU = waveHeightLod(pw + vec2(0.0, e)) * waveK;
-  vec3 n = normalize(vec3(hL - hR, 2.0 * e, hD - hU));
+  vec2 tilt;
+  float hC = waveLod(pw, tilt) * waveK;
+  vec3 n = normalize(vec3(-tilt.x * waveK, 1.0, -tilt.y * waveK));
   float amp = max(uWaveScale * 1.25 + uSwellScale * 3.2, 0.05);
-  float hn = (hL + hR + hD + hU) * 0.25 / amp;
+  float hn = hC / amp;
   vec3 v = normalize(cameraPosition - vWorld);
   vec3 sd = normalize(uSunDir);
+
+  // ---- larger than a wave: the shallows, gusts and cloud shadows
+  // 0 at a shore, 1 in open water: from the shore map at sea, or round the island you are on
+  float off = uShoal.z > 0.0 ? clamp((distance(p, uShoal.xy) - uShoal.z) / uShoal.w, 0.0, 1.0)
+                             : texture2D(uShoreMap, p * uShore + 0.5).r;
+  // (a ragged edge: sandbars and channels, not a ring drawn with compasses)
+  if (off < 0.999) off += (vnoise(p * 0.021 + 13.0) * 0.6 + vnoise(p * 0.057 + 29.0) * 0.4 - 0.5) * 0.2 * smoothstep(0.0, 0.1, off);
+  float shoal = (1.0 - smoothstep(0.02, 0.24, off)) * uBig.x;
+  float shelf = (1.0 - smoothstep(0.08, 1.0, off)) * uBig.x;
+  // wind space: x = downwind, y = across
+  vec2 wd = normalize(uWindDir + vec2(1e-4, 0.0));
+  vec2 wp = vec2(-wd.y, wd.x);
+  vec2 ws = vec2(dot(p, wd), dot(p, wp));
+  // gusts: darker, ruffled bands running downwind, faster than the foam drifts
+  vec2 gq = vec2(ws.x - uTime * 5.0, ws.y);
+  float gustN = vnoise(gq * vec2(0.0042, 0.013) + 40.0) * 0.65 + vnoise(gq * vec2(0.011, 0.031) + 7.0) * 0.35;
+  float gust = smoothstep(0.52, 0.66, gustN) * smoothstep(0.6, 1.15, uWindStr) * calm * uBig.y;
+  // cloud shadows: only the thick of a cloud throws one, its thin edges let the sun through
+  float cloudThr = mix(0.66, 0.34, uCloud.z);
+  float shade = smoothstep(cloudThr + 0.05, cloudThr + 0.17, vCloud) * uCloud.w * uBig.z;
 
   // ---- water body: deep navy troughs rising smoothly to blue, teal where a face catches the light
   float slope = length(n.xz);
@@ -128,18 +202,21 @@ void main() {
   // far off, where single waves no longer read, broad soft patches carry the colour instead
   float farK = smoothstep(150.0, 700.0, dist) * (1.0 - uLantern.w * 0.85);
   glow = max(glow, farK * (0.1 + smoothstep(0.3, 0.7, big) * 0.3 + smoothstep(0.35, 0.8, lively) * 0.22));
+  // the wide shallows round an island are a paler blue, and a gust darkens the water it ruffles
+  col = mix(col, uMid, shelf * 0.32);
+  col *= 1.0 - gust * 0.28;
+  glow *= (1.0 - gust * 0.7) * (1.0 - shade * 0.55);
   col = mix(col, uFace, glow * 0.9);
   col = mix(col, uCrest, smoothstep(0.55, 1.0, hn) * glow * 0.6);
   // back slopes fall off into shade
   float rel = dot(n, sd) - sd.y;
   col *= 1.0 + clamp(rel * 1.6, -0.16, 0.08);
+  // close to a shore the sand shows through: turquoise, fading with the daylight
+  col = mix(col, uShallow, shoal * 0.5 * (1.0 - uLantern.w * 0.7));
 
   // ---- foam: lacy streaks in wind space (x = downwind, y = across), draped over the swell
-  vec2 wd = normalize(uWindDir + vec2(1e-4, 0.0));
-  vec2 wp = vec2(-wd.y, wd.x);
-  vec2 ws = vec2(dot(p, wd), dot(p, wp));
   ws.x -= uTime * 0.8; // foam drifts slowly downwind
-  float A = clamp(uWindStr * 0.55 + uWaveScale * 0.75 - 0.38, 0.05, 1.3); // how foamy the sea is
+  float A = clamp(uWindStr * 0.55 + uWaveScale * 0.75 - 0.38 + gust * 0.2, 0.05, 1.3); // how foamy the sea is
   float detail = 1.0 - smoothstep(260.0, 700.0, dist);
   float crestBias = smoothstep(-0.2, 0.9, hn);
   // the pattern slides a little with the surface slope, so streaks bend over each wave
@@ -198,7 +275,7 @@ void main() {
   foam = max(foam, rd * 0.6);
 
   // ---- lighting
-  vec3 light = uAmbient + uLightCol;
+  vec3 light = uAmbient + uLightCol * (1.0 - shade * 0.75);
   float ld = length(vWorld - uLantern.xyz);
   light += vec3(1.0, 0.72, 0.38) * uLantern.w * (step(ld, uLanternR * 0.45) * 0.35 + step(ld, uLanternR) * 0.35);
   vec3 lit = col * light;
@@ -212,7 +289,7 @@ void main() {
   // ---- sun (or moon) glitter path, widening and warming as the sun drops
   float spec = dot(reflect(-v, n), sd);
   float low = 1.0 - smoothstep(0.12, 0.55, sd.y);
-  float noFoam = 1.0 - foam;
+  float noFoam = (1.0 - foam) * (1.0 - shade);
   lit += uLightCol * smoothstep(0.985 - low * 0.05, 1.0, spec) * (0.08 + low * 0.6) * noFoam;
   vec2 gc = p * 1.4 + n.xz * 2.0;
   vec2 gi = floor(gc);
@@ -227,6 +304,11 @@ void main() {
   #include <colorspace_fragment>
   #include <fog_fragment>
 }`;
+
+export const SEA_FEATURES = ['shallows', 'gusts', 'shade'];
+// A shore map of nothing but open water, until the world's own is set.
+const OPEN_SEA = new THREE.DataTexture(new Uint8Array([255]), 1, 1, THREE.RedFormat);
+OPEN_SEA.needsUpdate = true;
 
 export class Ocean {
   constructor(scene, quality) {
@@ -249,15 +331,59 @@ export class Ocean {
       uLanternR: { value: 30 },
       uRain: { value: 0 },
       uCalm: { value: new THREE.Vector3(0, 0, 0) }, // (x, z, radius): still water inside; radius 0 = off
+      uShallow: { value: new THREE.Color('#2fb3ab') },
+      uShoreMap: { value: OPEN_SEA },
+      uShore: { value: 0 },                                // 1 / the map's width in metres
+      uBig: { value: new THREE.Vector3(1, 1, 1) },         // how much of the shallows, the gusts and the cloud shadows to draw
+      uShoal: { value: new THREE.Vector4(0, 0, 0, 1) },    // ashore: (x, z, radius, falloff) of the island's own shallows; radius 0 = use the map
+      uCloud: { value: new THREE.Vector4(0, 0, 0.3, 0) },  // (drift x, drift z, sky cover, how dark a shadow is)
+      uCloudDir: { value: new THREE.Vector2(1, 0) },
     };
     this.material = new THREE.ShaderMaterial({
       uniforms: this.uniforms, vertexShader, fragmentShader, fog: true,
       defines: quality === 'low' ? { LOW_Q: 1 } : {},
     });
     this.mesh = new THREE.Mesh(oceanGeometry(4200, segs), this.material);
+    this.mesh.name = 'ocean';
     this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = -1;
+    // Drawn after everything else that is solid: its shader is the dearest thing on screen,
+    // and this way it only runs for water you can see, not for the sea under an island or
+    // behind the hull. (The sea's see-through layers, wake and shore foam, still come later.)
+    this.mesh.renderOrder = 1;
     scene.add(this.mesh);
+  }
+  /** The world's shallows (a shoreMap texture covering -half..half). Without one, it is all open sea. */
+  setShoreMap(texture, half) {
+    this.uniforms.uShoreMap.value = texture;
+    this.uniforms.uShore.value = 1 / (half * 2);
+  }
+  /**
+   * Which of the large features to draw, for comparing with and without: nothing (or
+   * null) = all three, '0' = none, 'gusts,shade' = just those. In the URL: ?sea=0.
+   */
+  setFeatures(spec) {
+    const on = spec == null || spec === '' ? SEA_FEATURES : String(spec).split(',');
+    this.uniforms.uBig.value.set(...SEA_FEATURES.map((f) => (on.includes(f) ? 1 : 0)));
+  }
+  /**
+   * Ashore the sea is drawn in the level's own space, where the map doesn't fit: the
+   * shallows are a ring round the island instead. `null` goes back to the map.
+   */
+  setShoal(shoal) {
+    if (shoal) this.uniforms.uShoal.value.set(shoal.x, shoal.z, shoal.r, shoal.fade || 90);
+    else this.uniforms.uShoal.value.set(0, 0, 0, 1);
+  }
+  /**
+   * Called every frame with the sky (sky.js) and the weather's numbers: cloud shadows lie
+   * where the sun would throw the clouds, and fade under an overcast sky, at night and as
+   * the sun gets low.
+   */
+  setSky(env, weather) {
+    const c = env.cloudUniforms, sun = env.sunDir, u = this.uniforms.uCloud.value;
+    const reach = env.clouds.position.y / Math.max(sun.y, 0.25);
+    u.set(c.uOffset.value.x + sun.x * reach, c.uOffset.value.y + sun.z * reach, weather.cloud,
+      (1 - env.overcast) * (1 - env.night) * smoothstep(0.05, 0.3, sun.y) * 0.8);
+    this.uniforms.uCloudDir.value.copy(c.uWindDir.value);
   }
   // Called every frame with the weather wind (direction it blows toward, any length).
   setWind(x, z, strength) {

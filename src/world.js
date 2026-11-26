@@ -352,6 +352,20 @@ export class World {
     return h;
   }
 
+  /**
+   * Every shore, for the sea's depth tint (ocean.js, shoreMap): islands have
+   * wide shallows, reefs and the wreck's rocks small ones. Far from an island
+   * its coast is taken as a circle, which is near enough for a tint.
+   */
+  shores() {
+    return this.all.map((F) => (F.isReef
+      ? { x: F.x, z: F.z, reach: F.bound, shelf: 320, dist: (x, z) => Math.min(...F.rocks.map((R) => Math.hypot(x - R.x, z - R.z) - R.r)) }
+      : { x: F.x, z: F.z, reach: F.bound, shelf: 900, dist: (x, z) => {
+        const d = Math.hypot(x - F.x, z - F.z);
+        return d - F.r * (d < F.bound * 1.6 ? edgeFactor(F, Math.atan2(z - F.z, x - F.x)) : 1);
+      } }));
+  }
+
   // Returns the closest rock overlapping a circle, or null.
   rockHit(x, z, rad) {
     let best = null, bd = 0;
@@ -608,6 +622,7 @@ export class IslandStreamer {
 
   build(F) {
     const group = new THREE.Group();
+    group.name = 'island';
     group.position.set(F.x, 0, F.z);
     const rec = { group, beacon: null };
     const exclusions = [];

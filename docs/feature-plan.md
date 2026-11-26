@@ -15,11 +15,11 @@ Decisions already made:
   island, not walked on the real heightfield.
 - Customization is available **on a new voyage and at a port Tailor**.
 
-This file holds the designs for phases that **haven't shipped yet** (4-7,
-9 and 10),
+This file holds the designs for phases that **haven't shipped yet** (4, 6,
+7, 9 and 10),
 plus what is left of one piece of tooling, the look-dev gallery.
 What is done, what's next and known issues live in [STATUS.md](STATUS.md).
-The designs of shipped phases (0-3 and 8) moved to
+The designs of shipped phases (0-3, 5 and 8) moved to
 [shipped-plans.md](shipped-plans.md).
 
 ---
@@ -87,38 +87,6 @@ Notes:
   [elder-grove-level.md](elder-grove-level.md) before it is built. Archway
   Isle's is drafted: [archway-isle-level.md](archway-isle-level.md).
 - 4.12 can land any time after 4.4; it is last because nothing waits on it.
-
----
-
-## Phase 5: Polish
-
-- **Audio** (`audio.js`, all procedural): footsteps per surface, jump and
-  land sounds, a coin chime, chest fanfare, a biome ambience bed and an
-  ashore music variant of the existing score.
-- **Tutorial hints** the first time you go ashore, the first time you open
-  the quest board and the first time you visit the Tailor.
-- **Mobile:** joystick dead-zone tuning, bigger hit targets, a lower decor
-  budget on `quality: 'low'`.
-- **Performance:** a profile pass covering draw calls per module, outline
-  cost and geometry disposal when you leave an island.
-- **README:** controls table for ashore, plus new tips.
-- **Water improvements** (`src/ocean.js`, `src/waves.js`, `WAVE_DEFS` in
-  `src/config.js`). The sea used to tile into a checkerboard. The first pass
-  fades wave colouring with distance and varies it by region (shader only).
-  Two ideas are left:
-  - **Bigger features to read.** Soft cloud shadows drifting with the wind,
-    darker gust bands running downwind, and a subtle tint for deeper and
-    shallower water, so the eye has something larger than one wave. Shader
-    only; the boat's motion doesn't change. Cloud shadows should follow the
-    weather's cloud cover and fade at night.
-  - **Retune the wave set.** The two biggest waves cross at about 63°,
-    which makes an egg-crate, and rows of crests still show a few hundred
-    metres out. Use more waves, with directions within about 40° of each
-    other and wavelengths that aren't simple multiples, for long rolling
-    crests. `waveHeight` runs on the CPU and the GPU from the same table, so
-    this changes how the boat rides: re-check handling, storm swell, shore
-    foam and the kraken. Each extra wave costs shader time (the ocean
-    samples the waves five times a pixel), so measure on Low.
 
 ---
 
@@ -315,9 +283,11 @@ so all of them sit in the open sea.
   terrain is.
 - Grandfather's wreck sits near Port Haven, so it is inside the shallows.
   Check it still reads well there.
-- This covers the Phase 5 idea of "a subtle tint for deeper and shallower
-  water" for home. A weaker version round every island's shore can follow
-  later.
+- Phase 5 built the weaker version of this for every shore: paler water
+  over the shallows round each island and reef, from a map of the world's
+  shores (`shoreMap` in `ocean.js`). Home waters are the stronger,
+  see-through version, and should start from that map and its `shoal`
+  factor rather than add a second one.
 
 ### Storms by distance
 
@@ -470,12 +440,14 @@ well, but a careless run still costs half the hull.
 
 | PR | Branch | What it adds | Depends on |
 | --- | --- | --- | --- |
-| 9.1 | `feature/home-waters` | `sea-zones.js` with the bands; storms by distance; storms blow out at home; the clear shallows and calmer waves at home; the gallery `sea` subject | — |
+| 9.1 | `feature/home-waters` | `sea-zones.js` with the bands; storms by distance; storms blow out at home; the clear shallows and calmer waves at home, judged on the gallery's `sea` sheets | — |
 | 9.2 | `feature/rough-water` | The Reach, the Rip and the Outer Swell: waves by place, swell floor, damage, warnings, the name on entering, chart hatching; races and the kraken kept out | 9.1 |
 | 9.3 | `feature/rogue-waves` | Rogue waves, ice growlers in the Reach, and tuning to the damage targets | 9.2 |
 
-- Phase 5's *retune the wave set* also changes `waves.js` and how the boat
-  rides. Don't build both at once; whichever lands second re-tunes.
+- Phase 5 retuned the wave set (`WAVE_DEFS`) and measured how the boat
+  rides it. Waves by place start from that table; `node tools/check.mjs
+  ride` holds pitch and bow slams to today's numbers, so extend it with a
+  case for each zone.
 - 9.1 is worth doing early: it makes the first minutes of the game prettier
   and safer.
 
@@ -769,11 +741,11 @@ One feature branch and PR per phase, matching how the repo already works
 | P2b | `feature/main-story` | P2a (story quests reuse the quest engine, tracker and map markers), plus the journal text written and approved |
 | P3 | `feature/ashore-core` | P0, and P1's articulated explorer |
 | P4 | Fourteen smaller PRs: see *Phase 4 in smaller PRs* | P2, P3 |
-| P5 | `feature/ashore-polish` | P4 |
+| P5 | (done: one PR, with the water work) | P4 |
 | P6 | One refit per Phase 4 biome PR | P3, and that biome's Phase 4 work |
 | P7 | `feature/living-sea` | P2a (report quests) |
 | P8 | `feature/rival-captain` | P3, P7 (encounters come through the director), the epilogue letters, and the rival's text written and approved |
-| P9 | Three smaller PRs: see *Phase 9 in smaller PRs* | — (not at the same time as Phase 5's wave retune) |
+| P9 | Three smaller PRs: see *Phase 9 in smaller PRs* | — (builds on Phase 5's wave set and shore map) |
 | P10 | Four smaller PRs: see *Phase 10 in smaller PRs* | P2b's epilogue (done); landmark items as Phase 4 ships them |
 
 **Verification each phase:** there's no test suite, so each PR is checked in

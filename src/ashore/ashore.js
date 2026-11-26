@@ -22,6 +22,7 @@ import { generateLevel } from './levelgen.js';
 import { buildWreckLevel } from './wreck.js';
 import { buildGroveLevel } from './grove.js';
 import { buildArchwayLevel } from './archway.js';
+import { shoalOf } from './shapes.js';
 import { CharacterController } from './controller.js';
 import { FollowCamera } from './camera.js';
 import { LandRace } from './pacer.js';
@@ -159,6 +160,8 @@ export class Ashore {
     this.hintsShown = new Set();
     const calm = this.level.calm;
     g.ocean.uniforms.uCalm.value.set(calm?.x || 0, calm?.z || 0, calm?.r || 0);
+    // the sea's shallows: a ring round this island (the world's shore map is in sea space)
+    g.ocean.setShoal(shoalOf(this.level));
     this.scene.add(this.level.group);
     this.buildPickups();
     this.borrowSky(true);
@@ -178,6 +181,7 @@ export class Ashore {
     const enc = !I.wreck && L.layout ? g.rival?.landEncounter(I) : null;
     this.race = enc ? new LandRace(this, L, enc) : null;
     this.trip = 0;
+    this.coinRun = 0; this.coinAt = null;
     this.prompt = null;
     this.splashT = 0;
     this.lastGroundY = L.spawn.y;
@@ -218,6 +222,7 @@ export class Ashore {
     await g.ui.fade(1, 0.5);
     this.borrowSky(false);
     g.ocean.uniforms.uCalm.value.set(0, 0, 0);
+    g.ocean.setShoal(null);
     const ex = g.boat.explorer;
     this.removeHandLantern(ex);
     g.boat.group.add(ex.root);
@@ -280,13 +285,20 @@ export class Ashore {
       const at = c.lamp || { x: 0.42, y: 1.78, z: 0 };
       const glow = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), glowOff);
       glow.position.set(at.x, at.y, at.z);
-      // every post glows a little at night to show the way; lit ones shine properly
-      const light = new THREE.PointLight(0xffc878, 0, 16, 1.4);
-      light.position.set(at.x, at.y - 0.08, at.z);
-      m.add(glow, light);
+      m.add(glow);
       m.position.set(c.x, c.y, c.z);
       this.scene.add(m);
-      return { ...c, mesh: m, glow, light, lit: false };
+      // (lamp: where its light shines from, when it has one of the shared lights: updateLights)
+      return { ...c, mesh: m, glow, lamp: { x: c.x + at.x, y: c.y + at.y - 0.08, z: c.z + at.z }, lit: false };
+    });
+    // The posts share a few lights, made once and kept between islands. Every light is
+    // paid for by each pixel of the island whether it reaches it or not, and a scene with
+    // a different number of lights has all its shaders built again, so there is never
+    // one a post.
+    this.postLights ||= Array.from({ length: g.settings.quality === 'low' ? 2 : 3 }, () => {
+      const light = new THREE.PointLight(0xffc878, 0, 16, 1.4);
+      this.scene.add(light);
+      return light;
     });
     // quest items wait at the vault, under a column of light you can see from below
     const V = L.vault, quests = this.game.quests;
@@ -338,8 +350,10 @@ export class Ashore {
     const r = Math.hypot(ctl.pos.x, ctl.pos.z), R = L.bounds.r;
     if (r > R) { ctl.pos.x *= R / r; ctl.pos.z *= R / r; }
 
-    if (ev.jumped) g.audio.play('sail', { volume: 0.4 });
-    if (ev.landed > 6) { g.boat.explorer.land(Math.min(1, ev.landed / 18)); g.audio.play('slam', { volume: Math.min(0.5, ev.landed / 40) }); }
+    // jump and land; the ground's surface (ctl.groundTag) picks the footfall
+    if (ev.jumped) g.audio.play('jump');
+    if (ev.landed > 6) g.boat.explorer.land(Math.min(1, ev.landed / 18));
+    if (ev.landed > 2) g.audio.play('land', { surface: ctl.groundTag, volume: Math.min(1, (ev.landed - 2) / 18) });
     if (ev.splashed && this.splashT <= 0) this.splash();
     else if (ev.landed && this.splashT <= 0 && this.fellFromLantern(this.lastGroundY - ctl.pos.y)) this.splash(true);
     if (ctl.grounded) this.lastGroundY = ctl.pos.y;
@@ -354,6 +368,10 @@ export class Ashore {
     this.lastYaw = ctl.yaw;
     const hs = Math.hypot(ctl.vel.x, ctl.vel.z);
     ex.update(dt, t, { footSpeed: hs, grounded: ctl.grounded, vy: ctl.vel.y, turn, windStrength: g.weather.windStrength * 0.6, windRel: Math.PI });
+    // a footfall each time a foot comes down: twice a stride (explorer.js, gait)
+    const foot = Math.floor(ex.gait * 2);
+    if (foot !== this.lastFoot && ctl.grounded && hs > 0.8 && !ev.landed) g.audio.play('step', { surface: ctl.groundTag, volume: 0.75 + 0.45 * Math.min(1, hs / ASHORE.run) });
+    this.lastFoot = foot;
     this.race?.update(dt, t, acts);
     L.update?.(dt, t, { pos: ctl.pos, night: g.env.night, play: (name, opts) => g.audio.play(name, opts) });
 
@@ -394,17 +412,19 @@ export class Ashore {
   // --------------------------------------------------------------- lights
   addHandLantern(ex) {
     pickupGeometry();
-    const g = new THREE.Group();
-    g.add(new THREE.Mesh(handGeo, propMaterial), new THREE.Mesh(handGeo, thinOutline));
+    const g = new THREE.Group(), body = new THREE.Group();
     const flame = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), handGlow);
     flame.position.y = 0.1;
+    body.add(new THREE.Mesh(handGeo, propMaterial), new THREE.Mesh(handGeo, thinOutline), flame);
     const light = new THREE.PointLight(0xffc878, 0, 16, 1.5);
     light.position.y = 0.12;
-    g.add(flame, light);
+    // the lantern is put away by day (body), but its light stays in the scene, dark: a
+    // light that comes and goes has every shader on the island built again, at dusk
+    g.add(body, light);
     // at the left hip, just in front of the satchel (it rides on the pelvis)
     g.position.set(0.23, -0.06, 0.09);
     ex.pelvis.add(g);
-    this.hand = { group: g, light, flame };
+    this.hand = { group: g, body, light, flame };
   }
 
   removeHandLantern(ex) {
@@ -419,7 +439,7 @@ export class Ashore {
     const flick = 1 + Math.sin(t * 9) * 0.04 + Math.sin(t * 23) * 0.03;
     if (this.hand) {
       this.hand.light.intensity = night * 7 * flick;
-      this.hand.group.visible = night > 0.05;
+      this.hand.body.visible = night > 0.05;
       this.hand.group.rotation.x = Math.sin(t * 3.1) * 0.12 * Math.min(1, Math.hypot(this.ctl.vel.x, this.ctl.vel.z) / 3);
     }
     // follows the bloom boost, which the Effects switch changes at runtime
@@ -427,13 +447,23 @@ export class Ashore {
       this.glowBoost = glowBoost.value;
       glowOn.color.set('#ffe8a0').multiplyScalar(glowBoost.value);
     }
-    for (const c of this.lanterns || []) {
+    const p = this.ctl.pos, posts = this.lanterns || [], pool = this.postLights || [];
+    for (const c of posts) {
       // (grandfather's storm lantern burns after dark whether you've lit it or not)
-      const bright = c.lit || (c.burns && night > 0.3);
-      c.light.intensity = night * (bright ? 16 : 4) * flick;
+      c.bright = c.lit || (c.burns && night > 0.3);
       c.glow.material = c.lit || night > 0.3 ? glowOn : glowOff;
-      c.glow.scale.setScalar(bright ? 1 : 0.7);
+      c.glow.scale.setScalar(c.bright ? 1 : 0.7);
+      c.far = Math.hypot(c.x - p.x, c.y - p.y, c.z - p.z);
     }
+    // every post glows a little at night to show the way, and lit ones shine properly: the
+    // nearest posts have the lights, and one dims before its light is wanted somewhere nearer
+    const near = night > 0.02 ? [...posts].sort((a, b) => a.far - b.far) : [];
+    const edge = near.length > pool.length ? near[pool.length].far : Infinity;
+    pool.forEach((light, i) => {
+      const c = near[i];
+      if (c) light.position.set(c.lamp.x, c.lamp.y, c.lamp.z);
+      light.intensity = c ? night * (c.bright ? 16 : 4) * flick * Math.min(1, (edge - c.far) / 6) : 0;
+    });
   }
 
   updatePickups(dt, t) {
@@ -448,7 +478,10 @@ export class Ashore {
       if (Math.abs(c.x - p.x) < 0.75 && Math.abs(c.z - p.z) < 0.75 && c.y + 0.6 > p.y - 0.2 && c.y < p.y + ASHORE.height) {
         c.taken = true; P.coins.push(c.id); changed = true;
         g.state.cargo += c.value; this.trip += c.value;
-        g.audio.play('coin', { volume: 0.5 });
+        // the chime climbs while you keep picking them up
+        this.coinRun = t - (this.coinAt ?? -9) < 1.6 ? this.coinRun + 1 : 0;
+        this.coinAt = t;
+        g.audio.play('chime', { n: this.coinRun });
         continue;
       }
       q.setFromAxisAngle(up, t * 2.4 + c.x);
@@ -539,7 +572,7 @@ export class Ashore {
     const g = this.game, P = this.progress(this.island);
     c.opened = true; P.chest = true;
     c.mesh.rotation.x = -0.15;
-    g.audio.play('treasure');
+    g.audio.play('fanfare');
     const pool = STYLES.filter((s) => s.source === 'tailor' && !owns(g.state.wardrobe, s.slot, s.style));
     const own = STYLES.find((s) => s.id === c.cosmetic && !g.state.wardrobe.includes(s.id));
     let item;
