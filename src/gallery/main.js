@@ -14,13 +14,13 @@ import * as THREE from 'three';
 import { Environment } from '../sky.js';
 import { Ocean, SEA_FEATURES } from '../ocean.js';
 import { WEATHER } from '../weather.js';
-import { updateWaves, waveHeight } from '../waves.js';
+import { updateWaves, waveHeight, setSeaOrigin } from '../waves.js';
 import { FX, fxFlags } from '../fx.js';
 import { toon } from '../toon.js';
 import { initProps } from '../props.js';
 import { clamp, lerp } from '../util.js';
 import { SUBJECTS, controlsFor, unknownParams } from './subjects.js';
-import { LIGHTS, VIEWS, WEATHERS, FIT_FOV } from './presets.js';
+import { LIGHTS, VIEWS, WEATHERS, SEA_PLACES, FIT_FOV } from './presets.js';
 import { SHEETS, propSheet } from './sheets.js';
 
 const HELP = `gallery
@@ -37,12 +37,13 @@ Other parameters: sun=<degrees> turns the light round the subject, ink=studio dr
 lines of the character creator, phase=<0-1> holds a walk or run at one point of the stride,
 play=0 stops the animation, weather=<${WEATHERS.join('|')}> swaps the light's weather,
 waves=<0-1> calms the sea, sea=0 (or sea=${SEA_FEATURES.join(',')}) picks the sea's large features,
+zone=<${Object.keys(SEA_PLACES).join('|')}> is where on the map the sea is (shallows: the clear home waters),
 fx=0 (or fx=edges,bloom) as in the game.`;
 
 const $ = (id) => document.getElementById(id);
 const rad = (deg) => ((parseFloat(deg) || 0) * Math.PI) / 180;
 // Parameters that change how a subject is seen, not what is built.
-const SEEN = new Set(['view', 'light', 'weather', 'sun', 'ink', 'play', 'waves', 'sea', 'sheet', 'fx']);
+const SEEN = new Set(['view', 'light', 'weather', 'sun', 'ink', 'play', 'waves', 'sea', 'zone', 'sheet', 'fx']);
 const size = () => [Math.max(1, window.innerWidth), Math.max(1, window.innerHeight)]; // a hidden tab can report 0
 
 function boot() {
@@ -208,6 +209,9 @@ function boot() {
     applyLight(q.light || 'noon', q.weather);
     for (const f of q.sea && q.sea !== '0' ? q.sea.split(',') : []) if (!SEA_FEATURES.includes(f)) warn(`sea=${f} is not one of ${SEA_FEATURES.join(', ')} (or 0 for none)`);
     ocean.setFeatures(q.sea);
+    // the subject stands at (0, 0), which in the game is Port Haven: say where it is instead
+    if (q.zone && !SEA_PLACES[q.zone]) warn(`zone=${q.zone} is not a place (${Object.keys(SEA_PLACES).join(', ')})`);
+    setSeaOrigin(...(SEA_PLACES[q.zone] || SEA_PLACES.coastal));
     stub.creator = q.ink === 'studio' ? { scene } : null; // fx.js thins the ink for the creator's scene
     playing = q.play !== '0' && q.phase == null;
     if (key !== builtKey || !subject) {
@@ -275,6 +279,7 @@ function boot() {
     menu('view', Object.keys(VIEWS), VIEWS[orbit.name] ? orbit.name : '', (v) => set({ view: v }));
     menu('light', Object.keys(LIGHTS), q.light, (v) => set({ light: v }));
     menu('weather', WEATHERS, q.weather, (v) => set({ weather: v }));
+    menu('zone', Object.keys(SEA_PLACES), q.zone, (v) => set({ zone: v }));
     for (const [key, choices] of controlsFor(q.show)) menu(key, choices, q[key], (v) => set({ [key]: v }));
     menu('sheet', [...Object.keys(SHEETS), 'props'], '', (v) => { if (v) sheet(v); });
   }

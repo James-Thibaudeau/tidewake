@@ -3,6 +3,8 @@
 // Three things larger than a wave give the eye something to read: paler water over the
 // shallows round a shore (shoreMap), darker gust bands running downwind, and the shadows of
 // the clouds. All three only colour the water; its shape, and how a boat rides it, is waves.js.
+// Home waters (sea-zones.js) are the shallows at their strongest: clear turquoise water
+// with the sand showing through (SHALLOWS_GLSL below, kept in a block of its own).
 import * as THREE from 'three';
 import { WAVE_GLSL, WAVE_LOD_GLSL, NOISE_GLSL, waveUniforms } from './waves.js';
 import { clamp, smoothstep } from './util.js';
@@ -66,6 +68,7 @@ ${NOISE_GLSL}
 varying vec3 vWorld;
 varying float vH;
 varying float vCloud;
+varying vec3 vSea;
 uniform vec3 uCalm;
 uniform vec4 uCloud;
 uniform vec2 uCloudDir;
@@ -87,7 +90,10 @@ float cloudAt(vec2 p) {
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vCloud = uCloud.w > 0.001 ? cloudAt(wp.xz) : 0.0;
-  float h = waveHeight(wp.xz) * calmK(wp.xz);
+  // what the sea zones say here (wave factor, swell factor, clear shallows), worked out at
+  // each corner of the grid: the fades are hundreds of metres wide, so a pixel needn't ask
+  vSea = vec3(seaWaveK(wp.xz), seaShallowK(wp.xz));
+  float h = waveHeightK(wp.xz, vSea.xy) * calmK(wp.xz);
   wp.y += h;
   vWorld = wp.xyz;
   vH = h;
@@ -95,6 +101,57 @@ void main() {
   gl_Position = projectionMatrix * mvPosition;
   #include <fog_vertex>
 }`;
+
+// ---- home waters: the clear shallows -------------------------------------------------
+// A block of its own: one function, called once from the fragment shader's main(), after
+// the water's body colour and before the foam, so foam and wave faces stay on top.
+// `k` is how much of home waters is here (vSea.z, from sea-zones.js) and `off` the shore
+// map's reading (0 at a shore, 1 in open water): the nearer a shore, the less water over
+// the sand. There is no seabed: the pattern is drawn where the line of sight would meet
+// one a little way down, so it slides under the surface like real depth, and it fades
+// with distance and at a shallow angle, where water only shows the sky.
+const lin = (hex) => { const c = new THREE.Color(hex); return `vec3(${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)})`; };
+const SHALLOWS_GLSL = /* glsl */ `
+vec3 clearShallows(vec3 col, vec2 p, vec3 v, vec3 n, float hn, float off, float dist, float k) {
+  if (k <= 0.001) return col;
+  // the edge is a lumpy bank, not a ring: the fade is pushed in and out, most at its middle
+  // (and the bank drops off quickly there, with a paler lip of sand just inside it)
+  float e = k, lip = 0.0;
+  if (k < 0.999) {
+    vec2 pr = vec2(p.x * 0.8 + p.y * 0.6, p.y * 0.8 - p.x * 0.6); // turned, so the lumps don't line up
+    float lump = vnoise(p * 0.0045 + 61.0) * 0.5 + vnoise(pr * 0.011 + 17.0) * 0.32 + vnoise(pr.yx * 0.037 + 5.0) * 0.18 - 0.5;
+    float kk = k + lump * 3.2 * k * (1.0 - k);
+    e = smoothstep(0.46, 0.54, kk);
+    lip = e * (1.0 - smoothstep(0.54, 0.74, kk));
+  }
+  float day = 1.0 - uLantern.w * 0.8;
+  // the water itself turns turquoise, paler up a wave's face
+  vec3 water = mix(${lin('#178a9e')}, ${lin('#43c6bf')}, max(smoothstep(-0.5, 0.8, hn), lip * 0.8));
+  col = mix(col, water, e * (0.62 + lip * 0.2) * mix(0.3, 1.0, day));
+  // the bed shows where you look down into the water near you, by day, and less under rain
+  float see = e * (1.0 - smoothstep(60.0, 240.0, dist)) * smoothstep(0.06, 0.32, v.y) * day * (1.0 - uRain * 0.6);
+  if (see > 0.004) {
+    float deep = smoothstep(0.0, 0.6, off);
+    float depth = mix(1.6, 5.5, deep);
+    // where this line of sight meets the bed; each wave bends it a little
+    vec2 bp = p - v.xz / max(v.y, 0.3) * depth + n.xz * depth * 2.0;
+    float aa = 0.03 + dist * 0.0012;
+    // sand, with darker beds of weed
+    float weed = vnoise(bp * 0.035 + 7.0) * 0.65 + vnoise(bp * 0.11 + 23.0) * 0.35;
+    vec3 bed = mix(${lin('#9fe0c8')}, ${lin('#2a9a8c')}, smoothstep(0.58 - aa, 0.58 + aa, weed) * 0.75);
+    // ripple bands in the sand
+    float rip = sin((bp.x * 0.5 + bp.y * 0.85 + vnoise(bp * 0.09 + 3.0) * 9.0) * 1.4);
+    bed *= 1.0 - smoothstep(0.35 - aa, 0.35 + aa, rip) * 0.11 * (1.0 - smoothstep(50.0, 150.0, dist));
+    // slow caustic lines, where two drifting patterns agree; fainter without the sun on the water
+    vec2 cq = bp * 0.28;
+    float ca = vnoise(cq + vec2(uTime * 0.05, uTime * 0.03));
+    float cb = vnoise(cq * 1.31 + 11.0 - vec2(uTime * 0.04, -uTime * 0.045));
+    bed += ${lin('#e9fff2')} * (1.0 - smoothstep(0.015, 0.04 + aa * 0.5, abs(ca - cb))) * mix(0.1, 0.3, clamp(uCloud.w * 1.25, 0.0, 1.0));
+    col = mix(col, bed, see * mix(0.7, 0.42, deep));
+  }
+  return col;
+}
+`;
 
 const fragmentShader = /* glsl */ `
 uniform vec3 uTrough;
@@ -122,6 +179,7 @@ uniform vec4 uCloud;
 varying vec3 vWorld;
 varying float vH;
 varying float vCloud;
+varying vec3 vSea;
 ${WAVE_GLSL}
 ${WAVE_LOD_GLSL}
 ${NOISE_GLSL}
@@ -141,8 +199,11 @@ float cel(float field, float thr) {
   float w = fwidth(field) * 1.6 + 0.004; // crisp, just anti-aliased
   return smoothstep(thr - w, thr + w, field);
 }
+${SHALLOWS_GLSL}
 void main() {
   vec2 p = vWorld.xz;
+  // the weather's wave scale and swell as the sea zones leave them here (half in home waters)
+  float seaWave = uWaveScale * vSea.x, seaSwell = uSwellScale * vSea.y;
   float calm = uCalm.z > 0.0 ? smoothstep(uCalm.z, uCalm.z + 4.0, distance(p, uCalm.xy)) : 1.0;
   float dist = length(cameraPosition - vWorld);
   // Far water: waves too small for a pixel drop out, and the rest lose contrast with distance.
@@ -157,9 +218,9 @@ void main() {
   float lively = vnoise(p * 0.0052 + 11.0 + drift * 2.0) * 0.6 + vnoise(p.yx * 0.0127 + 3.0 - drift * 2.0) * 0.4;
   float waveK = calm * mix(0.3, 1.35, smoothstep(0.25, 0.75, lively));
   vec2 tilt;
-  float hC = waveLod(pw, tilt) * waveK;
+  float hC = waveLod(pw, vSea.xy, tilt) * waveK;
   vec3 n = normalize(vec3(-tilt.x * waveK, 1.0, -tilt.y * waveK));
-  float amp = max(uWaveScale * 1.25 + uSwellScale * 3.2, 0.05);
+  float amp = max(seaWave * 1.25 + seaSwell * 3.2, 0.05);
   float hn = hC / amp;
   vec3 v = normalize(cameraPosition - vWorld);
   vec3 sd = normalize(uSunDir);
@@ -214,10 +275,12 @@ void main() {
   col *= 1.0 + clamp(rel * 1.6, -0.16, 0.08);
   // close to a shore the sand shows through: turquoise, fading with the daylight
   col = mix(col, uShallow, shoal * 0.5 * (1.0 - uLantern.w * 0.7));
+  // home waters: clear water over sand (SHALLOWS_GLSL)
+  col = clearShallows(col, p, v, n, hn, off, dist, vSea.z * uBig.x);
 
   // ---- foam: lacy streaks in wind space (x = downwind, y = across), draped over the swell
   ws.x -= uTime * 0.8; // foam drifts slowly downwind
-  float A = clamp(uWindStr * 0.55 + uWaveScale * 0.75 - 0.38 + gust * 0.2, 0.05, 1.3); // how foamy the sea is
+  float A = clamp(uWindStr * 0.55 + seaWave * 0.75 - 0.38 + gust * 0.2, 0.05, 1.3); // how foamy the sea is
   float detail = 1.0 - smoothstep(260.0, 700.0, dist);
   float crestBias = smoothstep(-0.2, 0.9, hn);
   // the pattern slides a little with the surface slope, so streaks bend over each wave
@@ -244,14 +307,14 @@ void main() {
   float trail = 0.0;
 #ifndef LOW_Q
   // foam lingers downwind of crests that just passed
-  trail = smoothstep(0.45, 0.95, waveHeight(p - wd * 3.5) / amp);
+  trail = smoothstep(0.45, 0.95, waveHeightK(p - wd * 3.5, vSea.xy) / amp);
 #endif
   // only a light link to the (fast-moving) wave crests, so foam doesn't race past
   float field = vein * 0.7 + body * 0.25 + (rag - 0.5) * 0.55 + crestBias * 0.07 + trail * 0.03;
   // whitecaps: the lace thickens on the highest crests, more in rough seas, rather than
   // breaking out as a separate slab of white
   float capN = vnoise(p * 0.12 + wd * uTime * 0.12) * 0.6 + vnoise(p * 0.42 - uTime * 0.06) * 0.4;
-  float capThr = 1.24 - smoothstep(0.3, 1.4, uWaveScale) * 0.42 - clamp(uWindStr - 0.8, 0.0, 0.8) * 0.08; // fewer caps in fair weather, same in storms
+  float capThr = 1.24 - smoothstep(0.3, 1.4, seaWave) * 0.42 - clamp(uWindStr - 0.8, 0.0, 0.8) * 0.08; // fewer caps in fair weather, same in storms
   float cap = smoothstep(capThr - 0.3, capThr + 0.1, hn + (capN - 0.5) * 0.55) * (1.0 - smoothstep(400.0, 900.0, dist));
   float foam = cel(field + cap * 0.2, 0.94 - A * 0.085) * detail;
 

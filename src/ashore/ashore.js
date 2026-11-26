@@ -23,6 +23,7 @@ import { buildWreckLevel } from './wreck.js';
 import { buildGroveLevel } from './grove.js';
 import { buildArchwayLevel } from './archway.js';
 import { shoalOf } from './shapes.js';
+import { setSeaOrigin } from '../waves.js';
 import { CharacterController } from './controller.js';
 import { FollowCamera } from './camera.js';
 import { LandRace } from './pacer.js';
@@ -162,6 +163,7 @@ export class Ashore {
     g.ocean.uniforms.uCalm.value.set(calm?.x || 0, calm?.z || 0, calm?.r || 0);
     // the sea's shallows: a ring round this island (the world's shore map is in sea space)
     g.ocean.setShoal(shoalOf(this.level));
+    setSeaOrigin(I.x, I.z); // …and its waves are those of where the island lies (sea-zones.js)
     this.scene.add(this.level.group);
     this.buildPickups();
     this.borrowSky(true);
@@ -223,6 +225,7 @@ export class Ashore {
     this.borrowSky(false);
     g.ocean.uniforms.uCalm.value.set(0, 0, 0);
     g.ocean.setShoal(null);
+    setSeaOrigin(0, 0);
     const ex = g.boat.explorer;
     this.removeHandLantern(ex);
     g.boat.group.add(ex.root);

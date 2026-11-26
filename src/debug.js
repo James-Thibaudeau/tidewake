@@ -10,6 +10,7 @@
 // Always finish with restoreSave(): it puts the save back and reloads, and
 // without it the test voyage is saved over the real one when the tab closes.
 import { UPGRADES, SAVE_KEY, REFITS, ASHORE_BIOMES } from './config.js';
+import { bandAt, seaAt } from './sea-zones.js';
 
 const BACKUP_KEY = SAVE_KEY + '.debug-backup';
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
@@ -21,6 +22,7 @@ const HELP = `tidewake.debug
   step(seconds, dt?)       advance the simulation without waiting for frames; returns state()
   frame()                  render one frame (do this before a screenshot when the tab is hidden)
   teleport(where, off?)    where: island id, island name, or { x, z }; puts the boat in open water nearby
+  zone()                   the sea where the boat is: band (home | coastal | open), zone, and what it does to the waves
   give({ gold, cargo, health, upgrades })   upgrades: 'max' or { sail: 3, hull: 2, … }
   journals(n, { anchor })  story: the first n journals found (0-7); anchor: true fits grandfather's anchor
   refit(tier, { open })    grandfather's anchor at refit tier 0-4 (fits the anchor too); open: biomes to
@@ -133,6 +135,17 @@ export function installDebug(game) {
         return api.state();
       }
       throw new Error('No open water found there; try a larger offset.');
+    },
+
+    /** The sea zones' reading at the boat (sea-zones.js), and the weather it has to work with. */
+    zone() {
+      const b = g.boat.pos, s = seaAt(b.x, b.z);
+      return {
+        band: bandAt(b.x, b.z), zone: s.zone, fromPortHaven: Math.round(Math.hypot(b.x, b.z)),
+        shallow: round(s.shallow, 2), rough: round(s.rough, 2), severity: s.severity,
+        wave: round(s.wave, 2), swell: round(s.swell, 2),
+        weather: g.weather.type, weatherFor: Math.round(g.weather.timer),
+      };
     },
 
     give({ gold, cargo, health, upgrades } = {}) {

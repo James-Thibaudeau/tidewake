@@ -1,7 +1,10 @@
 // Weather state machine (clear → rain → storm …), wind, rain, lightning and
-// cartoon wind streaks.
+// cartoon wind streaks. There is one weather for the whole world, but where the boat is
+// weights what comes next (sea-zones.js, BANDS): no storm starts in home waters, and
+// storms are commoner and longer in the open sea.
 import * as THREE from 'three';
 import { clamp, TAU, noise2 } from './util.js';
+import { BANDS, pickByBand } from './sea-zones.js';
 
 // cloud: sky cover (≥ ~0.9 reads as a full overcast deck); dark: how much the
 // weather greys and dims the world on top of that.
@@ -13,6 +16,7 @@ export const WEATHER = {
   storm: { cloud: 1.0, rain: 1.0, wave: 1.7, wind: 1.45, fog: 0.38, dark: 0.72, storm: 1, swell: 1.0, label: 'Storm!' },
   fog: { cloud: 0.85, rain: 0, wave: 0.25, wind: 0.55, fog: 0.18, dark: 0.14, storm: 0, swell: 0, label: 'Fog' },
 };
+// What can follow each weather on the coastal sea; a band reweights the rain and storms.
 const NEXT = {
   clear: ['breezy', 'cloudy', 'fog', 'clear', 'breezy'],
   breezy: ['clear', 'cloudy', 'rain', 'breezy'],
@@ -161,17 +165,21 @@ export class Weather {
     if (this.onThunder) this.onThunder(d);
   }
 
-  update(dt, camera, boatPos) {
+  /** `band` is where the boat is: 'home', 'coastal' or 'open' (sea-zones.js, bandAt). */
+  update(dt, camera, boatPos, band = 'coastal') {
     this.time += dt;
     this.calmTimer -= dt;
     // state transitions
     this.timer -= dt;
+    // a storm blows itself out soon after you sail into home waters
+    if (band === 'home' && this.type === 'storm') this.timer = Math.min(this.timer, 40);
     if (this.timer <= 0) {
-      const opts = NEXT[this.type];
-      let next = opts[Math.floor(Math.random() * opts.length)];
+      let next = pickByBand(NEXT[this.type], band, Math.random());
+      // (the first minutes of a new voyage stay fair wherever you sail them)
       if (this.calmTimer > 0 && (next === 'storm' || next === 'rain')) next = 'breezy';
       this.set(next);
-      this.timer = next === 'storm' ? 80 + Math.random() * 90 : 100 + Math.random() * 160;
+      const [lo, hi] = next === 'storm' ? BANDS[band].stormFor : [100, 260];
+      this.timer = lo + Math.random() * (hi - lo);
       this.windDrift = (Math.random() - 0.5) * 1.6;
     }
     // smooth params

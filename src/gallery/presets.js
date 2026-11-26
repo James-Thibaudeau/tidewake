@@ -22,6 +22,12 @@ export const LIGHTS = {
 // Weathers a light's own can be swapped for (`weather=storm`), from weather.js.
 export const WEATHERS = ['clear', 'breezy', 'cloudy', 'rain', 'storm', 'fog'];
 
+// Where on the map the subject sits, for the sea round it (sea-zones.js): metres east
+// and south of Port Haven. `shallows` is the middle of home waters and `bank` their
+// edge. `coastal` is the plain sea of the coast, far enough off that no zone shows even
+// on the horizon of the highest camera, so its pictures only change when the sea does.
+export const SEA_PLACES = { coastal: [100000, 0], shallows: [0, 0], bank: [1190, 0] };
+
 // Cameras. yaw 0 looks at the subject's front, pitch is radians above level.
 //   fit    frame the whole subject (a 30° lens, so little distortion)
 //   game   the game's own lens, from behind: how it will be seen (`sail`, `foot`),
