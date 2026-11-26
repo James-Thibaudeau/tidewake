@@ -162,6 +162,15 @@ export function roughDamage(sea, sailLevel, keel) {
   return ROUGH.batter[sea.severity] * sea.rough * ROUGH.sail[sailLevel] * (1 - keel * ROUGH.keel);
 }
 
+const goldSea = {};
+/**
+ * What sunken treasure or salvage lying at (x, z) is worth, against the same find in
+ * plain sea: 1 there, rising to ROUGH.gold in the worst of a rough zone.
+ */
+export function goldBonus(x, z) {
+  return 1 + (ROUGH.gold - 1) * seaAt(x, z, goldSea).rough;
+}
+
 /** 'home', 'coastal' or 'open': home waters reach to the middle of their fade. */
 export function bandAt(x, z) {
   const d = Math.hypot(x, z);

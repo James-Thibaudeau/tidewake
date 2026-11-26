@@ -47,6 +47,8 @@ export const WAVE_DEFS = [
 //   keel     how much of the keel counts against it: a storm is resisted by 1 - keel,
 //            rough water by 1 - keel × this, so the best keel only halves it and the
 //            hull has to take the rest
+//   gold     what sunken treasure and salvage are worth at a zone's worst, against the
+//            same find in plain sea: it costs hull to reach, so it pays more
 // The damage targets these are tuned towards are in docs/feature-plan.md (Phase 9);
 // 9.3's rogue waves are meant to make up the rest.
 export const ROUGH = {
@@ -54,6 +56,7 @@ export const ROUGH = {
   batter: [0, 0.04, 0.08, 0.12],
   sail: [1, 2.5, 9],
   keel: 0.5,
+  gold: 1.5,
   warn: 0.3,   // how far into a zone (0-1) before the warning shows
 };
 

@@ -439,6 +439,8 @@ well, but a careless run still costs half the hull.
   shallows.
 - **Treasure** and salvage inside rough water are worth more (× 1.5), so
   there's a reason to go in besides the landmark. Optional; tune after.
+  (Built in 9.2: up to × 1.5 by how far in the find lies, the same in every
+  zone. `ROUGH.gold` in `config.js`.)
 - **Ashore:** the anchored ship stays safe, as today. You land from the calm
   pocket.
 - **Save:** nothing new. The chart's hatching comes from the fog-of-war

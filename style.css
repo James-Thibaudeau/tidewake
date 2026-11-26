@@ -295,6 +295,8 @@ body.touch .btn, body.touch .tab, body.touch .chip, body.touch .toggle { min-hei
   animation: fadeIn 0.25s ease-out;
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+/* A wreck fades the sea out (#fade) and then shows this, so it has to sit above the fade. */
+#wreckScreen { z-index: 55; }
 .sheet {
   background: linear-gradient(180deg, rgba(20, 44, 80, 0.96), rgba(12, 28, 54, 0.96));
   border: 3px solid var(--border); border-radius: 22px; box-shadow: 0 6px 0 rgba(0, 0, 0, 0.4), 0 20px 60px rgba(0, 0, 0, 0.5);

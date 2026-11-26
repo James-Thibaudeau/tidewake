@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { UPGRADES, upgradeValue, MAP_RES, MAP_CELL, WORLD_HALF, DAY_LENGTH, ROUGH, isTouch } from './config.js';
 import { clamp, damp, dampAngle, smoothstep, lerp, wrapAngle, bearingDeg, TAU } from './util.js';
 import { updateWaves, waveHeight } from './waves.js';
-import { bandAt, seaAt, swellAt, roughDamage } from './sea-zones.js';
+import { bandAt, seaAt, swellAt, roughDamage, goldBonus } from './sea-zones.js';
 import { ringUniforms } from './world.js';
 import { propMesh } from './props.js';
 import { pointOfSailName } from './boat.js';
@@ -427,7 +427,8 @@ export class Game {
         const mesh = propMesh(kind);
         mesh.rotation.set(Math.random() * 0.5, Math.random() * TAU, Math.random() * 0.5);
         this.scene.add(mesh);
-        this.flotsam.push({ x, z, mesh, value: 4 + Math.floor(Math.random() * 11), phase: Math.random() * 10 });
+        // (salvage adrift in rough water is worth more, like the treasure sunk there)
+        this.flotsam.push({ x, z, mesh, value: Math.round((4 + Math.floor(Math.random() * 11)) * goldBonus(x, z)), phase: Math.random() * 10 });
       }
     }
     for (let i = this.flotsam.length - 1; i >= 0; i--) {
@@ -449,13 +450,15 @@ export class Game {
 
   haulTreasure(I) {
     const s = this.state;
+    // treasure lying in rough water is worth more: it costs hull to reach
+    const bonus = goldBonus(I.treasure.x, I.treasure.z), gold = Math.round(I.treasure.value * bonus);
     I.treasureTaken = true;
     s.pending.add(I.id);
-    s.cargo += I.treasure.value;
+    s.cargo += gold;
     s.stats.treasures++;
     this.streamer.setTreasureVisible(I, false);
     this.audio.play('treasure');
-    this.ui.banner(`${I.treasure.value} gold`, 'Treasure hauled aboard!');
+    this.ui.banner(`${gold} gold`, bonus > 1.05 ? SEAS.haul : 'Treasure hauled aboard!');
     this.events.emit('haul', I);
     this.spawnChestRise();
   }

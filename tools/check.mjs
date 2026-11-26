@@ -245,6 +245,10 @@ const checks = {
         if (!pages[page].has(m[1])) errors.push(`${rel(f)}:${lineOf(source[f], m.index)}: no element with id "${m[1]}" in ${page}`);
       }
     }
+    // the Shipwrecked screen comes up over the fade-out (game.js), so it must be drawn above it
+    const css = readFileSync(join(ROOT, 'style.css'), 'utf8');
+    const zOf = (sel) => Number(css.match(new RegExp('^' + sel + ' \\{[^}]*?z-index: (\\d+)', 'm'))?.[1]);
+    if (!(zOf('#wreckScreen') > zOf('#fade'))) errors.push(`style.css: #wreckScreen (z-index ${zOf('#wreckScreen')}) must be above #fade (${zOf('#fade')}), or a wreck ends on a blank screen`);
     return { errors, note: `${count} lookups` };
   },
 
@@ -553,6 +557,11 @@ const checks = {
     }
     // the open sea's darker water: none on the coast, all of it out by the landmarks, none past the world
     if (Z.openSea(Z.OPEN_SEA - 500) !== 0 || Z.openSea(Z.OPEN_SEA + 500) !== 1 || Z.openSea(WORLD_HALF * 1.42) !== 1 || Z.openSea(100000) !== 0 || Z.seaAt(100000, 0).open !== 0) errors.push('the open sea should darken across its start, hold to the corners of the world and end beyond them');
+    // treasure and salvage are worth more in rough water, by how far in they lie, and nowhere else
+    for (const R of rough) if (Math.abs(Z.goldBonus(...worstOf(R)) - ROUGH.gold) > 1e-9) errors.push(`${SEAS[R.id]}: a find in its worst water should be worth ${ROUGH.gold} times as much`);
+    if (!(ROUGH.gold > 1) || Z.goldBonus(0, 0) !== 1 || Z.goldBonus(2400, 300) !== 1 || marks.some((M) => Z.goldBonus(M.x + M.r, M.z) !== 1)) errors.push('a find should be worth more in rough water only: not at home, in plain sea or off a landmark in its calm pocket');
+    const gameSrc = source[join(SRC, 'game.js')];
+    if (!/goldBonus\(I\.treasure\.x, I\.treasure\.z\)/.test(gameSrc) || !/value: Math\.round\([^\n]*goldBonus\(x, z\)\)/.test(gameSrc) || !SEAS.haul) errors.push('game.js should price treasure (haulTreasure) and salvage (updateFlotsam) with goldBonus(), and say so (SEAS.haul)');
     // races and the kraken's trench keep out (race.js needs three.js, so its source is read)
     if (!/function clearAt[^}]*raceWater\(x, z\)/s.test(source[join(SRC, 'race.js')]) || !/!raceWater\(/.test(source[join(SRC, 'rival.js')])) errors.push('race.js (clearAt) and rival.js (the Deep) should both ask raceWater()');
 

@@ -719,6 +719,15 @@ Updated 2026-11-25.
     - **Kept out:** race courses and the kraken's trench ask `raceWater()`
       (`race.js`): no rough water, no home waters. The Deep is where it
       was.
+    - **Worth the hull:** sunken treasure and salvage are worth more in
+      rough water, up to × 1.5 at a zone's worst (`goldBonus`,
+      `ROUGH.gold`), worked out when it is hauled, so the world's own
+      numbers are untouched. Twelve islands gain by it, ten of them by a
+      quarter or more: eight in the Outer Swell (Heron Atoll
+      175 → 250 gold), Plover Spire in the Reach (230 → 333) and Thorn
+      Atoll in the Rip (177 → 246). The banner says "Hauled out of rough
+      water!". A landmark's own treasure lies in its calm pocket and is
+      worth what it was.
     - **Left over from 9.1:** the open sea is a shade darker (about 4% in
       the gallery's `open` cells), ending past the world's corners so the
       gallery's plain sea stays plain. The event director reads `seaAt`:
@@ -780,14 +789,20 @@ Updated 2026-11-25.
         4.11), so the landing from the calm pocket was tried with the
         biome opened by `debug.refit(4, { open: ['cold'] })`.
       - Not built: fog more often in the Reach, flying spray, the chapter
-        VII line and the shipwright's line about the Reach, treasure worth
-        more in rough water, hatching on the minimap, a sound for sailing
-        in.
+        VII line and the shipwright's line about the Reach, hatching on
+        the minimap, a sound for sailing in.
       - A race asked for inside a zone starts up to 750 m away, outside
         it; deep in home waters there is "no room to race".
+    - **Fixed on the way:** a shipwreck ended on a blank dark screen. The
+      Shipwrecked screen was drawn underneath the fade-out that comes
+      before it (`#fade` above `.screen` in `style.css`, since the first
+      commit), so "Wash ashore" could not be reached. It now sits above
+      the fade, and the `dom` check holds it there.
     - **Worth knowing:** three islands you can land on lie in rough water,
       with their treasure: Plover Spire (rocky) in the worst of the Reach,
-      Thorn Atoll (temperate) and Echo Cove in the Rip.
+      Thorn Atoll (temperate) and Echo Cove in the Rip. The bonus is the
+      same × 1.5 in every zone, though the Reach costs far more hull than
+      the Outer Swell: one number a zone would fix that, if it matters.
   - [ ] 9.3 Rogue waves and ice growlers, and tuning to the damage targets
     (see the table under 9.2)
   - [ ] Only a person can do, 9.2: sail each zone by hand (how it feels at

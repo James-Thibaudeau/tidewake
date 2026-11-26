@@ -183,6 +183,7 @@ export const SEAS = {
   rough: 'Rough water',
   reef: 'Rough water: reef your sails',
   beating: 'Rough water: hull taking a beating',
+  haul: 'Hauled out of rough water!',
 };
 
 // Report quests (reports.js): you see something at sea, and somebody ashore
