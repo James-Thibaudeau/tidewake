@@ -343,7 +343,7 @@ export class Game {
       this.ui.flashDamage(amount);
       this.audio.play('crash');
       this.cam.shake = Math.min(1.5, 0.3 + amount / 15);
-      this.ui.toast({ rock: 'Crunch! You struck a rock.', ice: SIGHTINGS.hitIce, spout: SIGHTINGS.hitSpout }[kind] || 'You ran aground!', 'warn');
+      this.ui.toast({ rock: 'Crunch! You struck a rock.', ice: SIGHTINGS.hitIce, spout: SIGHTINGS.hitSpout, whale: SIGHTINGS.hitWhale, breach: SIGHTINGS.hitBreach }[kind] || 'You ran aground!', 'warn');
     } else if (Math.random() < amount * 0.6) {
       this.ui.flashDamage(2);
       this.cam.shake = 0.25;

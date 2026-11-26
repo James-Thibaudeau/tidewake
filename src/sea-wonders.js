@@ -5,7 +5,7 @@
 //
 // Two of them can hurt the ship, through the director:
 //   ctx.batter(x, z, r, damage)   the waterspout: inside r of it, the hull takes a beating
-//   ctx.bump(x, z, r, kind)       ice: a solid lump of radius r that the boat can't sail through
+//   ctx.bump(x, z, r, kind)       ice: a solid lump of radius r that the boat can't sail through (the whale uses it too)
 // and the bloom lights the water through it:
 //   ctx.glow(x, z, r, k)          a patch of glowing sea (the ocean shader's uBloom)
 import * as THREE from 'three';

@@ -157,7 +157,8 @@ export class SeaEvents {
       sea: g.world, night: g.env.night,
       play: (name, x, z) => this.play(name, x, z),
       say: (text) => g.ui.toast(text, 'info'),
-      bump: (x, z, r, kind) => this.bump(x, z, r, kind),
+      bump: (x, z, r, kind, soft) => this.bump(x, z, r, kind, soft),
+      knock: (damage, kind) => { if (g.mode === 'sailing') g.damage(damage * (1 - g.upv.keel * 0.5), kind); },
       batter: (x, z, r, damage) => this.batter(x, z, r, damage),
       glow: (x, z, r, k) => g.ocean.uniforms.uBloom.value.set(x, z, r, k),
     };
@@ -169,8 +170,13 @@ export class SeaEvents {
     if (v > 0.05) this.game.audio.play(name, { volume: Math.min(1, v) });
   }
 
-  /** Something solid in the water (ice): the boat is kept out of it, and a hard knock costs hull, as a rock does. */
-  bump(x, z, r, kind) {
+  /**
+   * Something solid in the water (ice, a whale): the boat is kept out of it,
+   * and a hard knock costs hull, as a rock does (`soft` scales that: a whale
+   * gives). Returns false if the boat is clear of it, 'hit' for a hard knock,
+   * true for a touch.
+   */
+  bump(x, z, r, kind, soft = 1) {
     const g = this.game, b = g.boat;
     if (g.mode !== 'sailing') return false;
     let nx = b.pos.x - x, nz = b.pos.z - z;
@@ -183,8 +189,10 @@ export class SeaEvents {
       b.hitCooldown = 0.8;
       b.push.set(nx * into * 0.7, nz * into * 0.7);
       b.speed *= -0.3;
-      g.damage((into - 3) * 4.5 * (1 - g.upv.keel * 0.4), kind);
-    } else if (into > 0) b.speed *= 0.92;
+      g.damage((into - 3) * 4.5 * soft * (1 - g.upv.keel * 0.4), kind);
+      return 'hit';
+    }
+    if (into > 0) b.speed *= 0.92;
     return true;
   }
 

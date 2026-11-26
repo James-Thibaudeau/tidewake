@@ -398,6 +398,8 @@ export const SIGHTINGS = {
   bottleSlow: 'Slow down to pick up the bottle',
   hitIce: 'Crunch! You struck the ice.',
   hitSpout: 'The waterspout batters your hull!',
+  hitWhale: 'Thump! You ran into the whale.',
+  hitBreach: 'The whale comes up against your hull!',
   rewardEyebrow: 'Sightings',
   rewards: {
     whale: { title: 'Five whales', text: "A whale's tail carved from driftwood, on a cord. For someone the whales have got used to. Find it in the Tailor's wardrobe." },

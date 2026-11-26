@@ -8,6 +8,8 @@
 //   actor.pos, actor.size                 where it is, and how big, for "have you seen it"
 //   actor.done                            it has gone; the director can roll again
 //   actor.boost                           (dolphins) the player's sail drive while they ride the bow wave
+// The whale is solid: it keeps the boat out of its body through ctx.bump(x, z, r, kind, soft),
+// and a breach that comes up under you or down on you knocks the hull (ctx.knock(damage, kind)).
 //
 // Models face +z, like the boats, and are built once and kept. The ghost ship
 // is ghost-ship.js. The rules for where and when are sightings.js.
@@ -91,6 +93,9 @@ const WHALE = { back: '#46668a', belly: '#d9e6ec', fin: '#34506e', eye: '#141c28
 const WHALE_SIZE = 2;                  // the model is built at half size: she is 30 m, four boat lengths
 const WHALE_DEEP = -3.4 * WHALE_SIZE;  // swimming depth of the body's centre (the back is under water)
 const WHALE_UP = -0.12 * WHALE_SIZE;   // …and when it comes up to blow (the back shows)
+// Her body for the boat to run into, head to tail stock: [along the spine, half-breadth] in the model's own units.
+const WHALE_BODY = [[4.7, 1.3], [2.6, 1.65], [0.4, 1.75], [-1.8, 1.5], [-3.9, 1.0], [-5.8, 0.55]];
+const HULL = [-1, 1.5];                // the heights a boat's hull takes up, for what of her is in its way
 
 /** A whale about 30 m long: { group, tail } with the tail on a pivot so the flukes can beat. */
 export function buildWhale() {
@@ -146,6 +151,7 @@ export class Whale {
     this.breachIn = 13 + rng() * 8;
     this.phase = 'swim'; this.t = 0;
     this.out = false; this.wet = false; this.flick = false;
+    this.struck = false; this.spooked = false;
     this.y = WHALE_DEEP; this.pitch = 0; this.roll = 0;
     this.wander = rng() * 10;
     this.done = false;
@@ -186,8 +192,9 @@ export class Whale {
       if (u >= 0.12 && (before < 0.12 || before > u)) this.blow(ctx);
       this.breachIn -= dt;
       const ahead = openWater(this.sea, this.pos.x + fx * 110, this.pos.z + fz * 110, 45);
-      if (this.life <= 0 || this.age > 170 || !ahead) this.leave();
-      else if (this.breachIn <= 0 && u > 0.7 && d > 50) { this.phase = 'breach'; this.t = 0; this.wet = false; }
+      // (run into her hard and she has had enough of you)
+      if (this.life <= 0 || this.age > 170 || !ahead || this.spooked) this.leave();
+      else if (this.breachIn <= 0 && u > 0.7 && d > 50) { this.phase = 'breach'; this.t = 0; this.wet = false; this.struck = false; }
     } else if (this.phase === 'breach') {
       // up and out, nose first; hang; fall back on its side
       const k = this.t / 4.6;
@@ -219,6 +226,30 @@ export class Whale {
     this.pos.x += fx * speed * dt; this.pos.z += fz * speed * dt;
     this.tail.rotation.x = tailBeat;
     this.place();
+    this.collide(ctx);
+  }
+
+  /**
+   * She is solid. Each stretch of her body that is at the height of a hull
+   * keeps the boat out of it: deep down she passes under you, at the surface
+   * you sail round her, and a breach can come up beneath you. Running into
+   * her at speed costs hull (half what a rock would) and sends her down; a
+   * breach that catches the boat knocks it once.
+   */
+  collide(ctx) {
+    const S = WHALE_SIZE, fx = Math.sin(this.heading), fz = Math.cos(this.heading);
+    const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch), base = this.group.position.y;
+    let touched = false;
+    for (const [s, half] of WHALE_BODY) {
+      // this stretch's height (nose up or down moves it), and how wide she is where the hull would meet her
+      const y = base - s * S * sp, tall = half * S * 0.86, off = clamp(y, HULL[0], HULL[1]) - y;
+      const wide = Math.sqrt(Math.max(0, 1 - (off / tall) ** 2));
+      if (wide < 0.25) continue;
+      const hit = ctx.bump(this.pos.x + fx * s * S * cp, this.pos.z + fz * s * S * cp, half * S * wide * 0.92, 'whale', 0.5);
+      if (hit) touched = true;
+      if (hit === 'hit') this.spooked = true;
+    }
+    if (touched && this.phase === 'breach' && !this.struck) { this.struck = true; ctx.knock(9, 'breach'); }
   }
 
   /** The spout: a column of mist from the top of the head, and the sound of it. */

@@ -225,7 +225,11 @@ Updated 2026-11-25.
     - **Whale** (temperate and cold, not in storms; `src/sea-life.js`),
       about 30 m, four lengths of the starting boat: blows every 8 s,
       breaches, and goes down flukes-up. Keep within 95 m at under 8 kn and
-      it stays up (to about 3 minutes).
+      it stays up (to about 3 minutes). She is solid wherever her body is at
+      the height of the hull: at the surface you are kept about 5.5 m from
+      her spine amidships (less towards the tail), deep down you sail over
+      her. Run into her at speed and it costs half what a rock would, and
+      she dives; a breach that catches the boat costs 9 hull, once.
     - **Dolphins** (tropical and temperate, clear or breezy): 4-8 leaping.
       Come within 75 m at over 12 kn and they ride your bow wave: 8% more
       drive from the sail while they stay (up to 45 s).
@@ -327,8 +331,9 @@ Updated 2026-11-25.
     ghost ship is in fog, how hard ice and waterspouts hit, and how often
     boards ask for sightings. The phone-size look covered the first four
     cards only.
-  - Known: the whale, the dolphins and the turtles don't collide with the
-    boat, which shows more now that the whale is 30 m long.
+  - Known: the dolphins and the turtles don't collide with the boat (a
+    turtle you touch dives instead). The whale's flukes aren't solid, only
+    her body and tail stock.
     Reports go to the nearest port even if you haven't charted it, as the
     crabs' does. The fish's outline is heavy for its size. A bounty's
     kind can only be seen in its hour and weather, so a "glowing sea"
