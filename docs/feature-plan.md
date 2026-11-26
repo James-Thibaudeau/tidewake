@@ -16,7 +16,7 @@ Decisions already made:
 - Customization is available **on a new voyage and at a port Tailor**.
 
 This file holds the designs for phases that **haven't shipped yet** (4, 6,
-7, 9 and 10),
+7, 9, 10 and 11),
 plus what is left of one piece of tooling, the look-dev gallery.
 What is done, what's next and known issues live in [STATUS.md](STATUS.md).
 The designs of shipped phases (0-3, 5 and 8) moved to
@@ -721,6 +721,222 @@ purchase changes a stat.
 
 ---
 
+## Phase 11: Islands with shapes
+
+Today every island but one has the same shape: a lumpy circle. The coast
+comes from `edgeFactor` in `world.js`, which gives a radius for each angle,
+so an island can be fatter on one side but can never be a crescent, a ring
+or a hook. Archway Isle is the exception. A bay cut into it (`bayFor`,
+`baySdf`) makes it a U you sail into, and that one change is why you
+remember it from the sea and on the chart. This phase does the same for the
+other islands: an island's name says what shape it is, and the shape is
+what you see.
+
+Goals:
+- You can tell islands apart by their outline on the chart and their
+  silhouette from the deck.
+- **The name keeps its promise.** Moon Island is a crescent, Crab Island has
+  claws, and an atoll is a ring round a lagoon.
+- **Shapes make places to sail**, not only things to look at: lagoons, coves
+  and the bowl of a crescent that you can sail into, anchor in and land
+  from.
+- **The world doesn't move.** Every island keeps its centre, size, biome,
+  name, id and treasure angle. Only coasts change.
+
+### How a shape is made
+
+- **A shape is a signed distance.** A form is a few primitives in
+  island-local units, scaled by `r`: disc, ellipse, capsule (a fat line),
+  arc (a fat curve) and cut (the bay from Archway Isle). They combine by
+  union and subtraction. `formSdf(I, x, z)` is negative on land and 0 at the
+  coast. The coast still wobbles: the noise that `edgeFactor` uses today is
+  added along the edge, so no shape looks drawn with a compass.
+- **Height follows the shape.** Today a point's height comes from how far it
+  is from the centre (`s = 1 - d / edge`). A shaped island uses how far the
+  point is inland instead: `s = -sdf / depth`, where `depth` is the furthest
+  inland point. So the ridge runs down the middle of the shape: along a
+  crescent's arc, round an atoll's ring, out along a point. A form can also
+  taper its peak, so a crescent's horns are low sand and the middle of the
+  arc is a hill.
+- **Plain islands don't change.** The form `round` is today's code exactly.
+  Ports, Port Haven and every island left `round` use it, and the check
+  holds their heights to today's, point for point.
+- **Pure, and out of `world.js`.** `world.js` is 1,045 lines and needs
+  three.js. Move the island layout (names, `add()`, `islandHeight`,
+  `edgeFactor`, the bay) into a pure `src/island-layout.js`, and the forms
+  into a pure `src/island-forms.js`. Then `tools/check.mjs` can build the
+  real world in Node instead of reading `world.js` with regular expressions.
+- **No new draws from the world's `rng()`.** A form and its facing come from
+  the name and `I.seed`, which already exist. `add()` and `finishIsland()`
+  make the same number of `rng()` calls as today, so every island, reef,
+  port and the wreck stay where they are.
+- **Inside the bound.** Every form stays inside `I.bound` (`r × 1.32`).
+  Islands are placed at least `(r1 + r2) × 1.35 + 170` apart, so a form
+  can't reach its neighbour, and the streamer's grid and `heightAt` don't
+  change.
+
+### What has to follow the coast
+
+All of these assume today that the coast is a radius at an angle. Each one
+moves to the shape:
+
+| What | Where | Change |
+| --- | --- | --- |
+| Terrain | `buildTerrain` | Nothing: it is a square grid already. Thin parts (horns, rings) must be at least 3 cells wide: about 16u |
+| Chart coastline | `I.coast`, `ui/chart.js` | Traced from the height field (marching squares at h = 0) instead of 72 rays. A coast can be more than one loop (a skerry's rocks), so it becomes `I.coasts`, a list |
+| Shallows and foam | `ringGeometry` | A strip along each coast loop, pushed out along its normal, instead of a ring round the centre |
+| The sea's shore map | `shores()` | Uses `formSdf` |
+| Landing | `ashore.landingIsland` | Distance to the coast from either side, so you can land from inside a crescent or a lagoon. This replaces `inBay` |
+| Treasure, sea stacks, camps | `finishIsland`, `story.campOn` | Walk out from the coast point nearest the old angle, not along a ray from the centre (a ray from Moon Island's centre starts in the water) |
+| Props | `buildDecor`, `buildPort`, `buildLandmark` | Placed by inland depth and the form's named spots (below), not by a fraction of the radius |
+
+- **Named spots.** Each form lists a few points, in local units, for props
+  and life: a crescent's two horns and the middle of its bowl, a whale's
+  blowhole and flukes, an atoll's passes.
+- **Passes.** Water a boat should reach (a lagoon, a cove, a crescent's
+  bowl) opens to the sea through a pass at least 36u wide and 5u deep. That
+  fits the largest hull, and grandfather's ship (Phase 10, `sizeScale` 1.4).
+
+### The forms
+
+An island's form is picked by its name: the first word if it has a form,
+then the last word, then the seed.
+
+**By the first word.** One-of-a-kind shapes. The islands listed are the ones
+in today's world (`WORLD_SEED` 1121), with their radius.
+
+| Word | Shape | Islands today | Signature touch |
+| --- | --- | --- | --- |
+| Moon | A crescent: a disc with an offset disc taken out. Low sandy horns, a hill in the middle of the arc | Moon Island (244, temperate) | The full set: see *Moon Island, the first one* |
+| Star | Five points round a low middle. Flat islands get sand points, tall ones rock ridges | Star Reach (140, tropical), Star Cay (82, volcanic) | A ring of pale stones in the middle that glints from the crow's nest |
+| Whale | A long body, a narrow tail and two flukes; the head high and round | Whale Spire (243), Whale Key (65) | A blowhole in the head rocks that throws spray when the swell is up |
+| Turtle | An oval shell dome, four flipper lobes and a small head | Turtle Islet (71), Turtle Rock (47) | The dome's rock coloured in a shell pattern |
+| Crab | A round body and two claws curving forward round a small cove | Crab Island (93), Crab Cay (58) | A tall rock at each claw tip, like pincers |
+| Shell | A scallop fan: ribs running out from a hinge to a scalloped edge | Shell Heights (190), Shell Islet (52), Shell Key (57) | The ribs as low ridges with sand between them |
+| Spindle | Long and thin, tapered at both ends, with a slight twist | Spindle Highlands (230), Spindle Reach (98), Spindle Islet (70) | — |
+| Lagoon | An atoll (below) with the widest lagoon | Lagoon Atoll (128), Lagoon Key (86) | — |
+| Orca | A single dorsal fin of rock: tall, curved and thin | Orca Skerry (46, volcanic) | — |
+
+**By the last word.** Kinds of island:
+
+| Word | Shape | Islands today |
+| --- | --- | --- |
+| Atoll | A ring round a shallow lagoon, with one or two passes. The ring is low, except that a tall atoll keeps its peak on one side, as the rim of an old crater | Thorn, Fern, Pumice, Heron (peak 112: the rim), Sprat |
+| Cove | Archway Isle's bay, its mouth facing by seed. Beaches all round; cliffs only on rocky islands | Saffron, Sprat, Thorn, Flint (rocky), Echo, Glimmer |
+| Point | A plain island with a long headland running out from one side to a point | Otter, Sable, Minnow, Thistle, Seal, Briar |
+| Reach | Long, about three times as long as it is wide, with a bend | Sable, Saffron, Moss, Fern |
+| Key, Cay | A low sand bar bent in a gentle arc, with a tail of sand | the small ones |
+| Skerry | Three to five rocky knobs, joined under water or only just above it | Ember, Ivy, Moss, Hazel, Saltire, Glimmer |
+| Spire, Crag, Heights, Highlands | A first-word shape if it has one, otherwise from the seed; either way the name promises height, so the peak is at least `0.45 r` | Ember Spire (peak 7 today), Bramble Highlands (peak 7), Juniper Spire, Plover Spire, Whale Spire, Drift Crag, Tern Crag, Shell Heights, Puffin Heights, Spindle Highlands |
+
+**Everything else** gets a plain form from its seed: round (today's), twin
+(two hills joined by a sand neck), kidney, teardrop or hook. No two islands
+within 1.5 km get the same plain form. Islands under 60u stay round or twin,
+because smaller shapes don't read.
+
+**Landmarks** get a shape in the PR that rebuilds their sea view:
+
+| Landmark | Shape | Built in |
+| --- | --- | --- |
+| Archway Isle | Today's U, moved onto the form system as a `cove` with cliffs; its heights don't change | 11.1 |
+| The Elder Grove | An oak leaf: lobed edges, the stem a long spit pointing towards Port Haven, the Elder Tree where the veins meet | 11.4 |
+| Sunken Temple Isle | A square ring of broken causeways round a flooded court, the pillars standing in the water inside | 4.7 |
+| Mount Cinderhorn | A breached crater: the rim open on one side, a lava delta running to the sea through the gap, a curved horn of rock on the high side | 4.9 |
+| Frostspire | A star of ice ridges round the spire like buttresses, with the ice stacks in the gaps | 4.11 |
+
+Cinderhorn and Frostspire must still fit inside their rough water's calm
+pocket (Phase 9.2; the `seazones` check).
+
+### Moon Island, the first one
+
+Moon Island (radius 244, temperate, 3.2 km from Port Haven, peak 35) ships
+with the system in 11.1 and sets the standard for the rest, the way the
+Elder Tree did for landmarks.
+
+- **Shape:** the outer disc is the island's radius. A disc of about `0.72 r`
+  is taken out, offset by `0.42 r`. The horns are about 25u wide at the
+  tips, low and sandy, each trailing a sand bar. The hill is in the middle
+  of the arc, at today's peak.
+- **Facing:** the horns open east (+x), where the moon rises (`moonDir` in
+  `sky.js`), so from inside the bowl the moon comes up between them.
+- **The bowl:** sheltered water inside the crescent, shallow and turquoise
+  (the shore map's `shoal` tint), wide open to the sea between the horns.
+  The treasure lies in the bowl, and you can anchor and go ashore from
+  inside it.
+- **At night:** moonflowers along the bowl's shore open after dusk and glow
+  faintly (pale and bright enough to bloom, like the fireflies). A row of
+  standing stones on the ridge lines up with the horns.
+- **From the sea:** a long low hill with two sand horns. From the crow's nest
+  and on the chart, plainly a crescent.
+- **Later, maybe:** calmer waves in the bowl, as a small `lee` row in
+  `sea-zones.js`. Not in 11.1.
+
+### Not in this phase
+
+- **Ports** keep their shape: docks, towns and Port Haven's home waters
+  depend on it.
+- **Ashore levels** are still generated from the biome and seed, so landing
+  on Moon Island still gives a round level. A level that follows its island
+  (walking the crescent from horn to horn) is a later idea; Archway Isle
+  shows what one costs when it is built by hand.
+- No new, moved or renamed islands.
+
+### Saves
+
+Nothing new is saved. Everything keyed by island id (treasure taken, ashore
+progress) stays right, and the chart's fog of war doesn't care about
+coasts. Two things can be caught out by a coast that moved:
+- **A saved quest spot** (a salvage site or search point) that is now on
+  land or too shallow: on load, move it to the nearest water 10u deep.
+- **The boat saved mid-voyage** next to a reshaped coast: on load, if it is
+  aground, move it to the nearest deep water.
+
+### Checks and tools
+
+- **`tools/check.mjs`** gets a `forms` group that builds the real world in
+  Node:
+  - every island, reef, port, treasure angle and the wreck is where it is
+    today (held against a list taken from `main` before 11.1);
+  - round islands and ports give today's heights exactly;
+  - every form stays inside its bound and leaves at least 120u of water to
+    the nearest other coast;
+  - every pass is at least 36u wide and 5u deep, and its water joins the
+    open sea (a flood fill);
+  - every thin part is at least 16u across, so the terrain grid can draw it;
+  - every treasure lies in water a boat can reach, every camp on a beach,
+    and every landable island has a stretch of beach to land on;
+  - every form in the tables is used by at least one island, and no two
+    islands within 1.5 km share a plain form.
+- **Gallery:** an `island` subject at sea
+  (`gallery.show({ show: 'island', name: 'Moon Island', view: 'chart' })`)
+  with the views `chart` (straight down), `deck` (from the boat, 400u out)
+  and `crow` (from the crow's nest), and a `forms` sheet: every form from
+  above and from the deck.
+- **Cost:** `islandHeight` runs for every terrain vertex and every probe
+  under the boat. Keep each form to six primitives or fewer, and measure
+  `debug.bench()` while sailing past Moon Island on Low.
+
+### Phase 11 in smaller PRs
+
+| PR | Branch | What it adds | Depends on |
+| --- | --- | --- | --- |
+| 11.1 | `feature/island-forms` | The form system: `island-layout.js` and `island-forms.js` out of `world.js`; heights by inland depth; traced coasts, with the shallows and foam along them; landing, treasure, stacks, camps and props placed from the coast; Archway Isle moved onto it unchanged; Moon Island; the gallery's `island` subject and the `forms` check | — |
+| 11.2 | `feature/named-islands` | The first-word forms (star, whale, turtle, crab, shell, spindle, lagoon, orca) and their signature touches | 11.1 |
+| 11.3 | `feature/island-kinds` | The last-word forms (atoll, cove, point, reach, key, skerry), tall names made tall, and plain forms by seed for everything else | 11.1 |
+| 11.4 | `feature/leaf-grove` | The Elder Grove as an oak leaf | 11.1 |
+
+- 11.2, 11.3 and 11.4 touch different forms, but all of them add rows to
+  `island-forms.js`, so land them one at a time.
+- The landmark PRs 4.7, 4.9 and 4.11 give their landmarks a shape, so 11.1
+  lands before them.
+
+**Done when:** you can name an island from its outline on the chart; Moon
+Island is a crescent you can sail into by moonlight; atolls, coves and
+crescents have water you can reach; plain islands and ports haven't changed
+by a point; and every island, port and treasure angle is where it was.
+
+---
+
 ## Tooling: the look-dev gallery, what's left
 
 The gallery itself has shipped (`gallery.html`; how to use it is in
@@ -761,6 +977,7 @@ One feature branch and PR per phase, matching how the repo already works
 | P8 | `feature/rival-captain` | P3, P7 (encounters come through the director), the epilogue letters, and the rival's text written and approved |
 | P9 | Three smaller PRs: see *Phase 9 in smaller PRs* | — (builds on Phase 5's wave set and shore map) |
 | P10 | Four smaller PRs: see *Phase 10 in smaller PRs* | P2b's epilogue (done); landmark items as Phase 4 ships them |
+| P11 | Four smaller PRs: see *Phase 11 in smaller PRs* | — (11.1 lands before the landmark PRs 4.7, 4.9 and 4.11) |
 
 **Verification each phase:** there's no test suite, so each PR is checked in
 the browser preview (`tidewake-dev` in `.claude/launch.json`):
@@ -812,6 +1029,10 @@ the browser preview (`tidewake-dev` in `.claude/launch.json`):
   restoration takes too long, players stop before the launch, which is the
   best part. Measure income first, and keep the total within an evening or
   two of play.
+- **Shapes that only read from above:** from the deck, a crescent is mostly
+  a long hill. If shaped islands don't feel different at sea, lean on height
+  (taper the peak along the shape) and on the signature touches before
+  adding more forms.
 - **Retiring the walkable wreck:** it is the first ashore level. Raising her
   removes it, so make sure nothing after the epilogue still points there
   (quests, hints, the chart's markers).
