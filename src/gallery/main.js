@@ -12,15 +12,15 @@
 // the game's look. Everything is in the URL: reload it, or link it.
 import * as THREE from 'three';
 import { Environment } from '../sky.js';
-import { Ocean } from '../ocean.js';
+import { Ocean, SEA_FEATURES } from '../ocean.js';
 import { WEATHER } from '../weather.js';
-import { updateWaves } from '../waves.js';
+import { updateWaves, waveHeight } from '../waves.js';
 import { FX, fxFlags } from '../fx.js';
 import { toon } from '../toon.js';
 import { initProps } from '../props.js';
 import { clamp, lerp } from '../util.js';
 import { SUBJECTS, controlsFor, unknownParams } from './subjects.js';
-import { LIGHTS, VIEWS, FIT_FOV } from './presets.js';
+import { LIGHTS, VIEWS, WEATHERS, FIT_FOV } from './presets.js';
 import { SHEETS, propSheet } from './sheets.js';
 
 const HELP = `gallery
@@ -35,12 +35,14 @@ const HELP = `gallery
   list()           every subject, view, light and sheet, and the current subject's parameters
 Other parameters: sun=<degrees> turns the light round the subject, ink=studio draws the thinner
 lines of the character creator, phase=<0-1> holds a walk or run at one point of the stride,
-play=0 stops the animation, waves=<0-1> calms the sea, fx=0 (or fx=edges,bloom) as in the game.`;
+play=0 stops the animation, weather=<${WEATHERS.join('|')}> swaps the light's weather,
+waves=<0-1> calms the sea, sea=0 (or sea=${SEA_FEATURES.join(',')}) picks the sea's large features,
+fx=0 (or fx=edges,bloom) as in the game.`;
 
 const $ = (id) => document.getElementById(id);
 const rad = (deg) => ((parseFloat(deg) || 0) * Math.PI) / 180;
 // Parameters that change how a subject is seen, not what is built.
-const SEEN = new Set(['view', 'light', 'sun', 'ink', 'play', 'waves', 'sheet', 'fx']);
+const SEEN = new Set(['view', 'light', 'weather', 'sun', 'ink', 'play', 'waves', 'sea', 'sheet', 'fx']);
 const size = () => [Math.max(1, window.innerWidth), Math.max(1, window.innerHeight)]; // a hidden tab can report 0
 
 function boot() {
@@ -73,6 +75,8 @@ function boot() {
   function placeCamera() {
     const yaw = orbit.yaw + stage.rotation.y, cp = Math.cos(orbit.pitch), T = orbit.target;
     camera.position.set(T.x + Math.sin(yaw) * cp * orbit.dist, T.y + Math.sin(orbit.pitch) * orbit.dist, T.z + Math.cos(yaw) * cp * orbit.dist);
+    // over the sea, ride above the swell as the game's camera does (game.js, updateCamera)
+    if (ocean.mesh.visible) camera.position.y = Math.max(camera.position.y, waveHeight(camera.position.x, camera.position.z) + 1.8);
     camera.lookAt(T);
     if (camera.fov !== orbit.fov) { camera.fov = orbit.fov; camera.updateProjectionMatrix(); }
   }
@@ -95,6 +99,7 @@ function boot() {
     ou.uLanternR.value = subject?.boat?.lanternRange || 30;
     ou.uSkyColor.value.copy(env.horizon);
     ocean.setWind(wind.x, wind.y, w.wind);
+    ocean.setSky(env, w);
     ocean.update(camera);
   }
 
@@ -181,11 +186,12 @@ function boot() {
     }
   }
 
-  function applyLight(name) {
+  function applyLight(name, weather) {
     let P = LIGHTS[name];
     if (!P) { warn(`light=${name} is not a light (${Object.keys(LIGHTS).join(', ')})`); P = LIGHTS.noon; }
+    if (weather && !WEATHERS.includes(weather)) { warn(`weather=${weather} is not a weather (${WEATHERS.join(', ')})`); weather = null; }
     dayT = P.dayT;
-    stub.weather.p = { ...WEATHER[P.weather], flash: 0 };
+    stub.weather.p = { ...WEATHER[weather || P.weather], flash: 0 };
   }
 
   // --------------------------------------------------------------- subjects
@@ -199,7 +205,9 @@ function boot() {
     warnings = [];
     const key = subjectKey(q);
     stage.rotation.y = rad(q.sun);
-    applyLight(q.light || 'noon');
+    applyLight(q.light || 'noon', q.weather);
+    for (const f of q.sea && q.sea !== '0' ? q.sea.split(',') : []) if (!SEA_FEATURES.includes(f)) warn(`sea=${f} is not one of ${SEA_FEATURES.join(', ')} (or 0 for none)`);
+    ocean.setFeatures(q.sea);
     stub.creator = q.ink === 'studio' ? { scene } : null; // fx.js thins the ink for the creator's scene
     playing = q.play !== '0' && q.phase == null;
     if (key !== builtKey || !subject) {
@@ -213,6 +221,7 @@ function boot() {
       env.cloudUniforms.uOffset.value.set(0, 0); // the same sky every time
       floor.visible = subject.ground === 'floor';
       ocean.mesh.visible = subject.ground === 'sea';
+      ocean.setShoal(subject.shoal || null);
       // let poses, sails and the hull's ride settle before framing it
       applyView(q.view || 'quarter');
       placeCamera();
@@ -265,6 +274,7 @@ function boot() {
     menu('show', Object.keys(SUBJECTS), q.show, (v) => show({ show: v, light: q.light, fx: q.fx }), true);
     menu('view', Object.keys(VIEWS), VIEWS[orbit.name] ? orbit.name : '', (v) => set({ view: v }));
     menu('light', Object.keys(LIGHTS), q.light, (v) => set({ light: v }));
+    menu('weather', WEATHERS, q.weather, (v) => set({ weather: v }));
     for (const [key, choices] of controlsFor(q.show)) menu(key, choices, q[key], (v) => set({ [key]: v }));
     menu('sheet', [...Object.keys(SHEETS), 'props'], '', (v) => { if (v) sheet(v); });
   }

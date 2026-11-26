@@ -1,9 +1,9 @@
 // Entry point: renderer, scene, systems, main loop.
 import * as THREE from 'three';
-import { WORLD_SEED, isTouch } from './config.js';
+import { WORLD_SEED, WORLD_HALF, isTouch } from './config.js';
 import { initProps } from './props.js';
 import { World, IslandStreamer } from './world.js';
-import { Ocean } from './ocean.js';
+import { Ocean, shoreMap } from './ocean.js';
 import { Environment } from './sky.js';
 import { Weather } from './weather.js';
 import { Boat } from './boat.js';
@@ -55,6 +55,8 @@ async function boot() {
   const quality = low ? 'low' : 'high';
   const env = new Environment(scene, quality);
   const ocean = new Ocean(scene, quality);
+  ocean.setShoreMap(shoreMap(world.shores(), WORLD_HALF), WORLD_HALF);
+  ocean.setFeatures(new URLSearchParams(location.search).get('sea')); // ?sea=0, like ?fx=0
   const weather = new Weather(scene, quality);
   const boat = new Boat(scene);
   const streamer = new IslandStreamer(scene, world, quality);

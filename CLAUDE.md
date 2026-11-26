@@ -11,7 +11,7 @@ dependencies to install.** It deploys from `main` to GitHub Pages as-is.
 - Which file does what: "Project structure" in `README.md`. Every source file
   also opens with a comment saying what it owns.
 - Designs: `docs/feature-plan.md` (not built yet), `docs/shipped-plans.md`
-  (built; reference only, 550 lines, read one section), `docs/rival-captain.md`,
+  (built; reference only, 700 lines, read one section), `docs/rival-captain.md`,
   `docs/elder-grove-level.md`, `docs/archway-isle-level.md`.
 
 ## Check your work
@@ -23,7 +23,8 @@ node tools/check.mjs
 About a second, no browser. Run it after every change. It checks syntax,
 that every import resolves to a real export and is used, that no helper was
 left behind when code moved between files, text keys (`LINES.x`), element
-ids, save migration, 150 generated ashore layouts per landable biome, a test
+ids, save migration, how the boat rides the wave set (pitch and bow slams,
+`ride`), 150 generated ashore layouts per landable biome, a test
 climber (the real controller) that walks 12 generated islands per biome to
 the summit, the living sea's rules (what turns up where, 3,000 placements in
 a toy sea), the Elder Grove (its limits, and the climber from the beach
@@ -48,6 +49,8 @@ tidewake.debug.teleport('Frostspire')     // id, name or { x, z }
 tidewake.debug.sea('whale')               // a sea event now: whale | dolphins | ghostShip; sea() says what's out there
 tidewake.debug.step(30)                   // 30 s of game time in well under a second
 tidewake.debug.frame()                    // draw a frame before a screenshot
+tidewake.debug.profile()                  // what a frame draws: calls, triangles, lights, by kind
+tidewake.debug.bench()                    // ms a frame, graphics card included (works hidden)
 tidewake.debug.restoreSave()              // when you're done: real save back, reload to the title
 ```
 
@@ -62,6 +65,11 @@ tidewake.debug.restoreSave()              // when you're done: real save back, r
   it puts the save back and reloads to the title. Skip it and the test voyage
   is written over the real save when the tab closes.
 - Visual effects: `?fx=0` turns them all off, `?fx=edges,bloom` picks some.
+  The sea's large features likewise: `?sea=0`, or `?sea=shallows,gusts,shade`.
+- Sound can't be heard from here. `SoundSystem` builds on any audio context,
+  so render a sound through an `OfflineAudioContext` (`A.ctx = ctx;
+  A.build(); A._play(name, opts)`) and measure it against one that exists;
+  then say in the PR that nobody has listened.
 
 ## Look at the art
 
@@ -75,6 +83,7 @@ gallery.list()                             // subjects, views, lights, sheets, t
 gallery.show({ show: 'outfit', top: 'coat', extra: 'satchel', view: 'back' })
 gallery.set({ light: 'sunset' })           // change some parameters, keep the rest
 gallery.show({ show: 'ship', tier: 4, view: 'sail' })   // the game's own lens and distance
+gallery.set({ weather: 'storm', sea: '0' })             // any weather; the sea without its large features
 await gallery.sheet('tops-back')           // contact sheet: every top with every bag, from behind
 gallery.frame()                            // draw before a screenshot when the tab is hidden
 ```
@@ -84,7 +93,7 @@ gallery.frame()                            // draw before a screenshot when the 
   a close look at one place (`show=archway&at=keystone&view=spot`). The
   same parameters work in the URL: `gallery.html?show=ship&tier=4&light=night`.
 - **After changing how something looks, take the contact sheet that covers
-  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `sealife`…, or
+  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `sealife`, `sea`…, or
   `views` / `lights` / `distance` for the subject showing) and read every
   cell, not only the one you were fixing. A sheet takes the parameters
   already showing, so `gallery.set({ bottom: 'skirt' })` first narrows it.
@@ -117,9 +126,10 @@ game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, 
   Sea events are rolled by `sea-events.js` from the rules in `sightings.js`;
   each creature is an actor with `start`, `update`, `leave` and `done`.
   The grandparents are never named.
-- **`UI` and `Boat` are each one class split over several files.** The core
-  is `src/ui.js` / `src/boat.js`; the rest is mixed in from `src/ui/` and
-  `src/boat/` (see the header of each core file for the map). Methods are
+- **`UI`, `Boat` and `SoundSystem` are each one class split over several
+  files.** The core is `src/ui.js` / `src/boat.js` / `src/audio.js`; the rest
+  is mixed in from `src/ui/`, `src/boat/` and `src/audio/` (see the header of
+  each core file for the map). Methods are
   called as `this.method()` wherever they live, so grep the method name to
   find it. New methods go in the part file that fits.
 - **Pure modules stay pure**: `ashore/modules.js`, `ashore/grove-layout.js`, `ashore/archway-layout.js`, `collide.js`,

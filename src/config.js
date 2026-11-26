@@ -15,13 +15,28 @@ export const isTouch = typeof window !== 'undefined' && (
   (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches) ||
   'ontouchstart' in window);
 
+// The on-foot joystick (input.js), in fractions of its travel. `deadZone`: a
+// thumb resting this close to the centre doesn't move you; `runAt`: pushed
+// past this you run. `tidewake.input.deadZone` changes it on a running game,
+// for trying values on a real phone.
+export const TOUCH = { deadZone: 0.12, runAt: 0.92 };
+
 // [wavelength, amplitude, direction(radians)]
+// The three biggest run within 36° of each other and are close in size, so
+// crests are long and weave instead of crossing into a grid (far apart) or
+// lining up as stripes (one wave much the biggest); no wavelength is a simple
+// multiple of another, so the pattern doesn't repeat in rows. The boat rides
+// these (waves.js runs the same table on the CPU and the GPU), so a change
+// here changes how she pitches and rolls and how often the bow slams in a
+// storm: `node tools/check.mjs ride` holds it to what it is now.
 export const WAVE_DEFS = [
-  [64, 1.0, 0.35],
-  [38, 0.55, 1.45],
-  [23, 0.34, -0.75],
-  [14, 0.2, 2.35],
-  [8.5, 0.09, 0.95],
+  [76, 0.74, 0.4],
+  [58, 0.62, 0.74],
+  [43, 0.5, 0.12],
+  [29, 0.34, 0.92],
+  [19, 0.22, 0.3],
+  [12.3, 0.13, 0.66],
+  [8.1, 0.07, 0.02],
 ];
 
 export const UPGRADES = [

@@ -2,15 +2,15 @@
 // Fast checks that need no browser and no dependencies:
 //
 //   node tools/check.mjs            everything (about a second)
-//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | sea | layout | climb | grove | archway
+//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | sea | ride | layout | climb | grove | archway
 //   node tools/check.mjs layout 500 layouts for 500 synthetic islands (default 150)
 //
 // Run it after every change. It catches the mistakes that otherwise only show
 // up as a blank page: a syntax error, an import of a name the other module
 // doesn't export, a helper left behind when code moved to another file, a
 // text key or element id that doesn't exist, a save that no longer migrates,
-// a sea event that could turn up in the wrong place, and an ashore layout
-// that fails its own validation.
+// a sea event that could turn up in the wrong place, a wave set the boat rides
+// too hard or too gently, and an ashore layout that fails its own validation.
 //
 // The source is read with regular expressions, not a parser. `imports` and
 // `names` rely on the house style: one-line `import { … } from '…';` and
@@ -440,6 +440,46 @@ const checks = {
       expect(SIGHTINGS.rewards[k]?.title && SIGHTINGS.rewards[k]?.text, `SIGHTINGS.rewards.${k} needs a title and text`);
     }
     return { errors, note: `${kinds.length} kinds; ${placed} of ${count} placements in open water; the ghost ship at most ${longest} rolls apart` };
+  },
+
+  // How a boat rides the wave set (WAVE_DEFS in config.js): pitch and bow slams
+  // by the same sums as boat/rig.js (animate) and game.js (checkBowSlam), at
+  // 9 m/s on eight headings, in clear weather and in a storm (their `wave` and
+  // `swell` from weather.js). A retuned sea should stay inside these limits, so
+  // that sailing feels about the same and storms cost about as much hull.
+  async ride() {
+    const errors = [];
+    const { updateWaves, waveHeight } = await load('waves.js');
+    const damp = (a, b, l, dt) => a + (b - a) * (1 - Math.exp(-l * dt));
+    const sail = (wave, swell, heading, seconds) => {
+      const dt = 1 / 60, fx = Math.sin(heading), fz = Math.cos(heading);
+      let x = 0, z = 0, t = 0, pitch = 0, last = 0, wait = 0, slams = 0, sum = 0, n = 0, crest = -Infinity;
+      for (let i = 0; i < seconds * 60; i++) {
+        t += dt;
+        updateWaves(t * 0.6, wave, swell); // game.js runs the sea at 0.6 of real time
+        x += fx * 9 * dt; z += fz * 9 * dt;
+        const bow = waveHeight(x + fx * 3, z + fz * 3), stern = waveHeight(x - fx * 3, z - fz * 3);
+        pitch = damp(pitch, -Math.atan2(bow - stern, 6) * 0.8, 5, dt);
+        const rate = (pitch - last) / dt;
+        last = pitch; wait -= dt;
+        if (wait <= 0 && pitch > 0.08 && rate > 0.11) { wait = 3.5; slams++; }
+        if (i > 120) { sum += pitch * pitch; n++; crest = Math.max(crest, (bow + stern) / 2); }
+      }
+      return { pitch: (Math.sqrt(sum / n) * 180) / Math.PI, slams: slams / (seconds / 60), crest };
+    };
+    const over = (wave, swell) => {
+      const runs = Array.from({ length: 8 }, (_, h) => sail(wave, swell, (h / 8) * Math.PI * 2, 240));
+      const mean = (k) => runs.reduce((a, r) => a + r[k], 0) / runs.length;
+      return { pitch: mean('pitch'), slams: mean('slams'), crest: Math.max(...runs.map((r) => r.crest)) };
+    };
+    const clear = over(0.35, 0), storm = over(1.7, 1);
+    const want = (label, v, lo, hi, unit) => { if (!(v >= lo && v <= hi)) errors.push(`${label} is ${v.toFixed(2)}${unit}, outside ${lo}-${hi}${unit}`); };
+    want('clear weather: the pitch (rms)', clear.pitch, 0.8, 2, '°');
+    want('clear weather: the tallest crest', clear.crest, 0.5, 1.5, ' m');
+    want('a storm: the pitch (rms)', storm.pitch, 5, 9, '°');
+    want('a storm: bow slams a minute', storm.slams, 5, 11, '');
+    want('a storm: the tallest crest', storm.crest, 6, 12, ' m');
+    return { errors, note: `clear: pitch ${clear.pitch.toFixed(1)}°, crests to ${clear.crest.toFixed(1)} m; storm: pitch ${storm.pitch.toFixed(1)}°, ${storm.slams.toFixed(1)} bow slams a minute, crests to ${storm.crest.toFixed(1)} m` };
   },
 
   // Ashore layouts validate for islands across the whole difficulty range, in

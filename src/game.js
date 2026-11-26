@@ -614,6 +614,7 @@ export class Game {
     ou.uLanternR.value = up.lantern;
     ou.uRain.value = w.p.rain;
     this.ocean.setWind(w.wind.x, w.wind.y, w.windStrength);
+    this.ocean.setSky(this.env, w.p);
     ou.uSkyColor.value.copy(this.env.horizon);
     const L = ringUniforms.uLight.value.copy(this.env.oceanAmbient).add(this.env.oceanLight);
     L.r = Math.min(L.r, 1.1); L.g = Math.min(L.g, 1.1); L.b = Math.min(L.b, 1.1);
@@ -630,6 +631,7 @@ export class Game {
     this.audio.update(dt, {
       speed: Math.abs(boat.speed), wind: w.windStrength, rain: w.p.rain, storm: w.p.storm,
       inPort: this.mode === 'docked', night: this.env.night,
+      ashore: this.mode === 'ashore' ? this.ashore.island.biome || 'rocky' : null, // (the wreck lies on bare rock)
     });
     this.ui.update(dt);
   }

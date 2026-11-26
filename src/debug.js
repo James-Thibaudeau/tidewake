@@ -33,6 +33,8 @@ const HELP = `tidewake.debug
   ashore(where?)           go ashore on an island (async); no argument = grandfather's wreck
   weather(type)            clear | breezy | cloudy | rain | storm | fog
   time(t)                  time of day, 0-1 (0.25 dawn, 0.5 noon, 0.75 dusk)
+  profile()                draw one frame and count it: draw calls, triangles, lights, and what is in view by kind
+  bench(frames?)           time drawing the current view: ms a frame, with the graphics card's work included
   backupSave()             copy the real save aside (start() does this for you)
   restoreSave()            put it back and reload to the title; always finish with this`;
 
@@ -195,6 +197,55 @@ export function installDebug(game) {
 
     weather(type) { g.weather.set(type, true); return g.weather.type; },
     time(t) { g.state.dayT = ((t % 1) + 1) % 1; return g.state.dayT; },
+
+    /**
+     * How long a frame takes to draw, in ms: draws `frames` of the current view
+     * back to back, then waits for the graphics card to finish them (reading one
+     * pixel back does that). Works in a hidden tab. Compare like with like: the
+     * same view, window size and quality, before and after a change.
+     */
+    bench(frames = 40) {
+      const gl = g.renderer.getContext(), px = new Uint8Array(4);
+      const wait = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      api.frame(); wait(); // shaders compiled and buffers sent before the clock starts
+      const t0 = performance.now();
+      for (let i = 0; i < frames; i++) api.frame();
+      wait();
+      const c = g.renderer.domElement;
+      return { ms: round((performance.now() - t0) / frames, 2), frames, size: `${c.width}×${c.height}`, quality: g.settings.quality, effects: g.fx.enabled !== false };
+    },
+
+    /**
+     * Where a frame goes. Draws one frame of the current view (the sea, or the
+     * island you are on) and counts it: draw calls and triangles as the
+     * renderer reports them (every pass: shadows and effects too), what it
+     * holds in memory, how many lights the scene's materials pay for, and what
+     * is in the view by kind, biggest first. Ink outlines (the same mesh drawn
+     * again, inside out) are counted apart from what they outline.
+     */
+    profile() {
+      const info = g.renderer.info, auto = info.autoReset;
+      if (g.fx.csm) g.fx.scan(g.view.scene); // new meshes cast shadows from here on (fx.js looks every 20 frames)
+      info.autoReset = false;
+      info.reset();
+      api.frame();
+      const out = { view: g.view.scene === g.scene ? 'sea' : 'ashore', calls: info.render.calls, triangles: info.render.triangles,
+        geometries: info.memory.geometries, textures: info.memory.textures, programs: info.programs.length, lights: 0, kinds: {} };
+      info.autoReset = auto;
+      const named = (o) => { for (let p = o; p; p = p.parent) if (p.name) return p.name.split(':')[0]; return o.material?.type || o.type; };
+      g.view.scene.traverseVisible((o) => {
+        if (o.isPointLight || o.isSpotLight || o.isDirectionalLight) out.lights++;
+        const geo = o.geometry;
+        if (!geo || !(o.isMesh || o.isLine || o.isPoints)) return;
+        const n = Math.min(geo.drawRange.count, geo.index ? geo.index.count : geo.attributes.position?.count || 0);
+        const ink = o.material?.isMeshBasicMaterial && o.material.side === 1; // back faces only: an inverted-hull outline
+        const k = (out.kinds[named(o) + (ink ? ' (ink)' : '')] ||= { draws: 0, triangles: 0 });
+        k.draws++;
+        k.triangles += Math.round((n / 3) * (o.isInstancedMesh ? o.count : 1));
+      });
+      out.kinds = Object.fromEntries(Object.entries(out.kinds).sort((a, b) => b[1].triangles - a[1].triangles));
+      return out;
+    },
   };
 
   g.debug = api;

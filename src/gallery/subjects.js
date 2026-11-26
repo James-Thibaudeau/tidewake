@@ -2,6 +2,7 @@
 // the URL (all strings) and the stage to build into, and returns:
 //   group      the thing itself (already added to the stage)
 //   ground     'floor' | 'sea' | 'none': what it stands on
+//   shoal      { x, z, r, fade }: the sea's shallows round it, for an island (optional)
 //   look       { y }: the height the game cameras aim at (optional)
 //   face, helm, bow   { x, y, z, span }: what a close-up camera frames (optional)
 //   note       a line for the caption (optional)
@@ -39,6 +40,7 @@ import { buildGhostShip } from '../ghost-ship.js';
 import { generateLevel } from '../ashore/levelgen.js';
 import { layoutLevel } from '../ashore/modules.js';
 import { pieceParts } from '../ashore/pieces.js';
+import { shoalOf } from '../ashore/shapes.js';
 import { clamp } from '../util.js';
 import { POSES } from './presets.js';
 
@@ -205,7 +207,7 @@ function grove(q, stage) {
   stage.add(level.group);
   const pos = { x: 0, y: 0, z: 0 };
   return {
-    group: level.group, ground: 'sea', warnings,
+    group: level.group, ground: 'sea', warnings, shoal: shoalOf(level),
     update(dt, t, env) { level.update(dt, t, { pos, night: env.night, play: () => {} }); },
     dispose() { level.dispose(); },
   };
@@ -240,7 +242,7 @@ function archway(q, stage) {
   if (!PLACES[at]) { warnings.push(`at=${at} is not a place here (${Object.keys(PLACES).join(', ')})`); at = 'keystone'; }
   const pos = { x: 0, y: 0, z: 0 };
   return {
-    group: level.group, ground: 'sea', warnings, spot: PLACES[at], note: q.at ? at : undefined,
+    group: level.group, ground: 'sea', warnings, shoal: shoalOf(level), spot: PLACES[at], note: q.at ? at : undefined,
     update(dt, t, env) { level.update(dt, t, { pos, night: env.night, play: () => {} }); },
     dispose() { level.dispose(); },
   };
@@ -341,7 +343,7 @@ function level(q, stage) {
   }
   const lv = generateLevel(I, opts);
   stage.add(lv.group);
-  return { group: lv.group, ground: 'sea', warnings, note: `${lv.layout.biome}, ${lv.layout.tier}`, dispose() { lv.dispose(); } };
+  return { group: lv.group, ground: 'sea', warnings, shoal: shoalOf(lv), note: `${lv.layout.biome}, ${lv.layout.tier}`, dispose() { lv.dispose(); } };
 }
 
 export const SUBJECTS = { outfit, ship, prop, tree, arch, wreck, grove, archway, level, sealife };

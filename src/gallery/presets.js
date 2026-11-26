@@ -19,9 +19,13 @@ export const LIGHTS = {
   overcast: { dayT: 0.5, weather: 'cloudy' },
 };
 
+// Weathers a light's own can be swapped for (`weather=storm`), from weather.js.
+export const WEATHERS = ['clear', 'breezy', 'cloudy', 'rain', 'storm', 'fog'];
+
 // Cameras. yaw 0 looks at the subject's front, pitch is radians above level.
 //   fit    frame the whole subject (a 30° lens, so little distortion)
-//   game   the game's own lens and distance, from behind: how it will be seen
+//   game   the game's own lens, from behind: how it will be seen (`sail`, `foot`),
+//          or the sea itself from low and from high (`horizon`, `aloft`, `high`)
 //   face   a close-up of the explorer's head (outfits only)
 //   helm   a close-up of the explorer at the helm (ships only)
 //   bow    a close-up of the anchor at the bow (ships only)
@@ -35,6 +39,9 @@ export const VIEWS = {
   top: { kind: 'fit', yaw: 0, pitch: 1.25 },
   sail: { kind: 'game', yaw: Math.PI, pitch: 0.3, dist: 30, fov: 55 },   // game.js: the chase camera
   foot: { kind: 'game', yaw: Math.PI, pitch: 0.28, dist: 7.5, fov: 55 }, // ashore/camera.js
+  horizon: { kind: 'game', yaw: Math.PI, pitch: 0.09, dist: 30, fov: 55 }, // low over the water, out to the haze
+  aloft: { kind: 'game', yaw: Math.PI - 0.6, pitch: 0.6, dist: 170, fov: 55 }, // from a masthead far taller than hers: the run of the crests
+  high: { kind: 'game', yaw: Math.PI - 0.6, pitch: 0.62, dist: 430, fov: 55 }, // a gull's view, just under the clouds: gusts, cloud shadows, shallows
   face: { kind: 'face', yaw: 0.3, pitch: 0.05 },
   helm: { kind: 'helm', yaw: 0.65, pitch: 0.16 },
   bow: { kind: 'bow', yaw: 0.95, pitch: 0.22 },
