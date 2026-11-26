@@ -180,3 +180,9 @@ The save key stays `tidewake.save.v1`; the data inside carries `v`.
 - One branch per change (`feature/…`, `fix/…`, `chore/…`) → PR → merge commit
   (`gh pr merge --merge`) → delete the branch locally and on origin. Ask
   before committing, merging or deleting.
+- After the merge, clean up your worktree as part of deleting the branch:
+  stop its preview server, step out to the main checkout, then
+  `git worktree remove <path>` and `git worktree prune`. Remove the worktree
+  before `git branch -d`: git won't delete a branch that a worktree still
+  has checked out. Only remove your own: `git worktree list` shows the
+  others, and a `locked` one belongs to a session that is still running.
