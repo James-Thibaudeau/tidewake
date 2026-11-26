@@ -836,13 +836,17 @@ About a dozen general shapes. None of them belongs to a name.
   most islands have no hint: they get a form for variety alone.
 
 **Landmarks keep their shapes.** The Elder Grove's giant tree and Archway
-Isle's arch already make them stand out from the deck. Archway Isle moves
-onto the form system unchanged, as a cove with cliffs. The Sunken Temple,
-Mount Cinderhorn and Frostspire stand out through their sea-view rebuilds
-(4.7, 4.9, 4.11), as the Elder Grove does through its tree. A landmark's
-design can still use a form if it wants a shaped coast, but none needs one.
-If Cinderhorn or Frostspire gets one, it must still fit inside its rough
-water's calm pocket (Phase 9.2; the `seazones` check).
+Isle's arch already make them stand out from the deck.
+- **The Elder Grove stays exactly as it is.** It gets no form (no leaf, no
+  lobes), and its coast and heights don't change.
+- **Archway Isle** moves onto the form system unchanged, as a cove with
+  cliffs.
+- **The Sunken Temple, Mount Cinderhorn and Frostspire** stand out through
+  their sea-view rebuilds (4.7, 4.9, 4.11), as the Elder Grove does through
+  its tree. Their designs can still use a form if they want a shaped coast,
+  but none needs one. If Cinderhorn or Frostspire gets one, it must still
+  fit inside its rough water's calm pocket (Phase 9.2; the `seazones`
+  check).
 
 ### Moon Island, the first one
 
@@ -896,7 +900,7 @@ coasts. Two things can be caught out by a coast that moved:
   Node:
   - every island, reef, port, treasure angle and the wreck is where it is
     today (held against a list taken from `main` before 11.1);
-  - round islands and ports give today's heights exactly;
+  - round islands, ports and the Elder Grove give today's heights exactly;
   - every form stays inside its bound and leaves at least 120u of water to
     the nearest other coast;
   - every pass is at least 36u wide and 5u deep, and its water joins the
