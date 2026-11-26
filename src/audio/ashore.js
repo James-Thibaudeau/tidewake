@@ -1,6 +1,7 @@
 // On-foot sound, mixed into SoundSystem (audio.js): footsteps by surface, jump
 // and land, the coin chime, the chest fanfare, what an island sounds like
-// (birds, crickets, gulls, wind in the rocks) and the on-foot turn of the
+// (birds, crickets, gulls, wind in the rocks, parrots, doves and tree frogs)
+// and the on-foot turn of the
 // score. Made from the same oscillators and noise as the rest; no samples.
 
 const PENTA = [0, 2, 4, 7, 9]; // major pentatonic degrees
@@ -24,7 +25,10 @@ const STEPS = {
 const AMBIENCE = {
   temperate: { day: [['songbird', 2.5, 7]], night: [['cricket', 0.9, 2.6]] },
   rocky: { day: [['farGull', 6, 15], ['whistle', 5, 12]], night: [['whistle', 4, 10]] },
+  tropical: { day: [['parrot', 7, 16], ['dove', 4, 10], ['songbird', 5, 12]], night: [['treeFrog', 0.7, 2.2], ['cricket', 1.4, 3.5]] },
 };
+// Voices that carry on in the rain (the rest shelter from it).
+const RAIN_PROOF = new Set(['whistle', 'treeFrog']);
 
 export class AshoreSounds {
   /** Called once from build(): the island ambience's own bus, spread left to right. */
@@ -57,7 +61,7 @@ export class AshoreSounds {
       this.ambT[k] = (this.ambT[k] ?? rand(0.3, lo)) - dt;
       if (this.ambT[k] > 0) continue;
       this.ambT[k] = rand(lo, hi);
-      if (voice === 'whistle' || Math.random() > rain * 1.6) this[voice](t + 0.02, this.landPans[(Math.random() * 3) | 0]);
+      if (RAIN_PROOF.has(voice) || Math.random() > rain * 1.6) this[voice](t + 0.02, this.landPans[(Math.random() * 3) | 0]);
     }
   }
 
@@ -104,6 +108,34 @@ export class AshoreSounds {
     g.gain.linearRampToValueAtTime(0, t + dur);
     s.connect(f); f.connect(g); g.connect(dest);
     s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05);
+  }
+
+  /** A parrot somewhere in the palms: one or two harsh squawks that rise and drop. */
+  parrot(t, dest) {
+    const n = 1 + ((Math.random() * 2) | 0), f0 = rand(1300, 1700);
+    for (let i = 0; i < n; i++) {
+      const at = t + i * rand(0.22, 0.32), dur = rand(0.14, 0.22), f = f0 * rand(0.92, 1.08);
+      this.tone(f, at, dur, { type: 'sawtooth', vol: 0.022, attack: 0.008, glide: f * rand(1.25, 1.45), dest });
+      this.tone(f * 1.5, at, dur * 0.8, { type: 'square', vol: 0.008, attack: 0.008, glide: f * 0.9, dest });
+    }
+  }
+
+  /** A dove: a soft, low coo-COO-coo. */
+  dove(t, dest) {
+    const f = rand(380, 460);
+    [[0, 0.22, 0.9, 0.03], [0.3, 0.38, 1.06, 0.045], [0.75, 0.3, 0.94, 0.032]].forEach(([at, dur, k, vol]) => {
+      this.tone(f * k, t + at, dur, { type: 'sine', vol, attack: 0.05, glide: f * k * 0.9, dest });
+    });
+  }
+
+  /** A tree frog after dark: a quick two-note "ko-kee", now and then answered. */
+  treeFrog(t, dest) {
+    const f = rand(1050, 1350), n = Math.random() < 0.3 ? 2 : 1;
+    for (let i = 0; i < n; i++) {
+      const at = t + i * rand(0.45, 0.7);
+      this.tone(f, at, 0.06, { type: 'sine', vol: 0.035, attack: 0.005, glide: f * 1.1, dest });
+      this.tone(f * 1.55, at + 0.09, 0.11, { type: 'sine', vol: 0.04, attack: 0.005, glide: f * 1.75, dest });
+    }
   }
 
   // ---------------------------------------------------------------- music

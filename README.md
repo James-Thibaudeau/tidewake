@@ -107,7 +107,7 @@ src/
   tow.js          a tow line between two boats
   kraken.js       the finale set piece
   ashore/         going ashore: ashore.js (visit flow, pickups), levelgen.js + modules.js +
-                  pieces.js (island levels), wreck.js (grandfather's wreck, hand-built),
+                  pieces.js + tropical-art.js (island levels), wreck.js (grandfather's wreck, hand-built),
                   grove.js + grove-layout.js (the Elder Grove, hand-built) + grove-art.js
                   (its bark, moss and fungus) + grove-life.js (its owl guide and fireflies),
                   archway.js + archway-layout.js + archway-art.js (Archway Isle, hand-built)

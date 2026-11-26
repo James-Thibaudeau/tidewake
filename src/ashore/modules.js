@@ -14,7 +14,10 @@
 // Each biome picks its own climbing styles (POOLS), terrain shape (SHAPE) and
 // difficulty ease (BIOME_EASE). Rocky islands climb sheer ledges, sea stacks
 // and arches, and put a rock spire and a natural arch in place of the
-// lookout tree and the plain meadow walk.
+// lookout tree and the plain meadow walk. Tropical islands hop between palm
+// tops, climb tide pools stepping up the rock and cross rope bridges hung on
+// the face; the moat is crossed on a rope bridge or between rock pools, and
+// the chest sits in the crown of a giant palm.
 //
 // Rotations (obox.rot, piece.rot) use the three.js rotation.y convention:
 // a local (x, z) maps to world (x cos r + z sin r, -x sin r + z cos r).
@@ -67,9 +70,12 @@ const TIERS = {
 const HEADROOM = ASHORE.height + 0.2;
 // Rocky islands are the first biome after temperate (grandfather's anchor's
 // first refit) but the nearest lie ~2.3 km out: count them 800 m closer.
-const BIOME_EASE = { rocky: 800 };
+// Tropical islands come after rocky ones in the story but sit near temperate
+// in difficulty (rocky is the harder biome): a little ease, so the first few
+// past 1.5 km are still gentle.
+const BIOME_EASE = { rocky: 800, tropical: 300 };
 // Per-biome terrain: rock walls `H1` and summits `summit` times as tall.
-const SHAPE = { temperate: { H1: 1, summit: 1 }, rocky: { H1: 1.15, summit: 1.12 } };
+const SHAPE = { temperate: { H1: 1, summit: 1 }, rocky: { H1: 1.15, summit: 1.12 }, tropical: { H1: 0.95, summit: 0.95 } };
 
 const rotOf = (a) => -a - Math.PI / 2; // local x along the tangent at polar angle a
 export const toWorld = (lx, lz, rot) => [lx * Math.cos(rot) + lz * Math.sin(rot), -lx * Math.sin(rot) + lz * Math.cos(rot)];
@@ -190,7 +196,7 @@ function pieceBody(p) {
   switch (p.kind) {
     case 'bridge':
       return [obox(p.cx, p.top - 0.2, p.cz, p.hx, 0.2, p.hz, p.rot, 'wood')];
-    case 'block': case 'column': case 'pad':
+    case 'block': case 'column': case 'pad': case 'pool':
       return [obox(p.cx, (p.top + p.base - 0.6) / 2, p.cz, p.hx, (p.top - p.base + 0.6) / 2, p.hz, p.rot, tag)];
     case 'ledge': case 'plank': case 'vista':
       return [obox(p.cx, p.top - 0.25, p.cz, p.hx, 0.25, p.hz, p.rot, tag)];
@@ -200,6 +206,12 @@ function pieceBody(p) {
         : [cyl(p.cx, p.cz, p.r, p.top - 0.3, p.top, tag), cyl(p.cx, p.cz, p.trunk || 0.42, p.base - 0.5, p.top - 0.3, 'wood')];
     case 'stone':
       return [cyl(p.cx, p.cz, p.r, -3, p.top, 'stone')];
+    case 'palm':
+      // a frond crown on a slim trunk (the trunk's bow is drawn, not solid)
+      return [cyl(p.cx, p.cz, p.r, p.top - 0.3, p.top, 'leaf'), cyl(p.cx, p.cz, PALM_TRUNK, p.base - 0.5, p.top - 0.3, 'wood')];
+    case 'rope':
+      // a slatted deck hung on the face; its handrope (outer side) comes from `rail`
+      return [obox(p.cx, p.top - 0.12, p.cz, p.hx, 0.12, p.hz, p.rot, 'wood')];
     case 'stack':
       // a sea stack: solid rock from below the ground (or the water) to its top
       return [cyl(p.cx, p.cz, p.r, Math.min(p.base, 0) - 1, p.top, 'stone')];
@@ -238,14 +250,24 @@ const STAIRS = {
   sheer: { kind: 'ledge', w: [1.5, 1.9], d: [1.2, 1.32], rise: [0.85, 1.05], gap: [0.5, 1.2], off: 0.0, tag: 'stone', sheer: true },
   stacks: { kind: 'stack', r: [0.85, 1.05], rise: [0.6, 0.9], gap: [0.8, 1.45], off: 0.9, tag: 'stone' },
   arches: { kind: 'arch', w: [3.4, 4.2], d: [1.3, 1.55], rise: [0.7, 0.95], gap: [0.7, 1.3], off: 0.25, tag: 'stone' },
+  // tropical islands: palm crowns a step out from the wall, tide pools stepping
+  // up the rock like terraces (a wide kind near home), and rope bridges hung
+  // along the face with a handrope on the open side
+  palms: { kind: 'palm', r: [0.98, 1.12], rise: [0.7, 0.95], gap: [0.9, 1.5], off: 0.55, tag: 'leaf' },
+  pools: { kind: 'pool', w: [1.8, 2.2], d: [1.8, 2.2], rise: [0.6, 0.85], gap: [0.3, 1.0], off: 0.35, tag: 'stone' },
+  poolsWide: { kind: 'pool', w: [2.4, 2.8], d: [2.4, 2.8], rise: [0.5, 0.66], gap: [0.35, 0.8], off: 0.35, tag: 'stone' },
+  ropes: { kind: 'rope', w: [3.2, 4.0], d: [1.25, 1.4], rise: [0.65, 0.9], gap: [0.6, 1.25], off: 0.12, tag: 'wood', rope: true },
 };
 // Kinds whose top is a disc (r) rather than a rectangle (w × d).
-const ROUND = new Set(['disc', 'stack']);
+const ROUND = new Set(['disc', 'stack', 'palm']);
+// Kinds that are solid down to the ground (steps you stand on top of).
+const SOLID = new Set(['block', 'column', 'pool']);
 export const ARCH_LEG = 0.42; // half-width of an arch's legs along the span
-export const MODULE_TYPES = ['moat:stones', 'moat:log', 'moat:planks', 'moat:bridge', 'moat:stacks', ...Object.keys(STAIRS).map((k) => 'stair:' + k), 'vista', 'summit',
-  'branch:lookoutTree', 'branch:lookoutSpire', 'branch:summitNook', 'arch'];
-// Per-biome module pools, and what the chest branch is (a lookout tree, or on
-// bare rock a spire with ledges round it).
+export const PALM_TRUNK = 0.3; // radius of a palm-top's trunk
+export const MODULE_TYPES = ['moat:stones', 'moat:log', 'moat:planks', 'moat:bridge', 'moat:stacks', 'moat:pools', 'moat:ropeBridge',
+  ...Object.keys(STAIRS).map((k) => 'stair:' + k), 'vista', 'summit', 'branch:lookoutTree', 'branch:lookoutSpire', 'branch:lookoutPalm', 'branch:summitNook', 'arch'];
+// Per-biome module pools, and what the chest branch is (a lookout tree, on
+// bare rock a spire with ledges round it, in the tropics a giant palm).
 const POOLS = {
   temperate: {
     // stone stairs are listed twice: gentle islands are mostly a walk with a few hops
@@ -259,6 +281,12 @@ const POOLS = {
     medium: { moat: ['stacks', 'stacks', 'stones'], cliff: ['stacks', 'arches', 'ledges', 'sheer'], mesa: ['sheer', 'arches', 'stacks', 'scaffold'] },
     hard: { moat: ['stacks'], cliff: ['sheer', 'stacks', 'arches'], mesa: ['sheer', 'stacks', 'arches', 'scaffold'] },
   },
+  tropical: {
+    palm: true,
+    easy: { moat: ['ropeBridge'], cliff: ['steps', 'poolsWide', 'poolsWide', 'terracesWide'], mesa: ['steps', 'poolsWide', 'ledgesRail', 'steps'] },
+    medium: { moat: ['pools', 'pools', 'planks'], cliff: ['pools', 'palms', 'ropes', 'terraces'], mesa: ['palms', 'ropes', 'pools', 'ledges'] },
+    hard: { moat: ['pools', 'planks'], cliff: ['palms', 'ropes', 'pools'], mesa: ['palms', 'ropes', 'ledges', 'pools'] },
+  },
 };
 
 const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
@@ -269,7 +297,7 @@ const rr = (rng, [a, b], t = rng()) => a + (b - a) * t;
  * to yTo - 0.6, so the last hop onto the rim is ≤ 0.95 up. If `prevHalf` is
  * given, the first piece keeps a proper gap from whatever ends at aStart.
  */
-function stair(T, { Rw, aStart, dir, yFrom, yTo, style, rng, diff, route, groundAt, prevHalf = 0, lim = LIMITS.main, restEvery = 0, rails = false }) {
+function stair(T, { Rw, aStart, dir, yFrom, yTo, style, rng, diff, route, groundAt, prevHalf = 0, lim = LIMITS.main, restEvery = 0, rails = false, wallTop = yTo }) {
   const S = STAIRS[style];
   const pieces = [];
   const total = Math.max(0.3, yTo - 0.6 - yFrom);
@@ -288,7 +316,10 @@ function stair(T, { Rw, aStart, dir, yFrom, yTo, style, rng, diff, route, ground
     const top = slot.top;
     const half = ROUND.has(S.kind) ? rr(rng, S.r) : slot.landing ? Math.max(1.5, rr(rng, S.w) / 2 * 1.3) : rr(rng, S.w) / 2;
     const depth = ROUND.has(S.kind) ? half * 2 : rr(rng, S.d);
-    const radial = (ang) => Rw(ang) + S.off + depth / 2;
+    // a long straight deck (a rope bridge) stands off the wall's furthest
+    // point along its length, so a bulge in the rock can't cut into it
+    const wallAt = S.rope ? (ang) => Math.max(...[-1, -0.5, 0, 0.5, 1].map((k) => Rw(ang + (k * half) / Rw(ang)))) : Rw;
+    const radial = (ang) => wallAt(ang) + S.off + depth / 2;
     if (half0 > 0) {
       // a landing butts straight onto the piece before it (a walk, not a jump)
       let gap = slot.landing ? 0.04 : Math.min(lim.gap - 0.12, rr(rng, S.gap, clamp(0.25 + diff * 0.6 + (rng() - 0.5) * 0.5, 0, 1)));
@@ -304,8 +335,8 @@ function stair(T, { Rw, aStart, dir, yFrom, yTo, style, rng, diff, route, ground
   for (let i = 0; i < specs.length; i++) {
     const sp = specs[i];
     const base = groundAt(sp.cx, sp.cz);
-    const extra = { tag: S.tag, base: Number.isFinite(base) ? base : -2, route, style, angle: sp.a,
-      joined: !!S.joined || sp.landing || !!specs[i + 1]?.landing, landing: sp.landing, rail: rails && !ROUND.has(S.kind), carved: !!S.carved };
+    const extra = { tag: S.tag, base: Number.isFinite(base) ? base : -2, route, style, angle: sp.a, wallTop,
+      joined: !!S.joined || sp.landing || !!specs[i + 1]?.landing, landing: sp.landing, rail: (rails && !ROUND.has(S.kind)) || !!S.rope, carved: !!S.carved };
     if (ROUND.has(S.kind)) { pieces.push(discPiece(S.kind, sp.cx, sp.cz, sp.top, sp.half, S.kind === 'disc' ? { ...extra, trunk: 0.42 } : extra)); continue; }
     let rot = rotOf(sp.a);
     if (specs.length > 1) {
@@ -529,8 +560,8 @@ function layoutOnce(I, opts, attempt) {
     let style = pick(rng, pool.moat);
     if (style === 'log' && span > 12) style = 'planks';
     const list = [];
-    if (style === 'bridge') {
-      // a railed footbridge from bank to bank: walk on, walk off, no jumping
+    if (style === 'bridge' || style === 'ropeBridge') {
+      // a railed footbridge (in the tropics a rope bridge) from bank to bank: walk on, walk off, no jumping
       const endAt = (from, to) => { // first point (walking from `from` towards `to`) where the bank is ~0.55 high
         const L = Math.hypot(to.x - from.x, to.z - from.z);
         for (let t = 0; t <= L; t += 0.1) { const x = from.x + (to.x - from.x) * (t / L), z = from.z + (to.z - from.z) * (t / L); if (T.groundAt(x, z) <= 0.55) return { x, z }; }
@@ -564,6 +595,15 @@ function layoutOnce(I, opts, attempt) {
         const j = (rng() - 0.5) * 0.6;
         list.push(discPiece('stack', po.x + ux * t - uz * j, po.z + uz * t + ux * j, top, r, { tag: 'stone', base: -2.4, route: 'main', style }));
         top = clamp(top + (rng() < 0.55 ? 1 : -1) * (0.3 + rng() * 0.35), 0.7, 1.7);
+      }
+    } else if (style === 'pools') {
+      // rock rims standing in the channel, each holding a tide pool
+      const r = 0.9 + rng() * 0.08, n = Math.max(1, Math.round((span + 0.4) / (2 * r + 1.0 + diff * 0.4)));
+      const g = (span - n * 2 * r) / (n + 1);
+      for (let i = 0; i < n; i++) {
+        const t = g * (i + 1) + r * (2 * i + 1);
+        const j = (rng() - 0.5) * 0.5;
+        list.push(discPiece('stone', po.x + ux * t - uz * j, po.z + uz * t + ux * j, 0.45 + rng() * 0.2, r, { tag: 'stone', base: -2.4, route: 'main', style }));
       }
     } else {
       const r = 0.8, n = Math.max(1, Math.round((span + 0.4) / (2 * r + 1.0 + diff * 0.4)));
@@ -603,7 +643,7 @@ function layoutOnce(I, opts, attempt) {
       yNow = Math.min(...g);
     }
     const yTo = k === c1Parts - 1 ? T.h1 : yNow + (T.h1 - yNow) * 0.5 + 0.6;
-    const { pieces: list, aEnd, lastHalf: lh } = stair(T, { Rw: T.R1, aStart: aNow, dir, yFrom: yNow, yTo, style, rng, diff, route: 'main', groundAt, prevHalf: lastHalf, ...stairOpts, rails: false });
+    const { pieces: list, aEnd, lastHalf: lh } = stair(T, { Rw: T.R1, aStart: aNow, dir, yFrom: yNow, yTo, style, rng, diff, route: 'main', groundAt, prevHalf: lastHalf, ...stairOpts, rails: false, wallTop: T.h1 });
     if (k === 0) {
       const { back, via } = approachPoint(T, list[0], dir, T.R1, T.meadowR, [...colliders, ...list.flatMap(piecesColliders)], cfg.approachGap);
       walks[walks.length - 1].push([via.x, via.z], [back.x, back.z]);
@@ -649,7 +689,7 @@ function layoutOnce(I, opts, attempt) {
   for (let k = 0; k < mParts; k++) {
     const style = mesaStyles[k % mesaStyles.length];
     const yTo = k === mParts - 1 ? T.summit : yNow + yGain / mParts + 0.6;
-    const { pieces: list, aEnd, lastHalf: lh } = stair(T, { Rw: T.R2, aStart: aNow, dir, yFrom: yNow, yTo, style, rng, diff, route: 'main', groundAt, prevHalf: lastHalf, ...stairOpts, rails: cfg.rails });
+    const { pieces: list, aEnd, lastHalf: lh } = stair(T, { Rw: T.R2, aStart: aNow, dir, yFrom: yNow, yTo, style, rng, diff, route: 'main', groundAt, prevHalf: lastHalf, ...stairOpts, rails: cfg.rails, wallTop: T.summit });
     if (k === 0) {
       const { back, via } = approachPoint(T, list[0], dir, T.R2, T.terraceR, [...colliders, ...list.flatMap(piecesColliders)], cfg.approachGap);
       walks[walks.length - 1].push([via.x, via.z], [back.x, back.z]);
@@ -707,7 +747,7 @@ function layoutOnce(I, opts, attempt) {
     for (let i = 0; i < n; i++) {
       y += i === 0 ? TC.first : Math.min(rr(rng, TC.rise), LIMITS.optional.up - 0.08);
       const r = i === n - 1 ? TC.top : TC.r;
-      list.push(discPiece('disc', c.x + Math.cos(phi) * orbit, c.z + Math.sin(phi) * orbit, y, r, { tag: kit.spire ? 'stone' : 'leaf', base: g0, route: 'chest', trunk: 0, branch: true, hub: [c.x, c.z] }));
+      list.push(discPiece('disc', c.x + Math.cos(phi) * orbit, c.z + Math.sin(phi) * orbit, y, r, { tag: kit.spire ? 'stone' : 'leaf', base: g0, route: 'chest', trunk: 0, branch: true, hub: [c.x, c.z], palm: !!kit.palm }));
       phi += TC.dphi * dir;
     }
     const trunkTop = y + 1.4;
@@ -717,11 +757,11 @@ function layoutOnce(I, opts, attempt) {
     const f = list[0];
     const sx = f.cx + ((f.cx - c.x) / orbit) * 1.6, sz = f.cz + ((f.cz - c.z) / orbit) * 1.6;
     const nodes = [groundNode(sx, sz), ...list.map((p) => pieceNode(p))];
-    branches.push({ name: 'chest', nodes, tree: { x: c.x, z: c.z, base: g0, top: trunkTop, orbit, spire: !!kit.spire } });
+    branches.push({ name: 'chest', nodes, tree: { x: c.x, z: c.z, base: g0, top: trunkTop, orbit, spire: !!kit.spire, palm: !!kit.palm } });
     const top = list[list.length - 1];
     chests.push({ id: 'chest', x: top.cx, y: top.top, z: top.cz, yaw: Math.atan2(c.x - top.cx, c.z - top.cz) });
     list.forEach((p, i) => { if (i % 2 === 1 && i < n - 1) coinAt(p.cx, p.top, p.cz, 3); });
-    modules.push({ type: kit.spire ? 'branch:lookoutSpire' : 'branch:lookoutTree', pieces: list.length });
+    modules.push({ type: kit.spire ? 'branch:lookoutSpire' : kit.palm ? 'branch:lookoutPalm' : 'branch:lookoutTree', pieces: list.length });
     break;
   }
 
@@ -816,6 +856,8 @@ function polysOverlap(A, B) {
   }
   return true;
 }
+// Kinds that are a thin top over open air (what's under them may pass beneath).
+const THIN = new Set(['disc', 'ledge', 'plank', 'vista', 'palm', 'rope']);
 const footOf = (n) => (n.type === 'piece' ? n.piece.foot : null);
 /** Horizontal gap along the straight line between two nodes' centres (edge to edge). */
 function lineGap(A, B) {
@@ -913,7 +955,7 @@ export function validateLayout(L) {
   const byId = Object.fromEntries(L.pieces.map((p) => [p.id, p]));
   for (const p of L.pieces) {
     const ground = T.heightAt(p.cx, p.cz);
-    if (p.kind !== 'stone' && p.kind !== 'log' && p.top < ground + 0.25 && p.kind !== 'block' && p.kind !== 'column') errors.push(`${p.id} ${p.kind}: buried (top ${p.top.toFixed(2)} vs ground ${ground.toFixed(2)})`);
+    if (p.kind !== 'stone' && p.kind !== 'log' && p.top < ground + 0.25 && !SOLID.has(p.kind)) errors.push(`${p.id} ${p.kind}: buried (top ${p.top.toFixed(2)} vs ground ${ground.toFixed(2)})`);
     const shrink = p.foot.map(([x, z]) => [p.cx + (x - p.cx) * 0.96, p.cz + (z - p.cz) * 0.96]);
     for (const [ci, pl] of plans.entries()) {
       const owner = L.colliders[ci].rail && byId[L.colliders[ci].rail];
@@ -927,10 +969,10 @@ export function validateLayout(L) {
     for (let j = i + 1; j < L.pieces.length; j++) {
       const A = L.pieces[i], B = L.pieces[j];
       if (Math.hypot(A.cx - B.cx, A.cz - B.cz) > 8) continue;
-      const aLo = (A.kind === 'disc' || A.kind === 'ledge' || A.kind === 'plank' || A.kind === 'vista') ? A.top - 0.4 : -9;
-      const bLo = (B.kind === 'disc' || B.kind === 'ledge' || B.kind === 'plank' || B.kind === 'vista') ? B.top - 0.4 : -9;
+      const aLo = THIN.has(A.kind) ? A.top - 0.4 : -9;
+      const bLo = THIN.has(B.kind) ? B.top - 0.4 : -9;
       if (A.joined && B.joined && Math.abs(A.top - B.top) <= 0.4) continue; // stair steps and landings butt together on purpose
-      if (A.joined && B.joined && A.style === B.style && (A.kind === 'block' || A.kind === 'column') && Math.abs(A.top - B.top) <= 1.0) continue; // solid steps merge
+      if (A.joined && B.joined && A.style === B.style && SOLID.has(A.kind) && Math.abs(A.top - B.top) <= 1.0) continue; // solid steps merge
       if (A.branch && B.branch && A.kind === 'disc' && B.kind === 'disc' && Math.abs(A.top - B.top) > 0.3) continue; // spiral platforms, checked above
       if (Math.min(A.top, B.top) > Math.max(aLo, bLo) && polysOverlap(A.foot, B.foot)) errors.push(`${A.id}/${B.id} overlap`);
     }

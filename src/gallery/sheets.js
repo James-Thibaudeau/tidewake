@@ -8,6 +8,7 @@
 // skirt on, mid-stride.
 import { stylesFor } from '../cosmetics.js';
 import { POSES, LIGHTS, VIEWS, WEATHERS } from './presets.js';
+import { ASHORE_BIOMES } from '../config.js';
 
 const ids = (slot) => stylesFor(slot).map((s) => s.style);
 const PORTRAIT = [250, 330], LANDSCAPE = [420, 300], SQUARE = [300, 300], SMALL = [200, 200];
@@ -70,6 +71,8 @@ export const SHEETS = {
   'rogue': { about: 'A rogue wave in the Frostspire Reach, coming in off the starboard bow: 4, 3, 2 and 1 seconds out, on the ship, and a second past; from the helm, low over the water and a tall masthead', tile: LANDSCAPE, make: grid('view', ['sail', 'horizon', 'aloft'], 'rogue', ['4', '3', '2', '1', '0', '-1'], { show: 'ship', tier: '2', zone: 'rough' }) },
   'shallows': { about: 'The clear shallows of home waters under every light: from the helm, low over the water, a tall masthead and a gull', tile: LANDSCAPE, make: grid('view', ['sail', 'horizon', 'aloft', 'high'], 'light', Object.keys(LIGHTS), { show: 'ship', tier: '2', zone: 'shallows' }) },
   // ---- places
+  'islands': { about: 'A generated island in every biome you can land on: near home (easy), 2.5 km out (medium) and 5 km out (hard)', tile: LANDSCAPE, make: grid('biome', [...ASHORE_BIOMES], 'dist', ['900', '2500', '5000'], { show: 'level' }) },
+  'island-places': { about: "A generated island's moat crossing, the start of each climb and the chest's branch, close up: near home, 2.5 km and 5 km out (biome=tropical and seed=77 unless the page shows a level)", tile: LANDSCAPE, make: (base) => grid('at', ['moat', 'cliff', 'mesa', 'chest'], 'dist', ['900', '2500', '5000'], { show: 'level', view: 'spot', biome: base.show === 'level' && base.biome ? base.biome : 'tropical', seed: base.show === 'level' && base.seed ? base.seed : '77' })(base) },
   'archway-story': { about: "Archway Isle's story places, close up", tile: LANDSCAPE, make: strip('at', ['cove', 'keystone', 'lantern', 'stack'], { show: 'archway', view: 'spot' }, 2) },
   // ---- anything: the subject already in the URL
   'views': { about: 'The current subject from every fitted camera', tile: SQUARE, make: strip('view', Object.keys(VIEWS).filter((v) => VIEWS[v].kind === 'fit'), {}, 3) },
