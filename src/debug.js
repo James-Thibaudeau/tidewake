@@ -13,6 +13,8 @@ import { UPGRADES, SAVE_KEY, REFITS, ASHORE_BIOMES, ROUGH } from './config.js';
 import { SEA_ZONES, bandAt, seaAt, swellAt, roughWear } from './sea-zones.js';
 import { SEAS } from './story-text.js';
 import { crossing, openSides } from './debug-pilot.js';
+import { CUES } from './music/themes.js';
+import { cueFor } from './music-cues.js';
 
 const BACKUP_KEY = SAVE_KEY + '.debug-backup';
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
@@ -43,6 +45,9 @@ const HELP = `tidewake.debug
                            waterspout | ghostShip now (the bloom and the ghost ship make it night first);
                            no argument = what's out there, the next roll, bounties, the log, the ghost's chain.
                            at: { ahead, side } puts it that many metres ahead and to the right instead
+  music(cue?, intensity?)  the score: no argument = what's playing (cue, intensity, layers, key, bar); a cue's name
+                           (home | coastal | open) plays it whatever the game wants, at intensity 0-3 if given;
+                           music(null) = silence; music('game') hands it back. Changes come on the next bar line
   ashore(where?)           go ashore on an island (async); no argument = grandfather's wreck
   weather(type)            clear | breezy | cloudy | rain | storm | fog
   time(t)                  time of day, 0-1 (0.25 dawn, 0.5 noon, 0.75 dusk)
@@ -252,6 +257,16 @@ export function installDebug(game) {
     },
 
     weather(type) { g.weather.set(type, true); return g.weather.type; },
+    music(cue, intensity) {
+      const A = g.audio;
+      if (!A.ctx) return 'No sound yet: click or press a key in the game first.';
+      if (cue === 'game') A.forceMusic();
+      else if (cue !== undefined) {
+        if (cue !== null && !CUES[cue]) return `No cue called "${cue}". Choose from: ${Object.keys(CUES).join(', ')}, null (silence), 'game'.`;
+        A.forceMusic(cue, intensity);
+      }
+      return { ...A.musicState(), wants: cueFor({ band: bandAt(g.boat.pos.x, g.boat.pos.z), ashore: g.mode === 'ashore', speed: g.boat.speed }) };
+    },
     time(t) { g.state.dayT = ((t % 1) + 1) % 1; return g.state.dayT; },
 
     /**

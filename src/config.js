@@ -229,3 +229,12 @@ export const ASHORE = {
   // Level design limits for *required* moves (comfortable, not frame-perfect)
   design: { jumpUp: 1.15, gapWalk: 1.9, gapRun: 3.4, safeDrop: 6 },
 };
+
+// The score (music-cues.js, audio/music.js).
+//   hold     seconds a newly wanted cue must stay wanted before the music follows it,
+//            so it never flips back and forth at the edge of a zone
+//   brisk, fast   boat speeds (m/s) from which a cue plays its second and third
+//            levels: more layers the faster she sails
+//   ahead    seconds ahead of the audio clock that the next bar is written out
+//   level    the score's own level on the music bus, under the sea
+export const MUSIC = { hold: 8, brisk: 7, fast: 14, ahead: 0.25, level: 1 };

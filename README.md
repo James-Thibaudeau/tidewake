@@ -71,6 +71,12 @@ Pick things from the menus, drag to turn, scroll to zoom. The "sheet" menu
 draws a contact sheet, such as every top with every bag from behind; click
 it to close. Everything is in the URL, so a view can be reloaded or linked.
 
+## Listen to the music
+
+`jukebox.html` plays the score a cue at a time, without playing the game:
+`http://localhost:8767/jukebox.html`. Choose another cue while one plays and
+it comes in on the next bar line. Each instrument has a button of its own.
+
 ## Deploy to GitHub Pages
 
 1. Push this folder to a GitHub repository (it already includes `.nojekyll`).
@@ -83,6 +89,7 @@ it to close. Everything is in the URL, so a view can be reloaded or linked.
 ```
 index.html        page shell, HUD markup, import map (three.js and libraries from CDN)
 gallery.html      look-dev gallery: a page for looking at the art (not part of the game)
+jukebox.html      the jukebox: a page for listening to the score (not part of the game)
 style.css         all UI styling
 src/
   main.js         bootstrap: renderer, scene, main loop
@@ -140,9 +147,15 @@ src/
                   landmarks.js (the landmarks' pictures on the chart), port.js (port screen, journal),
                   story.js (Found! pop-up, story cards, quest tracker, races), icons.js, shared.js
   input.js        keyboard, mouse and touch controls
-  audio.js        procedural WebAudio sound and music: the buses, the sea's beds, the score, one-shots
+  audio.js        procedural WebAudio sound and music: the buses, the sea's beds, the storm's score, one-shots
   audio/          the rest of the sound: ashore.js (footsteps, jump and land, coin chime, chest fanfare,
-                  island ambience, the on-foot score)
+                  island ambience, the on-foot score), instruments.js (the score's instruments and reverb),
+                  music.js (the score's player: bars written onto the audio clock)
+  music/          the score as data: notation.js (notes, chords, keys, the text format tunes are written in),
+                  themes.js (the tunes and the cues that play them), score.js (the sequencer: what the next
+                  bar holds, and changes of cue on the bar) (all pure); jukebox.js (the jukebox page)
+  music-cues.js   the music's director: which cue the game wants and how much of it, and the hold that
+                  stops it flipping at a zone's edge (pure)
   save.js         localStorage save/load and save-version migration
   config.js       tuning constants and upgrade catalogue
   util.js         math and noise helpers

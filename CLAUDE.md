@@ -31,7 +31,9 @@ in the shaders, always arrives and costs the right share of the hull, `rogue`),
 150 generated ashore layouts per landable biome, a test
 climber (the real controller) that walks 12 generated islands per biome to
 the summit, the living sea's rules (what turns up where, bounties, 3,000
-placements in a toy sea), the Elder Grove (its limits, and the climber from the beach
+placements in a toy sea), the score (themes parse and stay in key, every
+note is in its instrument's range, changes of cue, no flip-flopping at a
+band's edge, `music`), the Elder Grove (its limits, and the climber from the beach
 to the crown) and Archway Isle (its limits, and the climber from the cove
 over the arch and up the stack). One group at a time:
 `node tools/check.mjs imports`.
@@ -54,6 +56,7 @@ tidewake.debug.sea('whale')               // a sea event now: whale | dolphins |
 tidewake.debug.zone()                     // the sea at the boat: band (home | coastal | open), zone, wave and swell factors
 tidewake.debug.rogue(50)                  // a rogue wave now, from 50° off the starboard bow (negative = port); rogue('state') says what's out there
 tidewake.debug.cross({ badly: true })     // a test pilot sails one crossing of the Reach and says what it cost the hull, and where it went
+tidewake.debug.music()                    // the score: cue, intensity, layers, key, bar; music('open', 3) forces a cue, music('game') hands it back
 tidewake.debug.step(30)                   // 30 s of game time in well under a second
 tidewake.debug.frame()                    // draw a frame before a screenshot
 tidewake.debug.profile()                  // what a frame draws: calls, triangles, lights, by kind
@@ -73,6 +76,9 @@ tidewake.debug.restoreSave()              // when you're done: real save back, r
   is written over the real save when the tab closes.
 - Visual effects: `?fx=0` turns them all off, `?fx=edges,bloom` picks some.
   The sea's large features likewise: `?sea=0`, or `?sea=shallows,gusts,shade`.
+- The score is written onto the audio clock, which runs in real time: after
+  `step()`, `await` a few real seconds before reading `debug.music()`. A
+  change of cue takes the 8 s hold (game time), then up to three bars.
 - Sound can't be heard from here. `SoundSystem` builds on any audio context,
   so render a sound through an `OfflineAudioContext` (`A.ctx = ctx;
   A.build(); A._play(name, opts)`) and measure it against one that exists;
@@ -119,6 +125,27 @@ gallery.frame()                            // draw before a screenshot when the 
   `src/gallery/subjects.js`; a new combination worth checking gets a sheet
   in `src/gallery/sheets.js`.
 
+## Listen to the music
+
+For how the score sounds, use the jukebox, not the game: `jukebox.html` on
+the same dev server plays one cue at a time and never touches the save.
+
+```js
+jukebox.help()
+jukebox.play('home', 3)                    // a cue at intensity 0-3; another play() changes on the next bar line
+jukebox.set({ rests: true, low: true })    // the long rests between statements, as in the game; the Low quality score
+jukebox.note('fiddle', 'A4')               // one instrument; no note = a run up its range
+await jukebox.measure()                    // every cue, 60 s, offline: loudness, peak, clipped. Works hidden
+```
+
+- You can't hear it. After changing a theme, an instrument or a level, run
+  `jukebox.measure()` and keep the cues within about 2 dB of each other
+  with no clipping, then say in the PR that nobody has listened. Every
+  theme needs the user's ears before it counts as done.
+- Tunes and cues are data in `src/music/themes.js`; the notation is
+  explained at the top of `src/music/notation.js`. `node tools/check.mjs
+  music` plays every cue through on paper.
+
 ## How the code is wired
 
 `src/main.js` builds everything and hands it to one `Game` (`src/game.js`),
@@ -141,6 +168,10 @@ game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, 
   (`sea-life.js`, `sea-wonders.js`, `ghost-ship.js`). The director also
   gives Sable their cue (`rival.spawn()`), so only one thing is out there.
   The grandparents are never named.
+- **The score**: `music-cues.js` says which cue the game wants
+  (`cueFor`), `music/score.js` turns the cue into bars of notes,
+  `audio/music.js` writes them onto the audio clock and
+  `audio/instruments.js` plays them. The game never plays a note itself.
 - **`UI`, `Boat` and `SoundSystem` are each one class split over several
   files.** The core is `src/ui.js` / `src/boat.js` / `src/audio.js`; the rest
   is mixed in from `src/ui/`, `src/boat/` and `src/audio/` (see the header of
@@ -149,7 +180,7 @@ game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, 
   find it. New methods go in the part file that fits.
 - **Pure modules stay pure**: `ashore/modules.js`, `ashore/grove-layout.js`, `ashore/archway-layout.js`, `collide.js`,
   `controller.js`, `shapes.js`, `save.js`, `config.js`, `util.js`, `sea-zones.js`, `waves.js`, `rogue.js`,
-  `cosmetics.js`, `sightings.js` and the text files import no three.js and touch no DOM at
+  `cosmetics.js`, `sightings.js`, `music-cues.js`, `music/notation.js`, `music/themes.js`, `music/score.js` and the text files import no three.js and touch no DOM at
   load, so `tools/check.mjs` can run them in Node. Keep it that way.
 - Tuning numbers live in `src/config.js`; on-foot limits are `ASHORE` there,
   and ashore levels must keep required jumps inside `ASHORE.design`.

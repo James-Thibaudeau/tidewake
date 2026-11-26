@@ -1,17 +1,21 @@
-// Fully procedural WebAudio: ocean/wind/rain beds, sparse ambient music and
-// one-shot effects. Everything is a safe no-op until unlock() is called from a
-// user gesture.
+// Fully procedural WebAudio: ocean/wind/rain beds, the score and one-shot
+// effects. Everything is a safe no-op until unlock() is called from a user
+// gesture.
 //
-// SoundSystem is one class split over two files. This one holds the core: the
-// buses, the sea's beds, the score and the one-shots heard at sea. The
-// on-foot sounds (footsteps, jump and land, the coin chime, the chest fanfare,
-// an island's ambience and the on-foot score) are mixed in from
-// audio/ashore.js.
+// SoundSystem is one class split over several files. This one holds the
+// core: the buses, the sea's beds, the storm's score and the one-shots heard
+// at sea. Mixed in from audio/:
+//   ashore.js       footsteps, jump and land, the coin chime, the chest
+//                   fanfare, an island's ambience and the on-foot score
+//   instruments.js  the score's instruments (this.voice) and its reverb
+//   music.js        the score's player: bars written onto the audio clock
 import { mixin } from './util.js';
+import { hz } from './music/notation.js';
 import { AshoreSounds } from './audio/ashore.js';
+import { Instruments } from './audio/instruments.js';
+import { MusicPlayer } from './audio/music.js';
 
-const PENTA = [0, 2, 4, 7, 9]; // major pentatonic degrees
-const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
+const midi = hz;
 
 export class SoundSystem {
   constructor() {
@@ -22,6 +26,7 @@ export class SoundSystem {
     this.nextNote = 2;
     this.melody = 2;
     this.night = 0;
+    this.musicLow = false; // Low quality: the score drops its counter-melody and rhythm
   }
 
   unlock() {
@@ -61,16 +66,14 @@ export class SoundSystem {
     this.sfx = c.createGain(); this.sfx.gain.value = 0.9; this.sfx.connect(this.master);
     this.amb = c.createGain(); this.amb.gain.value = 1; this.amb.connect(this.master);
 
-    // music bus with a feedback echo
+    // music bus, with a room round it
     this.musicBus = c.createGain(); this.musicBus.gain.value = this.musicOn ? 0.5 : 0;
     this.musicBus.connect(this.master);
     this.musicIn = c.createGain(); this.musicIn.gain.value = 1;
-    const delay = c.createDelay(2); delay.delayTime.value = 0.42;
-    const fb = c.createGain(); fb.gain.value = 0.38;
-    const wet = c.createGain(); wet.gain.value = 0.45;
-    const tone = c.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 2400;
+    const room = this.musicReverb();
+    const wet = c.createGain(); wet.gain.value = 0.4;
     this.musicIn.connect(this.musicBus);
-    this.musicIn.connect(delay); delay.connect(tone); tone.connect(fb); fb.connect(delay); tone.connect(wet); wet.connect(this.musicBus);
+    this.musicIn.connect(room); room.connect(wet); wet.connect(this.musicBus);
 
     // noise buffers
     const len = c.sampleRate * 2;
@@ -136,6 +139,7 @@ export class SoundSystem {
     this.nextStormNote = 2;
     this.stormMix = 0;
     this.buildAshore();
+    this.buildMusic();
   }
 
   update(dt, p = {}) {
@@ -155,16 +159,15 @@ export class SoundSystem {
     this.windFilter.frequency.setTargetAtTime(500 + wind * 400 + gust * 300 + storm * 500, t, 0.5);
     this.updateRain(dt, t, rain, wind, storm, p.inPort);
 
-    // music: the gentle plucks give way to the storm score
+    // music: the score (audio/music.js) gives way to the storm's own, and on foot to
+    // the old wandering line on a mallet (audio/ashore.js), until each has its cues
     this.stormMix += (Math.min(1, Math.max(0, (storm - 0.25) / 0.55)) - this.stormMix) * Math.min(1, dt * 0.4);
     this.stormBus.gain.setTargetAtTime(this.stormMix * 0.7, t, 0.8);
+    this.updateMusic(dt, t, p.music || null);
     this.nextNote -= dt;
     if (this.nextNote <= 0) {
-      const calm = this.night > 0.5 ? 1.5 : 1;
-      // on foot the same line moves along a little quicker, on a mallet (audio/ashore.js)
-      const land = this.landMix > 0.5;
-      this.nextNote = (land ? 0.8 + Math.random() * 1.7 : 1.1 + Math.random() * 2.6) * calm;
-      if (this.musicOn && Math.random() > this.stormMix) { if (land) this.landNote(storm); else this.musicNote(storm); }
+      this.nextNote = (0.8 + Math.random() * 1.7) * (this.night > 0.5 ? 1.5 : 1);
+      if (this.musicOn && this.landMix > 0.5 && Math.random() > this.stormMix) this.landNote(storm);
     }
     if (this.stormMix > 0.05 && this.musicOn) this.updateStormScore(dt, t);
   }
@@ -210,7 +213,7 @@ export class SoundSystem {
     const c = this.ctx;
     const s = c.createBufferSource(); s.buffer = this.white;
     const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
-    const g = c.createGain(); g.gain.setValueAtTime(0, t);
+    const g = c.createGain(); g.gain.value = 0; g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(vol, t + 0.002);
     g.gain.exponentialRampToValueAtTime(0.0005, t + dur);
     s.connect(f); f.connect(g); g.connect(dest);
@@ -255,7 +258,7 @@ export class SoundSystem {
         o.detune.value = (Math.random() - 0.5) * 18;
         const f = c.createBiquadFilter(); f.type = 'lowpass';
         f.frequency.setValueAtTime(300, t); f.frequency.linearRampToValueAtTime(1400, t + 3); f.frequency.linearRampToValueAtTime(250, t + 6);
-        const g = c.createGain(); g.gain.setValueAtTime(0, t);
+        const g = c.createGain(); g.gain.value = 0; g.gain.setValueAtTime(0, t);
         g.gain.linearRampToValueAtTime(0.03 * m, t + 3);
         g.gain.linearRampToValueAtTime(0.0, t + 6.5);
         o.connect(f); f.connect(g); g.connect(this.stormBus);
@@ -279,38 +282,11 @@ export class SoundSystem {
     const c = this.ctx;
     const s = c.createBufferSource(); s.buffer = opts.buf || this.white; s.loop = true;
     const f = c.createBiquadFilter(); f.type = opts.type || 'lowpass'; f.frequency.value = opts.freq || 800;
-    const g = c.createGain(); g.gain.setValueAtTime(0, t);
+    const g = c.createGain(); g.gain.value = 0; g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(opts.vol || 0.2, t + 0.01);
     g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
     s.connect(f); f.connect(g); g.connect(dest);
     s.start(t, Math.random()); s.stop(t + dur + 0.05);
-  }
-
-  musicNote(storm) {
-    const c = this.ctx, t = c.currentTime + 0.02;
-    this.melody += Math.floor(Math.random() * 5) - 2;
-    if (this.melody < 0) this.melody = 1;
-    if (this.melody > 11) this.melody = 9;
-    const deg = PENTA[this.melody % 5], oct = Math.floor(this.melody / 5);
-    const root = storm > 0.5 ? 57 : 62; // A (moody) or D
-    const note = root + deg + oct * 12;
-    const vol = this.night > 0.5 ? 0.05 : 0.07;
-    this.pluck(midi(note), t, vol);
-    if (Math.random() < 0.25) this.pluck(midi(note - 12 + (Math.random() < 0.5 ? 7 : 0)), t + 0.01, vol * 0.7);
-    if (Math.random() < 0.2) this.pluck(midi(note + PENTA[(this.melody + 2) % 5] - deg), t + 0.22, vol * 0.6);
-  }
-
-  pluck(freq, t, vol, dest = this.musicIn) {
-    const c = this.ctx;
-    const o = c.createOscillator(); o.type = 'triangle'; o.frequency.value = freq;
-    const o2 = c.createOscillator(); o2.type = 'sine'; o2.frequency.value = freq * 2;
-    const g = c.createGain(); g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0008, t + 1.6);
-    const g2 = c.createGain(); g2.gain.value = 0.25;
-    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 2200;
-    o.connect(g); o2.connect(g2); g2.connect(g); g.connect(f); f.connect(dest);
-    o.start(t); o2.start(t); o.stop(t + 1.7); o2.stop(t + 1.7);
   }
 
   tone(freq, t, dur, { type = 'triangle', vol = 0.15, attack = 0.01, glide = null, dest = this.sfx } = {}) {
@@ -318,7 +294,7 @@ export class SoundSystem {
     const o = c.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t);
     if (glide) o.frequency.exponentialRampToValueAtTime(glide, t + dur);
     const g = c.createGain();
-    g.gain.setValueAtTime(0, t);
+    g.gain.value = 0; g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(vol, t + attack);
     g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
     o.connect(g); g.connect(dest);
@@ -331,7 +307,7 @@ export class SoundSystem {
     const f = c.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t); f.Q.value = q;
     if (sweep) f.frequency.exponentialRampToValueAtTime(sweep, t + dur);
     const g = c.createGain();
-    g.gain.setValueAtTime(0, t);
+    g.gain.value = 0; g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(vol, t + attack);
     g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
     s.connect(f); f.connect(g); g.connect(this.sfx);
@@ -345,6 +321,8 @@ export class SoundSystem {
 
   _play(name, opts) {
     const t = this.ctx.currentTime + 0.01;
+    // the musical one-shots are written in D and played in the key of the cue that is on
+    const shift = this.keyShift(), key = Math.pow(2, shift / 12), midi = (n) => hz(n + shift);
     switch (name) {
       case 'click':
         this.tone(1250, t, 0.05, { type: 'sine', vol: 0.06 });
@@ -401,9 +379,9 @@ export class SoundSystem {
         break;
       case 'dock':
         for (const [dt, f] of [[0, 880], [0.45, 660]]) {
-          this.tone(f, t + dt, 1.8, { type: 'sine', vol: 0.12 });
-          this.tone(f * 2.76, t + dt, 0.9, { type: 'sine', vol: 0.03 });
-          this.tone(f * 5.4, t + dt, 0.4, { type: 'sine', vol: 0.015 });
+          this.tone(f * key, t + dt, 1.8, { type: 'sine', vol: 0.12 });
+          this.tone(f * key * 2.76, t + dt, 0.9, { type: 'sine', vol: 0.03 });
+          this.tone(f * key * 5.4, t + dt, 0.4, { type: 'sine', vol: 0.015 });
         }
         break;
       case 'hoot': {
@@ -498,9 +476,9 @@ export class SoundSystem {
         this.noise(t + 0.12, 0.12, { type: 'bandpass', freq: 900, q: 2, vol: 0.12 });
         break;
       default:
-        this.playAshore(name, opts, t);
+        this.playAshore(name, opts, t, shift);
         break;
     }
   }
 }
-mixin(SoundSystem, AshoreSounds);
+mixin(SoundSystem, AshoreSounds, Instruments, MusicPlayer);
