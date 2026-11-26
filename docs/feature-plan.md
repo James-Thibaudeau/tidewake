@@ -17,6 +17,7 @@ Decisions already made:
 
 This file holds the designs for phases that **haven't shipped yet** (4, 6,
 7, 9, 10, 11 and 12),
+possible improvements to the platforming feel,
 plus what is left of one piece of tooling, the look-dev gallery.
 What is done, what's next and known issues live in [STATUS.md](STATUS.md).
 The designs of shipped phases (0-3, 5 and 8) moved to
@@ -1287,6 +1288,72 @@ and you can hear where you are; every biome and landmark has a theme you
 could hum; Sable's theme comes before their sails; music changes on the bar
 and never flip-flops; every cue has been listened to on real speakers; and
 it runs on Low with no drop in frame rate.
+
+---
+
+## Platforming feel: possible improvements
+
+Ideas, not decisions. The on-foot controller already has coyote time, jump
+buffering, variable jump height, step-up, ground snapping and a hard brake
+on reversals. What's left is the shape of the jump, how easy it is to judge
+depth, and forgiveness at ledges. Each one can be tried on its own; the
+first three are the likeliest wins. Only playing them can say whether they
+help.
+
+1. **A shadow straight down under the explorer.** The biggest depth cue in
+   a 3D platformer. Today the only shadow is the `shadows` effect
+   (`fx.js`): cast at the sun's angle, gone with `?fx=0` and maybe on Low.
+   A dark disc projected straight down onto whatever is below, shrinking
+   and fading with height, shows where you'll land at every quality. It
+   matters most on a phone.
+2. **A better jump arc.** Gravity is the same up and down
+   (`ashore/controller.js`, `step`), so the fall is floaty, and letting go
+   of jump early cuts upward speed to 0.45 at once, a kink in the arc.
+   - Fall faster: about 1.6× gravity once the explorer stops rising.
+   - Hang at the top: about 0.6× gravity while jump is held and vertical
+     speed is within ±1.5 m/s, so the apex is easy to steer.
+   - Smoother cut: letting go early doubles gravity while still rising,
+     instead of the one-off `jumpCut`.
+   - There is room. A run-jump covers about 4.5 m on the flat today against
+     `ASHORE.design.gapRun` of 3.4 m. With 1.6× fall gravity and the same
+     `jumpVel` the apex stays 1.54 m, the jump takes about 0.57 s and a
+     run-jump covers about 4.0 m. `node tools/check.mjs` (the climbers)
+     says whether every required jump still makes it.
+3. **Draw between physics steps.** Physics runs at a fixed 1/120 s and the
+   explorer and camera are drawn exactly where the last step left them
+   (`ashore/ashore.js`, `update`). At 60 or 120 Hz that lines up; at 90,
+   100 or 144 Hz some frames get two steps and some none, a slight stutter
+   when running. Keep the previous step's position and draw the blend
+   (`acc / STEP`).
+4. **Forgiveness at ledges.**
+   - Step up in the air: `tryStepUp` only runs when grounded, so a jump a
+     few centimetres short catches the feet on the lip and slides down the
+     wall. Allow a small one (about 0.25 m) near the apex or falling, while
+     pushing into the wall. It may be why Archway's climber has three hops
+     that need a second try.
+   - Corner correction: a head that clips the edge of a ceiling or the
+     underside of a ledge is nudged a few centimetres aside instead of the
+     jump ending.
+5. **Steadier camera height in jumps.** In the air the camera's height
+   still follows the head, only slower (`ashore/camera.js`, `t.y`), so
+   every hop bobs the view. Hold the height of the last ground stood on,
+   and move only on landing somewhere higher or falling below it, so jumps
+   read against a still horizon.
+6. **More feedback.**
+   - Dust on take-off and landing, and sand kicked up on a sharp turn at a
+     run.
+   - The landing squash only plays for falls over 6 m/s
+     (`ashore.js`, `ev.landed > 6`); a small one on every landing makes
+     plain hops feel grounded.
+   - A short `navigator.vibrate` on hard landings on touch devices.
+7. **Smaller things.**
+   - Timers: coyote 0.1 s and buffer 0.12 s suit a keyboard; about 0.13 s
+     and 0.15 s forgive a touch screen's extra lag.
+   - Running: holding Shift the whole way is a chore. On a keyboard, run
+     after about 0.5 s of steady walking, or make Shift a toggle. (Touch
+     already runs with the stick at its rim.)
+   - Gamepad: `input.js` reads none. An analog stick changes 3D platforming
+     more than any tuning number.
 
 ---
 
