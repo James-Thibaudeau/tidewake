@@ -1218,7 +1218,7 @@ Updated 2026-11-26.
     the game? Do the two kinds of change (home to coastal, coastal to
     open) sound smooth? Is the reverb too wet? The on-foot mallet line
     now plays through the reverb instead of the echo: is it still right?
-  - [x] **12.2 Sea music** (PR-LINK):
+  - [x] **12.2 Sea music** ([#61](https://github.com/James-Thibaudeau/tidewake/pull/61)):
     - **Twelve more cues** (`src/music/themes.js`), fifteen in all:
       - `storm`: a reel in a hurry in B minor, 126 bpm. Squeezebox tune,
         a guitar hammering the root, drums that never stop, a fiddle on
