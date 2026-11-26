@@ -132,6 +132,8 @@ export const THEMES = {
 //   calm     true: at night it slows, loses its drums and gains a celesta
 //   plain    true: no colours for rain or night (a storm, the fog)
 //   quiet    true: meant to be faint, so not held to the others' loudness
+//   urgent   true: it can't wait (a storm): it comes after a short hold and by
+//            the quick way between keys
 //   form     the phrases of one full statement, in order
 //   pick     instead of the whole form, how many of its phrases a statement
 //            plays, chosen afresh each time (fragments)
@@ -240,7 +242,7 @@ export const CUES = {
   // A storm: driving and dark, and a thrill. The squeezebox has the tune,
   // the guitar hammers the root, and the drums never stop.
   storm: {
-    theme: 'tempest', tempo: 126, gain: 0.8, plain: true,
+    theme: 'tempest', tempo: 126, gain: 0.8, plain: true, urgent: true,
     form: ['gale', 'gale', 'surge', 'gale'], rest: [8, 20],
     drift: 'Bm | Bm | G | A',
     layers: {
@@ -327,7 +329,7 @@ export const CUES = {
 for (const zone of ['reach', 'rip', 'swell']) {
   const Z = CUES[zone];
   CUES[zone + '-storm'] = {
-    ...Z, tempo: Math.round(Z.tempo * 1.2), plain: true,
+    ...Z, tempo: Math.round(Z.tempo * 1.2), plain: true, urgent: true,
     layers: { ...Z.layers, rhythm: { vol: 0.42, from: 0, pattern: 'd . b d . b' }, drums: { vol: 0.34, from: 0, pattern: '. s s . s s' } },
   };
 }

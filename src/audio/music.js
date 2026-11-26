@@ -32,7 +32,7 @@ export class MusicPlayer {
    * or null for no score.
    */
   updateMusic(dt, t, want) {
-    const held = this.cueHold.update(dt, want ? want.cue : null);
+    const held = this.cueHold.update(dt, want ? want.cue : null, !!want?.urgent);
     const F = this.musicForce;
     this.score.setCue(F ? F.cue : held);
     this.intensity = F?.intensity ?? want?.intensity ?? 1;

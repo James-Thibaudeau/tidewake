@@ -79,7 +79,8 @@ tidewake.debug.restoreSave()              // when you're done: real save back, r
   The sea's large features likewise: `?sea=0`, or `?sea=shallows,gusts,shade`.
 - The score is written onto the audio clock, which runs in real time: after
   `step()`, `await` a few real seconds before reading `debug.music()`. A
-  change of cue takes the 8 s hold (game time), then up to three bars.
+  change of cue takes the 8 s hold (game time), then up to three bars; a
+  storm's takes 1.5 s and up to two.
 - Sound can't be heard from here. `SoundSystem` builds on any audio context,
   so render a sound through an `OfflineAudioContext` (`A.ctx = ctx;
   A.build(); A._play(name, opts)`) and measure it against one that exists;

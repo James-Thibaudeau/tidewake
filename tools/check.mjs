@@ -656,8 +656,8 @@ const checks = {
       [{ band: 'open', speed: -(MUSIC.fast + 1) }, 'open', 3],
       [{ band: 'home', ashore: true, speed: 0 }, null, 1],
       [{ ...clear, band: 'home' }, 'home', 1],
-      [{ ...clear, storm: 0.39 }, 'coastal', 1],
-      [{ ...clear, storm: 0.45, rain: 0.6, fog: 0.5 }, 'storm', 1],
+      [{ ...clear, storm: MUSIC.storm - 0.01 }, 'coastal', 1],
+      [{ ...clear, storm: MUSIC.storm + 0.05, rain: 0.6, fog: 0.5 }, 'storm', 1],
       [{ ...clear, storm: 1, rain: 1, fog: 0.38 }, 'storm', 3],
       [{ ...clear, band: 'open', zone: 'reach', rough: 0.6 }, 'reach', 1],
       [{ ...clear, band: 'open', zone: 'reach', rough: 1 }, 'reach', 3],
@@ -676,6 +676,20 @@ const checks = {
       expect(got.cue === cue && got.intensity === intensity, `cueFor(${JSON.stringify(s)}) gives ${got.cue} at ${got.intensity}, not ${cue} at ${intensity}`);
     }
     expect(cueFor({ ...clear, rain: 0.55 }).rain && !cueFor({ ...clear, rain: 0.1 }).rain && cueFor({ ...clear, night: 1 }).night && !cueFor(clear).night, 'cueFor: rain from MUSIC.rain up and night past dusk are colours');
+    // a storm can't wait: a short hold, and one bar between keys instead of two
+    expect(cueFor({ ...clear, storm: 1 }).urgent && cueFor({ ...clear, band: 'open', zone: 'reach', rough: 1, storm: 1 }).urgent && !cueFor(clear).urgent, 'cueFor: a storm is urgent, plain sea is not');
+    for (const [urgent, secs] of [[true, MUSIC.urgentHold], [false, MUSIC.hold]]) {
+      const H = new CueHold();
+      H.update(0.1, 'coastal');
+      let t = 0;
+      while (H.update(0.1, 'storm', urgent) !== 'storm' && t < 60) t += 0.1;
+      expect(Math.abs(t + 0.1 - secs) < 0.2, `CueHold took ${(t + 0.1).toFixed(1)} s to follow ${urgent ? 'an urgent' : 'an ordinary'} cue, not ${secs}`);
+    }
+    expect(MUSIC.urgentHold < MUSIC.hold / 2, 'MUSIC.urgentHold should be well under MUSIC.hold');
+    if (CUES.storm && keyOf('storm') !== keyOf('coastal')) {
+      const out = run('coastal', 'storm', 2);
+      expect(CUES.storm.urgent && out[0].phase === 'pivot' && out[1].cue === 'storm', `coastal to storm: expected one pivot bar, then the storm; got ${out.map((x) => `${x.cue}:${x.phase}`).join(', ')}`);
+    }
     // a ghost ship's cue has no bed: it rests in silence
     const hush = new Score(2);
     hush.setCue('ghost');

@@ -20,8 +20,9 @@ const RULES = [
   { cue: (s) => (s.homePort ? 'haven' : 'harbour'), when: (s) => s.docked, intensity: () => 2 },
   // The ghost ship: the score falls silent but for a music box, far off.
   { cue: () => 'ghost', when: (s) => s.ghost, intensity: () => 1 },
-  { cue: (s) => s.zone + '-storm', when: (s) => s.zone && inStorm(s), intensity: () => 3 },
-  { cue: () => 'storm', when: inStorm, intensity: (s) => level(s.storm, MUSIC.stormLevels) },
+  // A storm breaking can't wait for the hold: the music should be there with the first squall.
+  { cue: (s) => s.zone + '-storm', when: (s) => s.zone && inStorm(s), intensity: () => 3, urgent: true },
+  { cue: () => 'storm', when: inStorm, intensity: (s) => level(s.storm, MUSIC.stormLevels), urgent: true },
   { cue: (s) => s.zone, when: (s) => s.zone, intensity: (s) => level(s.rough ?? 1, MUSIC.roughLevels) },
   { cue: () => 'fog', when: (s) => (s.fog ?? 1) < MUSIC.fog && !(s.rain > 0.2), intensity: () => 1 },
   { cue: () => 'home', when: (s) => s.band === 'home' },
@@ -38,7 +39,7 @@ const RULES = [
  *   storm, rain 0-1, and fog: the weather's own number, 1 clear down to 0.18 in thick fog
  *   night       0-1
  *   speed       the boat's
- * Returns { cue, intensity, rain, night }: a name from CUES (or null for no
+ * Returns { cue, intensity, rain, night, urgent }: a name from CUES (or null for no
  * score), 0-3 from a bed only up to every layer, and the colours of the
  * moment (a cue that has no such colour ignores them). On plain sea, the
  * faster she sails the more plays; a storm and rough water go by how bad it is.
@@ -50,14 +51,15 @@ export function cueFor(s) {
     intensity: (rule?.intensity || bySpeed)(s),
     rain: (s.rain || 0) >= MUSIC.rain,
     night: (s.night || 0) > 0.5,
+    urgent: !!rule?.urgent,
   };
 }
 
 /**
  * Keeps the music from flipping back and forth at the edge of a zone: a
  * newly wanted cue has to stay wanted for MUSIC.hold seconds before the
- * music follows it. Silence (null, going ashore) and the first cue of all
- * are taken at once.
+ * music follows it (MUSIC.urgentHold if it is `urgent`: a storm). Silence
+ * (null, going ashore) and the first cue of all are taken at once.
  */
 export class CueHold {
   constructor() {
@@ -67,12 +69,12 @@ export class CueHold {
   }
 
   /** Call each frame with the cue wanted now; returns the cue to play. */
-  update(dt, wanted) {
+  update(dt, wanted, urgent = false) {
     if (wanted === this.cue) { this.next = undefined; this.t = 0; return this.cue; }
     if (this.cue == null || wanted == null) { this.cue = wanted; this.t = 0; return this.cue; }
     if (wanted !== this.next) { this.next = wanted; this.t = 0; }
     this.t += dt;
-    if (this.t >= MUSIC.hold) { this.cue = wanted; this.next = undefined; this.t = 0; }
+    if (this.t >= (urgent ? MUSIC.urgentHold : MUSIC.hold)) { this.cue = wanted; this.next = undefined; this.t = 0; }
     return this.cue;
   }
 }

@@ -9,7 +9,8 @@
 //   - to a cue in the same key: the new one comes in while the old one's bed
 //     dies away under it, over two bars;
 //   - to another key: the tune drops out, the bed holds a bar, then one note
-//     that both keys share is held for a bar, and the new cue begins;
+//     that both keys share is held for a bar, and the new cue begins (an
+//     urgent cue, a storm, skips the bar of bed);
 //   - to nothing (going ashore): the bed holds one quieter bar, then silence.
 //
 // It has a seeded RNG of its own and never touches the world's rng().
@@ -70,7 +71,7 @@ function parseCue(name, cue) {
   return {
     name, key: cue.key || theme.key, keyInfo, steps, barSec, stepSec: barSec / steps,
     gain: cue.gain ?? 1, form: cue.form, pick: cue.pick || 0, rest: cue.rest, phrases, drift: chordsOf(cue.drift), layers,
-    rain: false, night: false,
+    rain: false, night: false, urgent: !!cue.urgent,
   };
 }
 
@@ -145,7 +146,7 @@ export class Score {
         this.tail = { C: this.cue, st: this.st, left: 2 };
         this.begin(to);
         this.fresh = 2;
-      } else this.turn = { kind: 'key', left: 2 };
+      } else this.turn = { kind: 'key', left: to.urgent ? 1 : 2 }; // a storm skips the bar of bed and goes by the pivot alone
     }
     if (!this.cue) return { cue: null, key: null, bar: this.bar, seconds: 0.5, phase: 'silent', layers: [], events: [] };
     const C = compileCue(this.cue.name, { rain, night }); // the cue playing, in the colour of the moment

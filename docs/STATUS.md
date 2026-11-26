@@ -1242,7 +1242,7 @@ Updated 2026-11-26.
       celesta on the tune. Both come on the next bar line.
     - **The director's priorities** (`src/music-cues.js`), first that
       applies: the title; ashore (no score yet); in port; the ghost ship;
-      rough water in a storm; a storm (from 0.4); rough water (from
+      rough water in a storm; a storm (from 0.3); rough water (from
       half way into a zone); thick fog; then the band. A storm's and
       rough water's intensity go by how bad it is, not by speed. The
       numbers are `MUSIC` in `config.js`.
@@ -1272,6 +1272,12 @@ Updated 2026-11-26.
       docked at Port Haven and at Saltmarsh Harbor, and ashore. The
       storm's cue was heard to start by the player's own state
       (B minor, six layers). No console errors.
+    - **A storm doesn't wait.** Asked for after the first build: the
+      storm's cues are `urgent`. They need 1.5 s of hold, not 8, come
+      in from 0.3 of a storm, not 0.4, and cross between keys in one
+      bar, not two. Timed in the game on the coast: the weather turns
+      at 0 s, the held note between the keys is sounding by about 5 s
+      and the storm's first bar starts at 7.8 s. Before, it was 15–20 s.
     - A grace note could step out of its instrument's range (the open
       sea's whistle, to E7): fixed.
     - Decided against the plan: the rain colour is the Dorian, not the
@@ -1284,8 +1290,7 @@ Updated 2026-11-26.
     places? Is the fog still without being dull? Tick Rain and Night on
     `home`: are the colours a change of mood, or just wrong notes? Is
     the ghost's music box eerie, and is the whale's phrase too much? In
-    the game: is 8 s plus up to three bars too slow for a storm to
-    arrive in the music?
+    the game: does the storm's music now arrive with the storm?
   - [ ] 12.3 island music, 12.4 Sable's theme.
 
 ## Known issues
