@@ -8,7 +8,8 @@
 import { MUSIC } from '../config.js';
 import { CueHold } from '../music-cues.js';
 import { Score } from '../music/score.js';
-import { keyShift } from '../music/notation.js';
+import { keyShift, parseKey, MODES } from '../music/notation.js';
+import { STINGS } from '../music/themes.js';
 
 export class MusicPlayer {
   /** Called once from build(). `musicSeed` can be set first to get the same performance twice. */
@@ -23,6 +24,7 @@ export class MusicPlayer {
     this.lastBar = null;     // the bar most lately written out
     this.musicForce = null;  // { cue, intensity } from debug.music() or the jukebox, instead of the game's
     this.musicRests = true;  // false: statements back to back (the jukebox, measuring)
+    this.colour = { rain: false, night: false };
   }
 
   /**
@@ -34,8 +36,9 @@ export class MusicPlayer {
     const F = this.musicForce;
     this.score.setCue(F ? F.cue : held);
     this.intensity = F?.intensity ?? want?.intensity ?? 1;
-    // the storm's own score and the on-foot line take over from it for now
-    this.scoreBus.gain.setTargetAtTime(F ? MUSIC.level : MUSIC.level * (1 - this.stormMix) * (1 - this.landMix), t, 0.6);
+    this.colour = { rain: F?.rain ?? !!want?.rain, night: F?.night ?? !!want?.night };
+    // the on-foot line takes over from it for now
+    this.scoreBus.gain.setTargetAtTime(F ? MUSIC.level : MUSIC.level * (1 - this.landMix), t, 0.6);
     if (this.musicOn) this.writeMusic(t, t + MUSIC.ahead);
   }
 
@@ -43,7 +46,7 @@ export class MusicPlayer {
   writeMusic(now, until) {
     if (this.barAt < now) this.barAt = now + 0.05;
     while (this.barAt < until) {
-      const bar = this.score.nextBar(this.intensity, { low: this.musicLow, rests: this.musicRests });
+      const bar = this.score.nextBar(this.intensity, { low: this.musicLow, rests: this.musicRests, ...this.colour });
       for (const e of bar.events) this.voice(e.voice, e.midi, this.barAt + e.at, e.dur, e.vol);
       bar.at = this.barAt;
       this.lastBar = bar;
@@ -51,9 +54,27 @@ export class MusicPlayer {
     }
   }
 
-  /** Play this cue whatever the game wants (intensity 0-3, or none to leave that to the game); no argument hands it back. */
-  forceMusic(cue, intensity) {
-    this.musicForce = cue === undefined ? null : { cue, intensity };
+  /**
+   * Play this cue whatever the game wants (intensity 0-3, or none to leave
+   * that to the game; `colour` { rain, night } likewise); no argument hands
+   * it back.
+   */
+  forceMusic(cue, intensity, colour = {}) {
+    this.musicForce = cue === undefined ? null : { cue, intensity, ...colour };
+  }
+
+  /**
+   * A phrase played once over whatever is on, in its key (STINGS in
+   * music/themes.js): the whale's long low notes as it breaches.
+   */
+  musicPhrase(name, volume = 1) {
+    const S = STINGS[name];
+    if (!this.ctx || !this.musicOn || !S) return;
+    const key = parseKey(this.lastBar?.key || 'D major'), t = this.ctx.currentTime + 0.1;
+    S.steps.forEach((step, i) => {
+      const midi = (S.oct + 1) * 12 + key.tonic + MODES[key.mode].scale[step % 7] + 12 * Math.floor(step / 7);
+      this.voice(S.voice, midi, t + i * S.each, S.each * 1.1, S.vol * volume);
+    });
   }
 
   /**
@@ -72,6 +93,7 @@ export class MusicPlayer {
     return {
       cue: b?.cue ?? null, wanted: this.score.want, forced: !!this.musicForce, intensity: this.intensity,
       phase: b?.phase ?? 'silent', layers: b?.layers ?? [], key: b?.key ?? null, bar: b?.bar ?? 0, on: this.musicOn,
+      rain: !!b?.rain, night: !!b?.night,
     };
   }
 }

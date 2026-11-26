@@ -405,6 +405,8 @@ body.touch .btn, body.touch .tab, body.touch .chip, body.touch .toggle { min-hei
   background: rgba(123, 224, 123, 0.2); text-shadow: var(--outline-sm);
 }
 .toggle.off { background: rgba(0, 0, 0, 0.3); opacity: 0.75; }
+.toggle.slider { display: flex; align-items: center; gap: 8px; cursor: default; }
+.toggle.slider input { width: 96px; accent-color: currentColor; }
 .controls { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; font-size: 14px; align-items: center; }
 .controls kbd { font-size: 12px; line-height: 18px; margin-right: 2px; }
 .controls .k { white-space: nowrap; text-align: right; }

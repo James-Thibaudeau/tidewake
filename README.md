@@ -147,7 +147,7 @@ src/
                   landmarks.js (the landmarks' pictures on the chart), port.js (port screen, journal),
                   story.js (Found! pop-up, story cards, quest tracker, races), icons.js, shared.js
   input.js        keyboard, mouse and touch controls
-  audio.js        procedural WebAudio sound and music: the buses, the sea's beds, the storm's score, one-shots
+  audio.js        procedural WebAudio sound and music: the buses, the sea's beds, one-shots
   audio/          the rest of the sound: ashore.js (footsteps, jump and land, coin chime, chest fanfare,
                   island ambience, the on-foot score), instruments.js (the score's instruments and reverb),
                   music.js (the score's player: bars written onto the audio clock)

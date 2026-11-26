@@ -168,6 +168,7 @@ export class SeaEvents {
   play(name, x, z) {
     const b = this.game.boat.pos, v = 1.15 - Math.hypot(x - b.x, z - b.z) / HEAR;
     if (v > 0.05) this.game.audio.play(name, { volume: Math.min(1, v) });
+    if (v > 0.05 && name === 'breach') this.game.audio.musicPhrase('whale', Math.min(1, v)); // the score answers a whale
   }
 
   /**

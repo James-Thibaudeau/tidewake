@@ -129,6 +129,29 @@ export function chordTone(chord, token, oct) {
   }
 }
 
+/** A chord moved up `semis` semitones. */
+export function shiftChord(chord, semis) {
+  return { ...chord, root: (((chord.root + semis) % 12) + 12) % 12 };
+}
+
+/**
+ * A note of `key` moved to the same step of another mode on the same tonic:
+ * F# in D major is F in D dorian. A note outside the key is left alone.
+ */
+export function toMode(midi, key, mode) {
+  const pc = ((Math.round(midi) % 12) + 12) % 12, d = key.scale.indexOf(pc);
+  if (d < 0) return midi;
+  return midi + MODES[mode].scale[d] - MODES[key.mode].scale[d];
+}
+
+/** A chord of `key` as the other mode has it: the same step of the scale, with the third and fifth that mode gives it. */
+export function chordInMode(chord, key, mode) {
+  const d = key.scale.indexOf(chord.root);
+  if (d < 0) return chord;
+  const S = MODES[mode].scale, up = (n) => (S[(d + n) % 7] - S[d] + 12) % 12;
+  return { ...chord, root: (key.tonic + S[d]) % 12, tones: [0, up(2), up(4)] };
+}
+
 /** The next note of `key`'s scale above `midi` (for a grace note). */
 export function stepAbove(midi, key) {
   for (let n = midi + 1; n <= midi + 3; n++) if (key.scale.includes(n % 12)) return n;

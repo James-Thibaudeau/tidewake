@@ -9,23 +9,26 @@
 // is all a session that can't listen has to go on.
 import { SoundSystem } from '../audio.js';
 import { VOICES } from '../audio/instruments.js';
-import { CUES, RANGES, DRUMS } from './themes.js';
+import { CUES, RANGES, DRUMS, STINGS } from './themes.js';
 import { noteMidi, noteName, parseKey } from './notation.js';
 
 const HELP = `jukebox
   play(cue, intensity?)   play a cue (${Object.keys(CUES).join(' | ')}); the change comes on the next bar line.
                           intensity 0-3: a bed only, up to every layer (default: the slider's)
   stop()                  fade to silence on the next bar line
-  set({ intensity, rests, low, volume })   rests: true = the long rests on the bed between statements, as in the
-                          game (default false, so there is always a tune to hear); low: the Low quality score;
-                          volume: 1 = as loud as in the game
+  set({ intensity, rests, low, volume, rain, night })   rests: true = the long rests on the bed between
+                          statements, as in the game (default false, so there is always a tune to hear); low: the
+                          Low quality score; volume: 1 = as loud as in the game; rain, night: the cue's colours
+                          (a cue with no such colour plays as it is)
+  sting(name?)            a one-off phrase over whatever is on, in its key: sting('whale')
   note(voice, note?)      one note on one instrument: note('fiddle', 'A4'); no note = a run up its range
   state()                 what is playing: cue, intensity, phase, layers, key, bar
-  measure(seconds?)       every cue at full intensity through an offline context (default 60 s each): its
-                          loudness (RMS, dB), its peak, and whether it clipped. Works with the tab hidden`;
+  measure(seconds?, cues?, colour?)   every cue (or those named) at full intensity through an offline context
+                          (default 60 s each): its loudness (RMS, dB), its peak, and whether it clipped.
+                          colour: { rain, night }. Works with the tab hidden`;
 
 const A = new SoundSystem();
-const set = { intensity: 2, rests: false, low: false, volume: 1 };
+const set = { intensity: 2, rests: false, low: false, volume: 1, rain: false, night: false };
 let cue = null, timer = null, last = 0;
 const drums = Object.values(DRUMS);
 
@@ -48,12 +51,14 @@ function ready() {
   return true;
 }
 
+const force = () => A.forceMusic(cue, set.intensity, { rain: set.rain, night: set.night });
+
 function play(name, intensity = set.intensity) {
   if (name != null && !CUES[name]) return `No cue called "${name}". Choose from: ${Object.keys(CUES).join(', ')}.`;
   if (!ready()) return 'No sound here: this browser gave no audio context.';
   cue = name ?? null;
   set.intensity = intensity;
-  A.forceMusic(cue, intensity);
+  force();
   paint();
   return state();
 }
@@ -79,7 +84,7 @@ function note(voice, name) {
 const state = () => (A.ctx ? { ...A.musicState(), ...set } : { cue: null, phase: 'not started', ...set });
 
 /** Every cue (or `only`) at full intensity, offline: how loud it is and whether it clips. */
-async function measure(seconds = 60, only = Object.keys(CUES)) {
+async function measure(seconds = 60, only = Object.keys(CUES), colour = {}) {
   const rows = [];
   for (const name of only) {
     const sr = 44100, ctx = new OfflineAudioContext(2, sr * seconds, sr);
@@ -88,7 +93,7 @@ async function measure(seconds = 60, only = Object.keys(CUES)) {
     S.ctx = ctx;
     S.build();
     S.musicRests = false;
-    S.forceMusic(name, 3);
+    S.forceMusic(name, 3, colour);
     S.updateMusic(0, 0, null);
     S.writeMusic(0, seconds);
     const buf = await ctx.startRendering();
@@ -98,7 +103,7 @@ async function measure(seconds = 60, only = Object.keys(CUES)) {
       for (let i = 0; i < d.length; i++) { sum += d[i] * d[i]; peak = Math.max(peak, Math.abs(d[i])); }
     }
     const dB = (x) => Math.round(200 * Math.log10(x || 1e-9)) / 10;
-    rows.push({ cue: name, rms: dB(Math.sqrt(sum / (2 * buf.length))), peak: dB(peak), clipped: peak >= 1, bars: S.lastBar.bar + 1 });
+    rows.push({ cue: name, rms: dB(Math.sqrt(sum / (2 * buf.length))), peak: dB(peak), clipped: peak >= 1, bars: S.lastBar.bar + 1, quiet: !!CUES[name].quiet });
   }
   return rows;
 }
@@ -119,7 +124,7 @@ function paint() {
   const s = state();
   status.textContent = s.phase === 'not started' ? 'Choose a cue.'
     : `playing: ${s.cue ?? 'silence'}${s.wanted !== s.cue ? `  →  ${s.wanted ?? 'silence'} on the next bar` : ''}\n`
-      + `key: ${s.key ?? '-'}   bar: ${s.bar}   ${s.phase}   layers: ${s.layers.join(', ') || '-'}   intensity: ${s.intensity}`;
+      + `key: ${s.key ?? '-'}   bar: ${s.bar}   ${s.phase}   layers: ${s.layers.join(', ') || '-'}   intensity: ${s.intensity}${s.rain ? '   in the rain' : ''}${s.night ? '   at night' : ''}`;
 }
 
 const sliders = []; // kept in step with `set`, which the console can change too
@@ -134,7 +139,7 @@ function slider(text, key, min, max, step, onInput) {
 
 function tick(text, key) {
   const input = el('input', { type: 'checkbox', checked: set[key] });
-  input.addEventListener('change', () => { set[key] = input.checked; if (A.ctx) ready(); });
+  input.addEventListener('change', () => { set[key] = input.checked; if (A.ctx) { ready(); force(); } });
   return el('label', {}, input, text);
 }
 
@@ -153,11 +158,17 @@ function build() {
     b.addEventListener('click', () => note(name));
     voices.append(b);
   }
+  const stings = el('div', { className: 'row' });
+  for (const name of Object.keys(STINGS)) {
+    const b = el('button', { textContent: name });
+    b.addEventListener('click', () => window.jukebox.sting(name));
+    stings.append(b);
+  }
   const measureBtn = el('button', { textContent: 'Measure every cue' });
   measureBtn.addEventListener('click', async () => {
     report.textContent = 'Measuring…';
     const rows = await measure();
-    report.textContent = rows.map((r) => `${r.cue.padEnd(10)} loudness ${String(r.rms).padStart(6)} dB   peak ${String(r.peak).padStart(6)} dB${r.clipped ? '   CLIPPED' : ''}`).join('\n');
+    report.textContent = rows.map((r) => `${r.cue.padEnd(12)} loudness ${String(r.rms).padStart(6)} dB   peak ${String(r.peak).padStart(6)} dB${r.clipped ? '   CLIPPED' : ''}${r.quiet ? '   (meant to be faint)' : ''}`).join('\n');
   });
   main.append(
     el('h1', { textContent: 'Tidewake jukebox' }),
@@ -165,11 +176,15 @@ function build() {
     el('h2', { textContent: 'Cues' }), cues, status,
     el('h2', { textContent: 'How it plays' }),
     el('div', { className: 'row' },
-      slider('Intensity', 'intensity', 0, 3, 1, () => { if (timer) A.forceMusic(cue, set.intensity); }),
+      slider('Intensity', 'intensity', 0, 3, 1, () => { if (timer) force(); }),
       slider('Volume', 'volume', 0, 4, 0.5, () => { if (A.ctx) ready(); }),
       tick('Long rests between statements, as in the game', 'rests'),
-      tick('Low quality', 'low')),
-    el('p', { className: 'small', textContent: 'Intensity: 0 is the bed alone, 3 is every layer. Volume 1 is as loud as the music is in the game, where it sits under the sea.' }),
+      tick('Low quality', 'low'),
+      tick('Rain', 'rain'),
+      tick('Night', 'night')),
+    el('p', { className: 'small', textContent: 'Intensity: 0 is the bed alone, 3 is every layer. Volume 1 is as loud as the music is in the game, where it sits under the sea. Rain and night are colours: they change on the next bar, and a cue without one plays as it is.' }),
+    el('h2', { textContent: 'One-off phrases' }), stings,
+    el('p', { className: 'small', textContent: 'Played once over whatever cue is on, in its key. The whale\'s is what the score plays when a whale breaches.' }),
     el('h2', { textContent: 'Instruments' }), voices,
     el('p', { className: 'small', textContent: 'Each plays a run up its range, then one long note.' }),
     el('h2', { textContent: 'Levels' }), el('div', { className: 'row' }, measureBtn), report,
@@ -177,4 +192,4 @@ function build() {
 }
 
 build();
-window.jukebox = { play, stop: () => play(null), set: (o) => { Object.assign(set, o); if (A.ctx) { ready(); A.forceMusic(cue, set.intensity); } paint(); return state(); }, note, state, measure, help: () => { console.log(HELP); return HELP; }, audio: A };
+window.jukebox = { play, stop: () => play(null), set: (o) => { Object.assign(set, o); if (A.ctx) { ready(); force(); } paint(); return state(); }, sting: (name = 'whale') => (ready() ? (A.musicPhrase(name), name) : 'No sound here.'), note, state, measure, help: () => { console.log(HELP); return HELP; }, audio: A };
