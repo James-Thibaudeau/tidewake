@@ -755,10 +755,11 @@ Updated 2026-11-25.
   ship stage by stage at Port Haven and sail her; a paint yard for the
   ship (paints, sail cloth, emblems, figureheads); fireworks. Nothing adds
   stats. Four PRs, 10.1–10.4.
-- [ ] **Phase 11, islands with shapes:** like Archway Isle, every island's
-  outline says what it is: Moon Island a crescent you can sail into, atolls
-  rings round a lagoon, coves, points, whales and crabs, all chosen by the
-  name. Islands, ports and treasure angles don't move. Four PRs, 11.1–11.4.
+- [ ] **Phase 11, islands with shapes:** variety in the archipelago, as
+  Archway Isle's bay gave it a shape: crescents, rings, coves, hooks, twins
+  and more, spread so neighbours differ. Moon Island is the first, a
+  crescent you can sail into. Landmarks, ports, islands and treasure angles
+  don't move or change. Three PRs, 11.1–11.3.
 
 ## Known issues
 
