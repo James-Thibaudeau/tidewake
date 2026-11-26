@@ -111,7 +111,8 @@ Updated 2026-11-25.
     [feature-plan.md](feature-plan.md)).
 
 - [x] **Phase 5, polish:** sound on foot, the sea's larger features and a
-  retuned wave set, bigger touch targets, and a performance pass. One PR.
+  retuned wave set, bigger touch targets, and a performance pass
+  ([#47](https://github.com/James-Thibaudeau/tidewake/pull/47)).
   The design, and what was built instead where they differ, is in
   [shipped-plans.md](shipped-plans.md). Earlier pieces: the quest board and
   Tailor hints ([#25](https://github.com/James-Thibaudeau/tidewake/pull/25)),
