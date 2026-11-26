@@ -26,8 +26,8 @@ left behind when code moved between files, text keys (`LINES.x`), element
 ids, save migration, how the boat rides the wave set (pitch and bow slams,
 `ride`), 150 generated ashore layouts per landable biome, a test
 climber (the real controller) that walks 12 generated islands per biome to
-the summit, the living sea's rules (what turns up where, 3,000 placements in
-a toy sea), the Elder Grove (its limits, and the climber from the beach
+the summit, the living sea's rules (what turns up where, bounties, 3,000
+placements in a toy sea), the Elder Grove (its limits, and the climber from the beach
 to the crown) and Archway Isle (its limits, and the climber from the cove
 over the arch and up the stack). One group at a time:
 `node tools/check.mjs imports`.
@@ -46,7 +46,7 @@ helpers:
 tidewake.debug.start()                    // new voyage, prologue skipped; backs up the real save
 tidewake.debug.give({ gold: 5000, upgrades: 'max' })
 tidewake.debug.teleport('Frostspire')     // id, name or { x, z }
-tidewake.debug.sea('whale')               // a sea event now: whale | dolphins | ghostShip; sea() says what's out there
+tidewake.debug.sea('whale')               // a sea event now: whale | dolphins | turtles | bottle | bloom | iceberg | waterspout | ghostShip; sea() says what's out there
 tidewake.debug.step(30)                   // 30 s of game time in well under a second
 tidewake.debug.frame()                    // draw a frame before a screenshot
 tidewake.debug.profile()                  // what a frame draws: calls, triangles, lights, by kind
@@ -124,7 +124,9 @@ game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, 
   rules: quests, story and the rival all listen.
 - **Writing is kept apart from logic**: `story-text.js`, `rival-text.js`.
   Sea events are rolled by `sea-events.js` from the rules in `sightings.js`;
-  each creature is an actor with `start`, `update`, `leave` and `done`.
+  each one is an actor with `start`, `update`, `leave`, `stop` and `done`
+  (`sea-life.js`, `sea-wonders.js`, `ghost-ship.js`). The director also
+  gives Sable their cue (`rival.spawn()`), so only one thing is out there.
   The grandparents are never named.
 - **`UI`, `Boat` and `SoundSystem` are each one class split over several
   files.** The core is `src/ui.js` / `src/boat.js` / `src/audio.js`; the rest

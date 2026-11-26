@@ -66,9 +66,10 @@ Updated 2026-11-25.
   How it's built, and the decisions taken, are in
   [rival-captain.md](rival-captain.md)
   ([#28](https://github.com/James-Thibaudeau/tidewake/pull/28)).
-  - It shipped before Phase 7, so `rival.js` schedules its own encounters
-    (harbor talk on the Quest Board, a search circle, the Redwing appears when
-    you get close). The Phase 7 director can take that over later.
+  - It shipped before Phase 7 and scheduled its own encounters (harbor talk
+    on the Quest Board, a search circle, the Redwing appears when you get
+    close). Since Phase 7 the living sea's director decides the moment:
+    it calls `rival.spawn()`, and clears the water first.
   - Sable has a tab of their own in the journal (`J`), shown once you've
     met: the race record, what you've learned, and everything Sable has
     said to you, newest first, with the story card scenes. It used to be a
@@ -206,68 +207,125 @@ Updated 2026-11-25.
       outlines are about a quarter of the triangles ashore on Low; the
       explorer's and the platforms' stay.
 
-- [x] **Phase 7, a living sea** (the first three events; design in
+- [x] **Phase 7, a living sea** (design in
   [feature-plan.md](feature-plan.md);
-  [#46](https://github.com/James-Thibaudeau/tidewake/pull/46)): every three to six minutes of sailing
-  something turns up 150-300 m off the bow quarter, in open water, one at a
-  time.
+  [#46](https://github.com/James-Thibaudeau/tidewake/pull/46)): every three
+  to six minutes of sailing something turns up off the bow quarter, in open
+  water, one at a time.
   - The director (`src/sea-events.js`) rolls from the rules in
     `src/sightings.js` (pure, so `node tools/check.mjs sea` runs them): by
-    latitude, time of day, weather and story. Whales keep to temperate and
-    cold water and stay down in storms; dolphins want tropical or temperate
-    water and clear or breezy weather; the ghost ship comes only at night,
-    three times likelier in fog, and not before Journal I. A kind that could
-    have been picked and wasn't gains weight, and the ghost ship is certain
-    after eight misses. No rolls while Sable has your attention, in port,
-    ashore, or with the boat stopped. The director has its own random stream.
+    latitude, time of day, weather and story. A kind that could have been
+    picked and wasn't gains weight, and the ghost ship is certain after eight
+    misses. No rolls while Sable has your attention, in port, ashore, or with
+    the boat stopped. The director has its own random stream.
   - A line of text says which side to look ("A spout of mist, ahead to the
     left!"). It counts as **seen** within 80 m, or held in the spyglass for
     2 s; the spyglass reaches 340 m at tier 1 and 850 m at tier 5.
-  - **The whale** (`src/sea-life.js`), about 15 m long: comes up to blow
-    every 8 s, breaches now and then, and goes down with its flukes in the
-    air. Keep within 75 m at under 8 kn and it stays up (to about 3 minutes).
-  - **Dolphins**: a pod of 4-8 leaping along. Come within 75 m at over 12 kn
-    and they ride your bow wave: 8% more drive from the sail while they stay
-    (up to 45 s, or until you slow below about 10 kn).
-  - **The ghost ship** (`src/ghost-ship.js`): pale and see-through, green
-    lanterns that carry through fog, no wake, doesn't ride the swell. She
-    fades if you come within 38 m, and at first light. Stay within 340 m and
-    she leads you 650-950 m to a spot where she fades and leaves a strongbox
-    under a beam (110-190 gold in the hold; it waits 4 minutes).
-  - **Sightings**, a new tab in the journal (`J`): a card for each kind with
-    a drawing, how often you've seen it, and when and where first; a dark
-    shape and a hint until then. The crabs under the arch are in it too
-    (saves that already reported them get the card). Five whales earn the
-    whale-tail pendant (neck), three ghost ships the lantern hat.
-  - **Report quests** for all three (`src/reports.js`): the first sighting of
-    a kind starts one at the nearest port. The cartographer pays 90 gold for
-    the whale, the merchant 60 for dolphins, the old salt 150 for the ghost
-    ship. The news goes stale after 3 days; the report is dropped and the
+  - The eight kinds:
+    - **Whale** (temperate and cold, not in storms; `src/sea-life.js`),
+      about 15 m: blows every 8 s, breaches, and goes down flukes-up. Keep
+      within 75 m at under 8 kn and it stays up (to about 3 minutes).
+    - **Dolphins** (tropical and temperate, clear or breezy): 4-8 leaping.
+      Come within 75 m at over 12 kn and they ride your bow wave: 8% more
+      drive from the sail while they stay (up to 45 s).
+    - **Sea turtles** (tropical, by day, not in rain or storms): a slow
+      line of 5-7. Come among them at under 6 kn and after 3 s one swims
+      along beside you for half a minute. Bump one (2.3 m), or come within
+      24 m at over 8 kn, and they all dive.
+    - **A message in a bottle** (anywhere, uncommon, not in storms): a
+      glint 90-170 m off. Stop and haul it up. The first holds a letter
+      for the harbormaster at the third-nearest port (80 gold, never
+      stale); after that, turn about, a scrap of chart that puts the
+      nearest uncharted island on yours, and one of seven notes.
+    - **The glowing bloom** (tropical, and half as often temperate, at
+      night): a patch about 350 m across where the sea shines blue, drawn
+      by the ocean shader (`uBloom`), and your wake shines while you are
+      in it. Nothing to do but look.
+    - **An iceberg** (cold water; `src/sea-wonders.js`): a slab breaks off
+      with a crack and leaves five pieces of loose ice for about 100 s,
+      then the berg rolls over and sinks. The berg and the ice are solid:
+      a hard knock costs hull as a rock does.
+    - **A waterspout** (storms only, and the likeliest thing in one; a
+      storm that blows up looks for its waterspout within 40 s): a column
+      that wanders across your bow for 60-85 s. Within 7.5 m it takes 13
+      hull (less with a better keel) and throws the boat clear.
+    - **The ghost ship** (night only, three times likelier in fog, not
+      before Journal I; `src/ghost-ship.js`): see-through, green lanterns
+      that carry through fog, no wake. She fades within 38 m and at first
+      light. Stay within 340 m and she leads you 650-950 m to a strongbox
+      under a beam (110-190 gold; it waits 4 minutes).
+  - **Sightings**, a new tab in the journal (`J`): a card for each kind
+    (and the crabs under the arch) with a drawing, how often you've seen
+    it, and when and where first; a dark shape and a hint until then. Five
+    whales earn the whale-tail pendant (neck), three ghost ships the
+    lantern hat.
+  - **Report quests** for every kind (`src/reports.js`): the first sighting
+    starts one at the nearest port. Cartographer: whale 90 gold, turtles
+    70. Merchant: dolphins 60. Naturalist: the bloom 80. Harbormaster:
+    iceberg 100, waterspout 110. Old salt: the ghost ship 150. News goes
+    stale after 3 days (2 for a waterspout); the report is dropped and the
     next sighting starts a new one. Each kind is reported once.
-  - Saved: `state.sightings` (`seen`, and `miss` for the pity counts). A live
-    event is not saved.
+  - **Sighting wanted** on the quest boards (`quests.js`, type
+    `sighting`), on about four boards in ten: a whale, dolphins, turtles,
+    an iceberg, the glowing sea or the ghost ship, in waters where it can
+    turn up, with a 520 m search circle on the chart. Inside the circle
+    that kind is four times likelier and the director looks twice as
+    often; it still needs its hour and weather, which the offer says. See
+    it there, then any port pays (70 gold and up, by distance).
+  - **The ghost ship's captain** (`src/ghost-chain.js`), a short side
+    chain. After the third sighting she turns up three times as often,
+    and instead of a strongbox she makes for an island you can go ashore
+    on, 500-1700 m off, and fades off its shore. Follow her there and the
+    island goes on your chart with a story step; her captain's log waits
+    at the top (the level's vault), with 180 gold of unclaimed pay, and
+    reads as four story cards: why she can't make port. It can be read
+    again from her Sightings card.
+  - **Ambient life** (`src/sea-ambient.js`), always on and not events:
+    three gulls that come out to wheel over the boat within 380 m of an
+    island by day, seabirds circling reefs, and fish jumping in calm
+    water.
+  - **Sable comes through the director.** `rival.js` no longer schedules
+    itself: the director calls `rival.spawn()` when nothing of Sable's is
+    live. A meeting at sea waits for the water to be clear, and whatever
+    is out there is sent on its way first, so the Redwing never arrives on
+    top of a whale. Where and when Sable appears is unchanged.
+  - Saved: `state.sightings` (`seen`, `miss` for the pity counts, `chain`
+    for the ghost ship's). A live event is not saved.
   - Tools: `tidewake.debug.sea(kind)` brings one on; the gallery has a
-    `sealife` subject and sheet.
-  - Checked in the preview through the real game: each animal's whole act,
-    the bow-wave ride and its boost, the ghost ship followed to her find and
-    the haul, all three reports paid at port, the five-whale reward, stale
-    news, the spyglass by tier, save and continue, the Sightings tab at
-    desktop and phone sizes, and 65 minutes of unattended sailing (11 events,
-    none overlapping, none over land). The hats and tops-front sheets were
-    read for the two new pieces.
-  - Not yet done: a play by hand, and the sounds heard on real speakers (the
-    blow, the splash, the breach, the dolphins' whistles, the ghost ship's
-    bell and the sighting chime are new and were not listened to). The new
-    writing (`SIGHTINGS` and the three `REPORTS` in `story-text.js`) is a
-    first draft. Tuning to judge by hand: how often events come, the 8%
-    boost, the report rewards, and how faint the ghost ship is in fog.
-  - Left for later PRs: sea turtles, the glowing bloom, waterspouts, iceberg
-    calving and the message in a bottle; "sighting wanted" bounties on the
-    boards; the ghost ship's side chain; ambient life (gulls, jumping fish);
-    handing Sable's encounters to the director. Reports go to the nearest
-    port even if you haven't charted it yet, as the crabs' does.
-  - Known: an event already out there stays if Sable turns up; the whale
-    and the dolphins don't collide with the boat.
+    `sealife` subject and sheet (nine kinds; not the bloom, which only the
+    game's ocean can draw).
+  - Checked in the preview through the real game: each kind's whole act
+    and its way of leaving; the bow-wave ride; the turtle that comes
+    along, the bump and the too-fast dive; three bottles (letter, chart,
+    note); the bloom and the wake in it; ramming loose ice (27 hull at
+    11 kn) and leaning on the berg (none); the waterspout's damage; the
+    ghost ship followed to her strongbox, and with the chain begun to an
+    island, then ashore to the log and its cards; a bounty taken, seen
+    and paid; reports paid at port; the five-whale reward; stale news;
+    the spyglass by tier; save and continue; gulls arriving, roosting at
+    night and circling a reef; fish jumping; Sable held back until a
+    whale had gone. Unattended sailing, 53 minutes over the south, the
+    north and a forced storm: the right kinds in each, none overlapping,
+    none over land. The Sightings tab at desktop and phone sizes; the
+    hats and tops-front sheets for the two new pieces; the sealife sheet.
+  - Not yet done: a play by hand, and **none of the new sounds have been
+    heard** (the blow, splash, breach, dolphins' whistles, ghost ship's
+    bell, sighting chime, the waterspout's rush and the ice's crack). The
+    new writing (`SIGHTINGS`, `REPORTS`, `BOUNTY`, `BOTTLES` and
+    `GHOST_LOG` in `story-text.js`) is a first draft. Tuning to judge by
+    hand: how often events come, the 8% boost, the rewards, how faint the
+    ghost ship is in fog, how hard ice and waterspouts hit, and how often
+    boards ask for sightings. The phone-size look covered the first four
+    cards only.
+  - Known: the iceberg is rounder than it should be (lumps, not blades).
+    The whale, the dolphins and the turtles don't collide with the boat.
+    Reports go to the nearest port even if you haven't charted it, as the
+    crabs' does. The fish's outline is heavy for its size. A bounty's
+    kind can only be seen in its hour and weather, so a "glowing sea"
+    bounty means waiting for night.
+  - Left for later: the plan's link between events and Phase 9's sea
+    zones (waterspouts likelier in rough water, turtles and the bloom in
+    the home shallows), which waits for Phase 9.
 
 ## Next up
 
@@ -605,7 +663,8 @@ Updated 2026-11-25.
     the journals were.
   - [ ] Move the relic scramble to a tropical island when that biome can be
     landed on (Phase 4).
-  - [ ] Hand encounter delivery to the Phase 7 event director.
+  - [x] Hand encounter delivery to the Phase 7 event director
+    ([#46](https://github.com/James-Thibaudeau/tidewake/pull/46)).
   - [ ] Sounds for the kraken, the buoys' bells and the flare (they reuse
     existing sounds).
   - [ ] The towed Redwing has no collision with land, and Sable carries no
@@ -616,10 +675,6 @@ Updated 2026-11-25.
 
 - [ ] **Phase 6, anchor refits:** refit grandfather's anchor tier by tier
   to unlock each biome. Ships alongside the Phase 4 biomes.
-- [ ] **Phase 7, the rest of the living sea:** five more events (sea
-  turtles, the glowing bloom, waterspouts, iceberg calving, the message in a
-  bottle), sighting bounties on the boards, the ghost ship's side chain and
-  ambient life. The first three events have shipped (see Done).
 - [ ] **Phase 9, sea zones:** clear, calm home waters round Port Haven
   where storms don't start; more storms in the open sea; rough water in
   any weather round Frostspire (the Reach) and Mount Cinderhorn (the Rip),

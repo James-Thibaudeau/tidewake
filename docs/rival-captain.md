@@ -6,8 +6,12 @@ decisions made along the way.
 
 ## Decisions
 
-- **No Phase 7 director yet.** The plan delivers encounters through the
-  Phase 7 event director, which isn't built. `rival.js` schedules its own
+- **The Phase 7 director delivers encounters** (since #46): with nothing of
+  Sable's live, `sea-events.js` calls `rival.spawn(b, free)`, where `free` is
+  false while one of its own events is out there. A meeting at sea returns
+  `'wait'`, the director sends its event on its way, and Sable appears once
+  the water is clear. Sable waiting in a harbor or off an island doesn't
+  wait. Before that there was no director, and `rival.js` scheduled its own
   encounters (a rumour at a port, a search circle, the Redwing spawned when
   you get near). When Phase 7 lands, the director can call
   `rival.spawn()` instead; nothing else changes.
