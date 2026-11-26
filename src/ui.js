@@ -5,6 +5,7 @@
 // toasts, pause and the shipwreck screen. The rest is mixed in from ui/:
 //   ui/chart.js   minimap, sea chart, map markers
 //   ui/chart-seas.js   rough water on the sea chart: hatching and names
+//   ui/landmarks.js    the landmarks' pictures on the chart and the minimap
 //   ui/port.js    port screen (shipwright, quest board, tailor), journal
 //   ui/story.js   ashore panel, Found! pop-up, story cards, quest tracker, races and hails
 //   ui/icons.js   SVG icons and story card art
@@ -16,6 +17,7 @@ import { $, PX_PER_DEG, clampN, esc, fmt } from './ui/shared.js';
 import { ICONS } from './ui/icons.js';
 import { ChartUI } from './ui/chart.js';
 import { SeasUI } from './ui/chart-seas.js';
+import { LandmarksUI } from './ui/landmarks.js';
 import { PortUI } from './ui/port.js';
 import { StoryUI } from './ui/story.js';
 
@@ -517,4 +519,4 @@ export class UI {
   hideWreck() { this.el.wreckScreen?.classList.add('hidden'); }
 }
 
-mixin(UI, ChartUI, SeasUI, PortUI, StoryUI);
+mixin(UI, ChartUI, SeasUI, LandmarksUI, PortUI, StoryUI);

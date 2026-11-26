@@ -955,6 +955,43 @@ Updated 2026-11-25.
   - [ ] Only a person can do: judge the shallows on a real screen and
     sailing (so far: the gallery's sheets and stills from the game); run
     for home in a storm by hand; frame times on a real phone.
+- [ ] **Phase 11, islands with shapes:** four PRs, 11.1–11.4: see
+  *Phase 11* in [feature-plan.md](feature-plan.md). 11.4 is built; 11.1–11.3
+  are not started.
+  - [x] **11.4 Landmarks on the chart**
+    ([#56](https://github.com/James-Thibaudeau/tidewake/pull/56)):
+    - **A picture for each landmark you have found**, on the sea chart and
+      the minimap, from the moment it is discovered (`state.discovered`;
+      nothing new is saved, so an old save shows the ones it has found).
+      The Elder Tree (canopy, trunk, arching roots); the arch, its legs on
+      the arms of the bay and its feet in the water, turned to span the
+      mouth as it does at sea but kept the right way up; columns under a
+      broken pediment with water at their feet; a cone with a glowing
+      crater, a lava run and smoke; a white needle shaded ice-blue.
+    - **`src/ui/landmarks.js`**, a new UI part: one drawing function per
+      `I.landmark` key in the chart's style (flat fills, dark ink), each
+      drawn in a box from -1 to 1. A key with no function draws nothing.
+      `chart.js` grew by four lines.
+    - **One spot, `I.landmarkAt = { x, z, rot }`**, set at the end of
+      `finishIsland` (Archway Isle's is `archPos`; the rest stand at the
+      island's heart, the Elder Tree turned to Port Haven). `buildLandmark`,
+      `buildGrove` and `buildArch` now build from it. It draws nothing from
+      `rng()`: a fingerprint of every island, coast, rock, dock, treasure,
+      reef and the wreck is the same before and after.
+    - **Size:** 22 px across (times `dpr`) on the chart at any zoom,
+      growing with the island once it is bigger than that, to 0.9 of its
+      radius. On the minimap, a port anchor's size. Drawn over the island
+      and the fog, under the name (which moves up to clear it), the
+      treasure cross, quest markers and the boat.
+    - **Checked** in the game (`debug.start()`, `teleport` to each of the
+      five): the chart zoomed right out, at the opening zoom and right in,
+      at 1280×800 and phone size; the minimap by each one; an island
+      charted but not discovered shows no picture; a save made before the
+      change with two landmarks found shows those two and no others.
+  - [ ] Only a person can do, 11.4: judge the pictures on a real screen
+    and phone, at a glance, beside the islands' colours (the spire on the
+    cold islands' white is the weakest); whether the treasure cross over
+    a picture zoomed out bothers anyone.
 - [ ] **Phase 5 follow-ups** (after the polish PR; things only a person
   with the game in front of them can do):
   - [ ] Listen to the new sounds on real speakers and set their levels
