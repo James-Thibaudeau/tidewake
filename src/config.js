@@ -39,6 +39,24 @@ export const WAVE_DEFS = [
   [8.1, 0.07, 0.02],
 ];
 
+// Rough water (sea-zones.js gives each zone a severity, 1-3; index 0 is plain sea).
+//   floor    the least the swell is inside, in any weather, where a full storm is 1:
+//            enough from severity 1 up for the bow to slam under a clear sky
+//   batter   hull points a second the sea takes at the zone's worst with bare poles;
+//            `sail` is how many times that under reefed and under full sail
+//   keel     how much of the keel counts against it: a storm is resisted by 1 - keel,
+//            rough water by 1 - keel × this, so the best keel only halves it and the
+//            hull has to take the rest
+// The damage targets these are tuned towards are in docs/feature-plan.md (Phase 9);
+// 9.3's rogue waves are meant to make up the rest.
+export const ROUGH = {
+  floor: [0, 0.5, 0.8, 1.1],
+  batter: [0, 0.04, 0.08, 0.12],
+  sail: [1, 2.5, 9],
+  keel: 0.5,
+  warn: 0.3,   // how far into a zone (0-1) before the warning shows
+};
+
 export const UPGRADES = [
   {
     key: 'sail', name: 'Sails', stat: 'Top speed', icon: 'sail',

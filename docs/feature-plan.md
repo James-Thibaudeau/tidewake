@@ -334,6 +334,12 @@ anchor and catch your breath.
 | **The Cinder Rip** | Mount Cinderhorn (radius 330) | 2 | Rough from 600u to 1,200u | Steep chop, gusts that swing the wind, steam on the water |
 | **The Outer Swell** | The last ~600u before the world-edge current | 1 | A band along the edge | Long heavy swells: a sign you are near the edge |
 
+(As built in 9.2: the Outer Swell starts 100u further out, filling in from
+6,250u and full from 6,450u, to stay clear of Windrest's dock. It is not a
+ring, so its row is marked `edge` and measured along the further axis; it
+gives way inside a ring's calm pocket, because Frostspire's north shore lies
+in the band.)
+
 - **Danger follows the story**, like the refits: the Reach guards the last
   chapter (VII), the Rip the one before it (VI).
 - **No zone** at Archway Isle (the first rocky level, tuned gentle), the
@@ -380,6 +386,15 @@ part, in clear weather. The test pilot tunes to these.
 | Starting hull, no keel (100) | 35–50% of the hull | Wrecked |
 | Hull 3 and keel 2 (about what landing at Frostspire needs) | 20–30% | 60–80% |
 | Max hull and keel (600) | 10–15% | 35–50% |
+
+(As measured in 9.2, with the steady battering and bow slams but no rogue
+waves yet: 25–35% and 50–59% for the starting hull, 4–5% and 7–9% for hull 3
+and keel 2, 1% and 2% for the best of everything. The battering is in hull
+points, the same for every boat, and a fast boat is through in a third of
+the time, so the two bigger boats cannot reach their rows by tuning it.
+9.3's rogue waves need to cost a share of the hull, or the battering needs
+to go by the metre sailed. The numbers are `ROUGH` in `config.js`; the full
+table is under 9.2 in [STATUS.md](STATUS.md).)
 
 So a starting boat can get in, chart Frostspire and get out again only with
 no mistakes and no storm. A maxed boat gets through comfortably if sailed
@@ -447,8 +462,9 @@ well, but a careless run still costs half the hull.
   already exist.
 - **Gallery:** a `zone` parameter for any subject at sea, `zone: 'shallows'
   | 'bank' | 'coastal'` (built in 9.1, with the `shallows` and `sea-zones`
-  sheets), then `'rough'` and `severity` in 9.2, and a sheet of all of them
-  under every light. The shallows are judged there, not in the game.
+  sheets), then `'open'`, `'rough'` and `'offing'` with `severity` (built in
+  9.2, with the `rough` sheet), and a sheet of all of them under every light
+  (`sea-zones`). The shallows are judged there, not in the game.
 
 ### Phase 9 in smaller PRs
 

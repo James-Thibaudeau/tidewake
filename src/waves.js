@@ -1,7 +1,8 @@
 // Ocean waves. The same function runs on the CPU (boat physics) and the GPU
 // (ocean + shore foam shaders), so the boat always sits exactly on the water.
 // How big they are changes with place as well as weather: sea-zones.js says by how
-// much at each point (half as big in home waters), to the CPU and the GPU alike.
+// much at each point (half as big in home waters, and a swell that never drops below a
+// floor in rough water), to the CPU and the GPU alike.
 import { WAVE_DEFS } from './config.js';
 import { TAU } from './util.js';
 import { SEA_ZONE_GLSL, ZONE_AT, waveFactors } from './sea-zones.js';
@@ -29,6 +30,7 @@ export const waveUniforms = {
   uTime: { value: 0 },
   uSeaOrigin: { value: new Float32Array(2) }, // where the drawn space's origin is in the world (setSeaOrigin)
   uSeaZone: { value: ZONE_AT },               // the sea zones' centres (sea-zones.js)
+  uSeaFloor: { value: 1 },                    // how much of rough water's swell floor is let through (updateWaves)
 };
 
 /**
@@ -41,8 +43,14 @@ export function setSeaOrigin(x = 0, z = 0) {
   waveUniforms.uSeaOrigin.value[1] = z;
 }
 
-export function updateWaves(time, scale, swell = 0) {
+/**
+ * Once a frame: the sea's clock, and the weather's wave scale and swell. `floor` is how
+ * much of rough water's own swell to let through (1 at sea; less ashore, where the sea
+ * is kept gentle so it doesn't wash over the beach).
+ */
+export function updateWaves(time, scale, swell = 0, floor = 1) {
   waveUniforms.uSwellScale.value = swell;
+  waveUniforms.uSeaFloor.value = floor;
   const ph = waveUniforms.uWavePhase.value;
   for (let i = 0; i < WAVES.length; i++) {
     ph[i] = (WAVES[i].phase - WAVES[i].omega * time) % TAU;
@@ -51,7 +59,7 @@ export function updateWaves(time, scale, swell = 0) {
   waveUniforms.uTime.value = time % 3600;
 }
 
-const zoneK = [1, 1];
+const zoneK = [1, 1, 0];
 export function waveHeight(x, z) {
   const ph = waveUniforms.uWavePhase.value, o = waveUniforms.uSeaOrigin.value;
   let h = 0, hs = 0;
@@ -62,7 +70,7 @@ export function waveHeight(x, z) {
     if (w.swell) hs += v; else h += v;
   }
   waveFactors(x + o[0], z + o[1], zoneK);
-  return h * waveUniforms.uWaveScale.value * zoneK[0] + hs * waveUniforms.uSwellScale.value * zoneK[1];
+  return h * waveUniforms.uWaveScale.value * zoneK[0] + hs * Math.max(waveUniforms.uSwellScale.value * zoneK[1], zoneK[2] * waveUniforms.uSeaFloor.value);
 }
 
 const f = (v) => v.toFixed(6);
@@ -74,10 +82,12 @@ uniform float uTime;
 ${SEA_ZONE_GLSL}
 // k is seaWaveK(p), what the sea zones make of the waves there: a shader that samples the
 // waves more than once works it out once (a vertex, a pixel) and passes it in.
-float waveHeightK(vec2 p, vec2 k) {
+// The swell there: the weather's, as the zones scale it, or rough water's floor if that is more.
+float swellAt(vec3 k) { return max(uSwellScale * k.y, k.z); }
+float waveHeightK(vec2 p, vec3 k) {
   float h = 0.0; float hs = 0.0; float s;
 ${WAVES.map((w, i) => `  s = (sin(dot(p, vec2(${f(w.dx * w.k)}, ${f(w.dz * w.k)})) + uWavePhase[${i}]) + 1.0) * 0.5; ${w.swell ? 'hs' : 'h'} += ${f(w.a)} * (2.0 * s * s - 0.75);`).join('\n')}
-  return h * uWaveScale * k.x + hs * uSwellScale * k.y;
+  return h * uWaveScale * k.x + hs * swellAt(k);
 }
 float waveHeight(vec2 p) { return waveHeightK(p, seaWaveK(p)); }
 `;
@@ -105,10 +115,10 @@ float waveLodK(float len, float px, float dist) {
 void setWaveLod(float px, float dist) {
 ${WAVES.map((w, i) => `  gWaveK[${i}] = waveLodK(${f(TAU / w.k)}, px, dist);`).join('\n')}
 }
-float waveLod(vec2 p, vec2 k, out vec2 slope) {
+float waveLod(vec2 p, vec3 k, out vec2 slope) {
   float h = 0.0; float hs = 0.0; vec2 g = vec2(0.0); vec2 gs = vec2(0.0); float th; float s; float a;
 ${WAVES.map((w, i) => `  th = dot(p, vec2(${f(w.dx * w.k)}, ${f(w.dz * w.k)})) + uWavePhase[${i}]; s = sin(th) * 0.5 + 0.5; a = ${f(w.a)} * gWaveK[${i}]; ${w.swell ? 'hs' : 'h'} += a * (2.0 * s * s - 0.75); ${w.swell ? 'gs' : 'g'} += vec2(${f(w.dx * w.k)}, ${f(w.dz * w.k)}) * (2.0 * a * s * cos(th));`).join('\n')}
-  slope = g * (uWaveScale * k.x) + gs * (uSwellScale * k.y);
-  return h * uWaveScale * k.x + hs * uSwellScale * k.y;
+  slope = g * (uWaveScale * k.x) + gs * swellAt(k);
+  return h * uWaveScale * k.x + hs * swellAt(k);
 }
 `;

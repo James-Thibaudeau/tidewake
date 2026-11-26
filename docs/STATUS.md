@@ -682,12 +682,118 @@ Updated 2026-11-25.
       21% of the time in a storm, nearly three times the coast's, so they
       are × 1.5 (one line in `BANDS`). The open sea is not yet "a shade
       darker".
-  - [ ] 9.2 Rough water: the Reach, the Rip and the Outer Swell as rows in
-    `SEA_ZONES`, with the swell floor, damage, warnings, the name on
-    entering and the chart's hatching. Also the open sea's darker shade,
-    and Phase 7's event director reading `seaAt` (whichever of the two
-    lands second wires it).
-  - [ ] 9.3 Rogue waves and ice growlers
+  - [x] **9.2 Rough water** (branch `feature/rough-water`):
+    - **Three zones**, as rows in `SEA_ZONES`: the Frostspire Reach
+      (severity 3, rough from 600 to 1,500 m from the island's centre,
+      worst at 850–950), the Cinder Rip (severity 2, 600 to 1,200 m) and
+      the Outer Swell (severity 1). The two rings are centred on their
+      landmark islands, read from the world once it is built
+      (`placeSeaZones`, by `landmark` key); the hole in each is its calm
+      pocket. The Outer Swell is not a ring, so it has a form of its own
+      (`edge: true`): a band measured along the further axis from the
+      world's centre. It gives way inside a ring's calm pocket, because
+      Frostspire's north shore lies inside the band.
+    - **Waves by place:** inside, the swell never drops below a floor (0.5,
+      0.8 and 1.1 by severity; a full storm is 1), and the wave scale is
+      × 1, × 1.5 (the Rip's steep chop) and × 1.25. The CPU
+      (`waveFactors`) and the shaders (`seaZones()` and `swellAt()` in the
+      GLSL written from the same table) agree; shore foam and the other
+      wave-aware materials follow. Ashore only an eighth of the floor is
+      let through (`updateWaves`' last argument), or an island inside a
+      zone would stand in a storm's surf for good.
+    - **Damage** (`ROUGH` in `config.js`, `roughDamage`): a steady
+      battering, 0.04 / 0.08 / 0.12 hull points a second at a zone's worst
+      with bare poles, × 2.5 reefed and × 9 under full sail, resisted by
+      `1 - keel × 0.5`. Bow slams fire under a clear sky from the floor
+      alone.
+    - **What you see:** rough water is darker, foams more and breaks into
+      whitecaps under any sky; from outside the whitecaps still show as
+      pale streaks, a broken line at the horizon from the deck. Sailing in
+      shows the zone's name as a banner, and the warning is "Rough water:
+      reef your sails" under full sail, "Rough water: hull taking a
+      beating" otherwise. The sea chart hatches what you have charted of a
+      zone and writes its name there, from the fog-of-war cells
+      (`src/ui/chart-seas.js`; nothing new is saved). The words are `SEAS`
+      in `story-text.js`.
+    - **Kept out:** race courses and the kraken's trench ask `raceWater()`
+      (`race.js`): no rough water, no home waters. The Deep is where it
+      was.
+    - **Left over from 9.1:** the open sea is a shade darker (about 4% in
+      the gallery's `open` cells), ending past the world's corners so the
+      gallery's plain sea stays plain. The event director reads `seaAt`:
+      a storm over rough water breeds waterspouts twice as fast; turtles
+      also turn up over the home shallows by day, and the bloom is twice
+      as likely there at night.
+    - **Tools:** `debug.zone()` adds the zone's name, the swell's floor,
+      the swell now and hull points a second; `debug.teleport('reach' |
+      'rip' | 'swell')` goes to the worst of a zone. The gallery's `zone`
+      gains `open`, `rough` and `offing` (from 500 m outside, looking in),
+      with `severity` 1–3; the `sea-zones` sheet covers every kind of sea
+      under every light, and a new `rough` sheet each zone from inside and
+      outside. `seazones` in `tools/check.mjs` holds each calm pocket to
+      its island plus landing range, every port clear of rough water and
+      one within 2,000 m of each zone, the table's centres to `world.js`,
+      and the shader to the CPU at 12,769 points; `ride` has a case for
+      each zone and `sea` for the director's new weights.
+    - **Measured:**
+      - `ride`, clear weather at each zone's worst: the Reach pitch 4.0°,
+        2.8 bow slams a minute, crests to 6.3 m; the Rip 3.3°, 2.4 and
+        4.5 m; the Outer Swell 2.2°, 0.4 and 2.9 m. The Reach in a storm:
+        8.8° and 9.4 slams (plain sea in a storm: 7.2° and 7.7). Plain
+        sea and home waters are as they were.
+      - One crossing of the Reach in clear weather, wind on the beam, a
+        test pilot holding a straight course in from three sides (share
+        of the hull lost; the plan's target in brackets):
+
+        | Boat | Reefed | Full sail |
+        | --- | --- | --- |
+        | Starting hull, no keel (100) | 25–35% (35–50%) | 50–59%, not wrecked (wrecked) |
+        | Hull 3, keel 2, sails 2 (320) | 4–5% (20–30%) | 7–9% (60–80%) |
+        | Everything at its best (600) | 1% (10–15%) | 2% (35–50%) |
+
+        The starting boat is a little under its targets, which leaves room
+        for 9.3's rogue waves. The bigger boats are far under, and no
+        number in `ROUGH` can fix that: the battering is in hull points,
+        the same for every boat, and a faster boat is through in a third
+        of the time (35 s against 150 s). 9.3 has to make up the
+        difference with something that grows with the boat: rogue waves
+        that take a share of the hull, or battering by the metre sailed
+        rather than by the second.
+      - The Rip, starting boat: 14% reefed, 24% under full sail.
+      - A frame at sea on the development Mac, `main` → this branch, run
+        back to back: on High (2048×1536) in the Reach 7.54 → 7.87 ms, in
+        the Rip 7.75 → 8.03, in the Outer Swell 7.56 → 7.74; on the coast,
+        at home and in Frostspire's calm pocket no change (7.61 → 7.60,
+        8.20 → 8.24, 7.21 → 7.22). On Low (1024×768) in the Reach
+        1.35 → 1.43 ms; elsewhere within the noise.
+      - The gallery's sea sheets from before (`sea`, `sea-lights`,
+        `sea-features`, `shallows`, and the old cells of `sea-zones`)
+        match cell for cell, to 0.1 in 255. The world's 110 islands, 50
+        reefs, the wreck and Sable's places are where they were.
+    - **Not as planned:**
+      - The Outer Swell starts 100 m further out: it fills in from 6,250 m
+        and is full from 6,450 m to the edge (the plan: the last 600 m
+        before the current, from 6,150). Any nearer and it could reach
+        Windrest's dock.
+      - Frostspire can't be landed on yet (the cold biome has no levels,
+        4.11), so the landing from the calm pocket was tried with the
+        biome opened by `debug.refit(4, { open: ['cold'] })`.
+      - Not built: fog more often in the Reach, flying spray, the chapter
+        VII line and the shipwright's line about the Reach, treasure worth
+        more in rough water, hatching on the minimap, a sound for sailing
+        in.
+      - A race asked for inside a zone starts up to 750 m away, outside
+        it; deep in home waters there is "no room to race".
+    - **Worth knowing:** three islands you can land on lie in rough water,
+      with their treasure: Plover Spire (rocky) in the worst of the Reach,
+      Thorn Atoll (temperate) and Echo Cove in the Rip.
+  - [ ] 9.3 Rogue waves and ice growlers, and tuning to the damage targets
+    (see the table under 9.2)
+  - [ ] Only a person can do, 9.2: sail each zone by hand (how it feels at
+    the helm, whether reefing feels worth it); judge on a real screen
+    whether the band reads from the deck before you reach it, the Rip and
+    the Outer Swell above all; whether the open sea's darker shade is
+    enough; frame times on a real phone.
   - [ ] Only a person can do: judge the shallows on a real screen and
     sailing (so far: the gallery's sheets and stills from the game); run
     for home in a storm by hand; frame times on a real phone.

@@ -7,13 +7,13 @@
 // narrowed: `?sheet=tops-back&bottom=skirt&pose=run` is the same grid with a
 // skirt on, mid-stride.
 import { stylesFor } from '../cosmetics.js';
-import { POSES, LIGHTS, VIEWS, WEATHERS, SEA_PLACES } from './presets.js';
+import { POSES, LIGHTS, VIEWS, WEATHERS } from './presets.js';
 
 const ids = (slot) => stylesFor(slot).map((s) => s.style);
 const PORTRAIT = [250, 330], LANDSCAPE = [420, 300], SQUARE = [300, 300], SMALL = [200, 200];
 
 // A sheet of another subject keeps only how things are lit, not what was showing.
-const LIT = ['light', 'weather', 'sun', 'ink', 'waves', 'sea', 'zone', 'fx'];
+const LIT = ['light', 'weather', 'sun', 'ink', 'waves', 'sea', 'zone', 'severity', 'fx'];
 function carry(base, fixed) {
   if (!fixed.show || fixed.show === (base.show || 'outfit')) return { ...base, ...fixed };
   return { ...Object.fromEntries(LIT.filter((k) => k in base).map((k) => [k, base[k]])), ...fixed };
@@ -27,6 +27,18 @@ function grid(rowKey, rows, colKey, cols, fixed) {
     cells: rows.flatMap((r) => cols.map((c) => ({ label: `${r} · ${c}`, q: { ...carry(base, fixed), [rowKey]: r, [colKey]: c } }))),
   });
 }
+/** Named rows, each a set of parameters of its own, against every value of one parameter. */
+function rows(named, colKey, cols, fixed) {
+  return (base) => ({
+    cols: cols.length,
+    cells: Object.entries(named).flatMap(([name, r]) => cols.map((c) => ({ label: `${name} · ${c}`, q: { ...carry(base, fixed), severity: null, ...r, [colKey]: c } }))),
+  });
+}
+// The sea's places, plain to rough; the three rough zones by name, from inside and from outside.
+const ZONES = { coastal: { zone: 'coastal' }, shallows: { zone: 'shallows' }, bank: { zone: 'bank' }, open: { zone: 'open' },
+  'outer swell': { zone: 'rough', severity: '1' }, 'cinder rip': { zone: 'rough', severity: '2' }, 'frostspire reach': { zone: 'rough', severity: '3' } };
+const ROUGH_VIEWS = { 'outer swell': { zone: 'rough', severity: '1' }, 'cinder rip': { zone: 'rough', severity: '2' }, 'frostspire reach': { zone: 'rough', severity: '3' },
+  'swell, from outside': { zone: 'offing', severity: '1' }, 'rip, from outside': { zone: 'offing', severity: '2' }, 'reach, from outside': { zone: 'offing', severity: '3' } };
 /** One value after another, `cols` to a row. */
 function strip(key, values, fixed, cols = values.length) {
   return (base) => ({ cols, cells: values.map((v) => ({ label: String(v), q: { ...carry(base, fixed), [key]: v } })) });
@@ -53,7 +65,8 @@ export const SHEETS = {
   'sea': { about: 'The sea in every weather: from the helm, low over the water, from a tall masthead and from a gull', tile: LANDSCAPE, make: grid('view', ['sail', 'horizon', 'aloft', 'high'], 'weather', WEATHERS, { show: 'ship', tier: '2' }) },
   'sea-lights': { about: 'The sea under every light: from the helm, a tall masthead and a gull', tile: LANDSCAPE, make: grid('view', ['sail', 'aloft', 'high'], 'light', Object.keys(LIGHTS), { show: 'ship', tier: '2' }) },
   'sea-features': { about: "The sea's large features one at a time: none, the shallows, gusts, cloud shadows, all", tile: LANDSCAPE, make: grid('view', ['sail', 'high'], 'sea', ['0', 'shallows', 'gusts', 'shade', 'shallows,gusts,shade'], { show: 'ship', tier: '2', weather: 'breezy' }) },
-  'sea-zones': { about: 'The plain sea, the edge of home waters and the clear shallows under every light, from the helm', tile: LANDSCAPE, make: grid('zone', Object.keys(SEA_PLACES), 'light', Object.keys(LIGHTS), { show: 'ship', tier: '2', view: 'sail' }) },
+  'sea-zones': { about: 'Every kind of sea under every light, from the helm: the plain coast, home waters and their edge, the open sea, and the three rough zones at their worst', tile: LANDSCAPE, make: rows(ZONES, 'light', Object.keys(LIGHTS), { show: 'ship', tier: '2', view: 'sail' }) },
+  'rough': { about: 'Rough water in clear weather, from inside each zone and from 500 m outside it: from the helm, low over the water, a tall masthead and a gull', tile: LANDSCAPE, make: rows(ROUGH_VIEWS, 'view', ['sail', 'horizon', 'aloft', 'high'], { show: 'ship', tier: '2' }) },
   'shallows': { about: 'The clear shallows of home waters under every light: from the helm, low over the water, a tall masthead and a gull', tile: LANDSCAPE, make: grid('view', ['sail', 'horizon', 'aloft', 'high'], 'light', Object.keys(LIGHTS), { show: 'ship', tier: '2', zone: 'shallows' }) },
   // ---- places
   'archway-story': { about: "Archway Isle's story places, close up", tile: LANDSCAPE, make: strip('at', ['cove', 'keystone', 'lantern', 'stack'], { show: 'archway', view: 'spot' }, 2) },

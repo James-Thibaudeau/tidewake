@@ -1,6 +1,7 @@
 // UI part: the minimap, the full-screen sea chart, and the markers drawn on
 // both (fog of war, islands, quests, the Redwing). Methods are mixed into UI
-// (see ../ui.js), so `this` is the UI instance.
+// (see ../ui.js), so `this` is the UI instance. Rough water's hatching and
+// names on the chart are chart-seas.js.
 import { MAP_RES, MAP_CELL, WORLD_HALF } from '../config.js';
 import { bearingDeg } from '../util.js';
 import { $, TAU, clampN } from './shared.js';
@@ -307,6 +308,7 @@ export class ChartUI {
       }
     }
     this.fogCtx.putImageData(this.fogImg, 0, 0);
+    this.buildSeas(); // what you've charted of the rough water changes with the fog
   }
 
   updateMapStats() {
@@ -342,6 +344,8 @@ export class ChartUI {
       g.moveTo(x0, Y(v)); g.lineTo(x0 + ws, Y(v));
     }
     g.stroke();
+    // rough water you have charted, hatched (chart-seas.js)
+    this.drawSeaHatch(g, X, Y, z, dpr);
 
     // islands
     const lw = Math.max(1, 1.5 * dpr);
@@ -384,6 +388,7 @@ export class ChartUI {
     g.font = `600 ${fs}px Fredoka, sans-serif`;
     g.textAlign = 'center'; g.textBaseline = 'bottom';
     const pulse = 0.6 + 0.4 * Math.sin(now / 260);
+    this.drawSeaNames(g, X, Y, dpr);
     for (const I of world.islands) {
       const sx = X(I.x), sy = Y(I.z);
       if (sx < -200 || sy < -200 || sx > W + 200 || sy > H + 200) continue;

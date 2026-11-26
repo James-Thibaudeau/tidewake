@@ -4,6 +4,7 @@ import { WORLD_SEED, WORLD_HALF, isTouch } from './config.js';
 import { initProps } from './props.js';
 import { World, IslandStreamer } from './world.js';
 import { Ocean, shoreMap } from './ocean.js';
+import { placeSeaZones } from './sea-zones.js';
 import { Environment } from './sky.js';
 import { Weather } from './weather.js';
 import { Boat } from './boat.js';
@@ -52,6 +53,7 @@ async function boot() {
   await nextFrame();
   initProps();
   const world = new World(WORLD_SEED);
+  placeSeaZones(world.islands); // rough water lies round the landmarks themselves
   const quality = low ? 'low' : 'high';
   const env = new Environment(scene, quality);
   const ocean = new Ocean(scene, quality);

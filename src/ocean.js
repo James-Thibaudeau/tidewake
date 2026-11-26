@@ -5,6 +5,8 @@
 // the clouds. All three only colour the water; its shape, and how a boat rides it, is waves.js.
 // Home waters (sea-zones.js) are the shallows at their strongest: clear turquoise water
 // with the sand showing through (SHALLOWS_GLSL below, kept in a block of its own).
+// The zones also darken the open sea a shade, and rough water more, with whitecaps that
+// still show from outside it as a pale broken line.
 import * as THREE from 'three';
 import { WAVE_GLSL, WAVE_LOD_GLSL, NOISE_GLSL, waveUniforms } from './waves.js';
 import { clamp, smoothstep } from './util.js';
@@ -68,6 +70,7 @@ ${NOISE_GLSL}
 varying vec3 vWorld;
 varying float vH;
 varying float vCloud;
+varying vec3 vSeaK;
 varying vec3 vSea;
 uniform vec3 uCalm;
 uniform vec4 uCloud;
@@ -90,10 +93,13 @@ float cloudAt(vec2 p) {
 void main() {
   vec4 wp = modelMatrix * vec4(position, 1.0);
   vCloud = uCloud.w > 0.001 ? cloudAt(wp.xz) : 0.0;
-  // what the sea zones say here (wave factor, swell factor, clear shallows), worked out at
-  // each corner of the grid: the fades are hundreds of metres wide, so a pixel needn't ask
-  vSea = vec3(seaWaveK(wp.xz), seaShallowK(wp.xz));
-  float h = waveHeightK(wp.xz, vSea.xy) * calmK(wp.xz);
+  // what the sea zones say here (vSeaK: the wave factor, the swell factor and the swell's
+  // floor; vSea: how much of the clear shallows, of rough water and of the open sea), worked
+  // out at each corner of the grid: the fades are hundreds of metres wide, so a pixel needn't ask
+  vec3 seaK, seaLook;
+  seaZones(wp.xz, seaK, seaLook);
+  vSeaK = seaK; vSea = seaLook;
+  float h = waveHeightK(wp.xz, seaK) * calmK(wp.xz);
   wp.y += h;
   vWorld = wp.xyz;
   vH = h;
@@ -179,6 +185,7 @@ uniform vec4 uCloud;
 varying vec3 vWorld;
 varying float vH;
 varying float vCloud;
+varying vec3 vSeaK;
 varying vec3 vSea;
 ${WAVE_GLSL}
 ${WAVE_LOD_GLSL}
@@ -202,12 +209,16 @@ float cel(float field, float thr) {
 ${SHALLOWS_GLSL}
 void main() {
   vec2 p = vWorld.xz;
-  // the weather's wave scale and swell as the sea zones leave them here (half in home waters)
-  float seaWave = uWaveScale * vSea.x, seaSwell = uSwellScale * vSea.y;
+  // the weather's wave scale and swell as the sea zones leave them here (half in home
+  // waters; in rough water a swell that never drops below its floor)
+  float seaWave = uWaveScale * vSeaK.x, seaSwell = swellAt(vSeaK);
+  // how much of rough water and of the open sea's darker water is here
+  float rough = vSea.y * uBig.x, openK = vSea.z * uBig.x;
   float calm = uCalm.z > 0.0 ? smoothstep(uCalm.z, uCalm.z + 4.0, distance(p, uCalm.xy)) : 1.0;
   float dist = length(cameraPosition - vWorld);
   // Far water: waves too small for a pixel drop out, and the rest lose contrast with distance.
-  setWaveLod(max(length(dFdx(p)), length(dFdy(p))), dist);
+  float px = max(length(dFdx(p)), length(dFdy(p))); // metres of sea under this pixel
+  setWaveLod(px, dist);
   // The waves are a few fixed sines, so on their own they tile into a grid. Away from the
   // boat, bend where the colouring samples them so the grid never lines up across the view...
   vec2 drift = vec2(uTime * 0.003, -uTime * 0.002);
@@ -218,7 +229,7 @@ void main() {
   float lively = vnoise(p * 0.0052 + 11.0 + drift * 2.0) * 0.6 + vnoise(p.yx * 0.0127 + 3.0 - drift * 2.0) * 0.4;
   float waveK = calm * mix(0.3, 1.35, smoothstep(0.25, 0.75, lively));
   vec2 tilt;
-  float hC = waveLod(pw, vSea.xy, tilt) * waveK;
+  float hC = waveLod(pw, vSeaK, tilt) * waveK;
   vec3 n = normalize(vec3(-tilt.x * waveK, 1.0, -tilt.y * waveK));
   float amp = max(seaWave * 1.25 + seaSwell * 3.2, 0.05);
   float hn = hC / amp;
@@ -273,14 +284,16 @@ void main() {
   // back slopes fall off into shade
   float rel = dot(n, sd) - sd.y;
   col *= 1.0 + clamp(rel * 1.6, -0.16, 0.08);
+  // the open sea is a shade darker than the coast's, and rough water darker again
+  col *= 1.0 - openK * 0.1 - rough * 0.2;
   // close to a shore the sand shows through: turquoise, fading with the daylight
   col = mix(col, uShallow, shoal * 0.5 * (1.0 - uLantern.w * 0.7));
   // home waters: clear water over sand (SHALLOWS_GLSL)
-  col = clearShallows(col, p, v, n, hn, off, dist, vSea.z * uBig.x);
+  col = clearShallows(col, p, v, n, hn, off, dist, vSea.x * uBig.x);
 
   // ---- foam: lacy streaks in wind space (x = downwind, y = across), draped over the swell
   ws.x -= uTime * 0.8; // foam drifts slowly downwind
-  float A = clamp(uWindStr * 0.55 + seaWave * 0.75 - 0.38 + gust * 0.2, 0.05, 1.3); // how foamy the sea is
+  float A = clamp(uWindStr * 0.55 + seaWave * 0.75 - 0.38 + gust * 0.2 + rough * 0.3, 0.05, 1.3); // how foamy the sea is
   float detail = 1.0 - smoothstep(260.0, 700.0, dist);
   float crestBias = smoothstep(-0.2, 0.9, hn);
   // the pattern slides a little with the surface slope, so streaks bend over each wave
@@ -307,14 +320,14 @@ void main() {
   float trail = 0.0;
 #ifndef LOW_Q
   // foam lingers downwind of crests that just passed
-  trail = smoothstep(0.45, 0.95, waveHeightK(p - wd * 3.5, vSea.xy) / amp);
+  trail = smoothstep(0.45, 0.95, waveHeightK(p - wd * 3.5, vSeaK) / amp);
 #endif
   // only a light link to the (fast-moving) wave crests, so foam doesn't race past
   float field = vein * 0.7 + body * 0.25 + (rag - 0.5) * 0.55 + crestBias * 0.07 + trail * 0.03;
   // whitecaps: the lace thickens on the highest crests, more in rough seas, rather than
   // breaking out as a separate slab of white
   float capN = vnoise(p * 0.12 + wd * uTime * 0.12) * 0.6 + vnoise(p * 0.42 - uTime * 0.06) * 0.4;
-  float capThr = 1.24 - smoothstep(0.3, 1.4, seaWave) * 0.42 - clamp(uWindStr - 0.8, 0.0, 0.8) * 0.08; // fewer caps in fair weather, same in storms
+  float capThr = 1.24 - smoothstep(0.3, 1.4, seaWave) * 0.42 - clamp(uWindStr - 0.8, 0.0, 0.8) * 0.08 - rough * 0.3; // fewer caps in fair weather, same in storms; rough water breaks under any sky
   float cap = smoothstep(capThr - 0.3, capThr + 0.1, hn + (capN - 0.5) * 0.55) * (1.0 - smoothstep(400.0, 900.0, dist));
   float foam = cel(field + cap * 0.2, 0.94 - A * 0.085) * detail;
 
@@ -331,6 +344,20 @@ void main() {
 #endif
   // far away, unresolvable foam just lightens the water a touch
   float farFoam = (1.0 - detail) * A * 0.1;
+  // ...except rough water's whitecaps, which show from well outside it: pale dashes lying
+  // across the wind, a broken line once distance flattens them against the horizon
+  if (rough > 0.01) {
+    vec2 cq = ws * vec2(0.16, 0.03) + warp * 1.5;
+    float dash = smoothstep(0.57, 0.65, vnoise(cq + 9.0) * 0.6 + vnoise(cq * 2.3 + 41.0) * 0.4);
+    // Far off a pixel covers too much sea to tell one dash from the next, and gets their
+    // average. Seen nearly edge-on from a deck, though, they still break up from side to
+    // side, so near the horizon the line is cut by bearing instead.
+    vec2 away = (p - cameraPosition.xz) / max(dist, 1.0);
+    float cut = smoothstep(0.4, 0.56, vnoise(away * 34.0 + dist * 0.004 - uTime * 0.02));
+    float farDash = mix(0.22, cut * 0.85, 1.0 - smoothstep(0.015, 0.06, v.y));
+    dash = mix(dash, farDash, smoothstep(5.0, 30.0, px));
+    farFoam = max(farFoam, (1.0 - detail) * pow(rough, 0.6) * dash * 0.9);
+  }
 
   // rain dimples
   vec2 rc = p * 1.2;

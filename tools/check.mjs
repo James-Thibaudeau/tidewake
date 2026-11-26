@@ -10,8 +10,9 @@
 // doesn't export, a helper left behind when code moved to another file, a
 // text key or element id that doesn't exist, a save that no longer migrates,
 // a sea event that could turn up in the wrong place, sea zones that leave home
-// out or disagree between the CPU and the shaders, a wave set the boat rides
-// too hard or too gently, and an ashore layout that fails its own validation.
+// out, put rough water over a port or a landing, or disagree between the CPU
+// and the shaders, a wave set the boat rides too hard or too gently, and an
+// ashore layout that fails its own validation.
 //
 // The source is read with regular expressions, not a parser. `imports` and
 // `names` rely on the house style: one-line `import { … } from '…';` and
@@ -260,7 +261,7 @@ const checks = {
       }
     }
     const { SHEETS } = await load('gallery/sheets.js');
-    const { POSES, LIGHTS, VIEWS, SEA_PLACES } = await load('gallery/presets.js');
+    const { POSES, LIGHTS, VIEWS, SEA_PLACES, ROUGH_PLACES } = await load('gallery/presets.js');
     const { SLOTS, styleInfo } = await load('cosmetics.js');
     let count = 0;
     for (const [name, S] of Object.entries(SHEETS)) {
@@ -273,6 +274,7 @@ const checks = {
         if (q.light && !LIGHTS[q.light]) bad(`no light "${q.light}"`);
         if (q.pose && !POSES[q.pose]) bad(`no pose "${q.pose}"`);
         if (q.zone && !SEA_PLACES[q.zone]) bad(`no sea place "${q.zone}"`);
+        if (q.severity != null && !(ROUGH_PLACES[q.severity] && (q.zone === 'rough' || q.zone === 'offing'))) bad(`severity "${q.severity}" needs zone rough or offing, and a zone of that severity`);
         for (const slot of SLOTS) if (q[slot] && !styleInfo(slot, q[slot])) bad(`no ${slot} style "${q[slot]}"`);
       }
     }
@@ -357,6 +359,12 @@ const checks = {
     expect(W({ weather: 'storm' }).waterspout > 0 && ['clear', 'breezy', 'cloudy', 'rain', 'fog'].every((w) => W({ weather: w }).waterspout === 0), 'waterspouts should turn up in storms only');
     expect(W().bottle > 0 && W({ z: north }).bottle > 0 && W({ z: south, night: 1 }).bottle > 0 && W({ weather: 'storm' }).bottle === 0, 'a bottle should turn up anywhere, but not in a storm');
     expect(W().bottle < W().whale, 'a bottle should be less common than a whale');
+    // the sea zones (sea-zones.js): rough water breeds waterspouts, but only in a storm; turtles and the bloom favour the home shallows
+    const inRough = { shallow: 0, rough: 1 }, atHome = { shallow: 1, rough: 0 }, plainSea = { shallow: 0, rough: 0 };
+    expect(W({ weather: 'storm', sea: inRough }).waterspout > W({ weather: 'storm' }).waterspout && W({ sea: inRough }).waterspout === 0, 'waterspouts should be likelier in rough water, and still only in a storm');
+    expect(W({ sea: atHome }).turtles > W({ z: south }).turtles && W({ sea: atHome, night: 1 }).turtles === 0 && W({ z: north, sea: plainSea }).turtles === 0, 'turtles should favour the home shallows, by day, and stay out of cold water elsewhere');
+    expect(W({ night: 1, sea: atHome }).bloom > W({ night: 1 }).bloom && W({ sea: atHome }).bloom === 0, 'the bloom should favour the home shallows, at night');
+    expect(JSON.stringify(W({ sea: plainSea })) === JSON.stringify(W()) && JSON.stringify(W({ night: 1, weather: 'storm', sea: plainSea })) === JSON.stringify(W({ night: 1, weather: 'storm' })), 'plain sea should leave the weights as they are');
     // in a storm the waterspout is the likeliest thing by far
     const storm = W({ weather: 'storm', night: 1 });
     expect(kinds.every((k) => k === 'waterspout' || storm[k] < storm.waterspout), 'the waterspout should be the likeliest thing in a storm');
@@ -446,11 +454,15 @@ const checks = {
 
   // The sea zones (sea-zones.js): home waters hold Port Haven and grandfather's
   // wreck, the bands lie where the plan puts them, nothing jumps as you sail
-  // across a fade, and the shaders get the same table as the CPU.
+  // across a fade, and the shaders get the same table as the CPU. Rough water
+  // lies round its landmark and leaves a calm pocket for the whole island and
+  // the water you land from; it covers no port, and has one within reach.
   async seazones() {
     const errors = [];
     const Z = await load('sea-zones.js');
     const { WAVE_GLSL, updateWaves, waveHeight, setSeaOrigin } = await load('waves.js');
+    const { ROUGH, REFITS, LAND_RANGE, WORLD_HALF } = await load('config.js');
+    const { SEAS } = await load('story-text.js');
     const home = Z.SEA_ZONES.find((r) => r.id === 'home');
     if (!home || Z.SEA_ZONES[0] !== home) return { errors: ['home waters must be the first row of SEA_ZONES (bandAt reads it)'], note: 'no home' };
 
@@ -475,16 +487,82 @@ const checks = {
     const bands = [[0, 'home'], [home.outer, 'home'], [home.outer + home.fade, 'coastal'], [Z.OPEN_SEA - 1, 'coastal'], [Z.OPEN_SEA, 'open'], [6000, 'open']];
     for (const [d, want] of bands) if (Z.bandAt(0, d) !== want || Z.bandAt(-d, 0) !== want) errors.push(`${d} m from Port Haven should be ${want}, not ${Z.bandAt(0, d)}`);
     const plain = Z.seaAt(home.outer + home.fade + 1, 0);
-    if (plain.shallow || plain.rough || plain.zone || plain.wave !== 1 || plain.swell !== 1) errors.push(`past the fade the sea should be plain: ${JSON.stringify(plain)}`);
-    for (const [x, z] of [[5200, 2600], [-900, -6000], [-5300, 700], [2300, 5500], [-3800, -3300]]) if (Z.bandAt(x, z) !== 'open') errors.push(`the landmark at ${x}, ${z} is not in the open sea`);
+    if (plain.shallow || plain.rough || plain.zone || plain.wave !== 1 || plain.swell !== 1 || plain.floor || plain.open) errors.push(`past the fade the sea should be plain: ${JSON.stringify(plain)}`);
+    // the hand-placed islands, read from world.js: the landmarks, then the ports
+    const marks = [...world.matchAll(/add\(\{ x: (-?\d+), z: (-?\d+), r: (\d+),[^\n]*landmark: '(\w+)', name: '([^']+)'/g)].map((m) => ({ x: +m[1], z: +m[2], r: +m[3], landmark: m[4], name: m[5] }));
+    const ports = [...(world.match(/const ports = \[([\s\S]*?)\];\n/)?.[1] || '').matchAll(/\[(-?\d+), (-?\d+), '([^']+)'\]/g)].map((m) => ({ x: +m[1], z: +m[2], name: m[3] }));
+    const portR = world.match(/add\(\{ x: px, z: pz, r: (\d+) \+ rng\(\) \* (\d+), port: true/);
+    const fit = world.match(/< \(I\.r \+ r\) \* ([\d.]+) \+ (\d+)\) return false/), tryR = world.match(/!fits\(px, pz, (\d+)\)/)?.[1];
+    const edgeK = Number(world.match(/bound: r \* ([\d.]+),/)?.[1]); // an island reaches this many radii out
+    if (marks.length !== 5 || ports.length !== 8 || !portR || !fit || !tryR || !edgeK || !haven) errors.push("world.js: can't find the landmarks, the ports or how islands are fitted (update this check)");
+    for (const M of marks) if (Z.bandAt(M.x, M.z) !== 'open') errors.push(`${M.name} is not in the open sea`);
+    // a port is only moved if it doesn't fit where it is written: none should need to, so they are where world.js says
+    const biggest = Number(portR?.[1]) + Number(portR?.[2]);
+    const placed = [{ x: 0, z: 0, r: Number(haven) }, ...marks];
+    for (const P of ports) {
+      const near = placed.find((I) => Math.hypot(I.x - P.x, I.z - P.z) < (I.r + Number(tryR)) * Number(fit?.[1]) + Number(fit?.[2]));
+      if (near) errors.push(`${P.name} doesn't fit where world.js writes it (too near ${near.name || 'another port'}), so it is somewhere this check can't know`);
+      placed.push({ ...P, r: biggest });
+    }
+
+    // ---- rough water
+    const rough = Z.SEA_ZONES.filter((R) => R.severity);
+    const range = Math.max(LAND_RANGE, ...REFITS.map((R) => R.range || 0)); // the furthest off you can drop anchor
+    const round = (x, z, r, n = 48) => [[x, z], ...Array.from({ length: n }, (_, a) => [x + Math.cos((a / n) * Math.PI * 2) * r, z + Math.sin((a / n) * Math.PI * 2) * r])];
+    const cheb = (P) => Math.max(Math.abs(P.x), Math.abs(P.z));
+    const worstOf = (R) => (R.edge ? [300, R.inner + 150] : [R.x + (R.inner + R.outer) / 2, R.z]);
+    Z.placeSeaZones(marks); // as main.js does with the world's own islands
+    const firstEdge = Z.SEA_ZONES.findIndex((R) => R.edge);
+    if (firstEdge !== -1 && Z.SEA_ZONES.slice(firstEdge).some((R) => !R.edge)) errors.push('edge bands must be the last rows of SEA_ZONES (they give way to the pockets of the rings before them)');
+    for (const R of Z.SEA_ZONES) if (!SEAS[R.id]) errors.push(`${R.id}: no name in SEAS (story-text.js)`);
+    for (const key of ['rough', 'reef', 'beating']) if (!SEAS[key]) errors.push(`SEAS.${key} is missing (story-text.js)`);
+    for (const R of rough) {
+      const name = SEAS[R.id] || R.id;
+      if (!(ROUGH.floor[R.severity] > 0 && ROUGH.batter[R.severity] > 0)) errors.push(`${name}: severity ${R.severity} has no swell floor or battering in ROUGH (config.js)`);
+      if (ROUGH.floor[R.severity] < 0.4) errors.push(`${name}: a swell floor of ${ROUGH.floor[R.severity]} is under the 0.4 a bow slam needs (game.js, checkBowSlam)`);
+      const at = Z.seaAt(...worstOf(R));
+      if (at.rough !== 1 || at.severity !== R.severity || at.roughZone !== R.id || at.zone !== R.id || Math.abs(at.floor - ROUGH.floor[R.severity]) > 1e-9) errors.push(`${name}: its worst water should be fully rough: ${JSON.stringify(at)}`);
+      if (R.edge) {
+        // a band along the edge: full from before the edge's current (boat.js) to the edge, and a port within 2,000 m of where it starts
+        const current = WORLD_HALF - Number(source[join(SRC, 'boat.js')].match(/const edge = WORLD_HALF - (\d+);/)?.[1]);
+        if (!(R.inner <= current && R.outer >= WORLD_HALF)) errors.push(`${name}: should be full from before the edge's current (${current} m) to the edge`);
+        const gap = Math.min(...ports.map((P) => R.inner - (R.fadeIn ?? R.fade) - cheb(P)));
+        if (!(gap <= 2000)) errors.push(`${name}: the nearest port is ${Math.round(gap)} m short of it; one should be within 2,000 m (move the zone, never a port)`);
+        continue;
+      }
+      // a ring round a landmark: centred on it, as world.js places it
+      const M = marks.find((m) => m.landmark === R.landmark);
+      if (!M) { errors.push(`${name}: no island in world.js has landmark '${R.landmark}'`); continue; }
+      const T = source[join(SRC, 'sea-zones.js')].match(new RegExp(`id: '${R.id}', landmark: '${R.landmark}', x: (-?\\d+), z: (-?\\d+),`));
+      if (!T || +T[1] !== M.x || +T[2] !== M.z) errors.push(`${name}: the table's centre is not where world.js puts ${M.name} (${M.x}, ${M.z})`);
+      // its calm pocket holds the whole island and the water you land from
+      const reach = M.r * edgeK + range, pocket = R.inner - (R.fadeIn ?? R.fade);
+      if (reach > pocket) errors.push(`${name}: the calm pocket ends ${pocket} m from ${M.name}, inside its shore plus landing range (${Math.round(reach)} m)`);
+      for (const [x, z] of round(M.x, M.z, reach)) {
+        const S = Z.seaAt(x, z);
+        if (S.rough || S.floor || S.wave !== 1) { errors.push(`${name}: rough water at ${Math.round(x)}, ${Math.round(z)}, inside ${M.name}'s landing range (${JSON.stringify(S)})`); break; }
+      }
+      // a port within 2,000 m of its outer edge, to repair before and after
+      const gap = Math.min(...ports.map((P) => Math.hypot(P.x - M.x, P.z - M.z) - (R.outer + R.fade)));
+      if (!(gap <= 2000)) errors.push(`${name}: the nearest port is ${Math.round(gap)} m from its outer edge; one should be within 2,000 m (move the zone, never a port)`);
+    }
+    // no rough water over a port: the island at its biggest, its dock and the water you dock from
+    for (const P of [{ x: 0, z: 0, name: 'Port Haven' }, ...ports]) {
+      const hit = round(P.x, P.z, biggest * edgeK + 100).map(([x, z]) => Z.seaAt(x, z)).find((S) => S.rough > 0);
+      if (hit) errors.push(`${P.name} is in rough water (${SEAS[hit.roughZone]})`);
+    }
+    // the open sea's darker water: none on the coast, all of it out by the landmarks, none past the world
+    if (Z.openSea(Z.OPEN_SEA - 500) !== 0 || Z.openSea(Z.OPEN_SEA + 500) !== 1 || Z.openSea(WORLD_HALF * 1.42) !== 1 || Z.openSea(100000) !== 0 || Z.seaAt(100000, 0).open !== 0) errors.push('the open sea should darken across its start, hold to the corners of the world and end beyond them');
+    // races and the kraken's trench keep out (race.js needs three.js, so its source is read)
+    if (!/function clearAt[^}]*raceWater\(x, z\)/s.test(source[join(SRC, 'race.js')]) || !/!raceWater\(/.test(source[join(SRC, 'rival.js')])) errors.push('race.js (clearAt) and rival.js (the Deep) should both ask raceWater()');
 
     // fades are wide, and nothing steps as you cross one
-    const k = [1, 1];
+    const k = [1, 1, 0];
     for (const R of Z.SEA_ZONES) {
-      if (R.fade < 200) errors.push(`${R.id}: a fade of ${R.fade} m is under 200 m`);
-      let last = Z.waveFactors(R.x, R.z, k)[0], worst = 0;
-      for (let d = 1; d <= R.outer + R.fade + 50; d++) { const v = Z.waveFactors(R.x + d, R.z, k)[0]; worst = Math.max(worst, Math.abs(v - last)); last = v; }
-      if (worst > 0.004) errors.push(`${R.id}: the wave factor steps by ${worst.toFixed(4)} in one metre`);
+      if (R.fade < 200 || (R.fadeIn ?? R.fade) < 200) errors.push(`${R.id}: a fade of ${Math.min(R.fade, R.fadeIn ?? R.fade)} m is under 200 m`);
+      let last = [...Z.waveFactors(R.x, R.z, k)], worst = 0;
+      for (let d = 1; d <= R.outer + R.fade + 50; d++) { const v = Z.waveFactors(R.x + d, R.z, k); worst = Math.max(worst, ...v.map((n, j) => Math.abs(n - last[j]))); last = [...v]; }
+      if (worst > 0.008) errors.push(`${R.id}: the waves step by ${worst.toFixed(4)} in one metre`);
     }
 
     // the waves themselves: half as tall at home as the same water out on the coast
@@ -496,6 +574,20 @@ const checks = {
       const away = waveHeight(x, z);
       if (Math.abs(here - away * home.wave) > 1e-9 || Math.abs(away) < 1e-6) errors.push(`waveHeight at ${x}, ${z}: ${here.toFixed(3)} at home, ${away.toFixed(3)} outside; expected ${home.wave} of it`);
     }
+    // …and in rough water under a clear sky there is a swell all the same: its floor, however fair the weather
+    for (const R of rough) {
+      setSeaOrigin(...worstOf(R));
+      updateWaves(12, 0, 0);
+      const fair = waveHeight(7, 31);
+      updateWaves(12, 0, 0, 0.35); // ashore, only part of the floor is let through
+      const ashore = waveHeight(7, 31);
+      setSeaOrigin(1e5, 0);
+      updateWaves(12, 0, ROUGH.floor[R.severity]);
+      const stormy = waveHeight(7, 31);
+      if (Math.abs(fair - stormy) > 1e-9 || Math.abs(fair) < 1e-6) errors.push(`${R.id}: with no swell from the weather the sea should stand at its floor (${fair.toFixed(3)}, expected ${stormy.toFixed(3)})`);
+      if (Math.abs(ashore - fair * 0.35) > 1e-9) errors.push(`${R.id}: updateWaves(…, floor) should scale the swell's floor`);
+    }
+    updateWaves(12, 1, 0.6);
     setSeaOrigin(0, 0);
 
     // the weather's odds: no storm starts at home, and the bands rank as they should
@@ -507,29 +599,56 @@ const checks = {
     if (odds.coastal.storm !== 1500 || odds.coastal.rain !== 750) errors.push("the coastal sea should leave weather.js's table as it is");
     for (const [band, B] of Object.entries(Z.BANDS)) if (!(B.stormFor?.[0] > 0 && B.stormFor[1] > B.stormFor[0])) errors.push(`BANDS.${band}: stormFor needs a shortest and a longest storm`);
 
-    // the shaders: the waves include the zone code, with one line a zone that says what the table says
+    // the shaders: the waves include the zone code, with one line a zone that says what the table says.
+    // Each line is read back and worked out by hand, then compared with the CPU all over the map.
     const glsl = Z.SEA_ZONE_GLSL;
-    if (!WAVE_GLSL.includes(glsl) || !/waveHeightK\(p, seaWaveK\(p\)\)/.test(WAVE_GLSL)) errors.push('WAVE_GLSL does not include the sea zones (SEA_ZONE_GLSL, seaWaveK)');
-    if (!glsl.includes(`uniform vec2 uSeaZone[${Z.SEA_ZONES.length}];`) || Z.ZONE_AT.length !== Z.SEA_ZONES.length * 2) errors.push('uSeaZone does not have one centre for each zone');
+    if (!WAVE_GLSL.includes(glsl) || !/waveHeightK\(p, seaWaveK\(p\)\)/.test(WAVE_GLSL) || !WAVE_GLSL.includes('float swellAt(vec3 k) { return max(uSwellScale * k.y, k.z); }')) errors.push('WAVE_GLSL does not include the sea zones (SEA_ZONE_GLSL, seaWaveK, swellAt)');
+    if (!glsl.includes(`uniform vec2 uSeaZone[${Z.SEA_ZONES.length}];`) || Z.ZONE_AT.length !== Z.SEA_ZONES.length * 2 || !glsl.includes('k.z *= uSeaFloor;')) errors.push('uSeaZone does not have one centre for each zone, or the floor is not scaled by uSeaFloor');
     const num = '(-?[\\d.]+)';
-    const line = new RegExp(`d = distance\\(w, uSeaZone\\[(\\d+)\\]\\); k \\*= mix\\(vec2\\(1\\.0\\), vec2\\(${num}, ${num}\\), (?:smoothstep\\(${num}, ${num}, d\\) \\* )?\\(1\\.0 - smoothstep\\(${num}, ${num}, d\\)\\)\\); // (\\w+)`, 'g');
-    const rows = [...glsl.matchAll(line)];
-    if (rows.length !== Z.SEA_ZONES.length) errors.push(`the shader has ${rows.length} zone lines for ${Z.SEA_ZONES.length} zones`);
+    const line = new RegExp(`d = (distance\\(w, uSeaZone\\[(\\d+)\\]\\)|max\\(abs\\(w\\.x - uSeaZone\\[(\\d+)\\]\\.x\\), abs\\(w\\.y - uSeaZone\\[\\d+\\]\\.y\\)\\)); s = (?:smoothstep\\(${num}, ${num}, d\\) \\* )?\\(1\\.0 - smoothstep\\(${num}, ${num}, d\\)\\)( \\* calm)?;`
+      + `(?: k\\.xy \\*= mix\\(vec2\\(1\\.0\\), vec2\\(${num}, ${num}\\), s\\);)?(?: look\\.x = max\\(look\\.x, ${num} \\* s\\);)?(?: k\\.z = max\\(k\\.z, ${num} \\* s\\); look\\.y = max\\(look\\.y, ${num} \\* s\\);)?(?: calm \\*= smoothstep\\(${num}, ${num}, d\\);)? // (\\w+)`, 'g');
+    const lines = [...glsl.matchAll(line)].map((m) => {
+      const n = (v) => (v == null ? null : Number(v));
+      return { edge: m[3] != null, i: n(m[2] ?? m[3]), in0: n(m[4]), in1: n(m[5]), out0: n(m[6]), out1: n(m[7]), calm: !!m[8], wave: n(m[9]), swell: n(m[10]), shallow: n(m[11]), floor: n(m[12]), look: n(m[13]), p0: n(m[14]), p1: n(m[15]), id: m[16] };
+    });
+    if (lines.length !== Z.SEA_ZONES.length) errors.push(`the shader has ${lines.length} zone lines for ${Z.SEA_ZONES.length} zones`);
     const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-    for (const m of rows) {
-      const [i, wave, swell, in0, in1, out0, out1] = m.slice(1, 8).map((v) => (v == null ? null : Number(v)));
-      const R = Z.SEA_ZONES[i];
-      if (!R || R.id !== m[8]) { errors.push(`shader zone line ${i} is "${m[8]}", the table says "${R?.id}"`); continue; }
-      // work the shader's line out by hand and compare it with the CPU's along a line through the zone
-      for (let d = 0; d <= R.outer + R.fade + 100; d += 25) {
-        const s = (in0 == null ? 1 : sstep(in0, in1, d)) * (1 - sstep(out0, out1, d));
-        if (Math.abs(s - Z.zoneStrength(R, d)) > 1e-6) { errors.push(`${R.id}: the shader and the CPU disagree ${d} m out (${s.toFixed(4)} and ${Z.zoneStrength(R, d).toFixed(4)})`); break; }
+    lines.forEach((L, row) => {
+      const R = Z.SEA_ZONES[L.i];
+      if (!R || R.id !== L.id || L.i !== row) { errors.push(`shader zone line ${row} is "${L.id}" (uSeaZone[${L.i}]), the table says "${Z.SEA_ZONES[row]?.id}"`); return; }
+      const fin = R.fadeIn ?? R.fade, pocket = !!R.severity && R.inner > 0 && !R.edge;
+      const same = L.edge === !!R.edge && L.calm === !!R.edge && L.out0 === R.outer && L.out1 === R.outer + R.fade && (R.inner > 0 ? L.in0 === R.inner - fin && L.in1 === R.inner : L.in0 == null)
+        && (L.wave ?? 1) === R.wave && (L.swell ?? 1) === R.swell && (L.shallow ?? 0) === (R.shallow || 0)
+        && (R.severity ? L.floor === ROUGH.floor[R.severity] && Math.abs(L.look - R.severity / 3) < 1e-6 : L.floor == null)
+        && (pocket ? L.p0 === R.inner - fin && L.p1 === R.inner : L.p0 == null);
+      if (!same) errors.push(`${R.id}: the shader's numbers are not the table's`);
+    });
+    // the shader's lines, run as the graphics card would
+    const shaderSea = (x, z) => {
+      let wave = 1, swell = 1, floor = 0, shallow = 0, calm = 1;
+      for (const L of lines) {
+        const cx = Z.ZONE_AT[L.i * 2], cz = Z.ZONE_AT[L.i * 2 + 1];
+        const d = L.edge ? Math.max(Math.abs(x - cx), Math.abs(z - cz)) : Math.hypot(x - cx, z - cz);
+        const sK = (L.in0 == null ? 1 : sstep(L.in0, L.in1, d)) * (1 - sstep(L.out0, L.out1, d)) * (L.calm ? calm : 1);
+        if (L.wave != null) { wave *= 1 + (L.wave - 1) * sK; swell *= 1 + (L.swell - 1) * sK; }
+        if (L.shallow != null) shallow = Math.max(shallow, L.shallow * sK);
+        if (L.floor != null) floor = Math.max(floor, L.floor * sK);
+        if (L.p0 != null) calm *= sstep(L.p0, L.p1, d);
       }
-      if (wave !== R.wave || swell !== R.swell || out0 !== R.outer || out1 !== R.outer + R.fade || (R.inner > 0 && (in0 !== R.inner - R.fade || in1 !== R.inner))) errors.push(`${R.id}: the shader's numbers are not the table's`);
+      return [wave, swell, floor, shallow];
+    };
+    let compared = 0;
+    compare: for (let x = -WORLD_HALF; x <= WORLD_HALF; x += 125) for (let z = -WORLD_HALF; z <= WORLD_HALF; z += 125) {
+      const gpu = shaderSea(x, z), S = Z.seaAt(x, z), cpu = [...Z.waveFactors(x, z, k), S.shallow];
+      compared++;
+      if (gpu.some((v, j) => Math.abs(v - cpu[j]) > 1e-6) || cpu[0] !== S.wave || cpu[1] !== S.swell || cpu[2] !== S.floor) { errors.push(`the shader and the CPU disagree at ${x}, ${z}: ${gpu.map((v) => v.toFixed(4))} and ${cpu.map((v) => v.toFixed(4))}`); break compare; }
     }
+    const openLine = glsl.match(new RegExp(`look\\.z = smoothstep\\(${num}, ${num}, d\\) \\* \\(1\\.0 - smoothstep\\(${num}, ${num}, d\\)\\);`));
+    if (!openLine) errors.push('the shader has no line for the open sea (look.z)');
+    else for (let d = 0; d <= 12000; d += 50) if (Math.abs(sstep(+openLine[1], +openLine[2], d) * (1 - sstep(+openLine[3], +openLine[4], d)) - Z.openSea(d)) > 1e-6) { errors.push(`the open sea: the shader and the CPU disagree ${d} m out`); break; }
     const ocean = source[join(SRC, 'ocean.js')];
-    for (const need of ['seaWaveK(wp.xz)', 'seaShallowK(wp.xz)', 'clearShallows(']) if (!ocean.includes(need)) errors.push(`ocean.js no longer calls ${need}`);
-    return { errors, note: `${Z.SEA_ZONES.length} zone (${Z.SEA_ZONES.map((r) => r.id).join(', ')}), home waters to ${home.outer}-${home.outer + home.fade} m, open sea from ${Z.OPEN_SEA} m` };
+    for (const need of ['seaZones(wp.xz, seaK, seaLook)', 'swellAt(vSeaK)', 'clearShallows(', 'rough * 0.2']) if (!ocean.includes(need)) errors.push(`ocean.js no longer has ${need}`);
+    return { errors, note: `${Z.SEA_ZONES.length} zones (${Z.SEA_ZONES.map((r) => r.id).join(', ')}), home waters to ${home.outer}-${home.outer + home.fade} m, open sea from ${Z.OPEN_SEA} m, ${rough.length} rough zones clear of all ${ports.length + 1} ports; the shader and the CPU agree at ${compared} points` };
   },
 
   // How a boat rides the wave set (WAVE_DEFS in config.js): pitch and bow slams
@@ -539,11 +658,16 @@ const checks = {
   // that sailing feels about the same and storms cost about as much hull.
   // Each is sailed twice: out in plain sea, far from any zone (sea-zones.js),
   // and across home waters from one side to the other, where the sea is calmer.
+  // Then through the worst of each rough zone under a clear sky, where the
+  // swell's floor should make a sea of its own, and the roughest in a storm.
   async ride() {
     const errors = [];
     const { updateWaves, waveHeight, setSeaOrigin } = await load('waves.js');
-    const { SEA_ZONES, seaAt } = await load('sea-zones.js');
+    const { SEA_ZONES, seaAt, swellAt } = await load('sea-zones.js');
     const damp = (a, b, l, dt) => a + (b - a) * (1 - Math.exp(-l * dt));
+    let origin = [1e5, 0], plain = true; // where on the map a run's (0, 0) is, and whether that is plain sea
+    const sea = {};
+    const place = (x, z, isPlain = false) => { origin = [x, z]; plain = isPlain; setSeaOrigin(x, z); };
     const sail = (wave, swell, heading, seconds, start = 0) => {
       const dt = 1 / 60, fx = Math.sin(heading), fz = Math.cos(heading);
       let x = -fx * start, z = -fz * start, t = 0, pitch = 0, last = 0, wait = 0, slams = 0, sum = 0, n = 0, crest = -Infinity;
@@ -556,7 +680,7 @@ const checks = {
         const rate = (pitch - last) / dt;
         last = pitch; wait -= dt;
         // (game.js only counts a slam where the swell is heavy enough: the weather's, times the zone's)
-        if (wait <= 0 && pitch > 0.08 && rate > 0.11 && (start === 0 || swell * seaAt(x, z).swell >= 0.4)) { wait = 3.5; slams++; }
+        if (wait <= 0 && pitch > 0.08 && rate > 0.11 && (plain || swellAt(seaAt(x + origin[0], z + origin[1], sea), swell) >= 0.4)) { wait = 3.5; slams++; }
         if (i > 120) { sum += pitch * pitch; n++; crest = Math.max(crest, (bow + stern) / 2); }
       }
       return { pitch: (Math.sqrt(sum / n) * 180) / Math.PI, slams: slams / (seconds / 60), crest };
@@ -567,11 +691,19 @@ const checks = {
       const mean = (k) => runs.reduce((a, r) => a + r[k], 0) / runs.length;
       return { pitch: mean('pitch'), slams: mean('slams'), crest: Math.max(...runs.map((r) => r.crest)) };
     };
-    setSeaOrigin(1e5, 0); // plain sea: today's numbers
+    place(1e5, 0, true); // plain sea: today's numbers
     const clear = over(0.35, 0), storm = over(1.7, 1);
-    setSeaOrigin(0, 0);   // home waters: 220 s at 9 m/s is its full width, edge to edge
+    place(0, 0);          // home waters: 220 s at 9 m/s is its full width, edge to edge
     const reach = SEA_ZONES[0].outer - 10;
     const homeClear = over(0.35, 0, (reach * 2) / 9, reach), homeStorm = over(1.7, 1, (reach * 2) / 9, reach);
+    // rough water: 40 s through the worst of each zone on the same eight headings, under a clear sky, and the Reach in a storm
+    const rough = {};
+    for (const R of SEA_ZONES.filter((r) => r.severity)) {
+      place(...(R.edge ? [300, R.inner + 150] : [R.x + (R.inner + R.outer) / 2, R.z]));
+      rough[R.id] = over(0.35, 0, 40, 180);
+      if (R.severity === 3) rough.storm = over(1.7, 1, 40, 180);
+    }
+    setSeaOrigin(0, 0);
     const want = (label, v, lo, hi, unit) => { if (!(v >= lo && v <= hi)) errors.push(`${label} is ${v.toFixed(2)}${unit}, outside ${lo}-${hi}${unit}`); };
     want('clear weather: the pitch (rms)', clear.pitch, 0.8, 2, '°');
     want('clear weather: the tallest crest', clear.crest, 0.5, 1.5, ' m');
@@ -584,8 +716,20 @@ const checks = {
     want('home waters, a storm: bow slams a minute', homeStorm.slams, 0, 5, '');
     want('home waters, a storm: the tallest crest', homeStorm.crest, 3, 6, ' m');
     if (!(homeStorm.pitch < storm.pitch * 0.6 && homeStorm.slams < storm.slams * 0.6)) errors.push('a storm should be much easier to ride in home waters than outside');
+    // rough water under a clear sky: a real sea in each zone, worse with severity, and slams from the Rip up
+    const limits = { reach: [3, 5.5, 1.5, 5, 4.5, 8], rip: [2.4, 4.5, 1, 4.5, 3, 6], swell: [1.5, 3, 0, 2, 2, 4] };
+    for (const [id, [p0, p1, s0, s1, c0, c1]] of Object.entries(limits)) {
+      const r = rough[id];
+      if (!r) { errors.push(`no rough zone "${id}" to ride (update this check)`); continue; }
+      want(`${id}, clear weather: the pitch (rms)`, r.pitch, p0, p1, '°');
+      want(`${id}, clear weather: bow slams a minute`, r.slams, s0, s1, '');
+      want(`${id}, clear weather: the tallest crest`, r.crest, c0, c1, ' m');
+    }
+    if (rough.reach && rough.rip && rough.swell && !(rough.reach.pitch > rough.rip.pitch && rough.rip.pitch > rough.swell.pitch && rough.swell.pitch > clear.pitch * 1.5)) errors.push('rough water should ride harder with each severity, and all of it harder than plain sea');
+    if (rough.storm && !(rough.storm.pitch > storm.pitch && rough.storm.slams > storm.slams)) errors.push('a storm in the roughest zone should be the worst water there is');
     const told = (r) => `pitch ${r.pitch.toFixed(1)}°, ${r.slams.toFixed(1)} bow slams a minute, crests to ${r.crest.toFixed(1)} m`;
-    return { errors, note: `clear: pitch ${clear.pitch.toFixed(1)}°, crests to ${clear.crest.toFixed(1)} m; storm: ${told(storm)}; home waters, clear: pitch ${homeClear.pitch.toFixed(1)}°, crests to ${homeClear.crest.toFixed(1)} m; home waters, storm: ${told(homeStorm)}` };
+    const roughTold = Object.entries(rough).map(([id, r]) => `${id === 'storm' ? 'the roughest in a storm' : id}: ${told(r)}`).join('; ');
+    return { errors, note: `clear: pitch ${clear.pitch.toFixed(1)}°, crests to ${clear.crest.toFixed(1)} m; storm: ${told(storm)}; home waters, clear: pitch ${homeClear.pitch.toFixed(1)}°, crests to ${homeClear.crest.toFixed(1)} m; home waters, storm: ${told(homeStorm)}; rough water, clear: ${roughTold}` };
   },
 
   // Ashore layouts validate for islands across the whole difficulty range, in

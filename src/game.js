@@ -1,17 +1,17 @@
 // Game rules: sailing loop, economy, discovery, treasure, docking/saving,
 // storms and shipwrecks, camera.
 import * as THREE from 'three';
-import { UPGRADES, upgradeValue, MAP_RES, MAP_CELL, WORLD_HALF, DAY_LENGTH, isTouch } from './config.js';
+import { UPGRADES, upgradeValue, MAP_RES, MAP_CELL, WORLD_HALF, DAY_LENGTH, ROUGH, isTouch } from './config.js';
 import { clamp, damp, dampAngle, smoothstep, lerp, wrapAngle, bearingDeg, TAU } from './util.js';
 import { updateWaves, waveHeight } from './waves.js';
-import { bandAt, seaAt } from './sea-zones.js';
+import { bandAt, seaAt, swellAt, roughDamage } from './sea-zones.js';
 import { ringUniforms } from './world.js';
 import { propMesh } from './props.js';
 import { pointOfSailName } from './boat.js';
 import { loadSave, writeSave, clearSave, encodeBytes, decodeBytes, loadSettings, saveSettings, migrate } from './save.js';
 import { Emitter } from './events.js';
 import { STYLES, normalizeProfile } from './cosmetics.js';
-import { LINES, SIGHTINGS } from './story-text.js';
+import { LINES, SIGHTINGS, SEAS } from './story-text.js';
 
 const SPYGLASS_HINT = LINES.spyglassHint;
 // Sea camera: the lowest it orbits (radians above the boat), and how far past
@@ -341,7 +341,7 @@ export class Game {
     if (this.mode !== 'sailing') return;
     const s = this.state;
     s.health -= amount;
-    if (kind !== 'storm') {
+    if (kind !== 'storm' && kind !== 'rough') {
       this.ui.flashDamage(amount);
       this.audio.play('crash');
       this.cam.shake = Math.min(1.5, 0.3 + amount / 15);
@@ -541,7 +541,9 @@ export class Game {
     // don't drag the foam across the screen. CPU + GPU share this clock.
     // ashore, keep the swell gentle so it doesn't wash over the beach
     const ashoreSea = this.mode === 'ashore' || this.mode === 'landing' ? 0.35 : 1;
-    updateWaves(this.elapsed * 0.6, w.p.wave * ashoreSea, w.p.swell * ashoreSea);
+    // (and of rough water's own swell, less still: an island inside it would otherwise stand
+    // in a storm's surf for good. This leaves it a rainy day's sea.)
+    updateWaves(this.elapsed * 0.6, w.p.wave * ashoreSea, w.p.swell * ashoreSea, ashoreSea * ashoreSea);
     const wind = { angle: w.windAngle, strength: w.windStrength };
     const up = this.upv;
 
@@ -564,6 +566,9 @@ export class Game {
         const sf = [0, 0.5, 1][boat.sailLevel];
         this.damage(storm * (0.15 + 1.4 * sf * sf) * (1 - up.keel) * dt, 'storm'); // slams add the rest
       }
+      // rough water does the same under any sky, and the keel is only half the answer to it
+      if (this.sea.rough > 0 && this.mode === 'sailing') this.damage(roughDamage(this.sea, boat.sailLevel, up.keel) * dt, 'rough');
+      this.announceSea();
       this.updateSailingChecks(dt, acts);
     } else if (this.mode === 'docking') {
       this.dockT += dt / 1.6;
@@ -735,9 +740,22 @@ export class Game {
     if (boat.atEdge) warn = 'The currents of the world’s edge push you back';
     else if (w.p.storm > 0.5 && boat.sailLevel === 2) warn = 'Storm! Lower your sails to ride it out';
     else if (w.p.storm > 0.5) warn = 'Storm: hull taking a beating';
+    else if (this.sea.rough > ROUGH.warn && boat.sailLevel === 2) warn = SEAS.reef;
+    else if (this.sea.rough > ROUGH.warn) warn = SEAS.beating;
     else if (hf < 0.3) warn = 'Hull badly damaged: make for port!';
     else if (boat.efficiency < 0.2 && boat.sailLevel > 0) warn = 'In irons: turn across the wind';
     if (warn !== this.warn) { this.warn = warn; this.ui.warning(warn); }
+  }
+
+  /** Sailing into rough water shows its name, like a discovery (and again if you come back after a while). */
+  announceSea() {
+    const id = this.sea.rough > 0.12 ? this.sea.roughZone : null, said = this._seaSaid;
+    if (!id || (said && said.id === id && this.elapsed - said.t < 120)) {
+      if (id && said) said.t = this.elapsed; // still in it: the clock starts when you leave
+      return;
+    }
+    this._seaSaid = { id, t: this.elapsed };
+    this.ui.banner(SEAS[id], SEAS.rough);
   }
 
   // In heavy seas the bow plunges into troughs: a thud, spray-shake and a knock to the hull.
@@ -746,7 +764,7 @@ export class Game {
     const rate = (boat.pitch - (this._lastPitch ?? boat.pitch)) / Math.max(dt, 1e-3);
     this._lastPitch = boat.pitch;
     this._slamCd = (this._slamCd || 0) - dt;
-    const swell = w.p.swell * this.sea.swell; // the swell here: half the weather's in home waters
+    const swell = swellAt(this.sea, w.p.swell); // the swell here: half the weather's in home waters, never under rough water's floor
     if (this.mode !== 'sailing' || swell < 0.4 || this._slamCd > 0) return;
     if (boat.pitch > 0.08 && rate > 0.11 && Math.abs(boat.speed) > 2) {
       this._slamCd = 3.5;
@@ -840,7 +858,7 @@ export class Game {
     cam.lookAt(tx, ty, tz);
     if (lookUp > 0) cam.rotateX(lookUp);
     // in heavy seas the horizon tilts a little with the hull
-    const heavy = this.weather.p.swell * this.sea.swell;
+    const heavy = swellAt(this.sea, this.weather.p.swell);
     if (heavy > 0.05) cam.rotateZ(-boat.roll * 0.4 * heavy);
     this.setFov(55, dt);
   }
