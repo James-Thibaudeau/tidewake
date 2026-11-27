@@ -15,6 +15,7 @@ import { SEAS } from './story-text.js';
 import { crossing, openSides } from './debug-pilot.js';
 import { CUES } from './music/themes.js';
 import { cueFor } from './music-cues.js';
+import { PAINTS, keyOf } from './paints.js';
 
 const BACKUP_KEY = SAVE_KEY + '.debug-backup';
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
@@ -29,7 +30,8 @@ const HELP = `tidewake.debug
                            A rough zone's id (reach | rip | swell) puts it in the worst of that zone, bow to the island
   zone()                   the sea where the boat is: band (home | coastal | open), zone, what it does to the waves,
                            and in rough water its name, severity, swell and what it costs the hull a kilometre and a second
-  give({ gold, cargo, health, upgrades })   upgrades: 'max' or { sail: 3, hull: 2, … }
+  give({ gold, cargo, health, upgrades, paints })   upgrades: 'max' or { sail: 3, hull: 2, … };
+                           paints: 'all' or ['paint:harborBlue', 'figurehead:owl', …] for the paint yard
   journals(n, { anchor })  story: the first n journals found (0-7); anchor: true fits grandfather's anchor
   refit(tier, { open })    grandfather's anchor at refit tier 0-4 (fits the anchor too); open: biomes to
                            treat as having levels, e.g. ['rocky'], so their refit is offered (until reload)
@@ -178,8 +180,9 @@ export function installDebug(game) {
       };
     },
 
-    give({ gold, cargo, health, upgrades } = {}) {
+    give({ gold, cargo, health, upgrades, paints } = {}) {
       const s = g.state;
+      if (paints) for (const k of paints === 'all' ? PAINTS.map(keyOf) : paints) if (!s.paints.includes(k)) s.paints.push(k);
       if (gold != null) s.banked += gold;
       if (cargo != null) s.cargo += cargo;
       if (upgrades) {

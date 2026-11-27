@@ -1,10 +1,11 @@
 // Boat building blocks shared by the model, fittings and rig: dimensions and
 // colours per tier, the hull outline, canvas textures (deck, sails, emblems,
-// runes), decoration meshes, ropes and the figurehead.
+// runes), decoration meshes, ropes and the eagle figurehead.
 import * as THREE from 'three';
 import { toon, toonGradient, toonMaterial, outlineMaterial } from '../toon.js';
 import { smoothstep } from '../util.js';
 import { part, mergeParts } from '../explorer.js';
+import { drawMark } from './marks.js';
 
 export const SAIL_U = 12, SAIL_V = 10;
 export const JIB_U = 10, JIB_V = 7;     // along the luff, luff->leech
@@ -18,13 +19,18 @@ export const MAX_TIER = 5;
 export const SAIL_BASE = ['#e3d4b1', '#fbf8ef', '#fbf9f2', '#fff1cc', '#9c2f27', '#fffaf0'];
 export const ROPE = '#5a4632';
 
+// Each hull's own look: its paint, and its figurehead (none below hull 2:
+// there's no stem to carry one). `figure.base` is the tier's own carving
+// (figureheads.js); a paint-yard figurehead goes on the same mount, at
+// `at` (y and z on the stem, tilt) and `scale`.
+const STEM = { y: 0.62, z: 3.98, tilt: -0.35 };
 export const HULL_STYLE = [
-  { hull: '#8f5e2e', trim: '#cdb892', deck: '#c89b62' },
-  { hull: '#7a4a22', trim: '#f2ead6', deck: '#d0a46a' },
-  { hull: '#b8432f', trim: '#f5efe0', deck: '#d8ae74' },
-  { hull: '#2e1f1a', trim: '#ffcf4a', deck: '#b88a55' },
-  { hull: '#4a1d13', trim: '#f3e7c9', deck: '#c08a52' },   // mahogany galleon
-  { hull: '#123c5c', trim: '#ffd75e', deck: '#cfa168' },   // royal flagship
+  { hull: '#8f5e2e', trim: '#cdb892', deck: '#c89b62', figure: null },
+  { hull: '#7a4a22', trim: '#f2ead6', deck: '#d0a46a', figure: null },
+  { hull: '#b8432f', trim: '#f5efe0', deck: '#d8ae74', figure: { base: 'whiteEagle', at: STEM, scale: 1 } },
+  { hull: '#2e1f1a', trim: '#ffcf4a', deck: '#b88a55', figure: { base: 'gildedEagle', at: STEM, scale: 1 } },
+  { hull: '#4a1d13', trim: '#f3e7c9', deck: '#c08a52', figure: { base: 'gildedEagle', at: STEM, scale: 1 } },   // mahogany galleon
+  { hull: '#123c5c', trim: '#ffd75e', deck: '#cfa168', figure: { base: 'royalEagle', at: STEM, scale: 1.25 } },  // royal flagship
 ];
 export const GOLD = '#ffcf4a', BRASS = '#d9a441', COPPER = '#c8743a';
 
@@ -192,9 +198,11 @@ export function drawWing(g, S, H, { u = 0.37, v = 0.5, R = 1.35 } = {}) {
   g.restore();
 }
 
-// emblem: a livery's own mark in place of the tier's stripes and roses ('wing')
-export function sailTexture(tier, plain = false, cloth = null, emblem = null) {
-  const key = tier + (plain ? 'p' : '') + (cloth || '') + (emblem || '');
+// emblem: a livery's own mark in place of the tier's stripes and roses ('wing',
+// 'compass', or one of marks.js). look: a patterned cloth ({ pattern: 'stripe', color2 }).
+export function sailTexture(tier, plain = false, cloth = null, emblem = null, look = null) {
+  const stripe = look?.pattern === 'stripe' ? look.color2 : null;
+  const key = tier + (plain ? 'p' : '') + (cloth || '') + (emblem || '') + (stripe || '');
   if (sailTexCache[key]) return sailTexCache[key];
   const H = SAIL_H[tier];
   const CREAM = '#f3e7c9';
@@ -203,6 +211,8 @@ export function sailTexture(tier, plain = false, cloth = null, emblem = null) {
   const tex = canvasTex(256, 256, (g, S) => {
     g.fillStyle = cloth || SAIL_BASE[tier];
     g.fillRect(0, 0, S, S);
+    // a striped cloth: broad panels of the second colour, sewn in along the luff
+    if (stripe) { g.fillStyle = stripe; for (let x = 32; x < S; x += 64) g.fillRect(x, 0, 32, S); }
     for (let i = 0; i < 1400; i++) {
       g.fillStyle = dk ? `rgba(20,5,10,${Math.random() * 0.09})`
         : tier === 4 ? `rgba(40,10,5,${Math.random() * 0.08})` : `rgba(120,100,60,${Math.random() * (tier === 0 ? 0.08 : 0.04)})`;
@@ -263,6 +273,17 @@ export function sailTexture(tier, plain = false, cloth = null, emblem = null) {
       g.fillStyle = WING_INK; g.fillRect(0, S - 40, S, 26);
       g.fillStyle = '#f3e7c9'; g.fillRect(0, S - 44, S, 3);
       if (!plain) drawWing(g, S, H);
+    }
+    // an emblem's ink follows the cloth showing, dyed or the tier's own (tier 4's is dark red)
+    const showing = new THREE.Color(cloth || SAIL_BASE[tier]);
+    const markDark = 0.2126 * showing.r + 0.7152 * showing.g + 0.0722 * showing.b < 0.5;
+    if (emblem === 'compass' && !plain) drawEmblem(g, S, H, markDark ? { R: 1.25, ...paleRose } : { R: 1.25 });
+    else if (emblem && emblem !== 'wing' && !plain) {
+      // the paint yard's marks, squashed like drawWing so they read right on the taper
+      const u = 0.37, v = 0.5, R = 1.3, rx = R / (BOOM_LEN / S), ry = R / ((H * (1 - 0.55 * u)) / S);
+      g.save(); g.translate(u * S, (1 - v) * S); g.scale(rx, ry);
+      drawMark(g, emblem, markDark);
+      g.restore();
     }
     if (tier === 3 || tier === 5) {
       // gold wave trim along the foot
@@ -387,10 +408,8 @@ export function figurehead(gold, winged = false) {
       parts.push(part(new THREE.TorusGeometry(0.12, 0.025, 5, 12), GOLD, { y: 0.42, z: 0.28, rx: Math.PI / 2 }));
     }
   }
-  const g = decoMesh(parts, true);
-  g.position.set(0, 0.62, 3.98);
-  g.rotation.x = -0.35;
-  return g;
+  // placed on the stem by its hull's mount (figureheads.js, HULL_STYLE.figure)
+  return decoMesh(parts, true);
 }
 
 // The mast of a dismasted boat: this much of it is left standing.

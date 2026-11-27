@@ -155,12 +155,30 @@
         <button class="tab" data-tab="quests" role="tab"><span class="ico" data-icon="scroll"></span> Quest Board<span class="tabBadge hidden" id="questBadge"></span></button>
         <button class="tab" data-tab="tailor" role="tab"><span class="ico" data-icon="needle"></span> Tailor</button>
       </div>
+      <!-- The shipwright's tab is a stack of sections, each a <section class="shopSection">
+           with its own title, and a button for it in #shipwrightNav. -->
       <div class="tabPane" id="paneShipwright">
-        <div id="upgradeGrid" class="grid"></div>
-        <div id="sailDye" class="sailDye hidden">
-          <p>Sable's gift: crimson dye for your sails.</p>
-          <button id="btnSailDye" class="toggle">Sails: Standard</button>
-        </div>
+        <nav class="sectionNav" id="shipwrightNav">
+          <button class="chip" data-jump="secUpgrades">Upgrades</button>
+          <button class="chip" data-jump="secPaintYard">Paint yard</button>
+        </nav>
+        <section class="shopSection" id="secUpgrades">
+          <h3 class="sectionTitle">Upgrades</h3>
+          <div id="upgradeGrid" class="grid"></div>
+        </section>
+        <section class="shopSection" id="secPaintYard">
+          <h3 class="sectionTitle">Paint yard</h3>
+          <p class="shopIntro">Buy a paint once, then use it as often as you like. Looks only: nothing here makes the ship faster or stronger.</p>
+          <div id="paintYard" class="yard">
+            <div class="yardStage">
+              <canvas id="yardPreview" class="yardPreview" width="480" height="300"></canvas>
+            </div>
+            <div class="yardBar hidden"></div>
+            <div class="yardParts chips"></div>
+            <p class="yardNote"></p>
+            <div class="yardTiles"></div>
+          </div>
+        </section>
       </div>
       <div class="tabPane hidden" id="paneQuests">
         <div id="rivalNotes"></div>

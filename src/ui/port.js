@@ -6,7 +6,6 @@ import { STYLES, owns } from '../cosmetics.js';
 import { MAX_ACTIVE, fmtDist } from '../quests.js';
 import { JOURNALS, LETTERS, LINES, SIGHTINGS } from '../story-text.js';
 import { LOG, MILESTONES } from '../sightings.js';
-import { LINES as RIVAL_LINES } from '../rival-text.js';
 import { $, ROMAN, esc, fmt } from './shared.js';
 import { ICONS, SIGHTING_ART } from './icons.js';
 
@@ -35,7 +34,10 @@ export class PortUI {
     const sheet = this.el.portScreen?.querySelector('.sheet');
     if (sheet) sheet.scrollTop = 0;
   }
-  closePort() { this.el.portScreen?.classList.add('hidden'); }
+  closePort() {
+    this.el.portScreen?.classList.add('hidden');
+    this.endPaintTry();
+  }
 
   setPortTab(tab) {
     this.portTab = tab;
@@ -245,12 +247,6 @@ export class PortUI {
         <div class="row2">${f.races.map((r) => `<button class="btn" data-rematch="${r.id}">${esc(r.title)}</button>`).join('')}</div></div>`;
     }
     box.innerHTML = html;
-    const dye = this.el.sailDye;
-    if (dye) {
-      dye.classList.toggle('hidden', !rv?.canDye);
-      this.el.btnSailDye.textContent = rv?.dyeOn ? RIVAL_LINES.dye.on : RIVAL_LINES.dye.off;
-      this.el.btnSailDye.classList.toggle('off', !rv?.dyeOn);
-    }
   }
 
   refreshTailor() {
@@ -277,6 +273,7 @@ export class PortUI {
     this.refreshTailor();
     this.refreshQuests();
     this.refreshRivalNotes();
+    this.refreshPaintYard();
     const maxH = (b && b.maxHealth) || 100;
     this.el.portHull.textContent = `Hull ${Math.ceil(st.health || 0)}/${maxH}`;
     const cost = g.repairCost ? g.repairCost() : 0;

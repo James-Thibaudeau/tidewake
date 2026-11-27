@@ -21,6 +21,7 @@ import { SeaEvents } from './sea-events.js';
 import { RoughWater } from './rough-water.js';
 import { Ashore } from './ashore/ashore.js';
 import { Rival } from './rival.js';
+import { PaintYard } from './paint-yard.js';
 import { loadSettings } from './save.js';
 import { FX, fxFlags } from './fx.js';
 import { installDebug } from './debug.js';
@@ -82,6 +83,7 @@ async function boot() {
   game.reports = new Reports(game);
   game.seaEvents = new SeaEvents(game);
   game.rough = new RoughWater(game);
+  game.paintYard = new PaintYard(game);
 
   loadingText('Raising the sails…');
   await nextFrame();

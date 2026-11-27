@@ -219,6 +219,5 @@ export const LINES = {
   wrecked: 'The race is off. Sable will find you again.',
   towLost: "The tow line parted. The Redwing is adrift where you found her.",
   towSlow: 'Towing: your ship is slower',
-  dye: { on: 'Sails: Crimson', off: 'Sails: Standard' },
   record: 'Races with Sable: {wins} won, {losses} lost',
 };

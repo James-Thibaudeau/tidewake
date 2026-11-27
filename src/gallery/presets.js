@@ -72,6 +72,8 @@ export const VIEWS = {
   face: { kind: 'face', yaw: 0.3, pitch: 0.05 },
   helm: { kind: 'helm', yaw: 0.65, pitch: 0.16 },
   bow: { kind: 'bow', yaw: 0.95, pitch: 0.22 },
+  stem: { kind: 'stem', yaw: -0.85, pitch: 0.12 },       // the ship: close on the figurehead, from the port bow
+  masthead: { kind: 'masthead', yaw: Math.PI / 2, pitch: 0.05 }, // the ship: the flag and the pennant, abeam
   spot: { kind: 'spot', yaw: 0.6, pitch: 0.5 },
 };
 export const FIT_FOV = 30;

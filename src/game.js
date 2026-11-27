@@ -12,6 +12,7 @@ import { pointOfSailName } from './boat.js';
 import { loadSave, writeSave, clearSave, encodeBytes, decodeBytes, loadSettings, saveSettings, migrate } from './save.js';
 import { Emitter } from './events.js';
 import { STYLES, normalizeProfile } from './cosmetics.js';
+import { blankLivery } from './paints.js';
 import { LINES, SIGHTINGS, SEAS } from './story-text.js';
 
 const SPYGLASS_HINT = LINES.spyglassHint;
@@ -80,6 +81,8 @@ export class Game {
       rival: { chapter: 0, wins: 0, losses: 0, flags: {}, log: [] },
       // the living sea's log: what you've seen, and the pity counts (sea-events.js)
       sightings: { seen: {}, miss: {}, chain: null },
+      // the paint yard (paint-yard.js): what you own ('kind:id') and what the ship wears
+      paints: [], livery: blankLivery(),
     };
   }
 
@@ -114,6 +117,7 @@ export class Game {
     // Things that persist the moment they happen (not banked like gold)
     d.profile = s.profile; d.wardrobe = s.wardrobe; d.quests = s.quests;
     d.story = s.story; d.ashore = s.ashore; d.hold = s.hold; d.rival = s.rival; d.sightings = s.sightings;
+    d.paints = s.paints; d.livery = s.livery;
     migrate(d); // stamps the current version
     return d;
   }
@@ -152,6 +156,7 @@ export class Game {
     this.state = this.freshState();
     this.state.profile = normalizeProfile(profile);
     this.applyProfile();
+    this.paintYard?.apply();
     this.saveData = {};
     for (const I of this.world.islands) I.treasureTaken = false;
     this.applyUpgrades();
@@ -183,8 +188,10 @@ export class Game {
     s.tutorial = d.tutorial ?? 5;
     s.profile = normalizeProfile(d.profile); s.wardrobe = d.wardrobe; s.quests = d.quests;
     s.story = d.story; s.ashore = d.ashore; s.hold = d.hold; s.rival = d.rival; s.sightings = d.sightings;
+    s.paints = d.paints; s.livery = d.livery;
     this.state = s;
     this.saveData = d;
+    this.paintYard?.apply();
     this.applyUpgrades();
     this.applyProfile();
     s.health = d.health ?? this.boat.maxHealth;
