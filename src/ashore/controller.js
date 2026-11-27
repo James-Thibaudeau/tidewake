@@ -1,6 +1,7 @@
 // The on-foot character controller: a kinematic capsule with a cozy-platformer
 // feel (snappy acceleration, coyote time, jump buffering, variable jump height,
-// a jump that hangs at the top and falls quickly, step-up and ground snapping).
+// a jump that hangs at the top and falls quickly, step-up and ground snapping,
+// and a launch from a steam vent: launch()).
 // Physics runs in fixed steps; drawn() gives the place between the last two to
 // draw at, so a screen that refreshes at 90 or 144 Hz doesn't stutter. Pure JS
 // so it can be tested in Node; the tuning constants (config.js ASHORE) are
@@ -19,7 +20,8 @@ const STEP = 1 / 120; // fixed physics step (s)
  */
 export function gravityScale(P, vy, jump) {
   if (jump === 'cut' && vy > 0) return P.cutGravity;
-  if (jump === 'held' && Math.abs(vy) < P.hangSpeed) return P.hangGravity;
+  // (a launch from a vent hangs at the top like a held jump)
+  if ((jump === 'held' || jump === 'launch') && Math.abs(vy) < P.hangSpeed) return P.hangGravity;
   return vy > 0 ? 1 : P.fallGravity;
 }
 
@@ -53,7 +55,8 @@ export class CharacterController {
     this.groundNormalY = 1;
     this.coyote = 0;
     this.buffer = 0;
-    this.jump = null;         // the jump in progress: 'held', 'cut' or null (gravityScale)
+    this.jump = null;         // the jump in progress: 'held', 'cut', 'launch' (from a vent) or null (gravityScale)
+    this.groundOn = null;     // the collider we stand on (null on the terrain or in the air)
     this.splashed = false;    // fired once per fall into the water
     this.acc = 0;
     this.prev = { x: 0, y: 0, z: 0 }; // where the step before the last one left us (drawn)
@@ -69,11 +72,23 @@ export class CharacterController {
     this.vel.x = this.vel.y = this.vel.z = 0;
     this.yaw = yaw;
     this.grounded = false; this.coyote = 0; this.buffer = 0; this.jump = null; this.splashed = false;
+    this.groundOn = null;
     this.acc = 0;
     // settle onto whatever is below so we start grounded
     this.snapDown(1.0);
     this.prev.x = this.pos.x; this.prev.y = this.pos.y; this.prev.z = this.pos.z;
     this.prevYaw = this.yaw;
+  }
+
+  /**
+   * Thrown straight up at `vy` m/s by a steam vent. The sideways speed goes,
+   * and until the climb slows to P.vent.steerAbove you only drift, so you
+   * rise in the vent's column instead of into the rock beside it.
+   */
+  launch(vy) {
+    this.vel.y = vy;
+    this.vel.x = 0; this.vel.z = 0;
+    this.grounded = false; this.groundOn = null; this.coyote = 0; this.buffer = 0; this.jump = 'launch';
   }
 
   /** Horizontal speed (m/s). */
@@ -118,12 +133,14 @@ export class CharacterController {
     const wl = Math.hypot(wx, wz);
     if (wl > 1) { wx /= wl; wz /= wl; }
     const amt = Math.min(1, wl);
-    const top = (input.run ? P.run : P.walk) * amt;
+    // rising fast from a vent: only a drift (launch)
+    const rising = this.jump === 'launch' && v.y > P.vent.steerAbove;
+    const top = (input.run ? P.run : P.walk) * amt * (rising ? P.vent.steer : 1);
     const tx = amt > 1e-3 ? (wx / Math.max(wl, 1e-6)) * top : 0;
     const tz = amt > 1e-3 ? (wz / Math.max(wl, 1e-6)) * top : 0;
 
     // ---- horizontal acceleration (toward the target velocity)
-    let rate = this.grounded ? (amt > 0.05 ? P.accel : P.friction) : P.airAccel;
+    let rate = this.grounded ? (amt > 0.05 ? P.accel : P.friction) : P.airAccel * (rising ? P.vent.steer : 1);
     // turning back on yourself: brake harder so reversals feel crisp, not skiddy
     if (amt > 0.05 && v.x * tx + v.z * tz < 0) rate *= this.grounded ? 1.6 : 1.3;
     let dvx = tx - v.x, dvz = tz - v.z;
@@ -187,7 +204,7 @@ export class CharacterController {
     let grounded = res.grounded && v.y <= 0.01;
     // stay glued to the ground when walking down slopes and steps
     if (!grounded && wasGrounded && !ev.jumped && v.y <= 0.01) grounded = this.snapDown(P.stepUp + 0.05);
-    else if (grounded) { this.groundTag = res.tag; this.groundNormalY = res.normalY; }
+    else if (grounded) { this.groundTag = res.tag; this.groundNormalY = res.normalY; this.groundOn = res.onCollider; }
 
     if (grounded) {
       if (!wasGrounded && fallSpeed > 0.5) ev.landed = Math.max(ev.landed, fallSpeed);
@@ -195,6 +212,7 @@ export class CharacterController {
       if (!ev.jumped) this.jump = null;
     }
     this.grounded = grounded;
+    if (!grounded) this.groundOn = null;
 
     // ---- facing: turn smoothly toward where we're going
     // Face where the player is steering (not where momentum still carries us),
@@ -254,7 +272,7 @@ export class CharacterController {
     const res = moveCapsule(this.level, trial, { x: 0, y: -dist, z: 0 }, this.opts, this._probe);
     if (res.grounded && res.normalY >= this.opts.cosSlope && Math.hypot(trial.x - p.x, trial.z - p.z) < 0.02) {
       p.x = trial.x; p.y = trial.y; p.z = trial.z;
-      this.groundTag = res.tag; this.groundNormalY = res.normalY;
+      this.groundTag = res.tag; this.groundNormalY = res.normalY; this.groundOn = res.onCollider;
       this.grounded = true;
       return true;
     }

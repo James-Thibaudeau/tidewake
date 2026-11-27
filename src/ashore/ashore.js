@@ -9,7 +9,9 @@
 // own (chest.cosmetic) and life of its own (level.update): see wreck.js, grove.js.
 // Quest items (retrieve quests, an anchor refit's fitting) wait at the level's
 // vault; their state lives in the quest, not here. Which islands the anchor
-// will hold at, and from how far out, is refits.js.
+// will hold at, and from how far out, is refits.js. Steam vents and crumbling
+// basalt (level.vents, level.crumbles) are run by hazards.js; a level with
+// `lava` has lava for water. The anchor dragging in a storm is anchor-drag.js.
 import * as THREE from 'three';
 import { toonMaterial, glowBoost } from '../toon.js';
 import { ASHORE, ASHORE_BIOMES } from '../config.js';
@@ -28,6 +30,8 @@ import { CharacterController } from './controller.js';
 import { FollowCamera } from './camera.js';
 import { GroundShadow } from './ground-shadow.js';
 import { LandRace } from './pacer.js';
+import { Hazards } from './hazards.js';
+import { AnchorDrag } from './anchor-drag.js';
 
 // Hand-built levels for landmark islands, by island.landmark; the rest are generated.
 const LANDMARK_LEVELS = { grove: buildGroveLevel, arch: buildArchwayLevel };
@@ -94,6 +98,7 @@ export class Ashore {
     this.active = false;
     this.island = null;
     this._v = new THREE.Vector3();
+    this.drag = new AnchorDrag(this);
   }
 
   // ----------------------------------------------------------- at sea
@@ -176,6 +181,7 @@ export class Ashore {
     ex.root.rotation.set(0, L.spawn.yaw, 0);
     this.ctl = new CharacterController(L, ASHORE);
     this.ctl.teleport(L.spawn.x, L.spawn.y, L.spawn.z, L.spawn.yaw);
+    this.hazards = new Hazards(L, ASHORE);
     this.cam = new FollowCamera(g.camera, L);
     this.cam.snap(this.ctl, L.spawn.yaw);
     this.shadow = new GroundShadow();
@@ -224,6 +230,7 @@ export class Ashore {
     this.active = false;
     this.prompt = null;
     g.ui.setPrompt(null);
+    this.drag.stop();
     g.events.emit('ashore:leave', this.island);
     await g.ui.fade(1, 0.5);
     this.borrowSky(false);
@@ -240,7 +247,7 @@ export class Ashore {
     this.scene.remove(this.level.group);
     this.level.dispose();
     this.shadow.dispose();
-    this.level = null; this.ctl = null; this.cam = null; this.shadow = null;
+    this.level = null; this.ctl = null; this.cam = null; this.shadow = null; this.hazards = null;
     document.body.classList.remove('ashore');
     g.ui.setAshore(null);
     g.input.setScheme('sea');
@@ -362,6 +369,11 @@ export class Ashore {
     if (ev.jumped) g.audio.play('jump');
     if (ev.landed > 6) g.boat.explorer.land(Math.min(1, ev.landed / 18));
     if (ev.landed > 2) g.audio.play('land', { surface: ctl.groundTag, volume: Math.min(1, (ev.landed - 2) / 18) });
+    // steam vents and crumbling basalt
+    const hz = this.hazards.update(dt, ctl);
+    if (hz.launched) g.audio.play('vent');
+    if (hz.cracked) g.audio.play('crumble', { volume: 0.45 });
+    if (hz.fell) g.audio.play('crumble', { volume: 1, fall: true });
     if (ev.splashed && this.splashT <= 0) this.splash();
     else if (ev.landed && this.splashT <= 0 && this.fellFromLantern(this.lastGroundY - ctl.pos.y)) this.splash(true);
     if (ctl.grounded) this.lastGroundY = ctl.pos.y;
@@ -382,7 +394,8 @@ export class Ashore {
     if (foot !== this.lastFoot && ctl.grounded && hs > 0.8 && !ev.landed) g.audio.play('step', { surface: ctl.groundTag, volume: 0.75 + 0.45 * Math.min(1, hs / ASHORE.run) });
     this.lastFoot = foot;
     this.race?.update(dt, t, acts);
-    L.update?.(dt, t, { pos: ctl.pos, night: g.env.night, play: (name, opts) => g.audio.play(name, opts) });
+    L.update?.(dt, t, { pos: ctl.pos, night: g.env.night, play: (name, opts) => g.audio.play(name, opts), hazards: this.hazards });
+    if (this.active) this.drag.update(dt);
 
     this.cam.update(dt, ctl, g.input.consumeLook(), hs > 0.3);
     this.updateLights(t);
@@ -630,17 +643,20 @@ export class Ashore {
     await g.ui.fade(0, 0.4);
   }
 
-  /** Back to the last lantern: after falling in the water, or (fell = true) a long fall from the climb. */
+  /** Back to the last lantern: after falling in the water (or the lava), or (fell = true) a long fall from the climb. */
   async splash(fell = false) {
-    const g = this.game;
+    const g = this.game, lava = !fell && this.level.lava;
     this.splashT = 2;
-    if (!fell) g.audio.play('slam', { volume: 0.4 });
+    if (lava) g.audio.play('sizzle');
+    else if (!fell) g.audio.play('slam', { volume: 0.4 });
     await g.ui.fade(1, 0.35);
     const c = this.checkpoint;
+    this.hazards?.reset(); // what crumbled is back
     this.ctl?.teleport(c.x, c.y, c.z, c.yaw);
     this.cam?.snap(this.ctl, c.yaw);
     this.lastGroundY = c.y;
     if (fell) g.ui.toast('A long way down! Back at your last lantern.', 'info');
+    else if (lava) g.ui.toast(LINES.lava, 'info');
     await g.ui.fade(0, 0.4);
   }
 }

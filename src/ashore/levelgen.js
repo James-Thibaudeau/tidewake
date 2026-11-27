@@ -1,6 +1,8 @@
 // Ashore levels: turns a layout (modules.js) into a renderable level that
 // follows the contract in shapes.js. One merged terrain mesh, one merged
-// mesh (+ ink outline) for every platform, instanced decoration.
+// mesh (+ ink outline) for every platform, instanced decoration. A volcanic
+// island also gets its lava, steam and crumbling pieces (volcanic-life.js)
+// and the lists of what crumbles and throws you up (hazards.js).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PROPS, propMaterial, propOutline, thinOutline } from '../props.js';
@@ -9,6 +11,7 @@ import { mulberry32, noise2, TAU, clamp } from '../util.js';
 import { cyl } from './shapes.js';
 import { layoutLevel, validateLayout, LIMITS, MODULE_TYPES } from './modules.js';
 import { pieceParts, lookoutTreeParts, rowboatParts } from './pieces.js';
+import { buildVolcanicLife } from './volcanic-life.js';
 
 export { validateLayout, LIMITS, MODULE_TYPES };
 
@@ -18,6 +21,9 @@ const PALETTE = {
   rocky: { sand: '#cfc6b2', wet: '#a99f8c', grass: '#86ab55', grass2: '#76984b', scree: '#a39a8d', rock: '#8a8178', rock2: '#6a625a', seabed: '#a2967f' },
   // tropical: pale coral sand, lush green, warm coral-brown rock, a bright seabed
   tropical: { sand: '#f6e4ae', wet: '#dcc58c', grass: '#78cf55', grass2: '#5fbd48', rock: '#b39377', rock2: '#957659', seabed: '#e8d8a6' },
+  // volcanic: black sand, ash and tough olive grass, dark banded rock with a
+  // rust-red band, the lava's banks scorched orange-brown (ember)
+  volcanic: { sand: '#5b5556', wet: '#433d3e', grass: '#8f9a5a', grass2: '#7c8a4c', scree: '#8d8580', rock: '#5b5355', rock2: '#6c4a41', seabed: '#4a4243', ember: '#8a4a2e' },
 };
 
 // What grows (or lies about) on each biome's land. density scales the tree
@@ -30,6 +36,10 @@ const DECOR = {
     density: 0.5, tufts: 0.55, flowers: 0.3, boulders: [3.2, 3], seaStacks: 16 },
   tropical: { trees: [['palm', 0.46], ['bush', 0.2], ['berryBush', 0.1], ['fruitTree', 0.06], ['flower', 0.12], ['rock', 0.06]],
     density: 0.85, tufts: 0.9, flowers: 1.6, boulders: [5.5, 5], seaStacks: 0, beachPalms: 14 },
+  // volcanic: dark boulders, burnt trees, a few hardy pines and bushes; dark
+  // stacks offshore
+  volcanic: { trees: [['darkRock', 0.34], ['deadTree', 0.24], ['bush', 0.16], ['pine', 0.12], ['rock', 0.1], ['flower', 0.04]],
+    density: 0.55, tufts: 0.6, flowers: 0.25, boulders: [3.6, 3.4], boulder: 'darkRock', seaStacks: 8, dark: true },
 };
 
 // ----------------------------------------------------------------- terrain
@@ -75,7 +85,7 @@ function buildTerrain(T, pal, seed) {
       const cliff = (r < r1 && r >= r1 - W1 - 0.05) || (r < r2 && r >= r2 - W2 - 0.05);
       if (h < -0.4) tmp.copy(C.seabed);
       else if (cliff) tmp.copy(C.rock).lerp(C.rock2, 0.5 + 0.5 * Math.sin(h * 1.7 + n * 2)); // strata
-      else if (h < 0.35) tmp.copy(C.wet);
+      else if (h < 0.35) tmp.copy(C.ember && Math.abs(r - T.Rm(a)) < T.mw(a) + T.BANK ? C.ember : C.wet);
       else if (T.groundTag(x, z) === 'sand') tmp.copy(C.sand);
       else if (C.scree && n < -0.12) tmp.copy(C.scree);
       else tmp.copy(n > 0.1 ? C.grass2 : C.grass);
@@ -183,7 +193,7 @@ function buildDecor(L, group, colliders, quality, seed) {
       e.set(rng() * 0.6, rng() * TAU, rng() * 0.4); q.setFromEuler(e);
       v.set(p.x, h - s * 0.25, p.z); sc.set(s, s * (0.8 + rng() * 0.6), s);
       m.compose(v, q, sc);
-      (buckets.rock ||= []).push(m.clone());
+      (buckets[D.boulder || 'rock'] ||= []).push(m.clone());
       colliders.push(cyl(p.x, p.z, 0.8 * s, h - 1, h + s * 1.1, 'stone'));
     }
   };
@@ -223,6 +233,7 @@ function buildDecor(L, group, colliders, quality, seed) {
       mesh.setMatrixAt(i, mm);
       const b = 0.9 + rng() * 0.18;
       if (type === 'grassTuft') tint.copy(grass).multiplyScalar(0.92 + rng() * 0.16);
+      else if (D.dark && (type === 'seaStack' || type === 'deadTree')) tint.setRGB(b * 0.55, b * 0.5, b * 0.5); // basalt, and charred wood
       else tint.setRGB(b, b, b);
       mesh.setColorAt(i, tint);
     });
@@ -262,8 +273,9 @@ export function generateLevel(island, opts = {}) {
   own.push(terrain.geometry, terrain.material);
 
   // every platform, the lookout tree and the rowboat: one mesh + one outline
+  // (a piece that crumbles is drawn on its own, so it can fall)
   const parts = [];
-  for (const p of L.pieces) parts.push(...pieceParts(p));
+  for (const p of L.pieces) if (!p.crumble) parts.push(...pieceParts(p));
   const chestBranch = L.branches.find((b) => b.name === 'chest');
   if (chestBranch) parts.push(...lookoutTreeParts(chestBranch.tree, chestBranch.nodes.filter((n) => n.type === 'piece').map((n) => n.piece)));
   parts.push(...rowboatParts(L.rowboat));
@@ -278,6 +290,8 @@ export function generateLevel(island, opts = {}) {
 
   const colliders = [...L.colliders];
   const decor = buildDecor(L, group, colliders, opts.quality, island.seed | 0);
+  const life = L.lava ? buildVolcanicLife(L, L.pieces.filter((p) => p.crumble), opts.quality) : null;
+  if (life) group.add(life.group);
 
   const level = {
     group,
@@ -296,6 +310,11 @@ export function generateLevel(island, opts = {}) {
     vault: L.vault,
     // still water: the moat lies inside this radius, the beach takes the swell
     calm: { x: 0, z: 0, r: calmRadius(T) },
+    // hazards (hazards.js): steam vents, crumbling basalt, and lava for water
+    vents: L.vents,
+    crumbles: L.crumbles,
+    lava: L.lava,
+    update: life ? (dt, t, ctx) => life.update(dt, t, ctx.hazards) : undefined,
     // extras (not in the contract, handy for debugging and hints)
     modules: L.modules,
     layout: L,
@@ -303,6 +322,7 @@ export function generateLevel(island, opts = {}) {
       group.removeFromParent();
       for (const o of own) o.dispose();
       for (const d of decor) d.dispose();
+      life?.dispose();
     },
   };
   return level;

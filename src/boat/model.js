@@ -364,12 +364,14 @@ const TEMPERED = '#2b3644';
 /**
  * Grandfather's anchor at a refit tier, in its own space (shank along y, ring
  * at the top). 1 adds grapnel arms across the first pair, 2 broad flukes
- * crusted with coral, 3 the tempered chain (in setAnchorTier), 4 ice spikes
- * and gilding. The wooden stock stays: it is still his anchor.
+ * crusted with coral, 3 the tempered chain (from the cathead in
+ * setAnchorTier, and a length of it draped from the ring, so it shows while
+ * stowed) and blued iron, 4 ice spikes and gilding. The wooden stock stays:
+ * it is still his anchor.
  */
 function anchorParts(tier) {
   const gilded = tier >= 4;
-  const IRON = gilded ? BRASS : '#3c434c', IRON2 = gilded ? GOLD : '#5b6570';
+  const IRON = gilded ? BRASS : tier >= 3 ? '#2f3946' : '#3c434c', IRON2 = gilded ? GOLD : tier >= 3 ? '#4d5a6a' : '#5b6570';
   const P = [
     part(new THREE.CylinderGeometry(0.045, 0.05, 0.9, 6), IRON),                            // shank
     part(new THREE.TorusGeometry(0.09, 0.025, 4, 10), IRON2, { y: 0.52 }),                   // ring
@@ -391,6 +393,8 @@ function anchorParts(tier) {
     if (tier >= 4) P.push(part(new THREE.ConeGeometry(0.035, 0.15, 4), '#dff3ff', { x: x * 0.92, y: -0.28, z: z * 0.92, rx: Math.PI + rx, rz }));
   }
   if (tier >= 4) P.push(part(new THREE.ConeGeometry(0.045, 0.18, 4), '#dff3ff', { y: -0.6, rx: Math.PI }));
+  // the tempered chain, a few links hanging from the ring down past the stock
+  if (tier >= 3) P.push(...chainParts(V3(0.04, 0.46, 0.08), V3(0.2, -0.02, 0.12), 4, TEMPERED));
   return P;
 }
 

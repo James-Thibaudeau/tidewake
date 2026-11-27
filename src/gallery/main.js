@@ -250,6 +250,8 @@ function boot() {
       floor.visible = subject.ground === 'floor';
       ocean.mesh.visible = subject.ground === 'sea';
       ocean.setShoal(subject.shoal || null);
+      const calm = subject.calm;
+      ocean.uniforms.uCalm.value.set(calm?.x || 0, calm?.z || 0, calm?.r || 0);
       // let poses, sails and the hull's ride settle before framing it
       applyView(q.view || 'quarter');
       placeCamera();
