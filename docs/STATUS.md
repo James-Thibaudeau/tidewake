@@ -6,7 +6,7 @@ work, and update it in the same pull request as the change.**
 - Designs for work that hasn't started: [feature-plan.md](feature-plan.md)
 - Original designs of what has shipped (reference only): [shipped-plans.md](shipped-plans.md)
 
-Updated 2026-11-26.
+Updated 2026-11-27.
 
 ## Done
 
@@ -1146,6 +1146,39 @@ Updated 2026-11-26.
   ship stage by stage at Port Haven and sail her; a paint yard for the
   ship (paints, sail cloth, emblems, figureheads); fireworks. Nothing adds
   stats. Four PRs, 10.1–10.4.
+  - [x] **10.1 The paint yard** (`feature/paint-yard`):
+    - **A section of the shipwright's tab**, in every port. Pick a part
+      (hull, trim, deck, sails, emblem, flag, pennant, figurehead), then a
+      paint: one you own goes straight on, free; anything else is tried on a
+      side view of your ship first, with a Buy button. "As built" puts a part
+      back to its hull tier's look. The figurehead and the flags get close
+      views, and the figurehead tiles show each carving on your own bow.
+    - **36 items**, priced as the plan says: 10 paints, 7 cloths (one
+      striped), 6 emblems, 8 flags (chequered, swallowtail), 5 figureheads
+      (gilded eagle, dolphin, owl, sea serpent, mermaid). Nothing changes a
+      stat.
+    - **Earned, never sold:** crimson cloth (Sable's gift), gold leaf
+      (every island charted), kraken ink (the tow out of the Deep), the owl
+      emblem (the Elder Grove's crown). Their tiles say how; a toast at the
+      next port says when one is yours.
+    - **The crimson dye moved in.** The toggle (`rival.flags.dyeOn`) is gone;
+      `migrate()` turns a save with it on into crimson sails.
+    - **Styling is data per hull.** `HULL_STYLE` in `boat/parts.js` gives
+      each hull its paint and its figurehead mount (none below hull 2: no
+      stem). `boat/livery.js` paints from `paints.js liveryFor()`, so
+      grandfather's ship (10.4) needs only a hull style of its own.
+    - **The tab takes more sections:** each is a `<section class="shopSection">`
+      in `#paneShipwright` with a jump button in `#shipwrightNav`. 10.2's
+      Stores goes there the same way.
+    - **Save:** `paints` (owned, `kind:id`) and `livery` (a paint id or null
+      per part).
+    - **Gallery:** the ship takes `hullPaint`, `trim`, `deck`, `cloth`,
+      `emblem`, `flag`, `pennant` and `figurehead`; new views `stem` and
+      `masthead`; sheets `paints`, `paint-parts`, `cloths`, `emblems`,
+      `flags`, `figureheads`. `check.mjs paints` checks the catalogue.
+  - [ ] Paint yard follow-ups: tune prices against measured late-game income
+    (the plan's numbers are starting points); each ship keeps its own livery
+    once there are two (10.4).
 - [ ] **Phase 11, islands with shapes:** variety in the archipelago, as
   Archway Isle's bay gave it a shape: crescents, rings, coves, hooks, twins
   and more, spread so neighbours differ. Moon Island is the first, a

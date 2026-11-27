@@ -26,7 +26,7 @@ import { Boat } from './boat.js';
 import { AutoHelm, planCourse, raceWater, SeaRace } from './race.js';
 import { TowLine } from './tow.js';
 import { Kraken } from './kraken.js';
-import { SPEAKER, CRIMSON, SABLE_PROFILE, SABLE_LIVERY, ENCOUNTERS, LETTER, DEEP, CARDS, REWARDS, TITLE, FRIEND, LINES } from './rival-text.js';
+import { SPEAKER, SABLE_PROFILE, SABLE_LIVERY, ENCOUNTERS, LETTER, DEEP, CARDS, REWARDS, TITLE, FRIEND, LINES } from './rival-text.js';
 
 export const FINAL_CHAPTER = 8;
 const SEE = 950;          // the Redwing appears when you're this close to where it waits
@@ -49,7 +49,6 @@ export class Rival {
     this.redwing = null;      // built the first time it's needed
     this.cool = 12;         // seconds before the next spawn attempt
     this.flareT = 0;
-    this._dye = null;
     const ev = game.events;
     ev.on('dock', (port) => this.onDock(port));
     ev.on('wreck', () => this.onWreck());
@@ -304,7 +303,6 @@ export class Rival {
   update(dt, elapsed, wind) {
     const g = this.game;
     if (this.syncedState !== g.state) this.reset(g.state);
-    this.syncDye();
     this.cool -= dt;
     const b = this.player.pos, act = this.act;
     // (with nothing live, the living sea's director asks spawn() whether Sable should appear)
@@ -334,7 +332,6 @@ export class Rival {
     this.syncedState = state;
     this.clearAct();
     this.cool = 12;
-    this._dye = null;
     this.forced = false;
     this._landEnc = null;
   }
@@ -717,7 +714,8 @@ export class Rival {
     R.chapter = FINAL_CHAPTER;
     R.flags.day = g.state.day || 1;
     R.flags.title = TITLE;
-    R.flags.dye = true; R.flags.dyeOn = true;
+    R.flags.dye = true; // the crimson sail cloth (paints.js), and it goes straight on
+    g.paintYard?.wear('sail', 'crimson');
     g.unlockCosmetic('hat:rivalTricorn', 'story');
     const p = g.state.profile;
     p.hat = { ...p.hat, style: 'rivalTricorn' };
@@ -871,21 +869,6 @@ export class Rival {
     this.clearAct();
     R.flags.rematch = null; // only a race on foot waits for you (on its island)
     return this.startRace(enc, from, true);
-  }
-
-  // ------------------------------------------------------------ crimson sails
-  get canDye() { return !!this.R.flags.dye; }
-  get dyeOn() { return !!(this.R.flags.dye && this.R.flags.dyeOn); }
-  toggleDye() {
-    if (!this.canDye) return;
-    this.R.flags.dyeOn = !this.R.flags.dyeOn;
-    this.syncDye();
-    this.game.savePortState();
-  }
-  syncDye() {
-    if (this._dye === this.dyeOn) return;
-    this._dye = this.dyeOn;
-    this.player.setLivery?.(this._dye ? { sail: CRIMSON } : null);
   }
 
   // ------------------------------------------------------- quest / map glue

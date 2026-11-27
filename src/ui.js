@@ -7,6 +7,7 @@
 //   ui/chart-seas.js   rough water on the sea chart: hatching and names
 //   ui/landmarks.js    the landmarks' pictures on the chart and the minimap
 //   ui/port.js    port screen (shipwright, quest board, tailor), journal
+//   ui/paint-yard.js   the paint yard section of the shipwright's tab
 //   ui/story.js   ashore panel, Found! pop-up, story cards, quest tracker, races and hails
 //   ui/icons.js   SVG icons and story card art
 //   ui/shared.js  esc(), fmt() and other small helpers
@@ -20,6 +21,7 @@ import { SeasUI } from './ui/chart-seas.js';
 import { LandmarksUI } from './ui/landmarks.js';
 import { PortUI } from './ui/port.js';
 import { StoryUI } from './ui/story.js';
+import { PaintYardUI } from './ui/paint-yard.js';
 
 const POINTS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
 
@@ -39,7 +41,7 @@ export class UI {
       'journalTabs', 'journalTitle', 'storyCards', 'storyArt', 'storyTitle', 'storyText', 'storyDots', 'storySkip', 'storyNext',
       'foundScreen', 'foundEyebrow', 'foundTitle', 'foundItems', 'foundMain', 'foundLater',
       'ashorePanel', 'apName', 'apGold', 'apLeft',
-      'racePanel', 'rpTitle', 'rpLine', 'countdown', 'hail', 'hailName', 'hailText', 'rivalNotes', 'sailDye', 'btnSailDye'];
+      'racePanel', 'rpTitle', 'rpLine', 'countdown', 'hail', 'hailName', 'hailText', 'rivalNotes'];
     this.el = {};
     for (const id of ids) this.el[id] = $(id);
     this.notches = [...document.querySelectorAll('#sailGauge .notches span')];
@@ -147,7 +149,7 @@ export class UI {
       this.setPortTab(b.dataset.tab);
     });
     this.on('btnWardrobe', () => g.openWardrobe?.());
-    this.on('btnSailDye', () => { g.rival?.toggleDye(); this.refreshPort(); });
+    this.wirePaintYard();
     this.el.rivalNotes?.addEventListener('click', (e) => {
       const b = e.target.closest('button[data-rematch]');
       if (!b) return;
@@ -521,4 +523,4 @@ export class UI {
   hideWreck() { this.el.wreckScreen?.classList.add('hidden'); }
 }
 
-mixin(UI, ChartUI, SeasUI, LandmarksUI, PortUI, StoryUI);
+mixin(UI, ChartUI, SeasUI, LandmarksUI, PortUI, StoryUI, PaintYardUI);

@@ -2,6 +2,7 @@
 // blocked storage simply mean "no save". migrate() brings old saves up to date.
 import { SAVE_KEY, SETTINGS_KEY, SAVE_VERSION, isTouch } from './config.js';
 import { ENCOUNTERS, CARDS } from './rival-text.js';
+import { normalizeLivery } from './paints.js';
 
 export function loadSave() {
   try {
@@ -35,6 +36,14 @@ export function migrate(d) {
     chain: sg.chain && typeof sg.chain === 'object' ? sg.chain : null };
   const crabs = d.quests.reports.archCrabs;
   if (crabs && !d.sightings.seen.archCrabs) d.sightings.seen.archCrabs = { n: 1, day: crabs.day || 1, near: 'at Archway Isle' };
+  // the paint yard (paints.js): what you own ('kind:id') and what the ship wears.
+  // Sable's crimson dye was a toggle (rival flags.dyeOn); now it's a sail cloth.
+  d.paints = Array.isArray(d.paints) ? d.paints.filter((k) => typeof k === 'string') : [];
+  d.livery = normalizeLivery(d.livery);
+  if ('dyeOn' in d.rival.flags) {
+    if (d.rival.flags.dyeOn && d.rival.flags.dye && !d.livery.sail) d.livery.sail = 'crimson';
+    delete d.rival.flags.dyeOn;
+  }
   d.v = SAVE_VERSION;
   return d;
 }

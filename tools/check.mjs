@@ -2,7 +2,7 @@
 // Fast checks that need no browser and no dependencies:
 //
 //   node tools/check.mjs            everything (about a second)
-//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | sea | music | seazones | rogue | ride | layout | climb | grove | archway
+//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | paints | sea | music | seazones | rogue | ride | layout | climb | grove | archway
 //   node tools/check.mjs layout 500 layouts for 500 synthetic islands (default 150)
 //
 // Run it after every change. It catches the mistakes that otherwise only show
@@ -267,7 +267,8 @@ const checks = {
         if (resolve(dirname(f), imp.spec).startsWith(GALLERY)) errors.push(`${rel(f)}:${lineOf(source[f], imp.index)}: the game imports the gallery (${imp.spec})`);
       }
     }
-    const { SHEETS } = await load('gallery/sheets.js');
+    const { SHEETS, PAINT_PARAMS } = await load('gallery/sheets.js');
+    const { LIVERY_PARTS, paintInfo } = await load('paints.js');
     const { POSES, LIGHTS, VIEWS, SEA_PLACES, ROUGH_PLACES } = await load('gallery/presets.js');
     const { SLOTS, styleInfo } = await load('cosmetics.js');
     let count = 0;
@@ -284,6 +285,10 @@ const checks = {
         if (q.severity != null && !(ROUGH_PLACES[q.severity] && (q.zone === 'rough' || q.zone === 'offing'))) bad(`severity "${q.severity}" needs zone rough or offing, and a zone of that severity`);
         if (q.rogue != null && !Number.isFinite(Number(q.rogue))) bad(`rogue "${q.rogue}" is not a number of seconds`);
         for (const slot of SLOTS) if (q[slot] && !styleInfo(slot, q[slot])) bad(`no ${slot} style "${q[slot]}"`);
+        for (const [key, part] of Object.entries(PAINT_PARAMS)) {
+          const kind = LIVERY_PARTS.find((p) => p.id === part)?.kind;
+          if (q[key] && !paintInfo(kind, q[key])) bad(`no ${kind} "${q[key]}" for ${key}`);
+        }
       }
     }
     return { errors, note: `${Object.keys(SHEETS).length} sheets, ${count} cells` };
@@ -297,7 +302,7 @@ const checks = {
     const v1 = { v: 1, banked: 240, cargo: 0, health: 80, upgrades: { sail: 1 }, discovered: [0, 3], savePort: 0 };
     const cases = { empty: {}, v1, garbage: { quests: 7, story: 'x', rival: null, hold: {}, wardrobe: 'hat', ashore: null } };
     const objects = { quests: ['active', 'done', 'boards', 'pinned', 'reports'], story: ['chapter', 'journals', 'flags', 'seenCards'], rival: ['chapter', 'wins', 'losses', 'flags', 'log'], ashore: [], sightings: ['seen', 'miss', 'chain'] };
-    const arrays = ['wardrobe', 'hold'];
+    const arrays = ['wardrobe', 'hold', 'paints'];
     for (const [label, input] of Object.entries(cases)) {
       const d = migrate(structuredClone(input));
       if (!d) { errors.push(`${label}: migrate returned null`); continue; }
@@ -327,7 +332,62 @@ const checks = {
     if (crabbed?.n !== 1 || crabbed.day !== 6) errors.push('a save with the crabs reported should have them in the Sightings log');
     const kept = migrate({ sightings: { seen: { whale: { n: 3, day: 2, near: 'x' } }, miss: { ghostShip: 4 }, chain: { stage: 2, island: 31 } } }).sightings;
     if (kept.seen.whale?.n !== 3 || kept.miss.ghostShip !== 4 || kept.chain?.island !== 31) errors.push('migrate changed the Sightings log');
+    // the paint yard: a livery always has every part; Sable's crimson dye, once a toggle, becomes a sail cloth
+    const { PART_IDS } = await load('paints.js');
+    for (const [label, input] of Object.entries(cases)) {
+      const L = migrate(structuredClone(input)).livery;
+      if (!L || PART_IDS.some((k) => L[k] !== null)) errors.push(`${label}: the livery should be every part as built`);
+    }
+    const dyed = migrate({ rival: { chapter: 8, flags: { dye: true, dyeOn: true } } });
+    if (dyed.livery.sail !== 'crimson' || 'dyeOn' in dyed.rival.flags) errors.push('a save with the crimson dye on should wear crimson sails, and lose the old toggle');
+    const off = migrate({ rival: { chapter: 8, flags: { dye: true, dyeOn: false } } });
+    if (off.livery.sail !== null || !off.rival.flags.dye) errors.push('a save with the crimson dye off should keep its sails (and its gift)');
+    const odd = migrate({ paints: ['paint:plum', 3], livery: { hull: 'plum', sail: 'plum', figurehead: 'owl', mast: 'gold' } });
+    if (odd.paints.length !== 1 || odd.livery.hull !== 'plum' || odd.livery.sail !== null || odd.livery.figurehead !== 'owl' || 'mast' in odd.livery) errors.push('migrate should keep good paints and drop what doesn\'t fit its part');
     return { errors, note: `${Object.keys(cases).length} saves` };
+  },
+
+  // The paint yard's catalog (paints.js): every item is sold or earned, priced
+  // in its kind's range, on a part that takes it; earned ones unlock from the
+  // state they name; and a livery becomes the colours the boat draws.
+  async paints() {
+    const errors = [];
+    const P = await load('paints.js');
+    const { PAINTS, LIVERY_PARTS, KINDS, keyOf, ownsPaint, isEarned, newlyEarned, liveryFor, normalizeLivery, blankLivery, paintsOf } = P;
+    const RANGE = { paint: [200, 600], cloth: [400, 1000], emblem: [500, 1200], flag: [150, 400], figurehead: [1500, 3000] };
+    const keys = new Set();
+    for (const p of PAINTS) {
+      const k = keyOf(p);
+      if (keys.has(k)) errors.push(`${k}: listed twice`);
+      keys.add(k);
+      if (!KINDS[p.kind] || !RANGE[p.kind]) errors.push(`${k}: no such kind`);
+      if (!p.name) errors.push(`${k}: no name`);
+      if (p.earn) { if (p.price || !p.earn.hint) errors.push(`${k}: an earned item has no price and a hint`); }
+      else if (!(p.price >= RANGE[p.kind][0] && p.price <= RANGE[p.kind][1])) errors.push(`${k}: ${p.price} gold is outside ${RANGE[p.kind].join('-')}`);
+      if (['paint', 'cloth', 'flag'].includes(p.kind) && !/^#[0-9a-f]{6}$/i.test(p.color || '')) errors.push(`${k}: needs a colour`);
+      if (p.color2 && !p.pattern) errors.push(`${k}: a second colour with no pattern`);
+    }
+    for (const kind of Object.keys(KINDS)) {
+      if (!paintsOf(kind).some((p) => !p.earn)) errors.push(`${kind}: nothing to buy`);
+      if (!LIVERY_PARTS.some((part) => part.kind === kind)) errors.push(`${kind}: no part takes it`);
+    }
+    // earned items: locked on a fresh save, unlocked by what they say
+    const fresh = { rival: { chapter: 0, flags: {} }, wardrobe: [], paints: [] };
+    const earned = PAINTS.filter((p) => p.earn);
+    for (const p of earned) if (isEarned(fresh, p, { charted: false })) errors.push(`${keyOf(p)}: earned on a fresh save`);
+    const done = { rival: { chapter: 8, flags: { dye: true } }, wardrobe: ['hat:flowerCrown'], paints: [] };
+    for (const p of earned) if (!isEarned(done, p, { charted: true })) errors.push(`${keyOf(p)}: not earned when its rule is met`);
+    if (newlyEarned(done, { charted: true }).length !== earned.length) errors.push('newlyEarned should list every earned item not yet claimed');
+    if (newlyEarned({ ...done, paints: earned.map(keyOf) }, { charted: true }).length) errors.push('newlyEarned should skip claimed items');
+    if (!ownsPaint({ paints: ['emblem:owl'] }, 'emblem', 'owl') || ownsPaint({ paints: ['emblem:owl'] }, 'figurehead', 'owl')) errors.push('the owl emblem and the owl figurehead should be owned apart');
+    // liveries
+    if (liveryFor(blankLivery()) !== null) errors.push('an unpainted livery should draw as the tier\'s look (null)');
+    const all = Object.fromEntries(LIVERY_PARTS.map((part) => [part.id, paintsOf(part.kind).find((p) => p.pattern || p.shape)?.id || paintsOf(part.kind)[0].id]));
+    const L = liveryFor(all);
+    for (const part of LIVERY_PARTS) if (!L?.[part.id]) errors.push(`liveryFor left out the ${part.id}`);
+    if (!L.sailLook?.pattern || !L.flagLook?.shape && !L.flagLook?.pattern) errors.push('liveryFor should carry a patterned cloth\'s look');
+    if (JSON.stringify(normalizeLivery(all)) !== JSON.stringify(all)) errors.push('normalizeLivery changed a good livery');
+    return { errors, note: `${PAINTS.length} items, ${earned.length} earned, ${LIVERY_PARTS.length} parts` };
   },
 
   // The living sea's rules (sightings.js): each kind turns up only where and
