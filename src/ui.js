@@ -6,8 +6,8 @@
 //   ui/chart.js   minimap, sea chart, map markers
 //   ui/chart-seas.js   rough water on the sea chart: hatching and names
 //   ui/landmarks.js    the landmarks' pictures on the chart and the minimap
-//   ui/port.js    port screen (shipwright, quest board, tailor), journal
-//   ui/paint-yard.js   the paint yard section of the shipwright's tab
+//   ui/port.js    port screen (shipwright, quest board, tailor, the tabs), journal
+//   ui/paint-yard.js   the paint yard tab at port
 //   ui/story.js   ashore panel, Found! pop-up, story cards, quest tracker, races and hails
 //   ui/icons.js   SVG icons and story card art
 //   ui/shared.js  esc(), fmt() and other small helpers

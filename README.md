@@ -150,7 +150,7 @@ src/
   ui.js           the UI class: HUD, banners and toasts, title, pause and wreck screens
   ui/             the rest of UI: chart.js (minimap, sea chart), chart-seas.js (rough water on the chart),
                   landmarks.js (the landmarks' pictures on the chart), port.js (port screen, journal),
-                  paint-yard.js (the paint yard section of the shipwright's tab),
+                  paint-yard.js (the paint yard tab at port),
                   story.js (Found! pop-up, story cards, quest tracker, races), icons.js, shared.js
   input.js        keyboard, mouse and touch controls
   audio.js        procedural WebAudio sound and music: the buses, the sea's beds, one-shots

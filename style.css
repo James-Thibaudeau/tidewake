@@ -768,10 +768,8 @@ body.touch #hail { bottom: calc(var(--sab) + 232px); }
 @media (max-width: 560px) { #racePanel { width: 180px; } #hailText { font-size: 15px; } }
 @media (max-height: 460px) { #hail { bottom: calc(var(--sab) + 64px); } #hailText { font-size: 14px; } #countdown { top: 46%; } }
 
-/* the shipwright's tab: a stack of sections (upgrades, the paint yard, …), each with a jump button */
-.sectionNav { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
-.shopSection { scroll-margin-top: 8px; }
-.shopIntro { font-size: 14px; opacity: 0.85; margin: 0 0 10px; }
+/* a shop tab's opening line */
+.shopIntro { font-size: 14px; opacity: 0.85; margin: 12px 0 10px; }
 
 /* the paint yard */
 .yard { display: flex; flex-direction: column; gap: 8px; }

@@ -1147,7 +1147,8 @@ Updated 2026-11-27.
   ship (paints, sail cloth, emblems, figureheads); fireworks. Nothing adds
   stats. Four PRs, 10.1–10.4.
   - [x] **10.1 The paint yard** ([#65](https://github.com/James-Thibaudeau/tidewake/pull/65)):
-    - **A section of the shipwright's tab**, in every port. Pick a part
+    - **A Paint Yard tab at every port** (its own tab since
+      `feature/paint-yard-tab`; it began below the upgrades). Pick a part
       (hull, trim, deck, sails, emblem, flag, pennant, figurehead), then a
       paint: one you own goes straight on, free; anything else is tried on a
       side view of your ship first, with a Buy button. "As built" puts a part
@@ -1167,9 +1168,10 @@ Updated 2026-11-27.
       each hull its paint and its figurehead mount (none below hull 2: no
       stem). `boat/livery.js` paints from `paints.js liveryFor()`, so
       grandfather's ship (10.4) needs only a hull style of its own.
-    - **The tab takes more sections:** each is a `<section class="shopSection">`
-      in `#paneShipwright` with a jump button in `#shipwrightNav`. 10.2's
-      Stores goes there the same way.
+    - **Port tabs are data in the page:** a tab is a button with `data-tab`
+      in `#portTabs` and a `.tabPane` with the matching `data-pane`
+      (`setPortTab` in `ui/port.js` needs no change). 10.2's Stores can be a
+      tab the same way.
     - **Save:** `paints` (owned, `kind:id`) and `livery` (a paint id or null
       per part).
     - **Gallery:** the ship takes `hullPaint`, `trim`, `deck`, `cloth`,

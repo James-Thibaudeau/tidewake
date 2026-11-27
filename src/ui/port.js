@@ -40,11 +40,12 @@ export class PortUI {
   }
 
   setPortTab(tab) {
+    if (this.portTab === 'paintyard' && tab !== 'paintyard') this.endPaintTry();
     this.portTab = tab;
     this.el.portTabs?.querySelectorAll('button[data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
-    this.el.paneShipwright?.classList.toggle('hidden', tab !== 'shipwright');
-    this.el.paneQuests?.classList.toggle('hidden', tab !== 'quests');
-    this.el.paneTailor?.classList.toggle('hidden', tab !== 'tailor');
+    // each tab's pane says which tab it belongs to (data-pane in index.html)
+    this.el.portScreen?.querySelectorAll('.tabPane[data-pane]').forEach((p) => p.classList.toggle('hidden', p.dataset.pane !== tab));
+    if (tab === 'paintyard') this.refreshPaintYard();
     this.portTabHint(tab);
   }
 
