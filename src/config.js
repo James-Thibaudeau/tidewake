@@ -183,17 +183,23 @@ export const UPGRADES = [
 // a tier once you own `needs`; its fitting waits in a vault on an island of
 // biome `from`, and fitting it costs `cost` gold. Perks add up: `range` is how
 // far from the shore you can land, `speed` the fastest you can drop anchor
-// (m/s; the HUD shows m/s × 1.2 as knots).
+// (m/s; the HUD shows m/s × 1.2 as knots), `storm` that the anchor holds in a
+// storm while you're ashore (without it, it drags: ashore/anchor-drag.js).
 export const REFITS = [
   { label: "Grandfather's anchor", biome: 'temperate' },
   { label: 'Grapnel arms', biome: 'rocky', from: 'temperate', needs: { key: 'rudder', lvl: 1 }, cost: 150, range: 62 },
   { label: 'Coral flukes', biome: 'tropical', from: 'rocky', needs: { key: 'hull', lvl: 2 }, cost: 300, speed: 6.7 },
-  { label: 'Tempered chain', biome: 'volcanic', from: 'tropical', needs: { key: 'keel', lvl: 2 }, cost: 500 },
+  { label: 'Tempered chain', biome: 'volcanic', from: 'tropical', needs: { key: 'keel', lvl: 2 }, cost: 500, storm: true },
   { label: 'Ice spikes', biome: 'cold', from: 'volcanic', needs: { key: 'hull', lvl: 3 }, cost: 800 },
 ];
+// A storm while you're ashore (ashore/anchor-drag.js): without the tempered
+// chain the anchor drags once the storm is past `start` (weather.p.storm,
+// 0-1), you have `time` seconds to get back aboard, and if you don't she takes
+// `hull` of her hull on the rocks. It holds again once the storm eases below `end`.
+export const ANCHOR_DRAG = { start: 0.6, end: 0.3, time: 90, hull: 0.2 };
 // Biomes that have ashore levels. Each Phase 4 biome PR adds its own; a
 // refit is only offered once its biome is here.
-export const ASHORE_BIOMES = new Set(['temperate', 'rocky', 'tropical']);
+export const ASHORE_BIOMES = new Set(['temperate', 'rocky', 'tropical', 'volcanic']);
 export const LAND_RANGE = 46; // how close to the shore the boat must be to land (before the grapnel)
 export const LAND_SPEED = 5;  // boat speed (m/s) below which you can drop anchor (before the coral flukes)
 
@@ -229,8 +235,19 @@ export const ASHORE = {
   fallGravity: 1.6, hangGravity: 0.6, hangSpeed: 1.5, cutGravity: 2,
   coyote: 0.1, buffer: 0.12,
   maxFall: 32,
-  // Level design limits for *required* moves (comfortable, not frame-perfect)
-  design: { jumpUp: 1.15, gapWalk: 1.9, gapRun: 3.4, safeDrop: 6 },
+  // Level design limits for *required* moves (comfortable, not frame-perfect);
+  // launchUp and launchReach: the most a steam vent throws you up, and how far
+  // from the vent's middle what it throws you to may start
+  design: { jumpUp: 1.15, gapWalk: 1.9, gapRun: 3.4, safeDrop: 6, launchUp: 6, launchReach: 1.6 },
+  // Steam vents (ashore/hazards.js): a vent throws you `over` m higher than
+  // what it serves, so there is time at the top to step across; while still
+  // rising faster than `steerAbove` m/s you only drift (`steer` of your speed
+  // and grip), so the rock you are going up beside can't catch you; a vent
+  // rests `cooldown` s after it fires
+  vent: { over: 2.6, steerAbove: 6, steer: 0.2, cooldown: 0.6 },
+  // Crumbling basalt: it shakes for `hold` s after you land on it, then falls,
+  // and is back `back` s later
+  crumble: { hold: 1.0, back: 3.5 },
 };
 
 // The score (music-cues.js, audio/music.js).

@@ -17,13 +17,18 @@
 // lookout tree and the plain meadow walk. Tropical islands hop between palm
 // tops, climb tide pools stepping up the rock and cross rope bridges hung on
 // the face; the moat is crossed on a rope bridge or between rock pools, and
-// the chest sits in the crown of a giant palm.
+// the chest sits in the crown of a giant palm. On volcanic islands the moat
+// is lava, crossed by a stone causeway or on basalt columns (on the hardest,
+// every other one crumbles); every climb up cliff 1 starts at a steam vent
+// that throws you up the face, the mesa's often does too, and the rest is
+// basalt columns and cinder ledges that crumble under you. The top is a
+// crater with lava in it, and the summit is an outcrop over its mouth.
 //
-// Rotations (obox.rot, piece.rot) use the three.js rotation.y convention:
-// a local (x, z) maps to world (x cos r + z sin r, -x sin r + z cos r).
+// The pieces and the staircases built from them are in stairs.js.
 import { mulberry32, noise2, clamp, lerp, smoothstep, TAU } from '../util.js';
 import { obox, cyl, topOf } from './shapes.js';
 import { ASHORE } from '../config.js';
+import { rotOf, toWorld, resetPieceIds, rectPiece, discPiece, piecesColliders, STAIRS, SOLID, pick, rr, stair, vistaAfter, ventClimb, VENT } from './stairs.js';
 
 const D = ASHORE.design;
 // Required moves stay comfortably inside the design limits; optional branches
@@ -78,12 +83,15 @@ const HEADROOM = ASHORE.height + 0.2;
 // Tropical islands come after rocky ones in the story but sit near temperate
 // in difficulty (rocky is the harder biome): a little ease, so the first few
 // past 1.5 km are still gentle.
-const BIOME_EASE = { rocky: 800, tropical: 300 };
-// Per-biome terrain: rock walls `H1` and summits `summit` times as tall.
-const SHAPE = { temperate: { H1: 1, summit: 1 }, rocky: { H1: 1.15, summit: 1.12 }, tropical: { H1: 0.95, summit: 0.95 } };
-
-const rotOf = (a) => -a - Math.PI / 2; // local x along the tangent at polar angle a
-export const toWorld = (lx, lz, rot) => [lx * Math.cos(rot) + lz * Math.sin(rot), -lx * Math.sin(rot) + lz * Math.cos(rot)];
+// Volcanic islands come third in the story, but all lie 3-8 km out: counted
+// 1 km nearer, the nearer half are medium (Star Cay, Thistle Point, Puffin
+// Heights, Sprat Islet, Amber Key, Orca Skerry, Willow Rest) and the rest hard.
+const BIOME_EASE = { rocky: 800, tropical: 300, volcanic: 1000 };
+// Per-biome terrain: rock walls `H1` and summits `summit` times as tall
+// (a volcano's are the tallest: a vent throws you up the first part of each).
+// `ground`: what the land inland of the moat is underfoot (volcanic: bare rock);
+// `crater`: the top is a crater with an outcrop over it, not a plateau.
+const SHAPE = { temperate: { H1: 1, summit: 1 }, rocky: { H1: 1.15, summit: 1.12 }, tropical: { H1: 0.95, summit: 0.95 }, volcanic: { H1: 1.15, summit: 1.22, ground: 'stone', crater: true } };
 
 // ------------------------------------------------------------------ terrain
 /**
@@ -140,7 +148,33 @@ export function makeTerrain(I, rng, size, diff, cfg = TIERS.medium, shape = SHAP
     const r2 = R2(a);
     if (r >= r2) return lerp(h1, tierTop, smoothstep(r1 - W1, r2 + 1, r)) + n * 0.18 * smoothstep(r1 - W1, r1 - W1 - 2, r) * smoothstep(r2, r2 + 2, r);
     if (r >= r2 - W2) return lerp(tierTop, summit, smoothstep(r2, r2 - W2, r));
+    if (shape.crater) return craterH(r, a, x, z, r2 - W2);
     return summit + 0.25 * (1 - r / (r2 - W2));
+  };
+  // ---- a volcano's top (shape.crater): a rim round a crater with lava in it,
+  // and an outcrop, a tongue of rock from the rim out over the crater's mouth
+  // (setOutcrop, once the layout knows where the climb arrives)
+  const CRATER = { depth: 4, lip: 0.2, wall: 1.3, tip: 1.0, width: 1.5, edge: 0.8 };
+  const Rc = (a) => { const rin = R2(a) - W2; return clamp(rin * 0.55, 2.6, rin - 3.4); };
+  // the outcrop's direction from the centre, and how far past the centre its tip reaches (set: once placed)
+  const out = { set: false, ux: 1, uz: 0, tip: 0 };
+  const craterH = (r, a, x, z, rin) => {
+    const rc = Rc(a), top = summit + CRATER.lip;
+    if (r >= rc) return summit + CRATER.lip * smoothstep(rin, rc, r);
+    let h = top - CRATER.depth * smoothstep(rc, rc - CRATER.wall, r);
+    if (out.set) {
+      // distance to the tongue's edge: a strip that narrows towards a rounded tip
+      const along = x * out.ux + z * out.uz, perp = Math.abs(x * out.uz - z * out.ux);
+      const d = along > out.tip ? perp - lerp(CRATER.tip, CRATER.width, clamp(along / rc, 0, 1)) : Math.hypot(along - out.tip, perp) - CRATER.tip;
+      h = Math.max(h, top - CRATER.depth * smoothstep(0, CRATER.edge, d));
+    }
+    return h;
+  };
+  /** Point the outcrop along angle a (where the climb reaches the summit); returns the spot at its tip. */
+  const setOutcrop = (a) => {
+    const tip = -0.1 * Rc(a);
+    Object.assign(out, { set: true, ux: Math.cos(a), uz: Math.sin(a), tip });
+    return { x: Math.cos(a) * (tip + 0.3), z: Math.sin(a) * (tip + 0.3) };
   };
   const heightAt = (x, z) => hRA(Math.hypot(x, z), Math.atan2(z, x), x, z);
   const groundAt = (x, z) => { const h = heightAt(x, z); return h < -0.55 ? -Infinity : h; };
@@ -150,7 +184,7 @@ export function makeTerrain(I, rng, size, diff, cfg = TIERS.medium, shape = SHAP
     if ((r < r1 && r >= r1 - W1 - 0.1) || (r < r2 && r >= r2 - W2 - 0.1)) return 'stone';
     // everything seaward of the moat is beach and dunes; the inner bank is sand too
     if (r >= Rm(a) || Math.abs(r - Rm(a)) < mw(a) + BANK * 0.6) return 'sand';
-    return 'grass';
+    return shape.ground || 'grass';
   };
   const at = (r, a) => ({ x: Math.cos(a) * r, z: Math.sin(a) * r });
   /** Radius of the moat's waterline on its outer / inner side, at angle a. */
@@ -164,115 +198,17 @@ export function makeTerrain(I, rng, size, diff, cfg = TIERS.medium, shape = SHAP
     return Rm(a);
   };
   return { Rt, S1, W1, S2, W2, Sm, MW, BANK, beachTop, meadowLo, meadowHi, h1, tierTop, summit,
-    Rs, Rb, Rm, mw, moatIn, moatOut, R1, R2, meadowR, terraceR, hRA, heightAt, groundAt, groundTag, at, moatEdge };
+    Rs, Rb, Rm, mw, moatIn, moatOut, R1, R2, meadowR, terraceR, hRA, heightAt, groundAt, groundTag, at, moatEdge,
+    ...(shape.crater ? { Rc, setOutcrop, outcrop: out, crater: { ...CRATER, lavaY: summit + CRATER.lip - CRATER.depth + 1 } } : {}) };
 }
 
-// ------------------------------------------------------------------- pieces
-// A piece is something you stand on. Footprints are convex polygons [[x,z],…]
-// of the top surface; colliders are added per kind.
-let _pid = 0;
-function rectPiece(kind, cx, cz, top, hx, hz, rot, extra = {}) {
-  const pts = [[-hx, -hz], [hx, -hz], [hx, hz], [-hx, hz]].map(([x, z]) => { const [wx, wz] = toWorld(x, z, rot); return [cx + wx, cz + wz]; });
-  return { id: 'p' + (_pid++), kind, cx, cz, top, hx, hz, rot, foot: pts, minWidth: 2 * Math.min(hx, hz), ...extra };
-}
-function discPiece(kind, cx, cz, top, r, extra = {}) {
-  const foot = [];
-  for (let i = 0; i < 12; i++) { const a = (i / 12) * TAU; foot.push([cx + Math.cos(a) * r, cz + Math.sin(a) * r]); }
-  return { id: 'p' + (_pid++), kind, cx, cz, top, r, foot, minWidth: 2 * r, ...extra };
-}
-
-/** Colliders for a piece. `base` is the ground under it (pillars reach down to it). */
-function piecesColliders(p) {
-  const out = pieceBody(p);
-  // a low parapet along the outer edge (and both edges of a bridge)
-  const rail = (side) => {
-    const [ox, oz] = toWorld(0, side * (p.hz - 0.1), p.rot);
-    const c = obox(p.cx + ox, p.top + 0.33, p.cz + oz, Math.max(0.2, p.hx - 0.12), 0.38, 0.08, p.rot, 'wood');
-    c.rail = p.id; // (the validator ignores a joined neighbour's own rail post)
-    return c;
-  };
-  if (p.rail) out.push(rail(-1));
-  if (p.rails2) out.push(rail(-1), rail(1));
-  return out;
-}
-
-function pieceBody(p) {
-  const tag = p.tag || 'stone';
-  switch (p.kind) {
-    case 'bridge':
-      return [obox(p.cx, p.top - 0.2, p.cz, p.hx, 0.2, p.hz, p.rot, 'wood')];
-    case 'block': case 'column': case 'pad': case 'pool':
-      return [obox(p.cx, (p.top + p.base - 0.6) / 2, p.cz, p.hx, (p.top - p.base + 0.6) / 2, p.hz, p.rot, tag)];
-    case 'ledge': case 'plank': case 'vista':
-      return [obox(p.cx, p.top - 0.25, p.cz, p.hx, 0.25, p.hz, p.rot, tag)];
-    case 'disc':
-      // discs on a shared tree (trunk: 0) hang off branches; others stand on their own trunk
-      return p.trunk === 0 ? [cyl(p.cx, p.cz, p.r, p.top - 0.3, p.top, tag)]
-        : [cyl(p.cx, p.cz, p.r, p.top - 0.3, p.top, tag), cyl(p.cx, p.cz, p.trunk || 0.42, p.base - 0.5, p.top - 0.3, 'wood')];
-    case 'stone':
-      return [cyl(p.cx, p.cz, p.r, -3, p.top, 'stone')];
-    case 'palm':
-      // a frond crown on a slim trunk (the trunk's bow is drawn, not solid)
-      return [cyl(p.cx, p.cz, p.r, p.top - 0.3, p.top, 'leaf'), cyl(p.cx, p.cz, PALM_TRUNK, p.base - 0.5, p.top - 0.3, 'wood')];
-    case 'rope':
-      // a slatted deck hung on the face; its handrope (outer side) comes from `rail`
-      return [obox(p.cx, p.top - 0.12, p.cz, p.hx, 0.12, p.hz, p.rot, 'wood')];
-    case 'stack':
-      // a sea stack: solid rock from below the ground (or the water) to its top
-      return [cyl(p.cx, p.cz, p.r, Math.min(p.base, 0) - 1, p.top, 'stone')];
-    case 'arch': {
-      // a rock span on a leg at each end, open underneath
-      const out = [obox(p.cx, p.top - 0.25, p.cz, p.hx, 0.25, p.hz, p.rot, tag)];
-      const y0 = p.base - 1, y1 = p.top - 0.5;
-      if (y1 > y0 + 0.1) {
-        for (const s of [-1, 1]) {
-          const [ox, oz] = toWorld(s * (p.hx - ARCH_LEG), 0, p.rot);
-          out.push(obox(p.cx + ox, (y0 + y1) / 2, p.cz + oz, ARCH_LEG, (y1 - y0) / 2, p.hz * 0.8, p.rot, tag));
-        }
-      }
-      return out;
-    }
-    case 'log':
-      return [obox(p.cx, p.top - 0.45, p.cz, p.hx, 0.45, p.hz, p.rot, 'wood')];
-    default: return [];
-  }
-}
-
-// Staircase styles. w = along the route, d = depth away from the wall.
-const STAIRS = {
-  terraces: { kind: 'block', w: [1.8, 2.2], d: [1.8, 2.2], rise: [0.6, 0.85], gap: [0.25, 1.0], off: 0.35, tag: 'grass' },
-  ruins: { kind: 'column', w: [1.35, 1.6], d: [1.35, 1.6], rise: [0.55, 0.9], gap: [0.9, 1.6], off: 0.45, tag: 'stone' },
-  trees: { kind: 'disc', r: [0.95, 1.12], rise: [0.7, 0.95], gap: [0.9, 1.55], off: 0.5, tag: 'leaf' },
-  ledges: { kind: 'ledge', w: [1.9, 2.4], d: [1.3, 1.55], rise: [0.8, 1.0], gap: [0.55, 1.35], off: 0.0, tag: 'stone' },
-  scaffold: { kind: 'plank', w: [1.6, 2.0], d: [1.4, 1.6], rise: [0.65, 0.9], gap: [0.4, 1.15], off: 0.02, tag: 'wood' },
-  // gentle styles for islands near home
-  steps: { kind: 'block', w: [0.95, 1.1], d: [2.3, 2.6], rise: [0.27, 0.32], gap: [0.02, 0.05], off: 0.3, tag: 'stone', joined: true, carved: true },
-  terracesWide: { kind: 'block', w: [2.4, 2.8], d: [2.4, 2.8], rise: [0.5, 0.66], gap: [0.35, 0.8], off: 0.35, tag: 'grass' },
-  ruinsWide: { kind: 'column', w: [2.2, 2.6], d: [2.2, 2.6], rise: [0.5, 0.66], gap: [0.5, 0.85], off: 0.45, tag: 'stone' },
-  ledgesRail: { kind: 'ledge', w: [2.6, 3.0], d: [2.1, 2.4], rise: [0.5, 0.64], gap: [0.45, 0.85], off: 0.0, tag: 'stone' },
-  // rocky islands: narrow shelves on a sheer face, freestanding sea stacks a
-  // step out from the wall, and long rock arches that each rise a little
-  sheer: { kind: 'ledge', w: [1.5, 1.9], d: [1.2, 1.32], rise: [0.85, 1.05], gap: [0.5, 1.2], off: 0.0, tag: 'stone', sheer: true },
-  stacks: { kind: 'stack', r: [0.85, 1.05], rise: [0.6, 0.9], gap: [0.8, 1.45], off: 0.9, tag: 'stone' },
-  arches: { kind: 'arch', w: [3.4, 4.2], d: [1.3, 1.55], rise: [0.7, 0.95], gap: [0.7, 1.3], off: 0.25, tag: 'stone' },
-  // tropical islands: palm crowns a step out from the wall, tide pools stepping
-  // up the rock like terraces (a wide kind near home), and rope bridges hung
-  // along the face with a handrope on the open side
-  palms: { kind: 'palm', r: [0.98, 1.12], rise: [0.7, 0.95], gap: [0.9, 1.5], off: 0.55, tag: 'leaf' },
-  pools: { kind: 'pool', w: [1.8, 2.2], d: [1.8, 2.2], rise: [0.6, 0.85], gap: [0.3, 1.0], off: 0.35, tag: 'stone' },
-  poolsWide: { kind: 'pool', w: [2.4, 2.8], d: [2.4, 2.8], rise: [0.5, 0.66], gap: [0.35, 0.8], off: 0.35, tag: 'stone' },
-  ropes: { kind: 'rope', w: [3.2, 4.0], d: [1.25, 1.4], rise: [0.65, 0.9], gap: [0.6, 1.25], off: 0.12, tag: 'wood', rope: true },
-};
-// Kinds whose top is a disc (r) rather than a rectangle (w × d).
-const ROUND = new Set(['disc', 'stack', 'palm']);
-// Kinds that are solid down to the ground (steps you stand on top of).
-const SOLID = new Set(['block', 'column', 'pool']);
-export const ARCH_LEG = 0.42; // half-width of an arch's legs along the span
-export const PALM_TRUNK = 0.3; // radius of a palm-top's trunk
 export const MODULE_TYPES = ['moat:stones', 'moat:log', 'moat:planks', 'moat:bridge', 'moat:stacks', 'moat:pools', 'moat:ropeBridge',
-  ...Object.keys(STAIRS).map((k) => 'stair:' + k), 'vista', 'summit', 'branch:lookoutTree', 'branch:lookoutSpire', 'branch:lookoutPalm', 'branch:summitNook', 'arch'];
+  'moat:causeway', 'moat:basalt', 'moat:basaltCrumble', ...Object.keys(STAIRS).map((k) => 'stair:' + k), 'vent', 'vista', 'summit',
+  'branch:lookoutTree', 'branch:lookoutSpire', 'branch:lookoutPalm', 'branch:lookoutBasalt', 'branch:summitNook', 'arch'];
 // Per-biome module pools, and what the chest branch is (a lookout tree, on
-// bare rock a spire with ledges round it, in the tropics a giant palm).
+// bare rock a spire with ledges round it, in the tropics a giant palm, on a
+// volcano a stack of basalt columns). `vent`: which walls start at a steam
+// vent (ventClimb), and whether it throws you straight to the top (`toRim`).
 const POOLS = {
   temperate: {
     // stone stairs are listed twice: gentle islands are mostly a walk with a few hops
@@ -292,95 +228,14 @@ const POOLS = {
     medium: { moat: ['pools', 'pools', 'planks'], cliff: ['pools', 'palms', 'ropes', 'terraces'], mesa: ['palms', 'ropes', 'pools', 'ledges'] },
     hard: { moat: ['pools', 'planks'], cliff: ['palms', 'ropes', 'pools'], mesa: ['palms', 'ropes', 'ledges', 'pools'] },
   },
+  volcanic: {
+    spire: true, basalt: true,
+    easy: { vent: { cliff: true, toRim: true }, moat: ['causeway'], cliff: ['basaltWide', 'basaltSteps'], mesa: ['basaltSteps', 'basaltWide', 'slabsRail', 'basaltSteps'] },
+    medium: { vent: { cliff: true, mesa: true }, moat: ['basalt'], cliff: ['basalt', 'cinders', 'slabsWide'], mesa: ['basalt', 'cinders', 'slabs', 'scaffold'] },
+    hard: { vent: { cliff: true, mesa: true }, moat: ['basaltCrumble'], cliff: ['cinders', 'basalt'], mesa: ['cinders', 'basalt', 'slabs', 'basalt'] },
+  },
 };
 
-const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
-const rr = (rng, [a, b], t = rng()) => a + (b - a) * t;
-
-/**
- * Pieces climbing a wall (cliff or mesa) along its ring: from yFrom (ground)
- * to yTo - 0.6, so the last hop onto the rim is ≤ 0.95 up. If `prevHalf` is
- * given, the first piece keeps a proper gap from whatever ends at aStart.
- */
-function stair(T, { Rw, aStart, dir, yFrom, yTo, style, rng, diff, route, groundAt, prevHalf = 0, lim = LIMITS.main, restEvery = 0, rails = false, wallTop = yTo }) {
-  const S = STAIRS[style];
-  const pieces = [];
-  const total = Math.max(0.3, yTo - 0.6 - yFrom);
-  const riseAvg = Math.min(lim.up - 0.04, rr(rng, S.rise, 0.4 + diff * 0.4));
-  const n = Math.max(1, Math.ceil(total / riseAvg));
-  const step = total / n;
-  // the rising pieces, with a flat landing after every few hops on gentle islands
-  const slots = [];
-  for (let i = 0; i < n; i++) {
-    slots.push({ top: yFrom + step * (i + 1) + (i < n - 1 && !S.joined ? (rng() - 0.5) * 0.08 : 0) });
-    if (restEvery && !S.joined && (i + 1) % restEvery === 0 && i < n - 1) slots.push({ top: slots[slots.length - 1].top, landing: true });
-  }
-  let a = aStart, half0 = prevHalf;
-  const specs = [];
-  for (const slot of slots) {
-    const top = slot.top;
-    const half = ROUND.has(S.kind) ? rr(rng, S.r) : slot.landing ? Math.max(1.5, rr(rng, S.w) / 2 * 1.3) : rr(rng, S.w) / 2;
-    const depth = ROUND.has(S.kind) ? half * 2 : rr(rng, S.d);
-    // a long straight deck (a rope bridge) stands off the wall's furthest
-    // point along its length, so a bulge in the rock can't cut into it
-    const wallAt = S.rope ? (ang) => Math.max(...[-1, -0.5, 0, 0.5, 1].map((k) => Rw(ang + (k * half) / Rw(ang)))) : Rw;
-    const radial = (ang) => wallAt(ang) + S.off + depth / 2;
-    if (half0 > 0) {
-      // a landing butts straight onto the piece before it (a walk, not a jump)
-      let gap = slot.landing ? 0.04 : Math.min(lim.gap - 0.12, rr(rng, S.gap, clamp(0.25 + diff * 0.6 + (rng() - 0.5) * 0.5, 0, 1)));
-      // wide pieces on a tight curve: open the gap enough that inner corners don't meet
-      if (!slot.landing && !S.joined && !ROUND.has(S.kind)) gap = Math.min(lim.gap - 0.12, Math.max(gap, (depth * (half0 + gap + half)) / (2 * radial(a)) + 0.12));
-      a = stepAlong(radial, a, dir, half0 + gap + half);
-    }
-    const R = radial(a);
-    specs.push({ a, cx: Math.cos(a) * R, cz: Math.sin(a) * R, top, half, depth, landing: !!slot.landing });
-    half0 = half;
-  }
-  // rectangles face along the line through their neighbours (the ring may bend)
-  for (let i = 0; i < specs.length; i++) {
-    const sp = specs[i];
-    const base = groundAt(sp.cx, sp.cz);
-    const extra = { tag: S.tag, base: Number.isFinite(base) ? base : -2, route, style, angle: sp.a, wallTop,
-      joined: !!S.joined || sp.landing || !!specs[i + 1]?.landing, landing: sp.landing, rail: (rails && !ROUND.has(S.kind)) || !!S.rope, carved: !!S.carved };
-    if (ROUND.has(S.kind)) { pieces.push(discPiece(S.kind, sp.cx, sp.cz, sp.top, sp.half, S.kind === 'disc' ? { ...extra, trunk: 0.42 } : extra)); continue; }
-    let rot = rotOf(sp.a);
-    if (specs.length > 1) {
-      const A = specs[Math.max(0, i - 1)], B = specs[Math.min(specs.length - 1, i + 1)];
-      const dx = (B.cx - A.cx) * dir, dz = (B.cz - A.cz) * dir;
-      // keep local x along travel and local +z towards the wall (inward)
-      const t = Math.atan2(dz, dx);
-      rot = -t;
-      const [zx, zz] = toWorld(0, 1, rot);
-      if (zx * sp.cx + zz * sp.cz > 0) rot = -t + Math.PI;
-    }
-    const p = rectPiece(S.kind, sp.cx, sp.cz, sp.top, sp.half, sp.depth / 2, rot, extra);
-    if (S.joined) p.minWidth = sp.depth; // walked up, so it's as wide as it is deep
-    pieces.push(p);
-  }
-  return { pieces, aEnd: a, lastHalf: half0 };
-}
-
-/** A wide resting pad against a wall, `gap` along the ring after a piece of half-length `prevHalf`. */
-function vistaAfter(T, { Rw, a, dir, prevHalf, top, route, gap = 0.9, wide = false }) {
-  const hx = wide ? 1.7 : 1.4, hz = wide ? 1.4 : 1.3, R = Rw(a) + hz;
-  const a2 = stepAlong((ang) => Rw(ang) + hz, a, dir, prevHalf + gap + hx);
-  const R2 = Rw(a2) + hz;
-  void R;
-  return rectPiece('vista', Math.cos(a2) * R2, Math.sin(a2) * R2, top, hx, hz, rotOf(a2), { tag: 'stone', base: -2, route, angle: a2 });
-}
-
-/**
- * The angle after `a` (going `dir`) whose point on the curve r = rf(angle) is
- * exactly `dist` away in a straight line. Bisection, since the radius wobbles.
- */
-function stepAlong(rf, a, dir, dist) {
-  const p0x = Math.cos(a) * rf(a), p0z = Math.sin(a) * rf(a);
-  const d = (da) => { const b = a + dir * da, r = rf(b); return Math.hypot(Math.cos(b) * r - p0x, Math.sin(b) * r - p0z); };
-  let lo = 0, hi = Math.min(Math.PI / 2, (dist / Math.max(1, rf(a))) * 3);
-  while (d(hi) < dist && hi < Math.PI) hi *= 1.5;
-  for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; if (d(mid) < dist) lo = mid; else hi = mid; }
-  return a + dir * (lo + hi) / 2;
-}
 
 /**
  * Where you walk up to the first piece of a climb: the nearest clear spot
@@ -462,7 +317,7 @@ export function layoutLevel(I, opts = {}) {
 }
 
 function layoutOnce(I, opts, attempt) {
-  _pid = 0;
+  resetPieceIds();
   const rng = mulberry32((((I.seed | 0) * 2654435761) ^ 0x5eed1e ^ (attempt * 0x9e3779b1)) >>> 0);
   const size = clamp(((I.r || 100) - 45) / 210, 0, 1);
   const { tier, diff } = difficultyFor(I, opts);
@@ -528,6 +383,26 @@ function layoutOnce(I, opts, attempt) {
     }
   };
   const cp = (x, y, z, extra = {}) => { checkpoints.push({ id: 'cp' + checkpoints.length, x, y, z, ...extra }); keepOut.push([x, z, 2]); };
+  const vents = [];
+  /**
+   * The first stretch up a wall from a steam vent (volcanic islands): walk up
+   * to the vent, and it throws you to its shelf, or (toRim) to the top.
+   */
+  const ventPart = (Rw, ringF, aStart, yTo, toRim, wall) => {
+    const v = ventClimb(T, { Rw, aStart, dir, yTo, toRim, groundAt, route: 'main', launchUp: D.launchUp - 0.1, over: ASHORE.vent.over });
+    const [vent, shelf] = v.pieces;
+    const { back, via } = approachPoint(T, vent, dir, Rw, ringF, [...colliders, ...v.pieces.flatMap(piecesColliders)], cfg.approachGap);
+    walks[walks.length - 1].push([via.x, via.z], [back.x, back.z]);
+    route.push(groundNode(back.x, back.z));
+    addPieces(v.pieces);
+    route.push(pieceNode(vent, 'walk'));
+    if (shelf) route.push(pieceNode(shelf, 'launch'));
+    vents.push({ id: vent.id, x: vent.cx, y: vent.top, z: vent.cz, r: VENT.mouth, lift: vent.lift });
+    // coins hang in the steam, picked up on the way up
+    for (const f of [0.35, 0.7]) coinAt(vent.cx, vent.top + (vent.lift - ASHORE.vent.over) * f, vent.cz, 2);
+    modules.push({ type: 'vent', wall, pieces: v.pieces.length });
+    return v;
+  };
 
   // ---- walls: invisible vertical faces at each cliff foot, so nobody climbs
   // the rock whatever the controller does with steep ground.
@@ -565,8 +440,8 @@ function layoutOnce(I, opts, attempt) {
     let style = pick(rng, pool.moat);
     if (style === 'log' && span > 12) style = 'planks';
     const list = [];
-    if (style === 'bridge' || style === 'ropeBridge') {
-      // a railed footbridge (in the tropics a rope bridge) from bank to bank: walk on, walk off, no jumping
+    if (style === 'bridge' || style === 'ropeBridge' || style === 'causeway') {
+      // a railed footbridge (in the tropics a rope bridge, over lava a stone causeway) from bank to bank: walk on, walk off, no jumping
       const endAt = (from, to) => { // first point (walking from `from` towards `to`) where the bank is ~0.55 high
         const L = Math.hypot(to.x - from.x, to.z - from.z);
         for (let t = 0; t <= L; t += 0.1) { const x = from.x + (to.x - from.x) * (t / L), z = from.z + (to.z - from.z) * (t / L); if (T.groundAt(x, z) <= 0.55) return { x, z }; }
@@ -575,7 +450,7 @@ function layoutOnce(I, opts, attempt) {
       const far = T.at(T.moatOut(am) + 2, am), near = T.at(T.moatIn(am) - 2, am);
       const eo = endAt(far, near), ei = endAt(near, far);
       const Lb = Math.hypot(ei.x - eo.x, ei.z - eo.z);
-      const p = rectPiece('bridge', (eo.x + ei.x) / 2, (eo.z + ei.z) / 2, 0.85, Lb / 2 + 0.35, 1.15, rot, { tag: 'wood', base: -2.4, route: 'main', style, posts: true, rails2: true });
+      const p = rectPiece('bridge', (eo.x + ei.x) / 2, (eo.z + ei.z) / 2, 0.85, Lb / 2 + 0.35, 1.15, rot, { tag: style === 'causeway' ? 'stone' : 'wood', base: -2.4, route: 'main', style, posts: true, rails2: true });
       list.push(p);
       po.x = eo.x - ux * 0.05; po.z = eo.z - uz * 0.05; pi.x = ei.x + ux * 0.05; pi.z = ei.z + uz * 0.05;
       walks[walks.length - 1][1] = [po.x, po.z];
@@ -600,6 +475,19 @@ function layoutOnce(I, opts, attempt) {
         const j = (rng() - 0.5) * 0.6;
         list.push(discPiece('stack', po.x + ux * t - uz * j, po.z + uz * t + ux * j, top, r, { tag: 'stone', base: -2.4, route: 'main', style }));
         top = clamp(top + (rng() < 0.55 ? 1 : -1) * (0.3 + rng() * 0.35), 0.7, 1.7);
+      }
+    } else if (style === 'basalt' || style === 'basaltCrumble') {
+      // basalt columns standing in the lava, their tops stepping up and down;
+      // on the hardest islands every other one crumbles (never the first or last)
+      const r = 0.86 + rng() * 0.1, n = Math.max(1, Math.round((span + 0.4) / (2 * r + 1.1 + diff * 0.4)));
+      const g = (span - n * 2 * r) / (n + 1);
+      let top = 0.8 + rng() * 0.25;
+      for (let i = 0; i < n; i++) {
+        const t = g * (i + 1) + r * (2 * i + 1);
+        const j = (rng() - 0.5) * 0.5;
+        const crumble = style === 'basaltCrumble' && i % 2 === 1 && i < n - 1;
+        list.push(discPiece('basalt', po.x + ux * t - uz * j, po.z + uz * t + ux * j, top, r, { tag: 'stone', base: -2.4, route: 'main', style, ...(crumble ? { crumble: true } : {}) }));
+        top = clamp(top + (rng() < 0.55 ? 1 : -1) * (0.25 + rng() * 0.3), 0.75, 1.6);
       }
     } else if (style === 'pools') {
       // rock rims standing in the channel, each holding a tide pool
@@ -639,15 +527,24 @@ function layoutOnce(I, opts, attempt) {
     path.forEach(([x, z], i) => { if (i > 0 && i % 2 === 0) coinAt(x, groundAt(x, z), z, 1); });
     if (kit.meadowArch) meadowArch(path);
   }
-  let aNow = aS1, yNow = 0, lastHalf = 0;
-  for (let k = 0; k < c1Parts; k++) {
+  let aNow = aS1, yNow = 0, lastHalf = 0, rimLaunch = false;
+  let c1 = c1Parts; // (one more when a vent's shelf leaves part of the wall to climb)
+  for (let k = 0; k < c1; k++) {
     const style = cliffStyles[k % cliffStyles.length];
     if (k === 0) {
       // ground just outside the wall where the climb begins (lowest nearby point)
       const g = [-0.6, 0, 0.6].map((d) => { const a = aNow - dir * d / T.R1(aNow); const p = T.at(T.R1(a) + 1.6, a); return groundAt(p.x, p.z); });
       yNow = Math.min(...g);
     }
-    const yTo = k === c1Parts - 1 ? T.h1 : yNow + (T.h1 - yNow) * 0.5 + 0.6;
+    if (k === 0 && pool.vent?.cliff) {
+      // the shelf it throws you to is the rest before the next stretch (no vista)
+      const v = ventPart(T.R1, T.meadowR, aNow, T.h1, !!pool.vent.toRim, 'cliff');
+      aNow = v.aEnd; yNow = v.top; lastHalf = v.lastHalf;
+      if (v.rim) { rimLaunch = true; break; }
+      c1 = Math.max(c1, 2);
+      continue;
+    }
+    const yTo = k === c1 - 1 ? T.h1 : yNow + (T.h1 - yNow) * 0.5 + 0.6;
     const { pieces: list, aEnd, lastHalf: lh } = stair(T, { Rw: T.R1, aStart: aNow, dir, yFrom: yNow, yTo, style, rng, diff, route: 'main', groundAt, prevHalf: lastHalf, ...stairOpts, rails: false, wallTop: T.h1 });
     if (k === 0) {
       const { back, via } = approachPoint(T, list[0], dir, T.R1, T.meadowR, [...colliders, ...list.flatMap(piecesColliders)], cfg.approachGap);
@@ -658,9 +555,10 @@ function layoutOnce(I, opts, attempt) {
     list.forEach((p, i) => { route.push(pieceNode(p)); if (i % 2 === 1) coinAt(p.cx, p.top, p.cz, 2); });
     modules.push({ type: 'stair:' + style, wall: 'cliff', pieces: list.length });
     aNow = aEnd; yNow = list[list.length - 1].top; lastHalf = lh;
-    if (k < c1Parts - 1) {
+    if (k < c1 - 1) {
       const v = vistaAfter(T, { Rw: T.R1, a: aNow, dir, prevHalf: lastHalf, top: yNow + (tier === 'easy' ? 0 : 0.2), route: 'main', gap: tier === 'easy' ? 0.04 : 0.9, wide: tier === 'easy' });
       if (tier === 'easy') { v.joined = true; list[list.length - 1].joined = true; }
+      if (kit.basalt) v.style = 'slabs'; // (a rest of basalt, not a grassy ledge)
       addPieces([v]);
       route.push(pieceNode(v));
       modules.push({ type: 'vista' });
@@ -671,7 +569,7 @@ function layoutOnce(I, opts, attempt) {
   const aRim = aNow;
   // you land on the top of the rock face (the wall's top is solid), then walk on
   const rimEdge = rimFor(T, pieces[pieces.length - 1], T.R1);
-  route.push({ type: 'ground', x: rimEdge.x, z: rimEdge.z, y: T.h1, edge: 'jump', rim: true });
+  route.push({ type: 'ground', x: rimEdge.x, z: rimEdge.z, y: T.h1, edge: rimLaunch ? 'launch' : 'jump', rim: true });
   const rimP = T.at(T.R1(aRim) - T.W1 - 0.35, aRim);
   { const a = aRim + dir * 1.6 / T.R1(aRim); const c = T.at(T.R1(a) - T.W1 - 2.4, a); cp(c.x, groundAt(c.x, c.z), c.z); }
 
@@ -690,10 +588,17 @@ function layoutOnce(I, opts, attempt) {
   aNow = aM; lastHalf = 0;
   const mesaStyles = notFirst(shuffle(rng, pool.mesa), 'arches');
   const yGain = T.summit - yNow;
-  let midCp = false;
-  for (let k = 0; k < mParts; k++) {
+  let midCp = false, mP = mParts, vented = false;
+  for (let k = 0; k < mP; k++) {
     const style = mesaStyles[k % mesaStyles.length];
-    const yTo = k === mParts - 1 ? T.summit : yNow + yGain / mParts + 0.6;
+    if (k === 0 && pool.vent?.mesa) {
+      const v = ventPart(T.R2, T.terraceR, aNow, T.summit, false, 'mesa');
+      aNow = v.aEnd; yNow = v.top; lastHalf = v.lastHalf; vented = true;
+      mP = Math.max(mP, 2);
+      continue;
+    }
+    // (after a vent, the rest of the wall is shared out between the stretches left)
+    const yTo = k === mP - 1 ? T.summit : vented ? yNow + (T.summit - yNow) / (mP - k) + 0.6 : yNow + yGain / mParts + 0.6;
     const { pieces: list, aEnd, lastHalf: lh } = stair(T, { Rw: T.R2, aStart: aNow, dir, yFrom: yNow, yTo, style, rng, diff, route: 'main', groundAt, prevHalf: lastHalf, ...stairOpts, rails: cfg.rails, wallTop: T.summit });
     if (k === 0) {
       const { back, via } = approachPoint(T, list[0], dir, T.R2, T.terraceR, [...colliders, ...list.flatMap(piecesColliders)], cfg.approachGap);
@@ -704,13 +609,14 @@ function layoutOnce(I, opts, attempt) {
     list.forEach((p, i) => { route.push(pieceNode(p)); if (i % 2 === 0) coinAt(p.cx, p.top, p.cz, k > 1 ? 3 : 2); });
     modules.push({ type: 'stair:' + style, wall: 'mesa', pieces: list.length });
     aNow = aEnd; yNow = list[list.length - 1].top; lastHalf = lh;
-    if (k < mParts - 1) {
+    if (k < mP - 1) {
       const v = vistaAfter(T, { Rw: T.R2, a: aNow, dir, prevHalf: lastHalf, top: yNow + (tier === 'easy' ? 0 : 0.25), route: 'main', gap: tier === 'easy' ? 0.04 : 0.9, wide: tier === 'easy' });
       if (tier === 'easy') { v.joined = true; v.rail = cfg.rails; list[list.length - 1].joined = true; }
+      if (kit.basalt) v.style = 'slabs';
       addPieces([v]);
       route.push(pieceNode(v));
       modules.push({ type: 'vista' });
-      if (!midCp && k >= Math.floor((mParts - 1) / 2)) { midCp = true; cp(v.cx, v.top, v.cz, { onPiece: v.id }); }
+      if (!midCp && k >= Math.floor((mP - 1) / 2)) { midCp = true; cp(v.cx, v.top, v.cz, { onPiece: v.id }); }
       aNow = v.angle; yNow = v.top; lastHalf = v.hx;
     }
   }
@@ -719,17 +625,22 @@ function layoutOnce(I, opts, attempt) {
   const topEdge = rimFor(T, pieces.filter((p) => p.route === 'main').slice(-1)[0], T.R2);
   route.push({ type: 'ground', x: topEdge.x, z: topEdge.z, y: T.summit, edge: 'jump', rim: true });
   const topRim = T.at(T.R2(aTop) - T.W2 - 0.35, aTop);
-  const summit = { x: 0, y: groundAt(0, 0), z: 0 };
+  // on a volcano the summit is the tip of the outcrop over the crater, which
+  // runs out from where you arrive; the lantern, coins and vault go round the rim
+  const crater = !!T.setOutcrop;
+  const tip = crater ? T.setOutcrop(aTop) : { x: 0, z: 0 };
+  const rimR = (a) => (T.Rc(a) + T.R2(a) - T.W2) / 2;
+  const summit = { x: tip.x, y: groundAt(tip.x, tip.z), z: tip.z };
   modules.push({ type: 'summit' });
   caches.push({ id: 'g0', x: summit.x, y: summit.y, z: summit.z, value: Math.round(40 + diff * 30 + size * 10 + rng() * 10) });
-  { const c = T.at(Math.min(3.2, T.R2(aTop) * 0.4), aTop); cp(c.x, groundAt(c.x, c.z), c.z); }
-  for (let i = 0; i < 4; i++) { const a = aTop + (i / 4) * TAU + 0.4; const p = T.at(T.R2(a) * 0.5, a); coinAt(p.x, groundAt(p.x, p.z), p.z, 2); }
+  { const c = crater ? T.at(rimR(aTop + 0.9), aTop + 0.9) : T.at(Math.min(3.2, T.R2(aTop) * 0.4), aTop); cp(c.x, groundAt(c.x, c.z), c.z); }
+  for (let i = 0; i < 4; i++) { const a = aTop + (i / 4) * TAU + 0.4; const p = T.at(crater ? rimR(a) : T.R2(a) * 0.5, a); coinAt(p.x, groundAt(p.x, p.z), p.z, 2); }
   walks.push([[topRim.x, topRim.z], [summit.x + 0.01, summit.z]]);
-  keepOut.push([0, 0, 2.5]);
+  keepOut.push([summit.x, summit.z, 2.5]);
   // the vault: where a quest item waits (retrieve quests, anchor refits), across
   // the summit from where you arrive, between two of the summit coins
   const aV = aTop + 0.4 + Math.PI * 0.75;
-  const vp = T.at(Math.min(2.2, T.R2(aV) * 0.35), aV);
+  const vp = crater ? T.at(rimR(aV), aV) : T.at(Math.min(2.2, T.R2(aV) * 0.35), aV);
   const vault = { x: vp.x, y: groundAt(vp.x, vp.z), z: vp.z };
   keepOut.push([vault.x, vault.z, 1.6]);
 
@@ -752,7 +663,7 @@ function layoutOnce(I, opts, attempt) {
     for (let i = 0; i < n; i++) {
       y += i === 0 ? TC.first : Math.min(rr(rng, TC.rise), LIMITS.optional.up - 0.08);
       const r = i === n - 1 ? TC.top : TC.r;
-      list.push(discPiece('disc', c.x + Math.cos(phi) * orbit, c.z + Math.sin(phi) * orbit, y, r, { tag: kit.spire ? 'stone' : 'leaf', base: g0, route: 'chest', trunk: 0, branch: true, hub: [c.x, c.z], palm: !!kit.palm }));
+      list.push(discPiece('disc', c.x + Math.cos(phi) * orbit, c.z + Math.sin(phi) * orbit, y, r, { tag: kit.spire ? 'stone' : 'leaf', base: g0, route: 'chest', trunk: 0, branch: true, hub: [c.x, c.z], palm: !!kit.palm, ...(kit.basalt ? { basalt: true } : {}) }));
       phi += TC.dphi * dir;
     }
     const trunkTop = y + 1.4;
@@ -762,11 +673,11 @@ function layoutOnce(I, opts, attempt) {
     const f = list[0];
     const sx = f.cx + ((f.cx - c.x) / orbit) * 1.6, sz = f.cz + ((f.cz - c.z) / orbit) * 1.6;
     const nodes = [groundNode(sx, sz), ...list.map((p) => pieceNode(p))];
-    branches.push({ name: 'chest', nodes, tree: { x: c.x, z: c.z, base: g0, top: trunkTop, orbit, spire: !!kit.spire, palm: !!kit.palm } });
+    branches.push({ name: 'chest', nodes, tree: { x: c.x, z: c.z, base: g0, top: trunkTop, orbit, spire: !!kit.spire, palm: !!kit.palm, ...(kit.basalt ? { basalt: true } : {}) } });
     const top = list[list.length - 1];
     chests.push({ id: 'chest', x: top.cx, y: top.top, z: top.cz, yaw: Math.atan2(c.x - top.cx, c.z - top.cz) });
     list.forEach((p, i) => { if (i % 2 === 1 && i < n - 1) coinAt(p.cx, p.top, p.cz, 3); });
-    modules.push({ type: kit.spire ? 'branch:lookoutSpire' : kit.palm ? 'branch:lookoutPalm' : 'branch:lookoutTree', pieces: list.length });
+    modules.push({ type: kit.basalt ? 'branch:lookoutBasalt' : kit.spire ? 'branch:lookoutSpire' : kit.palm ? 'branch:lookoutPalm' : 'branch:lookoutTree', pieces: list.length });
     break;
   }
 
@@ -775,7 +686,7 @@ function layoutOnce(I, opts, attempt) {
     const a = free.mid + free.width * off;
     const yN = T.summit - (3.6 + rng() * 1.2);
     const Rn = T.R2(a) + 0.95;
-    const nook = rectPiece('ledge', Math.cos(a) * Rn, Math.sin(a) * Rn, yN, 1.25, 0.95, rotOf(a), { tag: 'stone', base: -2, route: 'secret', branch: true, angle: a });
+    const nook = rectPiece('ledge', Math.cos(a) * Rn, Math.sin(a) * Rn, yN, 1.25, 0.95, rotOf(a), { tag: 'stone', base: -2, route: 'secret', branch: true, angle: a, ...(kit.basalt ? { style: 'slabs' } : {}) });
     const clash = pieces.some((p) => Math.hypot(p.cx - nook.cx, p.cz - nook.cz) < 2.5 + (p.r || Math.max(p.hx, p.hz)) && Math.abs(p.top - nook.top) < 4);
     if (!clash) {
       addPieces([nook]);
@@ -797,8 +708,12 @@ function layoutOnce(I, opts, attempt) {
   }
   coins.forEach((c, i) => { c.id = 'c' + i; });
 
+  // what crumbles under you, by piece (hazards.js); the moat is lava on a volcano
+  const crumbles = pieces.filter((p) => p.crumble).map((p) => ({ id: p.id, x: p.cx, y: p.top, z: p.cz }));
+  // lava in a crater: below this, you've fallen in (hazards.js)
+  const pools = crater ? [{ x: 0, z: 0, r: Math.max(...Array.from({ length: 48 }, (_, i) => T.Rc((i / 48) * TAU))), y: T.crater.lavaY }] : [];
   return { biome, tier, size, diff, dir, a0, T, pieces, colliders, route, branches, walks, modules, coins, caches, chests, checkpoints,
-    keepOut, spawn, exit, rowboat, summit, vault, arches };
+    keepOut, spawn, exit, rowboat, summit, vault, arches, vents, crumbles, pools, lava: biome === 'volcanic' };
 }
 
 /** The widest angular gap between the given angles: { mid, width }. */
@@ -820,13 +735,14 @@ export function walkableEdge(A, B) {
   return lineGap(A, B) <= 0.2 && dy <= ASHORE.stepUp + 1e-6 && -dy <= 0.8;
 }
 
-/** Numbers for comparing difficulty: route length, jumps, worst gap/rise, summit height. */
+/** Numbers for comparing difficulty: route length, jumps, launches from vents, worst gap/rise, summit height. */
 export function routeStats(L) {
-  let length = 0, jumps = 0, maxGap = 0, maxRise = 0, run = 0, maxRun = 0;
+  let length = 0, jumps = 0, launches = 0, maxGap = 0, maxRise = 0, run = 0, maxRun = 0;
   const R = L.route;
   for (let i = 1; i < R.length; i++) {
     const A = R[i - 1], B = R[i];
     length += Math.hypot(B.x - A.x, B.z - A.z);
+    if (B.edge === 'launch') { launches++; run = 0; continue; }
     if (walkableEdge(A, B)) { run = 0; continue; }
     jumps++; run++; maxRun = Math.max(maxRun, run);
     maxGap = Math.max(maxGap, lineGap(A, B));
@@ -834,7 +750,7 @@ export function routeStats(L) {
   }
   // walked polylines add their own length
   for (const w of L.walks) for (let i = 1; i < w.length; i++) length += Math.hypot(w[i][0] - w[i - 1][0], w[i][1] - w[i - 1][1]);
-  return { tier: L.tier, length: Math.round(length), jumps, maxConsecutiveJumps: maxRun, maxGap: +maxGap.toFixed(2), maxRise: +maxRise.toFixed(2),
+  return { tier: L.tier, length: Math.round(length), jumps, launches, maxConsecutiveJumps: maxRun, maxGap: +maxGap.toFixed(2), maxRise: +maxRise.toFixed(2),
     summitAboveMeadow: +(L.T.summit - L.T.meadowLo).toFixed(1), modules: L.modules.map((m) => m.type).join(', ') };
 }
 
@@ -908,6 +824,7 @@ export function validateLayout(L) {
       const dy = B.y - A.y;
       const gap = lineGap(A, B);
       const where = `${label}[${i}] ${A.piece?.kind || 'ground'}→${B.piece?.kind || 'ground'}`;
+      if (B.edge === 'launch') { checkLaunch(A.piece, B, where); continue; }
       if (dy > lim.up + 1e-6) errors.push(`${where}: jump up ${dy.toFixed(2)} > ${lim.up.toFixed(2)}`);
       if (-dy > lim.drop) errors.push(`${where}: drop ${(-dy).toFixed(2)} > ${lim.drop}`);
       if (gap > lim.gap + 1e-6) errors.push(`${where}: gap ${gap.toFixed(2)} > ${lim.gap.toFixed(2)}`);
@@ -915,17 +832,40 @@ export function validateLayout(L) {
     for (const n of nodes) {
       if (n.type !== 'piece') continue;
       const p = n.piece;
-      if (p.minWidth < lim.minWidth - 1e-6) errors.push(`${label} ${p.id} ${p.kind}: width ${p.minWidth.toFixed(2)} < ${lim.minWidth}`);
+      if (p.minWidth < lim.minWidth - 1e-6 && p.kind !== 'vent') errors.push(`${label} ${p.id} ${p.kind}: width ${p.minWidth.toFixed(2)} < ${lim.minWidth}`);
     }
+  };
+  /**
+   * A steam vent throws you to B: no higher than design.launchUp, B within
+   * design.launchReach of the vent's middle, high enough to step across at
+   * the top, and nothing overhead in the column you rise through.
+   */
+  const checkLaunch = (V, B, where) => {
+    if (V?.kind !== 'vent') { errors.push(`${where}: a launch starts at a vent`); return; }
+    const dy = B.y - V.top, reach = lineGap({ type: 'ground', x: V.cx, z: V.cz }, B);
+    if (dy > D.launchUp + 1e-6) errors.push(`${where}: launch up ${dy.toFixed(2)} > ${D.launchUp}`);
+    if (reach > D.launchReach + 1e-6) errors.push(`${where}: launch reach ${reach.toFixed(2)} > ${D.launchReach}`);
+    if (!(V.lift >= dy + ASHORE.vent.over - 1e-6)) errors.push(`${where}: the vent lifts ${V.lift} m, not ${ASHORE.vent.over} m over its ledge`);
+    const column = [];
+    for (let k = 0; k < 8; k++) { const a = (k / 8) * TAU; column.push([V.cx + Math.cos(a) * (ASHORE.radius + 0.3), V.cz + Math.sin(a) * (ASHORE.radius + 0.3)]); }
+    const lo = V.top + 0.3, hi = V.top + V.lift + ASHORE.height;
+    const bi = plans.findIndex((pl) => pl.y1 > lo && pl.y0 < hi && polysOverlap(column, pl.foot));
+    if (bi >= 0) errors.push(`${where}: something overhead in the vent's column (${L.colliders[bi].type}/${L.colliders[bi].tag} at ${plans[bi].y0.toFixed(1)} m)`);
   };
   const mainLim = L.tier === 'easy' ? LIMITS.easy : LIMITS.main;
   check(L.route, mainLim, 'main');
+  // crumbling basalt: never a rest, a lantern's footing, or near home
+  const cpOn = new Set(L.checkpoints.map((c) => c.onPiece).filter(Boolean));
+  for (const p of L.pieces) {
+    if (!p.crumble) continue;
+    if (p.landing || p.kind === 'vista' || cpOn.has(p.id) || L.tier === 'easy') errors.push(`${p.id} ${p.kind}: crumbles, but is a ${L.tier === 'easy' ? 'piece near home' : 'rest'}`);
+  }
   for (const b of L.branches) check(b.nodes, LIMITS.optional, b.name);
   // gentle islands: never more than a few jumps without a walkable rest
   if (mainLim.maxRun) {
     let run = 0;
     for (let i = 1; i < L.route.length; i++) {
-      if (walkableEdge(L.route[i - 1], L.route[i])) run = 0;
+      if (L.route[i].edge === 'launch' || walkableEdge(L.route[i - 1], L.route[i])) run = 0;
       else if (++run > mainLim.maxRun) { errors.push(`main[${i}]: ${run} jumps in a row (max ${mainLim.maxRun})`); break; }
     }
   }

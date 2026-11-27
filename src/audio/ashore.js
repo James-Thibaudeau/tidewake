@@ -1,8 +1,9 @@
 // On-foot sound, mixed into SoundSystem (audio.js): footsteps by surface, jump
 // and land, the coin chime, the chest fanfare, what an island sounds like
-// (birds, crickets, gulls, wind in the rocks, parrots, doves and tree frogs)
-// and the on-foot turn of the
-// score. Made from the same oscillators and noise as the rest; no samples.
+// (birds, crickets, gulls, wind in the rocks, parrots, doves and tree frogs,
+// lava bubbling and the mountain rumbling), a volcano's steam vents, crumbling
+// rock and the hiss of lava, and the on-foot turn of the score. Made from the
+// same oscillators and noise as the rest; no samples.
 
 import { hz } from '../music/notation.js';
 
@@ -28,9 +29,10 @@ const AMBIENCE = {
   temperate: { day: [['songbird', 2.5, 7]], night: [['cricket', 0.9, 2.6]] },
   rocky: { day: [['farGull', 6, 15], ['whistle', 5, 12]], night: [['whistle', 4, 10]] },
   tropical: { day: [['parrot', 7, 16], ['dove', 4, 10], ['songbird', 5, 12]], night: [['treeFrog', 0.7, 2.2], ['cricket', 1.4, 3.5]] },
+  volcanic: { day: [['blub', 1.2, 4], ['rumble', 9, 20], ['farGull', 10, 24]], night: [['blub', 1.2, 4], ['rumble', 8, 18], ['cricket', 2.5, 6]] },
 };
 // Voices that carry on in the rain (the rest shelter from it).
-const RAIN_PROOF = new Set(['whistle', 'treeFrog']);
+const RAIN_PROOF = new Set(['whistle', 'treeFrog', 'blub', 'rumble']);
 
 export class AshoreSounds {
   /** Called once from build(): the island ambience's own bus, spread left to right. */
@@ -107,6 +109,29 @@ export class AshoreSounds {
     const g = c.createGain();
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(rand(0.1, 0.2), t + dur * 0.45);
+    g.gain.linearRampToValueAtTime(0, t + dur);
+    s.connect(f); f.connect(g); g.connect(dest);
+    s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05);
+  }
+
+  /** Lava in the moat: one or two thick bubbles that swell and pop. */
+  blub(t, dest) {
+    const n = Math.random() < 0.35 ? 2 : 1;
+    for (let i = 0; i < n; i++) {
+      const at = t + i * rand(0.12, 0.3), f = rand(95, 150);
+      this.tone(f, at, rand(0.12, 0.2), { type: 'sine', vol: rand(0.05, 0.08), attack: 0.03, glide: f * rand(1.8, 2.4), dest });
+      this.tone(f * 3.1, at + 0.1, 0.05, { type: 'sine', vol: 0.012, attack: 0.004, dest });
+    }
+  }
+
+  /** The mountain, deep down: a low rumble that swells and settles. */
+  rumble(t, dest) {
+    const c = this.ctx, dur = rand(2.5, 4.5);
+    const s = c.createBufferSource(); s.buffer = this.brown; s.loop = true;
+    const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = rand(90, 140);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(rand(0.04, 0.06), t + dur * 0.4);
     g.gain.linearRampToValueAtTime(0, t + dur);
     s.connect(f); f.connect(g); g.connect(dest);
     s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05);
@@ -218,6 +243,27 @@ export class AshoreSounds {
         for (let i = 0; i < 7; i++) this.tone(midi(86 + PENTA[(i * 2) % 5]), t + 0.55 + i * 0.07, 0.35, { type: 'sine', vol: 0.02 });
         return true;
       }
+      case 'vent':
+        // a steam vent firing: a hard puff, then a roar of steam that rises and thins out
+        this.noise(t, 0.12, { type: 'lowpass', freq: 500, vol: 0.2 * v, attack: 0.004, buf: this.brown });
+        this.noise(t, 1.3, { type: 'bandpass', freq: 900, sweep: 3600, q: 0.6, vol: 0.2 * v, attack: 0.03 });
+        this.noise(t + 0.05, 1.0, { type: 'highpass', freq: 3200, vol: 0.08 * v, attack: 0.05 });
+        this.tone(70, t, 0.3, { type: 'sine', vol: 0.12 * v, glide: 110 });
+        return true;
+      case 'crumble':
+        // rock giving way: a crack and a dry grinding (fall: the slab going, with a heavier crunch)
+        this.noise(t, 0.08, { type: 'highpass', freq: 2600, vol: 0.28 * v, attack: 0.002 });
+        this.noise(t + 0.02, opts.fall ? 0.7 : 0.35, { type: 'bandpass', freq: 700, sweep: 260, q: 0.9, vol: 0.22 * v, attack: 0.01 });
+        if (opts.fall) {
+          this.tone(85, t, 0.35, { type: 'sine', vol: 0.18 * v, glide: 45 });
+          for (let i = 0; i < 4; i++) this.noise(t + 0.15 + i * rand(0.06, 0.12), 0.06, { type: 'bandpass', freq: rand(1200, 2400), q: 1.5, vol: 0.1 * v, attack: 0.002 });
+        }
+        return true;
+      case 'sizzle':
+        // falling into the lava: a hiss and a puff of steam
+        this.noise(t, 0.9, { type: 'highpass', freq: 2400, sweep: 5200, vol: 0.14 * v, attack: 0.01 });
+        this.noise(t, 0.5, { type: 'lowpass', freq: 600, vol: 0.1 * v, attack: 0.01, buf: this.brown });
+        return true;
       default:
         return false;
     }

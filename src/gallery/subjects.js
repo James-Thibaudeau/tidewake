@@ -3,6 +3,7 @@
 //   group      the thing itself (already added to the stage)
 //   ground     'floor' | 'sea' | 'none': what it stands on
 //   shoal      { x, z, r, fade }: the sea's shallows round it, for an island (optional)
+//   calm       { x, z, r }: still water inside r, as the game has it in an island's moat (optional)
 //   look       { y }: the height the game cameras aim at (optional)
 //   face, helm, bow   { x, y, z, span }: what a close-up camera frames (optional)
 //   note       a line for the caption (optional)
@@ -221,7 +222,7 @@ function grove(q, stage) {
   stage.add(level.group);
   const pos = { x: 0, y: 0, z: 0 };
   return {
-    group: level.group, ground: 'sea', warnings, shoal: shoalOf(level),
+    group: level.group, ground: 'sea', warnings, shoal: shoalOf(level), calm: level.calm,
     update(dt, t, env) { level.update(dt, t, { pos, night: env.night, play: () => {} }); },
     dispose() { level.dispose(); },
   };
@@ -256,7 +257,7 @@ function archway(q, stage) {
   if (!PLACES[at]) { warnings.push(`at=${at} is not a place here (${Object.keys(PLACES).join(', ')})`); at = 'keystone'; }
   const pos = { x: 0, y: 0, z: 0 };
   return {
-    group: level.group, ground: 'sea', warnings, shoal: shoalOf(level), spot: PLACES[at], note: q.at ? at : undefined,
+    group: level.group, ground: 'sea', warnings, shoal: shoalOf(level), calm: level.calm, spot: PLACES[at], note: q.at ? at : undefined,
     update(dt, t, env) { level.update(dt, t, { pos, night: env.night, play: () => {} }); },
     dispose() { level.dispose(); },
   };
@@ -360,13 +361,16 @@ function level(q, stage) {
   const PLACES = levelPlaces(lv.layout);
   let at = q.at || 'cliff';
   if (!PLACES[at]) { warnings.push(`at=${at} is not a place here (${Object.keys(PLACES).join(', ')})`); at = Object.keys(PLACES)[0]; }
-  return { group: lv.group, ground: 'sea', warnings, shoal: shoalOf(lv), spot: PLACES[at], note: `${lv.layout.biome}, ${lv.layout.tier}${q.at ? ', ' + at : ''}`, dispose() { lv.dispose(); } };
+  return { group: lv.group, ground: 'sea', warnings, shoal: shoalOf(lv), calm: lv.calm, spot: PLACES[at], note: `${lv.layout.biome}, ${lv.layout.tier}${q.at ? ', ' + at : ''}`,
+    // (a volcanic island's lava flows and bubbles, and its vents steam)
+    update: lv.update ? (dt, t, env) => lv.update(dt, t, { night: env.night }) : undefined, dispose() { lv.dispose(); } };
 }
 
 /**
  * Close-ups of a generated level for the `spot` view, each looked at from
  * outside the island: the moat crossing, the start of the climbs up cliff 1
- * and the mesa, and the chest's branch.
+ * and the mesa, the chest's branch, and the top (on a volcano, the crater
+ * and the outcrop over it).
  */
 function levelPlaces(L) {
   const main = L.pieces.filter((p) => p.route === 'main' && p.kind !== 'vista');
@@ -385,6 +389,7 @@ function levelPlaces(L) {
   out.mesa = around(climb.filter((p) => p.top > L.T.h1 + 0.1).slice(0, 4), 3);
   const chest = L.branches.find((b) => b.name === 'chest');
   if (chest) out.chest = { ...around(chest.nodes.filter((n) => n.piece).map((n) => n.piece), 4), y: (chest.tree.base + chest.tree.top) / 2 };
+  { const a = Math.atan2(L.summit.z, L.summit.x) + 0.8; out.top = { x: 0, y: L.summit.y - 1, z: 0, span: L.T.S2 * 2.2, yaw: Math.atan2(Math.cos(a), Math.sin(a)), pitch: 0.7 }; }
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v));
 }
 
@@ -410,7 +415,7 @@ export function unknownParams(show, q, also) {
   return Object.keys(q).filter((k) => !known.has(k));
 }
 
-const PIECE_KINDS = ['block', 'bridge', 'column', 'disc', 'ledge', 'vista', 'plank', 'stone', 'stack', 'arch', 'log', 'palm', 'pool', 'rope'];
+const PIECE_KINDS = ['block', 'bridge', 'column', 'disc', 'ledge', 'vista', 'plank', 'stone', 'stack', 'arch', 'log', 'palm', 'pool', 'rope', 'basalt', 'vent', 'shelf'];
 const TIERS = ['0', '1', '2', '3', '4', '5'];
 /** The parameters a subject takes, as [key, choices] pairs, for the page's menus. */
 export function controlsFor(show) {

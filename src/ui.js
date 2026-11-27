@@ -40,7 +40,7 @@ export class UI {
       'btnJournal', 'paneQuests', 'questCount', 'questOffers', 'questBadge', 'journalScreen', 'journalBody', 'journalClose',
       'journalTabs', 'journalTitle', 'storyCards', 'storyArt', 'storyTitle', 'storyText', 'storyDots', 'storySkip', 'storyNext',
       'foundScreen', 'foundEyebrow', 'foundTitle', 'foundItems', 'foundMain', 'foundLater',
-      'ashorePanel', 'apName', 'apGold', 'apLeft',
+      'ashorePanel', 'apName', 'apGold', 'apLeft', 'apDrag',
       'racePanel', 'rpTitle', 'rpLine', 'countdown', 'hail', 'hailName', 'hailText', 'rivalNotes'];
     this.el = {};
     for (const id of ids) this.el[id] = $(id);
