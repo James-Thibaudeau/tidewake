@@ -1393,13 +1393,9 @@ Updated 2026-11-27.
       own (it plays whatever the sea plays until the kraken comes).
       Sable waiting in a port, or for a rematch off an island, is not a
       moment. Not measured on Low quality.
-  - [ ] Only a person can do, 12.4: **listen to it.** Nobody has heard a
-    note of Sable's theme. In `jukebox.html`: is the jig cheeky and
-    spirited rather than menacing? Play `sable-race` at 2 and 3, then
-    `sable-tow` (is it kind, not sad?), `sable-kraken` (huge, or just
-    muddy?) and `sable-fog`. Try the stings over `coastal`: is the horn
-    faint enough to feel far off, and does it sound like a horn? In the
-    game: do you hear the horn before you see the crimson sails?
+  - [x] 12.4 listened to in `jukebox.html` (2026-11-27): "sounds good",
+    no changes asked for. Still to hear in the game: the horn before the
+    crimson sails come into sight.
 
 ## Known issues
 
