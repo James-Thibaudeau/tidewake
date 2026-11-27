@@ -8,8 +8,11 @@
 // wake. The rest is mixed in from boat/:
 //   boat/model.js     build(): hull tiers, mast, sails, flags; anchor; wreckage
 //   boat/fittings.js  helm, keel, lanterns, crow's nest
-//   boat/rig.js       applyUpgrades, colours and livery, layoutRig, animate
+//   boat/rig.js       applyUpgrades, layoutRig, animate
+//   boat/livery.js    colours and livery: paint, cloth, emblem, flags, figurehead
 //   boat/parts.js     shared constants, textures, ropes and decoration helpers
+//   boat/marks.js     the paint yard's sail emblems and flag cloths
+//   boat/figureheads.js  the figureheads and each hull's mount for one
 // Every method is called as this.method() whichever file it lives in; grep
 // for the method name to find it.
 import * as THREE from 'three';
@@ -19,6 +22,7 @@ import { SAIL_H, decoMat, thinInk, ropeMat } from './boat/parts.js';
 import { BoatModel } from './boat/model.js';
 import { BoatFittings } from './boat/fittings.js';
 import { BoatRig } from './boat/rig.js';
+import { BoatLivery } from './boat/livery.js';
 
 // Efficiency by angle between bow and where the wind comes from (0 = into wind).
 export function pointOfSail(a) {
@@ -43,8 +47,8 @@ export class Boat {
    * opts.npc      not the player's boat: no PointLights (adding lights at
    *               runtime recompiles every shader), lantern glow meshes only
    * opts.profile  appearance profile for the explorer at the helm
-   * opts.livery   { hull, trim, deck, sail, flag, pennant } colours that
-   *               replace the tier colours (see setLivery)
+   * opts.livery   { hull, trim, deck, sail, flag, pennant, emblem, figurehead }
+   *               that replace the tier's look (see setLivery)
    */
   constructor(scene, opts = {}) {
     this.scene = scene;
@@ -211,4 +215,4 @@ export class Boat {
   }
 }
 
-mixin(Boat, BoatModel, BoatFittings, BoatRig);
+mixin(Boat, BoatModel, BoatFittings, BoatRig, BoatLivery);

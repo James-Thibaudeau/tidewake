@@ -9,8 +9,14 @@
 import { stylesFor } from '../cosmetics.js';
 import { POSES, LIGHTS, VIEWS, WEATHERS } from './presets.js';
 import { ASHORE_BIOMES } from '../config.js';
+import { paintsOf } from '../paints.js';
 
 const ids = (slot) => stylesFor(slot).map((s) => s.style);
+const paintIds = (kind) => paintsOf(kind).map((p) => p.id);
+
+// The ship's paint-yard parameters (subjects.js), and the part of the livery
+// each one sets (`hull` and `sail` already name an upgrade tier).
+export const PAINT_PARAMS = { hullPaint: 'hull', trim: 'trim', deck: 'deck', cloth: 'sail', emblem: 'emblem', flag: 'flag', pennant: 'pennant', figurehead: 'figurehead' };
 const PORTRAIT = [250, 330], LANDSCAPE = [420, 300], SQUARE = [300, 300], SMALL = [200, 200];
 
 // A sheet of another subject keeps only how things are lit, not what was showing.
@@ -40,6 +46,14 @@ const ZONES = { coastal: { zone: 'coastal' }, shallows: { zone: 'shallows' }, ba
   'outer swell': { zone: 'rough', severity: '1' }, 'cinder rip': { zone: 'rough', severity: '2' }, 'frostspire reach': { zone: 'rough', severity: '3' } };
 const ROUGH_VIEWS = { 'outer swell': { zone: 'rough', severity: '1' }, 'cinder rip': { zone: 'rough', severity: '2' }, 'frostspire reach': { zone: 'rough', severity: '3' },
   'swell, from outside': { zone: 'offing', severity: '1' }, 'rip, from outside': { zone: 'offing', severity: '2' }, 'reach, from outside': { zone: 'offing', severity: '3' } };
+/** Named rows, each its own parameters plus `keys` all set to the column's value, against `cols`. */
+function paired(named, keys, cols, fixed) {
+  return (base) => ({
+    cols: cols.length,
+    cells: Object.entries(named).flatMap(([name, r]) => cols.map((c) => ({ label: `${name} · ${c}`, q: { ...carry(base, fixed), ...r, ...Object.fromEntries(keys.map((k) => [k, c])) } }))),
+  });
+}
+const TIER_ROWS = (tiers) => Object.fromEntries(tiers.map((t) => [`tier ${t}`, { tier: t }]));
 /** One value after another, `cols` to a row. */
 function strip(key, values, fixed, cols = values.length) {
   return (base) => ({ cols, cells: values.map((v) => ({ label: String(v), q: { ...carry(base, fixed), [key]: v } })) });
@@ -60,6 +74,14 @@ export const SHEETS = {
   // ---- ships
   'ships': { about: 'Every upgrade tier, from the bow quarter and the side', tile: LANDSCAPE, make: grid('view', ['quarter', 'side'], 'tier', ['0', '1', '2', '3', '4', '5'], { show: 'ship' }) },
   'anchors': { about: 'Every anchor refit, close on the bow', tile: LANDSCAPE, make: strip('anchor', ['0', '1', '2', '3', '4'], { show: 'ship', view: 'bow', canvas: '0' }) },
+  // ---- the paint yard (paints.js)
+  'paints': { about: 'Every hull paint on hull tiers 0, 2 and 4, from the side', tile: LANDSCAPE, make: grid('tier', ['0', '2', '4'], 'hullPaint', paintIds('paint'), { show: 'ship', view: 'side' }) },
+  'paint-parts': { about: 'Every paint on the hull, the trim and the deck of a tier 3 ship, close on the bow', tile: LANDSCAPE, make: (base) => ({ cols: paintIds('paint').length,
+    cells: ['hullPaint', 'trim', 'deck'].flatMap((k) => paintIds('paint').map((c) => ({ label: `${k} · ${c}`, q: { ...carry(base, { show: 'ship', view: 'bow', tier: '3', anchor: 'none', canvas: '0' }), [k]: c } }))) }) },
+  'cloths': { about: 'Every sail cloth on sail tiers 0, 2, 4 and 5, from the side', tile: LANDSCAPE, make: grid('tier', ['0', '2', '4', '5'], 'cloth', paintIds('cloth'), { show: 'ship', view: 'side' }) },
+  'emblems': { about: 'Every sail emblem on tiers 0, 2 and 4, and on a midnight cloth, from the side', tile: LANDSCAPE, make: paired({ ...TIER_ROWS(['0', '2', '4']), 'midnight cloth': { tier: '2', cloth: 'midnight' } }, ['emblem'], paintIds('emblem'), { show: 'ship', view: 'side' }) },
+  'flags': { about: 'Every flag at the masthead with the same pennant, on sail tiers 2, 3 and 4', tile: LANDSCAPE, make: paired(TIER_ROWS(['2', '3', '4']), ['flag', 'pennant'], paintIds('flag'), { show: 'ship', view: 'masthead', spyglass: '0' }) },
+  'figureheads': { about: 'Every figurehead on every hull with a stem (tiers 2-5), close on the bow', tile: LANDSCAPE, make: grid('tier', ['2', '3', '4', '5'], 'figurehead', paintIds('figurehead'), { show: 'ship', view: 'stem', canvas: '0', anchor: 'none' }) },
   // ---- the living sea
   'sealife': { about: 'Everything the living sea turns up, one of each', tile: LANDSCAPE, make: strip('kind', ['whale', 'dolphin', 'turtle', 'gull', 'fish', 'bottle', 'berg', 'spout', 'ghost'], { show: 'sealife', view: 'quarter' }, 3) },
   // ---- the sea

@@ -26,11 +26,14 @@ import { Boat } from './boat.js';
 import { AutoHelm, planCourse, raceWater, SeaRace } from './race.js';
 import { TowLine } from './tow.js';
 import { Kraken } from './kraken.js';
-import { SPEAKER, CRIMSON, SABLE_PROFILE, SABLE_LIVERY, ENCOUNTERS, LETTER, DEEP, CARDS, REWARDS, TITLE, FRIEND, LINES } from './rival-text.js';
+import { SPEAKER, SABLE_PROFILE, SABLE_LIVERY, ENCOUNTERS, LETTER, DEEP, CARDS, REWARDS, TITLE, FRIEND, LINES } from './rival-text.js';
 
 export const FINAL_CHAPTER = 8;
 const SEE = 950;          // the Redwing appears when you're this close to where it waits
 const HAIL = 62;          // close enough to shout across the water
+const HORN_FAR = 450;     // Sable's horn carries this much further than the sails can be seen
+const HORN_LEAD = 5;      // seconds from the horn to the Redwing coming across your bows
+const HORN_STALE = 40;    // a horn this long ago with no Sable to follow it is sounded again
 const TOW_DRIVE = 0.72;   // how much of your sail's drive is left with a ship in tow
 const LOG_MAX = 80;       // conversations kept in the journal
 // Sable's ship keeps up with yours: every part is at least this tier, and
@@ -49,7 +52,6 @@ export class Rival {
     this.redwing = null;      // built the first time it's needed
     this.cool = 12;         // seconds before the next spawn attempt
     this.flareT = 0;
-    this._dye = null;
     const ev = game.events;
     ev.on('dock', (port) => this.onDock(port));
     ev.on('wreck', () => this.onWreck());
@@ -304,8 +306,8 @@ export class Rival {
   update(dt, elapsed, wind) {
     const g = this.game;
     if (this.syncedState !== g.state) this.reset(g.state);
-    this.syncDye();
     this.cool -= dt;
+    if (this.horn) this.horn.t += dt;
     const b = this.player.pos, act = this.act;
     // (with nothing live, the living sea's director asks spawn() whether Sable should appear)
     if (!act) { /* nothing to drive: spawn() below decides when they turn up */ }
@@ -334,9 +336,9 @@ export class Rival {
     this.syncedState = state;
     this.clearAct();
     this.cool = 12;
-    this._dye = null;
     this.forced = false;
     this._landEnc = null;
+    this.horn = null;
   }
 
   clearAct() {
@@ -373,10 +375,12 @@ export class Rival {
       if (enc.id === 'bows') {
         const H = this.world.home.dock, d = dist(b, H);
         if (!free) return d > 170 && d < 1400 ? 'wait' : null;
-        this.spawnAcross(enc, b);
+        // the horn first, then the sails
+        if (this.crossing(b) && this.sounded(enc.id) >= HORN_LEAD) this.spawnAcross(enc, b);
         return null;
       }
       const at = P[enc.id];
+      if (at && dist(b, at) < SEE + HORN_FAR) this.sounded(enc.id);
       if (at && dist(b, at) < SEE) {
         if (!free && enc.kind !== 'summit' && enc.kind !== 'relics') return 'wait';
         if (R.flags.heard !== R.chapter) {
@@ -399,6 +403,7 @@ export class Rival {
       }
     } else if (R.chapter === 8 && R.flags.rematch?.island != null) {
       const I = this.world.islands[R.flags.rematch.island];
+      if (I && dist(b, I) < SEE + HORN_FAR) this.sounded('rematch');
       if (I && dist(b, I) < SEE) this.anchorOff(I, b);
     } else if (R.chapter === 7 && R.flags.flare && dist(b, P.deep) < P.deep.r + 160 && g.mode === 'sailing') {
       if (!free) return 'wait';
@@ -408,25 +413,43 @@ export class Rival {
   }
 
   // ------------------------------------------------------- meeting at sea
-  /** Encounter 1: Sable comes in off the bow quarter and cuts across your course. */
-  spawnAcross(enc, b) {
+  /**
+   * Sable's horn, faint on the wind, before the crimson sails are in sight:
+   * sounded once for encounter `id` (again if nothing came of it for a
+   * while). Returns the seconds since it sounded.
+   */
+  sounded(id) {
+    if (this.horn?.id !== id || this.horn.t > HORN_STALE) {
+      this.horn = { id, t: 0 };
+      this.game.audio.musicPhrase?.('sable-horn');
+    }
+    return this.horn.t;
+  }
+
+  /** Where encounter 1 can cut across your bows from right now, or null. */
+  crossing(b) {
     const g = this.game, H = this.world.home, p = this.player;
-    if (g.mode !== 'sailing' || dist(b, H.dock) < 170 || dist(b, H.dock) > 1400 || Math.abs(p.speed) < 2) return;
+    if (g.mode !== 'sailing' || dist(b, H.dock) < 170 || dist(b, H.dock) > 1400 || Math.abs(p.speed) < 2) return null;
     const W = this.world.wreck;
-    if (W && dist(b, W) < 150) return;
+    if (W && dist(b, W) < 150) return null;
     for (const off of [0.75, -0.75, 1.1, -1.1, 0.4, -0.4]) {
       const a = p.heading + off, x = b.x + Math.sin(a) * 250, z = b.z + Math.cos(a) * 250;
-      if (!this.isOpen(x, z, 60)) continue;
-      // heading across the player's course
-      this.showRedwing(x, z, p.heading - Math.sign(off) * 1.9);
-      this.redwing.sailLevel = 2; this.redwing.speed = 6;
-      this.act = { type: 'approach', enc, hailed: false, t: 0 };
-      g.ui.banner(LINES.sighted, enc.title);
-      g.audio.play('discover');
-      g.quests.pin('rival');
-      return;
+      if (this.isOpen(x, z, 60)) return { x, z, off };
     }
-    this.cool = 6;
+    return null;
+  }
+
+  /** Encounter 1: Sable comes in off the bow quarter and cuts across your course. */
+  spawnAcross(enc, b) {
+    const g = this.game, p = this.player, at = this.crossing(b);
+    if (!at) { this.cool = 6; return; }
+    // heading across the player's course
+    this.showRedwing(at.x, at.z, p.heading - Math.sign(at.off) * 1.9);
+    this.redwing.sailLevel = 2; this.redwing.speed = 6;
+    this.act = { type: 'approach', enc, hailed: false, t: 0 };
+    g.ui.banner(LINES.sighted, enc.title);
+    g.audio.play('discover');
+    g.quests.pin('rival');
   }
 
   /** Later sea encounters: Sable is already out there, sailing lazy circles. */
@@ -525,7 +548,8 @@ export class Rival {
     if (won) R.wins++; else R.losses++;
     if (won && gold) { s.cargo += gold; g.ui.toast(`+${gold} gold from Sable's purse`, 'gold'); }
     g.ui.banner(won ? 'You won!' : 'Sable wins', enc.title);
-    g.audio.play(won ? 'treasure' : 'dock');
+    // Sable's phrase that ends up or down; the plain one-shot with the music off
+    if (!g.audio.musicPhrase?.(won ? 'sable-won' : 'sable-lost')) g.audio.play(won ? 'treasure' : 'dock');
     if (rematch) {
       if (won) R.flags.rematchDay = s.day || 1;
       R.flags.rematch = null;
@@ -717,7 +741,8 @@ export class Rival {
     R.chapter = FINAL_CHAPTER;
     R.flags.day = g.state.day || 1;
     R.flags.title = TITLE;
-    R.flags.dye = true; R.flags.dyeOn = true;
+    R.flags.dye = true; // the crimson sail cloth (paints.js), and it goes straight on
+    g.paintYard?.wear('sail', 'crimson');
     g.unlockCosmetic('hat:rivalTricorn', 'story');
     const p = g.state.profile;
     p.hat = { ...p.hat, style: 'rivalTricorn' };
@@ -730,6 +755,26 @@ export class Rival {
     g.saveVoyage();
     await g.ui.showFound({ eyebrow: REWARDS.eyebrow, title: REWARDS.title,
       items: [{ icon: 'tricorn', ...REWARDS.hat }, { icon: 'sail', ...REWARDS.sails }, { icon: 'star', ...REWARDS.honour }], main: 'Onward' });
+  }
+
+  // ------------------------------------------------------------------ music
+  /**
+   * What Sable is up to, for the music's director (`sable` in cueFor,
+   * music-cues.js), or null. Sailing off after a race, or moored in a port,
+   * is nothing: the sea's own music comes back.
+   */
+  musicMoment() {
+    const g = this.game, act = this.act, land = g.mode === 'ashore' ? g.ashore?.race : null;
+    if (land) return land.state === 'done' ? null : { kind: 'pacer', start: land.state !== 'racing' };
+    if (g.mode === 'ashore' || !act) return null;
+    switch (act.type) {
+      case 'approach': return { kind: 'meet' };
+      case 'race': return { kind: act.enc.kind === 'fog' ? 'fog' : 'race', start: act.race.phase !== 'racing', lead: act.race.lead };
+      case 'adrift': return { kind: 'tow', start: true };
+      case 'tow': return { kind: 'tow' };
+      case 'kraken': return act.done ? null : { kind: 'kraken' };
+      default: return null;
+    }
   }
 
   // ------------------------------------------------------------- interaction
@@ -871,21 +916,6 @@ export class Rival {
     this.clearAct();
     R.flags.rematch = null; // only a race on foot waits for you (on its island)
     return this.startRace(enc, from, true);
-  }
-
-  // ------------------------------------------------------------ crimson sails
-  get canDye() { return !!this.R.flags.dye; }
-  get dyeOn() { return !!(this.R.flags.dye && this.R.flags.dyeOn); }
-  toggleDye() {
-    if (!this.canDye) return;
-    this.R.flags.dyeOn = !this.R.flags.dyeOn;
-    this.syncDye();
-    this.game.savePortState();
-  }
-  syncDye() {
-    if (this._dye === this.dyeOn) return;
-    this._dye = this.dyeOn;
-    this.player.setLivery?.(this._dye ? { sail: CRIMSON } : null);
   }
 
   // ------------------------------------------------------- quest / map glue

@@ -309,6 +309,7 @@ export class SeaRace {
     this.pg = 0;             // the player's next gate
     this.sg = 0;             // the Redwing's next gate
     this.ahead = true;
+    this.lead = 0;           // metres of course the Redwing leads by (negative: behind), for the music
     this.line = null;
     this.bearingT = 0;
     this.bearing = '';
@@ -422,7 +423,7 @@ export class SeaRace {
     const G = this.course.gates, pb = g.boat.pos, sb = redwing.pos;
     const left = (pos, i) => Math.hypot(G[i].x - pos.x, G[i].z - pos.z) + this.after[i];
     // how far the Redwing leads, in metres of course still to sail
-    const lead = left(pb, this.pg) - left(sb, this.sg);
+    const lead = this.lead = left(pb, this.pg) - left(sb, this.sg);
 
     // gentle rubber band: the Redwing eases off when well ahead, presses on when well behind
     const k = clamp(lead / BAND_FAR, -1, 1);

@@ -123,6 +123,8 @@ src/
                   spot under the explorer), pacer.js (races on foot),
                   shapes.js (the collider shapes they all share)
   cosmetics.js    wardrobe catalogue: palettes, styles, unlock sources, appearance profile
+  paints.js       the paint yard's catalogue: paints, cloth, emblems, flags, figureheads, what's earned, liveries (pure)
+  paint-yard.js   the paint yard in the game: buying, wearing, earned unlocks, the side view of your ship
   creator.js      character creator / port wardrobe (studio scene + panel)
   world.js        procedural islands, terrain height (and Archway Isle's bay), island streaming
   props.js        low-poly prop library (trees, huts, lighthouse, rocks, chests…)
@@ -130,7 +132,9 @@ src/
   sea-arch.js     the great arch of Archway Isle, as seen from the sea
   boat.js         the Boat class (the player's boat and the Redwing): sailing physics, collisions
   boat/           the rest of Boat: model.js (hull, mast, sails), fittings.js (helm, keel, lanterns,
-                  crow's nest), rig.js (upgrades, rig layout, animation), parts.js (shared textures and helpers)
+                  crow's nest), rig.js (upgrades, rig layout, animation), livery.js (colours, cloth, flags,
+                  which figurehead), parts.js (shared textures and helpers, each hull's look), marks.js (sail
+                  emblems, flag cloths), figureheads.js (the figureheads and each hull's mount)
   wake.js         the wake ribbons behind a boat
   explorer.js     the anime explorer character: rig, poses (helm / on foot), animation
   outfits.js      geometry for every wearable style, and the face texture
@@ -146,6 +150,7 @@ src/
   ui.js           the UI class: HUD, banners and toasts, title, pause and wreck screens
   ui/             the rest of UI: chart.js (minimap, sea chart), chart-seas.js (rough water on the chart),
                   landmarks.js (the landmarks' pictures on the chart), port.js (port screen, journal),
+                  paint-yard.js (the paint yard tab at port),
                   story.js (Found! pop-up, story cards, quest tracker, races), icons.js, shared.js
   input.js        keyboard, mouse and touch controls
   audio.js        procedural WebAudio sound and music: the buses, the sea's beds, one-shots
@@ -166,7 +171,7 @@ src/
                   subjects.js (what it can show), presets.js (poses, lights, views), sheets.js (contact sheets)
 tools/
   serve.py        static dev server, caching off
-  check.mjs       quick checks in Node: syntax, imports, text keys, element ids, the gallery, saves, how the boat rides the waves, ashore layouts, the grove and Archway climbs
+  check.mjs       quick checks in Node: syntax, imports, text keys, element ids, the gallery, saves, the paint yard's catalogue, how the boat rides the waves, ashore layouts, the grove and Archway climbs
 docs/
   STATUS.md       what has shipped, what's next, known issues
   feature-plan.md designs for phases not built yet; shipped-plans.md keeps the designs of built ones
