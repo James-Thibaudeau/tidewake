@@ -711,7 +711,7 @@ Updated 2026-11-27.
       (`ashore.js`: no prompts once you've set off).
     - Not done: a play by hand, a listen to the new voices, and the pacing
       check (the scramble now needs Hull 2 and the coral flukes).
-  - [x] 4.7 The Sunken Temple (design in
+  - [x] 4.7 The Sunken Temple ([#68](https://github.com/James-Thibaudeau/tidewake/pull/68); design in
     [sunken-temple-level.md](sunken-temple-level.md)): flooded ruins, Journal
     V, the gold circlet, the temple rebuilt at sea. One PR, sea view, level
     and story together. No shaped coast: the temple stands over the edge of
