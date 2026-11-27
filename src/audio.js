@@ -154,7 +154,7 @@ export class SoundSystem {
     this.nextNote -= dt;
     if (this.nextNote <= 0) {
       this.nextNote = (0.8 + Math.random() * 1.7) * (this.night > 0.5 ? 1.5 : 1);
-      if (this.musicOn && this.landMix > 0.5) this.landNote(storm);
+      if (this.musicOn && this.landMix > 0.5 && !this.score.want) this.landNote(storm);
     }
   }
 

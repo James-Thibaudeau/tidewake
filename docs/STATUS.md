@@ -1222,6 +1222,41 @@ Updated 2026-11-27.
   ship stage by stage at Port Haven and sail her; a paint yard for the
   ship (paints, sail cloth, emblems, figureheads); fireworks. Nothing adds
   stats. Four PRs, 10.1–10.4.
+  - [x] **10.1 The paint yard** ([#65](https://github.com/James-Thibaudeau/tidewake/pull/65)):
+    - **A Paint Yard tab at every port** (its own tab since
+      [#66](https://github.com/James-Thibaudeau/tidewake/pull/66); it began below the upgrades). Pick a part
+      (hull, trim, deck, sails, emblem, flag, pennant, figurehead), then a
+      paint: one you own goes straight on, free; anything else is tried on a
+      side view of your ship first, with a Buy button. "As built" puts a part
+      back to its hull tier's look. The figurehead and the flags get close
+      views, and the figurehead tiles show each carving on your own bow.
+    - **36 items**, priced as the plan says: 10 paints, 7 cloths (one
+      striped), 6 emblems, 8 flags (chequered, swallowtail), 5 figureheads
+      (gilded eagle, dolphin, owl, sea serpent, mermaid). Nothing changes a
+      stat.
+    - **Earned, never sold:** crimson cloth (Sable's gift), gold leaf
+      (every island charted), kraken ink (the tow out of the Deep), the owl
+      emblem (the Elder Grove's crown). Their tiles say how; a toast at the
+      next port says when one is yours.
+    - **The crimson dye moved in.** The toggle (`rival.flags.dyeOn`) is gone;
+      `migrate()` turns a save with it on into crimson sails.
+    - **Styling is data per hull.** `HULL_STYLE` in `boat/parts.js` gives
+      each hull its paint and its figurehead mount (none below hull 2: no
+      stem). `boat/livery.js` paints from `paints.js liveryFor()`, so
+      grandfather's ship (10.4) needs only a hull style of its own.
+    - **Port tabs are data in the page:** a tab is a button with `data-tab`
+      in `#portTabs` and a `.tabPane` with the matching `data-pane`
+      (`setPortTab` in `ui/port.js` needs no change). 10.2's Stores can be a
+      tab the same way.
+    - **Save:** `paints` (owned, `kind:id`) and `livery` (a paint id or null
+      per part).
+    - **Gallery:** the ship takes `hullPaint`, `trim`, `deck`, `cloth`,
+      `emblem`, `flag`, `pennant` and `figurehead`; new views `stem` and
+      `masthead`; sheets `paints`, `paint-parts`, `cloths`, `emblems`,
+      `flags`, `figureheads`. `check.mjs paints` checks the catalogue.
+  - [ ] Paint yard follow-ups: tune prices against measured late-game income
+    (the plan's numbers are starting points); each ship keeps its own livery
+    once there are two (10.4).
 - [ ] **Phase 11, islands with shapes:** variety in the archipelago, as
   Archway Isle's bay gave it a shape: crescents, rings, coves, hooks, twins
   and more, spread so neighbours differ. Moon Island is the first, a
@@ -1397,7 +1432,81 @@ Updated 2026-11-27.
     `home`: are the colours a change of mood, or just wrong notes? Is
     the ghost's music box eerie, and is the whale's phrase too much? In
     the game: does the storm's music now arrive with the storm?
-  - [ ] 12.3 island music, 12.4 Sable's theme.
+  - [ ] 12.3 island music.
+  - [x] **12.4 Sable's theme** ([#64](https://github.com/James-Thibaudeau/tidewake/pull/64)):
+    - **The theme** (`sable` in `src/music/themes.js`): a rakish jig in
+      A Dorian, in six. A long note and a quick three, a climb to a
+      cheeky D major chord, a high turn that shows off. Sixteen bars,
+      plus a two-bar phrase for a race won (ends up) and one for a race
+      lost (ends down, with a shrug).
+    - **Its versions**, six cues, all `sable…`:
+      - `sable`: Sable coming to meet you. The jig at an easy swagger on
+        the fiddle, guitar and harp under it, a bodhrán at speed.
+      - `sable-race`: the full jig at 116, with drums. Everything while
+        you lead or it's close; the whistle drops out while Sable leads
+        by more than 30 m (`MUSIC.sableLead`). The countdown gets only
+        the first layers.
+      - `sable-fog`: the fog run. Only the bass line and a heartbeat.
+      - `sable-pacer`: the foot race ashore. Quick and light: a tin
+        whistle an octave up over a ukulele.
+      - `sable-tow`: slow, tired and kind, in a major key (A Mixolydian;
+        the theme has no chords that turn diminished there). Also while
+        Sable is adrift, waiting for the line.
+      - `sable-kraken`: the theme down on the low strings and guitar,
+        huge and slow, under the storm's drums and squeezebox stabs.
+    - **Heard before the sails are seen.** A new instrument, the horn
+      (two saws through a filter that opens as it speaks), plays the
+      theme's first two bars, faint, in the key of whatever is playing
+      (`sable-horn`). It sounds 450 m further out than the Redwing
+      appears (1,400 m from where Sable waits), and for the first
+      encounter, where Sable cuts across your bows out of nowhere, the
+      Redwing now comes 5 s after the horn. A race's end plays the won
+      or lost phrase instead of the treasure or dock one-shot (those
+      still play with the music off).
+    - **The director** (`src/music-cues.js`): Sable is second only to the
+      title screen, above the weather, the ghost ship and being ashore.
+      `rival.musicMoment()` says what Sable is up to: an approach, a race
+      (and how far Sable leads, from `SeaRace.lead`), the fog run, adrift
+      and the tow, the kraken, the foot race. Sailing off after a race,
+      or moored in a port, is nothing, and the sea's music comes back.
+      The races and the kraken are urgent (1.5 s hold); the meeting and
+      the tow take the usual 8 s. Ashore the score is no longer ducked
+      for the on-foot line while it has a cue, and the line stops.
+    - **The engine:** a cue can play its theme in another mode on the
+      same note (the tow); a sting can be a phrase of a theme, moved
+      into the key that shares the playing cue's notes and by an octave
+      if that keeps it on its instrument (`stingNotes` in
+      `music/score.js`, which the player and the check share).
+    - **Check:** the director's table has twelve Sable rows (a race in a
+      storm, in rough water, Sable leading, the countdown, the fog run,
+      the foot race, the tow, the kraken in the rain, the title above
+      it all); every Sable moment has a version of the theme, and the
+      hold agrees with the cue; every phrase over every key in every
+      mode stays in key and on its instrument.
+    - **In the game** (preview): chapter 1's horn sounded at 1,320 m
+      with no Redwing yet; the Redwing came at 950 m and the music
+      followed through a pivot into `sable` (A Dorian, five layers). The
+      race: intensity 1 in the countdown, 3 neck and neck, 2 with Sable
+      83 m ahead; Sable won, `sable-lost` played in A Dorian and the
+      coastal cue came back. Adrift asked for `sable-tow` at 1; the
+      kraken for `sable-kraken` at 3, urgent, out of the open sea in
+      one pivot bar; ashore, `sable-pacer` at 1 when meeting Sable and
+      2 at the off, with the score at full level; the fog run played
+      `sable-fog` (bed, bass, heartbeat), and the meeting before it
+      played over the fog's cue. No console errors.
+    - **Measured**, 60 s of each at full intensity, after setting the
+      gains: all six between −40.5 and −40.7 dB, beside home, open and
+      the storm at −40.5 to −40.6; none clips, peaks −24.3 dB or lower.
+      The phrases on their own (over D major): the horn −50 dB while it
+      sounds (meant to be faint), won and lost −44.7 and −43, the
+      whale's −45.7.
+    - Not done: the flare at dusk before the kraken has no music of its
+      own (it plays whatever the sea plays until the kraken comes).
+      Sable waiting in a port, or for a rematch off an island, is not a
+      moment. Not measured on Low quality.
+  - [x] 12.4 listened to in `jukebox.html` (2026-11-27): "sounds good",
+    no changes asked for. Still to hear in the game: the horn before the
+    crimson sails come into sight.
 
 ## Known issues
 

@@ -153,22 +153,32 @@
       </div>
       <div class="tabs" id="portTabs" role="tablist">
         <button class="tab on" data-tab="shipwright" role="tab"><span class="ico" data-icon="hull"></span> Shipwright</button>
+        <button class="tab" data-tab="paintyard" role="tab"><span class="ico" data-icon="flag"></span> Paint Yard</button>
         <button class="tab" data-tab="quests" role="tab"><span class="ico" data-icon="scroll"></span> Quest Board<span class="tabBadge hidden" id="questBadge"></span></button>
         <button class="tab" data-tab="tailor" role="tab"><span class="ico" data-icon="needle"></span> Tailor</button>
       </div>
-      <div class="tabPane" id="paneShipwright">
+      <!-- One pane per port tab: a .tabPane whose data-pane matches its button's data-tab (ui/port.js setPortTab). -->
+      <div class="tabPane" id="paneShipwright" data-pane="shipwright">
         <div id="upgradeGrid" class="grid"></div>
-        <div id="sailDye" class="sailDye hidden">
-          <p>Sable's gift: crimson dye for your sails.</p>
-          <button id="btnSailDye" class="toggle">Sails: Standard</button>
+      </div>
+      <div class="tabPane hidden" id="panePaintYard" data-pane="paintyard">
+        <p class="shopIntro">Buy a paint once, then use it as often as you like. Looks only: nothing here makes the ship faster or stronger.</p>
+        <div id="paintYard" class="yard">
+          <div class="yardStage">
+            <canvas id="yardPreview" class="yardPreview" width="480" height="300"></canvas>
+          </div>
+          <div class="yardBar hidden"></div>
+          <div class="yardParts chips"></div>
+          <p class="yardNote"></p>
+          <div class="yardTiles"></div>
         </div>
       </div>
-      <div class="tabPane hidden" id="paneQuests">
+      <div class="tabPane hidden" id="paneQuests" data-pane="quests">
         <div id="rivalNotes"></div>
         <div class="questCount" id="questCount"></div>
         <div id="questOffers" class="grid"></div>
       </div>
-      <div class="tabPane hidden" id="paneTailor">
+      <div class="tabPane hidden" id="paneTailor" data-pane="tailor">
         <div class="tailorIntro">
           <p>Change your look any time. Your outfit is free to change; new pieces cost gold.</p>
           <button id="btnWardrobe" class="btn primary"><span class="ico" data-icon="needle"></span> Try on &amp; change outfit</button>

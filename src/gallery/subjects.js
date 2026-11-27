@@ -22,6 +22,8 @@ import { DEFAULT_PROFILE, SLOTS, STYLES, normalizeProfile } from '../cosmetics.j
 import { SABLE_PROFILE, SABLE_LIVERY } from '../rival-text.js';
 import { Boat, pointOfSail } from '../boat.js';
 import { MAX_TIER } from '../boat/parts.js';
+import { LIVERY_PARTS, paintsOf, paintInfo, liveryFor } from '../paints.js';
+import { PAINT_PARAMS } from './sheets.js';
 import { UPGRADES, ASHORE_BIOMES, upgradeValue } from '../config.js';
 import { PROPS, initProps, propMesh, propMaterial, thinOutline } from '../props.js';
 import { buildElderTree } from '../elder-tree.js';
@@ -102,12 +104,22 @@ function outfit(q, stage) {
 // `tier` sets every upgrade at once; a key of its own (`hull=5`) overrides it.
 // `canvas` is how much sail is up (0 furled, 1 reefed, 2 full), `anchor` the
 // refit tier (0-4, or `none`), `livery=redwing` is Sable's ship, `crew=0`
-// hides the explorer, and the outfit parameters dress them.
+// hides the explorer, and the outfit parameters dress them. The paint yard's
+// choices (paints.js) each have a parameter of their own (PAINT_PARAMS):
+// `hullPaint=harborBlue&cloth=striped&emblem=owl&figurehead=mermaid`.
 function ship(q, stage) {
   const warnings = [];
   const redwing = q.livery === 'redwing';
   if (q.livery && !redwing) warnings.push(`livery=${q.livery} is not a livery (redwing)`);
-  const boat = new Boat(stage, redwing ? { npc: true, profile: SABLE_PROFILE, livery: SABLE_LIVERY } : {});
+  const painted = {};
+  for (const [key, part] of Object.entries(PAINT_PARAMS)) {
+    if (!q[key]) continue;
+    const kind = LIVERY_PARTS.find((p) => p.id === part).kind;
+    if (paintInfo(kind, q[key])) painted[part] = q[key];
+    else warnings.push(`${key}=${q[key]} is not a ${kind} (${paintsOf(kind).map((p) => p.id).join(', ')})`);
+  }
+  const livery = redwing ? SABLE_LIVERY : liveryFor(painted);
+  const boat = new Boat(stage, redwing ? { npc: true, profile: SABLE_PROFILE, livery } : { livery });
   if (!redwing) boat.explorer.setAppearance(profileFrom(q, warnings));
   const tier = clamp(int(q.tier, 0), 0, MAX_TIER);
   const levels = {};
@@ -128,6 +140,8 @@ function ship(q, stage) {
     look: { y: 3.5 },
     helm: { x: ex.x, y: ex.y + 1.1, z: ex.z, span: 3.2 },
     bow: { x: 0.8 * boat.sizeScale, y: 0.75 * boat.sizeScale, z: 2.7 * boat.sizeScale, span: 4.6 * boat.sizeScale },
+    stem: { y: 0.95 * boat.sizeScale, z: 4.0 * boat.sizeScale, span: 2.4 * boat.sizeScale },
+    masthead: { y: (boat.mastTop.y - 0.8) * boat.sizeScale, z: (0.9 + 1.3) * boat.sizeScale, span: 4.2 * boat.sizeScale },
     update(dt, t, env) {
       // a steady beam reach: the wind over the port side, sails drawing
       boat.relWind = num(q.windRel, 1.8);
@@ -383,7 +397,7 @@ export const SUBJECTS = { outfit, ship, prop, tree, arch, wreck, grove, archway,
 const DRESS = [...SLOTS, ...SLOTS.map((s) => s + 'Color'), 'shirt', 'skin', 'head', 'eyeColor', 'eyeShape', 'blush', 'freckles', 'profile'];
 const PARAMS = {
   outfit: [...DRESS, 'pose', 'phase', 'wind', 'windRel'],
-  ship: [...DRESS, ...UPGRADES.map((U) => U.key), 'tier', 'canvas', 'anchor', 'livery', 'crew', 'wind', 'windRel'],
+  ship: [...DRESS, ...UPGRADES.map((U) => U.key), 'tier', 'canvas', 'anchor', 'livery', 'crew', 'wind', 'windRel', ...Object.keys(PAINT_PARAMS)],
   prop: ['id'],
   tree: [],
   wreck: ['sea'],
@@ -407,7 +421,8 @@ export function controlsFor(show) {
   const dress = SLOTS.map((slot) => [slot, styles(slot)]);
   switch (show) {
     case 'outfit': return [...dress, ['pose', Object.keys(POSES)], ['profile', ['sable']]];
-    case 'ship': return [['tier', TIERS], ['canvas', ['0', '1', '2']], ['anchor', ['none', '0', '1', '2', '3', '4', 'down']], ['livery', ['redwing']], ['crew', ['0']]];
+    case 'ship': return [['tier', TIERS], ['canvas', ['0', '1', '2']], ['anchor', ['none', '0', '1', '2', '3', '4', 'down']], ['livery', ['redwing']], ['crew', ['0']],
+      ...Object.entries(PAINT_PARAMS).map(([key, part]) => [key, paintsOf(LIVERY_PARTS.find((p) => p.id === part).kind).map((p) => p.id)])];
     case 'prop': return [['id', Object.keys(initProps())]];
     case 'grove': return [['kind', [...new Set(buildGroveLayout().pieces.map((p) => p.kind))]], ['n', TIERS]];
     case 'archway': return [['at', ARCHWAY_PLACES], ['journal', ['0']], ['kind', [...new Set(buildArchwayLayout().pieces.map((p) => p.kind))]], ['n', TIERS]];

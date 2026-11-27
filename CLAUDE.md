@@ -23,7 +23,7 @@ node tools/check.mjs
 About a second, no browser. Run it after every change. It checks syntax,
 that every import resolves to a real export and is used, that no helper was
 left behind when code moved between files, text keys (`LINES.x`), element
-ids, save migration, the sea zones (home waters hold Port Haven and the
+ids, save migration, the paint yard's catalogue (`paints`), the sea zones (home waters hold Port Haven and the
 wreck; the CPU and the shaders agree, `seazones`), how the boat rides the
 wave set in plain sea, in home waters and over a rogue wave (pitch and bow slams,
 `ride`), rough water's rogue waves and ice (the wave is the same on the CPU as
@@ -52,7 +52,7 @@ helpers:
 
 ```js
 tidewake.debug.start()                    // new voyage, prologue skipped; backs up the real save
-tidewake.debug.give({ gold: 5000, upgrades: 'max' })
+tidewake.debug.give({ gold: 5000, upgrades: 'max' })   // paints: 'all' owns every paint-yard item
 tidewake.debug.teleport('Frostspire')     // id, name or { x, z }
 tidewake.debug.sea('whale')               // a sea event now: whale | dolphins | turtles | bottle | bloom | iceberg | waterspout | ghostShip; sea() says what's out there
 tidewake.debug.zone()                     // the sea at the boat: band (home | coastal | open), zone, wave and swell factors
@@ -108,13 +108,16 @@ await gallery.sheet('tops-back')           // contact sheet: every top with ever
 gallery.frame()                            // draw before a screenshot when the tab is hidden
 ```
 
+- The ship wears the paint yard's choices: `hullPaint`, `trim`, `deck`,
+  `cloth`, `emblem`, `flag`, `pennant`, `figurehead` (ids from `paints.js`);
+  `view=stem` is close on the figurehead, `view=masthead` the flags.
 - Subjects: `outfit`, `ship`, `prop`, `tree`, `arch`, `wreck`, `grove`,
   `archway`, `level`, `sealife`. A big subject takes `at=<place>` with `view=spot` for
   a close look at one place (`show=archway&at=keystone&view=spot`; a
   generated island's `level` takes `at=moat|cliff|mesa|chest`). The
   same parameters work in the URL: `gallery.html?show=ship&tier=4&light=night`.
 - **After changing how something looks, take the contact sheet that covers
-  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `sealife`, `sea`, `shallows`, `rough`, `rogue`, `islands`, `island-places`…, or
+  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `paints`, `paint-parts`, `cloths`, `emblems`, `flags`, `figureheads`, `sealife`, `sea`, `shallows`, `rough`, `rogue`, `islands`, `island-places`…, or
   `views` / `lights` / `distance` for the subject showing) and read every
   cell, not only the one you were fixing. A sheet takes the parameters
   already showing, so `gallery.set({ bottom: 'skirt' })` first narrows it.
@@ -163,11 +166,11 @@ which the other systems hang off:
 
 ```
 game.world  .streamer  .boat  .ocean  .env (sky)  .weather  .input  .audio  .fx
-game.ui  .creator  .story  .ashore  .quests  .rival  .refits  .reports  .seaEvents  .rough  .debug
+game.ui  .creator  .story  .ashore  .quests  .rival  .refits  .reports  .seaEvents  .rough  .paintYard  .debug
 game.state     everything that is saved (see below)
 game.mode      title | sailing | docking | docked | landing | ashore | wrecking | wrecked
 game.view      { scene, camera } being drawn: the sea, or the ashore level
-game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, cosmetic, outfit, pickup, sighting
+game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, cosmetic, paint, outfit, pickup, sighting
 ```
 
 - **Systems react to events** (`src/events.js`) instead of patching game
@@ -189,7 +192,7 @@ game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, 
   called as `this.method()` wherever they live, so grep the method name to
   find it. New methods go in the part file that fits.
 - **Pure modules stay pure**: `ashore/modules.js`, `ashore/grove-layout.js`, `ashore/archway-layout.js`, `collide.js`,
-  `controller.js`, `shapes.js`, `save.js`, `config.js`, `util.js`, `sea-zones.js`, `waves.js`, `rogue.js`,
+  `controller.js`, `shapes.js`, `save.js`, `paints.js`, `config.js`, `util.js`, `sea-zones.js`, `waves.js`, `rogue.js`,
   `cosmetics.js`, `sightings.js`, `music-cues.js`, `music/notation.js`, `music/themes.js`, `music/score.js` and the text files import no three.js and touch no DOM at
   load, so `tools/check.mjs` can run them in Node. Keep it that way.
 - Tuning numbers live in `src/config.js`; on-foot limits are `ASHORE` there,

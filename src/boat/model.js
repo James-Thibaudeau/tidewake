@@ -5,7 +5,8 @@ import * as THREE from 'three';
 import { toon, toonGradient, toonMaterial } from '../toon.js';
 import { Wake } from '../wake.js';
 import { Explorer, part, mergeParts } from '../explorer.js';
-import { SAIL_U, SAIL_V, JIB_U, JIB_V, TOP_U, TOP_V, BOOM_Y, BOOM_LEN, MAST_Z, MAST_BASE, MAST_TOP, SAIL_BASE, GOLD, BRASS, hullShape, taper, sideAt, onSide, bandGeo, deckTexture, sailTexture, makeFlag, thinInk, decoMesh, _up, ropePart, segMesh, V3, figurehead, STUB_H } from './parts.js';
+import { SAIL_U, SAIL_V, JIB_U, JIB_V, TOP_U, TOP_V, BOOM_Y, BOOM_LEN, MAST_Z, MAST_BASE, MAST_TOP, SAIL_BASE, GOLD, BRASS, hullShape, taper, sideAt, onSide, bandGeo, deckTexture, sailTexture, makeFlag, thinInk, decoMesh, _up, ropePart, segMesh, V3, STUB_H, HULL_STYLE } from './parts.js';
+import { figureMount } from './figureheads.js';
 
 export class BoatModel {
   build() {
@@ -231,12 +232,18 @@ export class BoatModel {
           parts.push(part(new THREE.ConeGeometry(0.05, 0.16, 6), GOLD, { x: side * 1.15, y: 1.62, z: -3.3 }));
         }
       }
-      const grp = decoMesh(parts);
-      grp.add(figurehead(gold));
-      tiers.push(grp);
+      tiers.push(decoMesh(parts));
     }
     // tiers 4 and 5: galleon and royal flagship (the whole model also scales up)
     for (const royal of [false, true]) tiers.push(this.grandHull(royal));
+    // a figurehead mount on every hull that has a stem for one (boat/livery.js swaps what's on it)
+    this.figureMounts = tiers.map((t, i) => {
+      const F = HULL_STYLE[i].figure;
+      if (!F) return null;
+      const m = figureMount(F);
+      t.add(m.mount);
+      return m;
+    });
     this.hullTiers = tiers;
     for (const t of tiers) { t.visible = false; this.model.add(t); }
   }
@@ -287,11 +294,7 @@ export class BoatModel {
     parts.push(part(new THREE.CylinderGeometry(0.07, 0.11, 2.3, 8), royal ? '#5b3a1f' : '#6e4a2c', { y: 1.37, z: 4.32, rx: Math.PI / 2 - 0.36 }));
     parts.push(part(new THREE.SphereGeometry(0.1, 8, 6), gold, { y: 1.77, z: 5.42 }));
     parts.push(part(new THREE.CylinderGeometry(0.115, 0.115, 0.08, 10), gold, { y: 1.2, z: 3.85, rx: Math.PI / 2 - 0.36 }));
-    const grp = decoMesh(parts);
-    const fig = figurehead(true, royal);
-    if (royal) fig.scale.setScalar(1.25);
-    grp.add(fig);
-    return grp;
+    return decoMesh(parts);
   }
 
   buildWake() {

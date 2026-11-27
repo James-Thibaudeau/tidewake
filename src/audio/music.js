@@ -7,8 +7,8 @@
 // The instruments are in audio/instruments.js, the tunes in music/themes.js.
 import { MUSIC } from '../config.js';
 import { CueHold } from '../music-cues.js';
-import { Score } from '../music/score.js';
-import { keyShift, parseKey, MODES } from '../music/notation.js';
+import { Score, stingNotes } from '../music/score.js';
+import { keyShift } from '../music/notation.js';
 import { STINGS } from '../music/themes.js';
 
 export class MusicPlayer {
@@ -37,8 +37,8 @@ export class MusicPlayer {
     this.score.setCue(F ? F.cue : held);
     this.intensity = F?.intensity ?? want?.intensity ?? 1;
     this.colour = { rain: F?.rain ?? !!want?.rain, night: F?.night ?? !!want?.night };
-    // the on-foot line takes over from it for now
-    this.scoreBus.gain.setTargetAtTime(F ? MUSIC.level : MUSIC.level * (1 - this.landMix), t, 0.6);
+    // the on-foot line takes over from it for now, except when the score has a cue ashore (Sable's foot race)
+    this.scoreBus.gain.setTargetAtTime(F || held ? MUSIC.level : MUSIC.level * (1 - this.landMix), t, 0.6);
     if (this.musicOn) this.writeMusic(t, t + MUSIC.ahead);
   }
 
@@ -65,16 +65,15 @@ export class MusicPlayer {
 
   /**
    * A phrase played once over whatever is on, in its key (STINGS in
-   * music/themes.js): the whale's long low notes as it breaches.
+   * music/themes.js): the whale's long low notes as it breaches, Sable's
+   * horn on the wind. Returns whether it played (not with the music off).
    */
   musicPhrase(name, volume = 1) {
     const S = STINGS[name];
-    if (!this.ctx || !this.musicOn || !S) return;
-    const key = parseKey(this.lastBar?.key || 'D major'), t = this.ctx.currentTime + 0.1;
-    S.steps.forEach((step, i) => {
-      const midi = (S.oct + 1) * 12 + key.tonic + MODES[key.mode].scale[step % 7] + 12 * Math.floor(step / 7);
-      this.voice(S.voice, midi, t + i * S.each, S.each * 1.1, S.vol * volume);
-    });
+    if (!this.ctx || !this.musicOn || !S) return false;
+    const t = this.ctx.currentTime + 0.1;
+    for (const n of stingNotes(name, this.lastBar?.key || 'D major')) this.voice(S.voice, n.midi, t + n.at, n.dur, S.vol * volume);
+    return true;
   }
 
   /**

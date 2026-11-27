@@ -264,8 +264,9 @@ export const ASHORE = {
 //   rain     how much rain (0-1) turns a cue to its rain colour
 //   ahead    seconds ahead of the audio clock that the next bar is written out
 //   level    the score's own level on the music bus, under the sea
+//   sableLead   metres Sable has to lead a race by before its music holds back a layer
 export const MUSIC = {
   hold: 8, urgentHold: 1.5, brisk: 7, fast: 14,
   storm: 0.3, stormLevels: [0.6, 0.85], roughLevels: [0.7, 0.9], fog: 0.4, rain: 0.3,
-  ahead: 0.25, level: 1,
+  ahead: 0.25, level: 1, sableLead: 30,
 };

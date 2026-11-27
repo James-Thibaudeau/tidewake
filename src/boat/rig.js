@@ -1,4 +1,4 @@
-// Boat part: the rig. Applying upgrade tiers, colours and livery, dismasting,
+// Boat part: the rig. Applying upgrade tiers (colours and livery are boat/livery.js), dismasting,
 // laying out mast, boom and sails for the current tiers (layoutRig), and the
 // per-frame animation of sails, sheets, flags and lanterns (animate).
 // Methods are mixed into Boat (see ../boat.js), so `this` is the boat.
@@ -7,7 +7,7 @@ import { glowBoost } from '../toon.js';
 import { waveHeight } from '../waves.js';
 import { clamp, damp, wrapAngle } from '../util.js';
 import { part, mergeParts } from '../explorer.js';
-import { SAIL_U, SAIL_V, JIB_U, JIB_V, TOP_U, TOP_V, BOOM_Y, BOOM_LEN, MAST_Z, MAST_BASE, SAIL_H, MAST_TOP, SIZE_SCALE, MAX_TIER, SAIL_BASE, HULL_STYLE, GOLD, BRASS, halfW, sailTexture, makeFlag, decoMat, ropePart, coilPart, setSeg, V3, STUB_H } from './parts.js';
+import { SAIL_U, SAIL_V, JIB_U, JIB_V, TOP_U, TOP_V, BOOM_Y, BOOM_LEN, MAST_Z, MAST_BASE, SAIL_H, MAST_TOP, SIZE_SCALE, MAX_TIER, GOLD, BRASS, halfW, makeFlag, decoMat, ropePart, coilPart, setSeg, V3, STUB_H } from './parts.js';
 
 export class BoatRig {
   applyUpgrades(levels, values) {
@@ -68,37 +68,6 @@ export class BoatRig {
 
     this.maxHealth = values.hull;
     this.lanternRange = values.lantern;
-  }
-
-  /** Hull paint, sail cloth and flags: the tier's own colours, or the livery's where it names one. */
-  applyColors() {
-    const lv = this.levels, Lv = this.livery || {};
-    const hs = HULL_STYLE[lv.hull];
-    this.hullMat.color.set(Lv.hull || hs.hull);
-    this.trimMat.color.set(Lv.trim || hs.trim);
-    this.deckMat.color.set(Lv.deck || hs.deck);
-    this.stripeMat.color.set(Lv.trim || '#3f7fd0');
-    const cloth = Lv.sail || null;
-    const mark = Lv.emblem || null;
-    this.sailMat.map = sailTexture(lv.sail, false, cloth, mark);
-    this.sailMat.needsUpdate = true;
-    this.jibMat.map = sailTexture(lv.sail, true, cloth, mark);
-    this.jibMat.needsUpdate = true;
-    this.topMat.map = sailTexture(lv.sail, true, cloth, mark);
-    this.topMat.needsUpdate = true;
-    this.flagMat.color.set(Lv.flag || (lv.sail >= 3 ? GOLD : '#d64a3a'));
-    this.pennant.mat.color.set(Lv.pennant || (lv.sail === 4 ? '#9c2f27' : lv.sail >= 3 ? GOLD : '#2f6fd0'));
-    for (const p of this.extraPennants || []) p.mat.color.set(Lv.pennant || (lv.sail === 4 ? '#9c2f27' : GOLD));
-    this.wreckClothMat?.color.set(cloth || SAIL_BASE[lv.sail]);
-  }
-
-  /**
-   * Repaint the boat. livery: { hull, trim, deck, sail, flag, pennant, emblem } (CSS
-   * hex, each optional; `sail` dyes every sail), or null for the tier's look.
-   */
-  setLivery(livery) {
-    this.livery = livery || null;
-    this.applyColors();
   }
 
   /** Mast gone by the board: a broken stub, no sails or rigging, a spar and canvas across the deck. */
