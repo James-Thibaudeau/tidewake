@@ -1322,7 +1322,7 @@ Updated 2026-11-27.
     the ghost's music box eerie, and is the whale's phrase too much? In
     the game: does the storm's music now arrive with the storm?
   - [ ] 12.3 island music.
-  - [x] **12.4 Sable's theme** (PR to come):
+  - [x] **12.4 Sable's theme** ([#64](https://github.com/James-Thibaudeau/tidewake/pull/64)):
     - **The theme** (`sable` in `src/music/themes.js`): a rakish jig in
       A Dorian, in six. A long note and a quick three, a climb to a
       cheeky D major chord, a high turn that shows off. Sixteen bars,
