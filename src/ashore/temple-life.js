@@ -21,7 +21,7 @@ function turtleGeometry() {
     part(new THREE.BoxGeometry(0.03, 0.03, 0.03), C.eye, { x: 0.66, y: 0.13, z: -0.07 }),
   ];
   for (const [x, z, ry, s] of [[0.25, 0.38, 0.7, 1], [0.25, -0.38, -0.7, 1], [-0.32, 0.3, -0.5, 0.6], [-0.32, -0.3, 0.5, 0.6]]) {
-    P.push(part(new THREE.BoxGeometry(0.42 * s, 0.04, 0.16 * s), C.skin2, { x, y: 0.03, z, ry }));
+    P.push(part(new THREE.BoxGeometry(0.42 * s, 0.04, 0.16 * s), C.skin2, { x, y: 0.012, z, ry }));
   }
   const g = mergeGeometries(P);
   for (const p of P) p.dispose();

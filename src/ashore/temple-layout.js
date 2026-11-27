@@ -179,7 +179,8 @@ export function buildTempleLayout() {
   const capital = (s, k, top = T.deck, half = C.cap) => (caps[s][k] = add(rect('capital', s * C.x, colZ(k), top, half, half, 0, { col: true })));
   /** The beam between capitals k and k+1 on side s; `gap` breaks it in the middle. */
   const beam = (s, k, gap = 0, tops = [T.deck, T.deck]) => {
-    const za = colZ(k) + C.cap, zb = colZ(k + 1) - C.cap;
+    // from the edge of one capital to the edge of the next (the turning capitals are wider)
+    const za = colZ(k) + (caps[s][k]?.hx ?? C.cap), zb = colZ(k + 1) - (caps[s][k + 1]?.hx ?? C.cap);
     if (!gap) return [add(rect('beam', s * C.x, (za + zb) / 2, tops[0], 0.6, (zb - za) / 2 + 0.03, 0))];
     const half = (zb - za - gap) / 4;
     return [add(rect('beam', s * C.x, za + half - 0.03, tops[0], 0.6, half + 0.03, 0)), add(rect('beam', s * C.x, zb - half + 0.03, tops[1], 0.6, half + 0.03, 0))];

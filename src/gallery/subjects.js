@@ -289,6 +289,7 @@ function ruins(q, stage) {
     causeway: { x: L.slabs[2].cx, y: 0.5, z: L.slabs[2].cz, span: 16 },
     colonnade: { x: 0, y: 6, z: -32, span: 34 },
     portico: { x: 0, y: 11, z: 4, span: 24 },
+    stair: { x: 0, y: 7, z: -1.5, span: 15, yaw: Math.PI + 0.55, pitch: 0.3 },   // the top of the front stair, from out over the water
     hall: { x: 0, y: 1, z: 23, span: 24, yaw: Math.PI + 0.35, pitch: 1.15 },
     treasury: { x: L.crate.x + 0.6, y: L.crate.y + 1, z: L.crate.z + 0.6, span: 6, yaw: Math.PI, pitch: 0.35 },
     gable: { x: L.chests[0].x, y: L.chests[0].y + 0.8, z: L.chests[0].z, span: 8 },
@@ -308,7 +309,7 @@ function ruins(q, stage) {
     dispose() { level.dispose(); },
   };
 }
-const TEMPLE_PLACES = ['overview', 'sea', 'beach', 'causeway', 'colonnade', 'portico', 'hall', 'treasury', 'gable', 'shrine', 'breach', 'lantern'];
+const TEMPLE_PLACES = ['overview', 'sea', 'beach', 'causeway', 'colonnade', 'stair', 'portico', 'hall', 'treasury', 'gable', 'shrine', 'breach', 'lantern'];
 
 // The great arch as seen from the sea (sea-arch.js). The `spot` view is the
 // storm lantern on its keystone.

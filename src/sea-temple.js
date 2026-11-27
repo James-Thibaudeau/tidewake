@@ -32,6 +32,7 @@ export const TEMPLE_SEA = {
   hall: { half: 21, z0: 30, z1: 68, wall: 3, rise: 13 },
 };
 const T = TEMPLE_SEA;
+const STAIR0 = -0.6;   // the stair starts in front of the platform's moulding
 
 const C = {
   stone: '#d9c08c', stone2: '#c7aa76', stone3: '#b0935f', shade: '#8f7650', course: '#a88c5c', dark: '#3d3226', wet: '#7a845a', wet2: '#56664a',
@@ -79,19 +80,21 @@ function column(x, z, r, y0, y1, seed, broken = false) {
 function stoneParts(deck) {
   const P = [], H = T.hall, rng = mulberry32(0x7e3a);
   // the platform, deep into the ground, with a moulding at the top
-  P.push(stone(box(T.half * 2, deck + 8, T.deckZ + 4), C.stone2, { y: (deck - 8) / 2, z: (T.deckZ - 4) / 2 + 2 }, 1));
+  // (the body stops just under the moulding, and the stair starts in front of it:
+  // faces that share a plane flicker)
+  P.push(stone(box(T.half * 2, deck + 7.7, T.deckZ + 2), C.stone2, { y: (deck - 8.3) / 2, z: (T.deckZ + 2) / 2 }, 1));
   P.push(stone(box(T.half * 2 + 1.2, 1.2, T.deckZ + 1.2), C.stone, { y: deck - 0.6, z: T.deckZ / 2 }, 2));
   // courses of masonry round the platform, and pilasters on its front either side of the stair
-  for (let y = 3; y < deck - 2; y += 3.2) P.push(stone(box(T.half * 2 + 0.3, 0.35, T.deckZ + 4.3), C.course, { y, z: (T.deckZ - 4) / 2 + 2 }, 3 + y));
-  for (const x of [-27, -20, 20, 27]) P.push(stone(box(2.4, deck + 2, 1.2), C.stone, { x, y: deck / 2 - 1, z: -2.2 }, 8 + x));
+  for (let y = 3; y < deck - 2; y += 3.2) P.push(stone(box(T.half * 2 + 0.3, 0.35, T.deckZ + 2.3), C.course, { y, z: (T.deckZ + 2) / 2 }, 3 + y));
+  for (const x of [-27, -20, 20, 27]) P.push(stone(box(2.4, deck + 1.85, 1.2), C.stone, { x, y: (deck - 2.15) / 2, z: -0.5 }, 8 + x));   // tops just under the moulding
   // the front stair, down into the sea
   const steps = Math.round((deck + 3) / 0.9), run = 1.45;
   for (let i = 0; i < steps; i++) {
     const top = deck - (i + 1) * 0.9;
-    P.push(stone(box(T.stairHalf * 2, 1.0, run + 0.05), i % 2 ? C.stone : C.stone2, { y: top + 0.45, z: -(i + 0.5) * run }, 10 + i));
+    P.push(stone(box(T.stairHalf * 2 + 0.4, 1.0, run + 0.05), i % 2 ? C.stone : C.stone2, { y: top - 0.5, z: STAIR0 - (i + 0.5) * run }, 10 + i));
   }
   const len = steps * run, tilt = Math.atan2(deck + 3, len);
-  for (const s of [-1, 1]) P.push(stone(box(2.2, 2.4, Math.hypot(len, deck + 3) + 2), C.stone2, { x: s * (T.stairHalf + 1.1), y: (deck - 3) / 2 + 1, z: -len / 2, rx: -tilt }, 20 + s));
+  for (const s of [-1, 1]) P.push(stone(box(2.2, 2.4, Math.hypot(len, deck + 3) + 2), C.stone2, { x: s * (T.stairHalf + 1.1), y: (deck - 3) / 2 + 1, z: STAIR0 - len / 2, rx: -tilt }, 20 + s));
   // the portico: six columns, two broken; the entablature, broken in the west; the east half of the pediment
   const ET = deck + 18, PZ = T.porticoZ;
   for (const [k, x] of [-25, -15, -5, 5, 15, 25].entries()) {
@@ -235,7 +238,7 @@ export function buildSeaTemple({ deck = 14, world = (x, z) => [x, z], glowMap = 
   const spillMat = new THREE.MeshBasicMaterial({ color: 0xcff4ff, map: spillTex, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
   const spill = new THREE.Mesh(new THREE.PlaneGeometry(7, Math.hypot(len, deck + 3)), spillMat);
   spill.rotation.x = Math.atan2(len, deck + 3);   // lying on the stair, from the portico down into the sea
-  spill.position.set(0, (deck - 3) / 2 + 0.75, -len / 2);
+  spill.position.set(0, (deck - 3) / 2 + 0.2, STAIR0 - len / 2);
   group.add(spill);
   detail.push(spill);
 
@@ -245,7 +248,7 @@ export function buildSeaTemple({ deck = 14, world = (x, z) => [x, z], glowMap = 
   const lowest = Math.ceil((deck - 0.9) / 0.9) - 1;   // the last step clear of the water
   const turtles = [-8, -3, 5, 10].map((x, k) => {
     const m = new THREE.Mesh(tg, propMaterial);
-    const home = { x, y: stepY(lowest) + 0.9, z: -(lowest + 0.5) * 1.45 + 0.2 };
+    const home = { x, y: stepY(lowest) + 0.02, z: STAIR0 - (lowest + 0.5) * 1.45 + 0.2 };
     m.position.set(home.x, home.y, home.z);
     m.rotation.y = Math.PI / 2 + (k - 1.5) * 0.4;
     group.add(m);

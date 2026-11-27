@@ -102,7 +102,8 @@ export function pieceArt(p, i) {
     case 'stump':
       P.push(shaft(p.cx, p.cz, p.r - 0.06, -4, p.top, seed, true));
       // the broken top you stand on: flat enough to land on
-      P.push(stone(new THREE.CylinderGeometry(p.r - 0.12, p.r - 0.08, 0.2, 14), C.stone2, { x: p.cx, y: p.top - 0.1, z: p.cz }, seed + 4, { moss: 0.5 }));
+      // (deep enough to sit down in the jagged top of the shaft, so it never floats)
+      P.push(stone(new THREE.CylinderGeometry(p.r - 0.12, p.r - 0.08, 0.9, 14), C.stone2, { x: p.cx, y: p.top - 0.45, z: p.cz }, seed + 4, { moss: 0.5 }));
       break;
     case 'capital': {
       const tilt = p.top < TEMPLE.deck - 0.1 ? 0.05 : 0;
@@ -112,38 +113,42 @@ export function pieceArt(p, i) {
     }
     case 'beam': {
       // an architrave: a heavy stone beam with a frieze band; broken ends ragged
-      const L2 = p.hz * 2, H = 1.05, along = p.hz > p.hx;
+      // (it runs along z down a row, or along x for the one that fell across the rows)
+      // (drawn a little short of the capitals it rests on, so their tops never overlap in one plane)
+      const along = p.hz > p.hx, L2 = (along ? p.hz : p.hx) * 2 - 0.1, H = 1.05;
       const g = jitter(box(along ? 1.18 : L2, H, along ? L2 : 1.18, along ? 1 : 4, 2, along ? 4 : 1), 0.03, seed);
       const q = g.attributes.position;
       for (let j = 0; j < q.count; j++) if (q.getY(j) > 0) q.setY(j, H / 2);
       g.computeVertexNormals();
       P.push(stone(g, C.stone, { x: p.cx, y: p.top - H / 2, z: p.cz }, seed, { moss: 0.35 }));
-      P.push(stone(box(along ? 1.24 : L2 - 0.1, 0.16, along ? L2 - 0.1 : 1.24), C.shade, { x: p.cx, y: p.top - 0.72, z: p.cz }, seed + 1));
+      P.push(stone(box(along ? 1.36 : L2 - 0.1, 0.16, along ? L2 - 0.1 : 1.36), C.shade, { x: p.cx, y: p.top - 0.72, z: p.cz }, seed + 1));
       break;
     }
     case 'ramp': break;   // the fallen column is drawn whole (fallenColumn)
     case 'deck':
-      P.push(stone(box(p.hx * 2, 13, p.hz * 2), C.stone2, { x: p.cx, y: p.top - 6.5, z: p.cz }, seed, { moss: 0.12 }));
+      // (the body stops just under the moulding: two tops at one height flicker)
+      P.push(stone(box(p.hx * 2, 12.9, p.hz * 2), C.stone2, { x: p.cx, y: p.top - 6.55, z: p.cz }, seed, { moss: 0.12 }));
       P.push(stone(box(p.hx * 2 + 0.3, 0.3, p.hz * 2 + 0.3), C.stone, { x: p.cx, y: p.top - 0.15, z: p.cz }, seed + 1));
       P.push(stone(box(p.hx * 2 + 0.5, 0.4, p.hz * 2 + 0.5), C.shade, { x: p.cx, y: 2.4, z: p.cz }, seed + 2));
       break;
     case 'door':
-      P.push(stone(box(p.hx * 2, 0.3, p.hz * 2), C.stone3, { x: p.cx, y: p.top - 0.15, z: p.cz }, seed));
+      P.push(stone(box(p.hx * 2, 0.3, p.hz * 2), C.stone3, { x: p.cx, y: p.top - 0.17, z: p.cz }, seed));   // a touch under the moulding it meets
       break;
     case 'stair': {
       const h = p.top + 4.4;
-      P.push(stone(box(p.hx * 2, h, p.hz * 2 + 0.02), (i % 2) ? C.stone : C.stone2, { x: p.cx, y: p.top - h / 2, z: p.cz }, seed, { moss: 0.08 }));
+      // its ends run into the side walls, so no two faces lie in one plane
+      P.push(stone(box(p.hx * 2 + 0.3, h, p.hz * 2 + 0.02), (i % 2) ? C.stone : C.stone2, { x: p.cx, y: p.top - h / 2, z: p.cz }, seed, { moss: 0.08 }));
       break;
     }
     case 'block': {
       const sy = Math.min(p.thick, p.fallen ? 1.05 : 1.6);
       P.push(roughBlock(p.cx, p.cz, p.top, p.hx * 2, sy, p.hz * 2, p.rot, seed, p.fallen ? C.stone : C.stone2));
-      if (p.thick > sy + 0.05) P.push(roughBlock(p.cx, p.cz, p.top - sy, p.hx * 2 - 0.1, p.thick - sy, p.hz * 2 - 0.1, p.rot + 0.05, seed + 1, C.stone3));
+      if (p.thick > sy + 0.25) P.push(roughBlock(p.cx, p.cz, p.top - sy, p.hx * 2 - 0.1, p.thick - sy, p.hz * 2 - 0.1, p.rot + 0.05, seed + 1, C.stone3));
       break;
     }
     case 'step':
       P.push(stone(box(p.hx * 2, 0.32, p.hz * 2 + 0.02), C.stone, { x: p.cx, y: p.top - 0.16, z: p.cz }, seed, { moss: 0 }));
-      P.push(stone(box(p.hx * 2, 2.6, p.hz * 2), C.stone3, { x: p.cx, y: p.top - 1.6, z: p.cz }, seed, { moss: 0 }));
+      P.push(stone(box(p.hx * 2 - 0.1, 2.6, p.hz * 2 - 0.04), C.stone3, { x: p.cx, y: p.top - 1.6, z: p.cz }, seed, { moss: 0 }));
       break;
     case 'dais':
       P.push(stone(box(p.hx * 2, 3, p.hz * 2), C.stone2, { x: p.cx, y: p.top - 1.5, z: p.cz }, seed, { moss: 0 }));
@@ -157,7 +162,7 @@ export function pieceArt(p, i) {
     case 'cornice': break;   // the gable is drawn whole (gableParts)
     case 'apex': P.push(roughBlock(p.cx, p.cz, p.top, p.hx * 2, 1.4, p.hz * 2, 0, seed, C.stone)); break;
     case 'plinth':
-      P.push(stone(box(1.2, 3.4, 1.2), C.stone2, { x: p.cx, y: p.top - 1.7, z: p.cz, ry: p.rot }, seed));
+      P.push(stone(box(1.2, 3.3, 1.2), C.stone2, { x: p.cx, y: p.top - 1.75, z: p.cz, ry: p.rot }, seed));   // under the cap, not level with it
       P.push(stone(box(1.36, 0.18, 1.36), C.stone, { x: p.cx, y: p.top - 0.09, z: p.cz, ry: p.rot }, seed + 1));
       if (p.statue) P.push(...statueParts(p.cx, p.top, p.cz, p.a, seed));
       break;
@@ -169,8 +174,11 @@ export function pieceArt(p, i) {
 
 /** The fallen column leaning up from the stumps to the first capital: one long fluted drum. */
 export function fallenColumn(L) {
-  const R = L.ramp, a = R[0], b = R[R.length - 1], r = 0.78;
-  const y0 = a.top - r - 0.05, y1 = b.top - r - 0.05, z0 = a.cz - a.hz - 0.6, z1 = b.cz + b.hz;
+  // its top runs through the middle of every step's top (the steps are what you walk on)
+  const R = L.ramp, a = R[0], b = R[R.length - 1], r = 1.05, k = (b.top - a.top) / (b.cz - a.cz);
+  // (a tilted drum's top stands r / cos(tilt) above its axis, and the flutes stand a little proud)
+  const lift = r * Math.sqrt(1 + k * k) + 0.05;
+  const z0 = a.cz - a.hz - 0.6, z1 = b.cz + b.hz, y0 = a.top + (z0 - a.cz) * k - lift, y1 = a.top + (z1 - a.cz) * k - lift;
   const len = Math.hypot(z1 - z0, y1 - y0), tilt = Math.atan2(y1 - y0, z1 - z0);
   const g = new THREE.CylinderGeometry(r, r, len, 16, 6);
   const p = g.attributes.position;
@@ -189,17 +197,19 @@ export function fallenColumn(L) {
 /** The gable over the portico: the east half still stands, a triangle under its rising cornice; the west half lies in pieces. */
 export function gableParts(L) {
   const P = [], ET = TEMPLE.entab, first = L.cornice[0], top = L.apex;
-  const xa = first.cx + first.hx + 0.6, xb = top.cx - top.hx;   // from the entablature's east end to the broken edge
+  const xa = first.cx + first.hx + 0.6, xb = top.cx - top.hx + 0.08;   // from the entablature's east end to just inside the broken edge
   const slope = 0.35, yAt = (x) => ET.y + slope * (12.6 - x);
   // the tympanum: a wall under the cornice
   const shape = new THREE.Shape();
-  shape.moveTo(xa, ET.y); shape.lineTo(xb, ET.y); shape.lineTo(xb, yAt(xb) - 0.5); shape.lineTo(xb + 0.6, yAt(xb + 0.6) - 0.3);
-  shape.lineTo(xa, ET.y + 0.05);
+  // (its top edge stays under the cornice steps all the way along)
+  shape.moveTo(xa, ET.y - 0.05); shape.lineTo(xb, ET.y - 0.05); shape.lineTo(xb, yAt(xb) - 0.9); shape.lineTo(xb + 0.6, yAt(xb + 0.6) - 0.75);
+  shape.lineTo(xa, ET.y - 0.05);
   const tg = new THREE.ExtrudeGeometry(shape, { depth: 0.9, bevelEnabled: false });
   tg.translate(0, 0, ET.z - 0.45);
   P.push(stone(tg, C.stone2, {}, 3701, { moss: 0.2 }));
   // the raking cornice along its top, the steps you climb
-  for (const S of L.cornice) P.push(stone(box(S.hx * 2 + 0.04, 0.5, S.hz * 2 + 0.1), C.stone, { x: S.cx, y: S.top - 0.25, z: S.cz }, 3710 + S.cx * 10, { moss: 0.35 }));
+  // (a little proud of the entablature's faces, so the two never share a plane)
+  for (const S of L.cornice) P.push(stone(box(S.hx * 2 + 0.04, 0.5, S.hz * 2 + 0.16), C.stone, { x: S.cx, y: S.top - 0.25, z: S.cz }, 3710 + S.cx * 10, { moss: 0.35 }));
   // a carved fish in the tympanum, staring out to sea
   P.push(...fishParts(6.4, 16.25, ET.z - 0.5, 0, Math.PI, 2.2));
   // the west half, fallen on the portico and down the stair
@@ -281,13 +291,13 @@ export function hallParts(L) {
   // the door's jambs and lintel stand proud of the wall
   for (const sx of [-1, 1]) wallBox(sx * 2.45 - 0.45, sx * 2.45 + 0.45, 9.7, 10.1, 8, 12.2, 3904 + sx, C.stone);
   wallBox(-2.9, 2.9, 9.7, 10.1, 12.2, 12.9, 3906, C.stone);
-  wallBox(-wo, -H.half, H.z0, H.z1 + H.wall, -4, top, 3907);
+  wallBox(-wo, -H.half, H.z0, H.z1, -4, top, 3907);   // the side walls stop at the back wall, so the corners don't share a face
   wallBox(H.half, wo, H.z0, B.z - B.half, -4, top, 3908);
-  wallBox(H.half, wo, B.z + B.half, H.z1 + H.wall, -4, top, 3909);
+  wallBox(H.half, wo, B.z + B.half, H.z1, -4, top, 3909);
   wallBox(H.half, wo, B.z - B.half, B.z + B.half, B.top, top, 3910);
   // the breach's broken edges, and what fell out of it onto the sand
   for (const [dz, y0, h] of [[-B.half + 0.25, B.sill, 1.6], [B.half - 0.3, B.sill + 1.2, 2.2], [-B.half + 0.35, B.top - 1.3, 1.3], [B.half - 0.2, B.top - 0.9, 0.9]]) {
-    P.push(roughBlock(H.half + H.wall / 2, B.z + dz, y0 + h, H.wall + 0.1, h, 0.7, 0.1, 3912 + dz * 10, C.stone2));
+    P.push(roughBlock(H.half + H.wall / 2, B.z + dz, y0 + h, H.wall + 0.3, h, 0.7, 0.1, 3912 + dz * 10, C.stone2));   // proud of both faces of the wall
   }
   for (const [x, dz, s, r] of B.rubble) {
     P.push(roughBlock(x, B.z + dz, groundH(x, B.z + dz) + 0.5 * s, 1.3 * s, 0.9 * s, 1.0 * s, r, 3916 + x, C.stone));
@@ -313,7 +323,7 @@ export function hallParts(L) {
   // vines hanging down the inside of the walls
   for (let k = 0; k < 14; k++) {
     const sd = k % 2 ? 1 : -1, z = H.z0 + 1 + rng() * (H.z1 - H.z0 - 2), len = 2 + rng() * 4;
-    P.push(part(box(0.12, len, 0.35), k % 3 ? C.vine : C.moss, { x: sd * (H.half - 0.08), y: top - len / 2, z }));
+    P.push(part(box(0.1, len, 0.35), k % 3 ? C.vine : C.moss, { x: sd * (H.half - 0.1 - (k % 4) * 0.03), y: top - 0.05 - (k % 3) * 0.04 - len / 2, z }));   // no two in one plane
   }
   // the one piece of roof left, over the treasury, coffered underneath
   const R = L.roof, w = H.half + H.wall - R.gap;
@@ -390,7 +400,7 @@ export function desk(L) {
   const at = (lx, lz) => ({ x: K.x + lx * cs + lz * sn, z: K.z - lx * sn + lz * cs });
   return [
     part(box(0.84, 0.6, 0.64), C.plank, { x: K.x, y: y + 0.3, z: K.z, ry: K.rot }),
-    part(box(0.86, 0.06, 0.08), C.plank2, { ...at(0, -0.29), y: y + 0.5, ry: K.rot }),
+    part(box(0.86, 0.06, 0.08), C.plank2, { ...at(0, -0.31), y: y + 0.5, ry: K.rot }),
     part(new THREE.CylinderGeometry(0.05, 0.06, 0.1, 8), C.ink, { ...at(0.28, 0.12), y: y + 0.65 }),
     part(box(0.02, 0.2, 0.02), C.canvas, { ...at(0.3, 0.12), y: y + 0.75, rz: 0.4 }),
     // the stool: canvas between crossed legs
@@ -418,15 +428,15 @@ export function campParts(L) {
   const P = [];
   P.push(part(box(1.0, 0.06, 0.7), C.plank, { ...at(0, 0, 0.74), ry: K.rot }));
   for (const [lx, lz] of [[-0.42, -0.28], [0.42, -0.28], [-0.42, 0.28], [0.42, 0.28]]) P.push(part(box(0.06, 0.74, 0.06), C.plank2, { ...at(lx, lz, 0.37), ry: K.rot }));
-  for (let k = 0; k < 6; k++) P.push(part(box(0.5, 0.012, 0.36), k % 2 ? C.paper : '#e4d6b2', { ...at(-0.15 + k * 0.01, 0.02, 0.785 + k * 0.012), ry: K.rot + (k - 2.5) * 0.05 }));
-  P.push(part(box(0.4, 0.012, 0.3), C.paper, { ...at(0.2, -0.05, 0.86), ry: K.rot + 0.2 }));     // the note, on top
+  for (let k = 0; k < 6; k++) P.push(part(box(0.5, 0.012, 0.36), k % 2 ? C.paper : '#e4d6b2', { ...at(-0.15 + k * 0.01, 0.02, 0.785 + k * 0.015), ry: K.rot + (k - 2.5) * 0.05 }));
+  P.push(part(box(0.4, 0.012, 0.3), C.paper, { ...at(0.2, -0.05, 0.875), ry: K.rot + 0.2 }));     // the note, on top
   P.push(part(new THREE.ConeGeometry(0.09, 0.2, 7), C.shell, { ...at(0.26, -0.02, 0.92), rz: 1.3, ry: K.rot, c2: C.shell2 }));
   // the hammock, sagging between the palms at ±2.4 along the camp's x
   const pts = [];
   for (let k = 0; k <= 8; k++) { const t = k / 8, lx = lerp(-2.1, 2.1, t); pts.push(at(lx, 1.6, 1.25 - Math.sin(t * Math.PI) * 0.55)); }
   for (let k = 0; k < 8; k++) {
     const a = pts[k], b = pts[k + 1], len = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-    P.push(part(box(len + 0.02, 0.04, 0.85), k % 2 ? C.canvas : C.canvas2, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2, ry: K.rot, rz: Math.atan2(b.y - a.y, Math.hypot(b.x - a.x, b.z - a.z)) * (k < 4 ? -1 : -1) }));
+    P.push(part(box(len, k % 2 ? 0.04 : 0.055, 0.85), k % 2 ? C.canvas : C.canvas2, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2, ry: K.rot, rz: Math.atan2(b.y - a.y, Math.hypot(b.x - a.x, b.z - a.z)) * (k < 4 ? -1 : -1) }));
   }
   return P;
 }
