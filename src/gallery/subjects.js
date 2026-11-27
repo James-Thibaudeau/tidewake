@@ -419,7 +419,8 @@ function sealife(q, stage) {
 
 // A generated island level: `biome`, `seed`, `r` (island radius) and `dist`
 // (metres from Port Haven, which sets how hard it is). With `kind=arch&n=0`,
-// one of its pieces on its own.
+// one of its pieces on its own. `gust=calm|warn|blow` holds a cold island's
+// gusts at one point of their round (otherwise they come and go as it plays).
 function level(q, stage) {
   initProps();
   const warnings = [];
@@ -434,19 +435,23 @@ function level(q, stage) {
   }
   const lv = generateLevel(I, opts);
   stage.add(lv.group);
+  const GUSTS = { calm: { state: 'calm', k: 0, stir: 0 }, warn: { state: 'warn', k: 0, stir: 0.8 }, blow: { state: 'blow', k: 1, stir: 1 } };
+  if (q.gust && !GUSTS[q.gust]) warnings.push(`gust=${q.gust} is not one of ${Object.keys(GUSTS).join(', ')}`);
+  const hazards = GUSTS[q.gust] ? { gusts: (lv.gusts || []).map(() => GUSTS[q.gust]) } : null;
   const PLACES = levelPlaces(lv.layout);
   let at = q.at || 'cliff';
   if (!PLACES[at]) { warnings.push(`at=${at} is not a place here (${Object.keys(PLACES).join(', ')})`); at = Object.keys(PLACES)[0]; }
   return { group: lv.group, ground: 'sea', warnings, shoal: shoalOf(lv), calm: lv.calm, spot: PLACES[at], note: `${lv.layout.biome}, ${lv.layout.tier}${q.at ? ', ' + at : ''}`,
-    // (a volcanic island's lava flows and bubbles, and its vents steam)
-    update: lv.update ? (dt, t, env) => lv.update(dt, t, { night: env.night }) : undefined, dispose() { lv.dispose(); } };
+    // (a volcanic island's lava flows and bubbles, and its vents steam; a cold one's pennants fly and its snow falls)
+    update: lv.update ? (dt, t, env) => lv.update(dt, t, { night: env.night, hazards }) : undefined, dispose() { lv.dispose(); } };
 }
 
 /**
  * Close-ups of a generated level for the `spot` view, each looked at from
  * outside the island: the moat crossing, the start of the climbs up cliff 1
  * and the mesa, the chest's branch, and the top (on a volcano, the crater
- * and the outcrop over it).
+ * and the outcrop over it); on a cold island its first gust of wind and its
+ * frozen pond.
  */
 function levelPlaces(L) {
   const main = L.pieces.filter((p) => p.route === 'main' && p.kind !== 'vista');
@@ -465,6 +470,10 @@ function levelPlaces(L) {
   out.mesa = around(climb.filter((p) => p.top > L.T.h1 + 0.1).slice(0, 4), 3);
   const chest = L.branches.find((b) => b.name === 'chest');
   if (chest) out.chest = { ...around(chest.nodes.filter((n) => n.piece).map((n) => n.piece), 4), y: (chest.tree.base + chest.tree.top) / 2 };
+  const G = (L.gusts || [])[0];
+  if (G) { const a = Math.atan2(G.z, G.x); out.gust = { x: G.x, y: G.y + 1.2, z: G.z, span: G.along * 2 + 7, yaw: Math.atan2(Math.cos(a), Math.sin(a)), pitch: 0.3 }; }
+  const P = (L.ponds || [])[0];
+  if (P) { const a = Math.atan2(P.z, P.x); out.pond = { x: P.x, y: P.y + 0.5, z: P.z, span: P.r * 2 + 5, yaw: Math.atan2(Math.cos(a), Math.sin(a)), pitch: 0.5 }; }
   { const a = Math.atan2(L.summit.z, L.summit.x) + 0.8; out.top = { x: 0, y: L.summit.y - 1, z: 0, span: L.T.S2 * 2.2, yaw: Math.atan2(Math.cos(a), Math.sin(a)), pitch: 0.7 }; }
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v));
 }
@@ -484,7 +493,7 @@ const PARAMS = {
   temple: ['at'],
   archway: ['kind', 'n', 'at', 'journal'],
   ruins: ['kind', 'n', 'at', 'journal'],
-  level: ['biome', 'seed', 'r', 'dist', 'kind', 'n', 'at'],
+  level: ['biome', 'seed', 'r', 'dist', 'kind', 'n', 'at', 'gust'],
   sealife: ['kind'],
 };
 /** The keys in `q` that the subject `show` doesn't read (`also`: the page's own parameters). */
@@ -493,7 +502,7 @@ export function unknownParams(show, q, also) {
   return Object.keys(q).filter((k) => !known.has(k));
 }
 
-const PIECE_KINDS = ['block', 'bridge', 'column', 'disc', 'ledge', 'vista', 'plank', 'stone', 'stack', 'arch', 'log', 'palm', 'pool', 'rope', 'basalt', 'vent', 'shelf'];
+const PIECE_KINDS = ['block', 'bridge', 'column', 'disc', 'ledge', 'vista', 'plank', 'stone', 'stack', 'arch', 'log', 'palm', 'pool', 'rope', 'basalt', 'vent', 'shelf', 'pine', 'floe'];
 const TIERS = ['0', '1', '2', '3', '4', '5'];
 /** The parameters a subject takes, as [key, choices] pairs, for the page's menus. */
 export function controlsFor(show) {

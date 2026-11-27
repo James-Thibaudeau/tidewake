@@ -6,15 +6,15 @@
 //   box(minX, minY, minZ, maxX, maxY, maxZ, tag)   axis-aligned box
 //   obox(cx, cy, cz, hx, hy, hz, rotY, tag)        box rotated about y by rotY
 //   cyl(x, z, r, y0, y1, tag)                      vertical cylinder
-// `tag` is the surface: 'sand' | 'grass' | 'stone' | 'wood' | 'leaf' | 'water' (footsteps
-// and future surface rules like ice).
+// `tag` is the surface: 'sand' | 'grass' | 'stone' | 'wood' | 'leaf' | 'water' | 'snow' | 'ice'
+// (footsteps; 'ice' also slides underfoot: controller.js, ASHORE.ice).
 //
 // A level (from levelgen.generateLevel) is:
 // {
 //   group: THREE.Group,                 // everything to render, origin = island centre
 //   colliders: Collider[],              // solid shapes (stand on, bump into)
 //   groundAt(x, z): number,             // terrain top under (x, z); -Infinity over open water
-//   groundTag(x, z): string,            // 'sand' | 'grass' | 'stone'
+//   groundTag(x, z): string,            // 'sand' | 'grass' | 'stone' | 'snow' | 'ice'
 //   waterY: 0,                          // falling below waterY - 0.6 = splash → respawn
 //   bounds: { r },                      // keep the player within r of the origin
 //   spawn: { x, y, z, yaw },            // on the beach beside the rowboat
