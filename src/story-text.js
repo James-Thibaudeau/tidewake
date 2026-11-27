@@ -171,6 +171,7 @@ export const LINES = {
   shipwrightSpyglass: "Find your grandfather's spyglass",
   groveNote: '"Gone up the big tree. Back for supper."',
   groveNoteText: 'His handwriting, in a hurry. A worn path runs inland, towards the great tree.',
+  lava: 'Too hot! Back at your last lantern.',
   carving: 'A lopsided heart, two sets of initials worn soft by the weather, and a little anchor underneath.',
   flowerCrown: "Somebody wove it and left it at the top of the oldest tree. Try it on at any port's Tailor.",
   archNote: '"Glass dropping. Up to the arch for a look. If it\'s coming, I\'m going through first."',
@@ -482,6 +483,13 @@ export const REFIT = {
   questFetch: 'Climb {place} and bring the {item} back to any shipwright.',
   questBring: 'Bring the {item} to any shipwright to have the {label} fitted.',
   questGiver: 'Opens {biome} islands',
+  // a storm while you're ashore (ashore/anchor-drag.js): the tempered chain
+  // holds; before it, the anchor drags and you have a while to get back aboard
+  stormHolds: 'A storm is blowing up. Your tempered chain holds.',
+  stormDrag: 'A storm! The anchor is dragging. Get back to the ship!',
+  dragging: 'Anchor dragging! {time}',
+  stormPassed: 'The storm has eased. The anchor holds again.',
+  stormDragged: 'The anchor dragged and she hit the rocks. You row out after her.',
   needGold: 'The shipwright needs {gold} gold to fit the {label}.',
   maxed: 'It has been everywhere.',
   notYet: 'Nothing more to fit yet.',

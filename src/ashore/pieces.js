@@ -1,10 +1,12 @@
 // Geometry for ashore level pieces: vertex-coloured primitives in the props
 // style, built straight into level space so they can all be merged into one
 // mesh (plus one ink-outline mesh). Each builder returns an array of parts.
-// Tropical islands' pieces are drawn in tropical-art.js.
+// Tropical islands' pieces are drawn in tropical-art.js, volcanic islands'
+// in volcanic-art.js.
 import * as THREE from 'three';
 import { part, jitter } from '../props.js';
 import { palmTopParts, tidePoolParts, ropeDeckParts, poolRimParts, ropeBridgeParts, lookoutPalmParts, palmDiscParts } from './tropical-art.js';
+import { basaltParts, basaltDiscParts, basaltStepParts, cinderParts, ventParts, shelfParts, causewayParts, lookoutBasaltParts } from './volcanic-art.js';
 
 const C = {
   earth: '#a39484', earthTop: '#6cc24a', earthDark: '#857766',
@@ -43,6 +45,8 @@ function railParts(p, side) {
 export function pieceParts(p) {
   // the rope bridge over the moat hangs its own handropes
   if (p.style === 'ropeBridge') return ropeBridgeParts(p);
+  // …and the causeway over the lava its stone walls
+  if (p.style === 'causeway') return causewayParts(p);
   const P = pieceBody(p);
   if (p.rail && p.kind !== 'rope') P.push(...railParts(p, -1)); // a rope bridge draws its own handrope
   if (p.rails2) P.push(...railParts(p, -1), ...railParts(p, 1));
@@ -56,8 +60,12 @@ function pieceBody(p) {
     case 'palm': return palmTopParts(p);
     case 'pool': return tidePoolParts(p);
     case 'rope': return ropeDeckParts(p);
+    case 'basalt': return basaltParts(p);
+    case 'vent': return ventParts(p);
+    case 'shelf': return shelfParts(p);
     case 'block': {
       const H = h + 0.6, w = p.hx * 2, d = p.hz * 2;
+      if (p.style === 'basaltSteps') return basaltStepParts(p);
       if (p.carved) {
         // stone stairs: pale treads on a rocky riser
         P.push(placed(new THREE.BoxGeometry(w, H, d), C.rock, p, { y: p.top - H / 2 }, { c2: C.rockDark, split: 0.7 }));
@@ -97,6 +105,7 @@ function pieceBody(p) {
     }
     case 'disc': {
       if (p.palm) return palmDiscParts(p);
+      if (p.basalt) return basaltDiscParts(p);
       if (p.tag === 'stone') {
         // a rock shelf jutting from a spire (rocky islands' lookout)
         P.push(placed(new THREE.CylinderGeometry(p.r, p.r * 0.78, 0.42, 9), C.crag, p, { y: p.top - 0.21, ry: p.cx }, { c2: C.cragDark, split: 0.5 }));
@@ -118,6 +127,7 @@ function pieceBody(p) {
       break;
     }
     case 'ledge': case 'vista': {
+      if (p.style === 'cinders' || p.style?.startsWith('slabs')) return cinderParts(p, p.style !== 'cinders');
       // the slab reaches 0.8 m back into the rock so it looks attached to the face
       const w = p.hx * 2, d = p.hz * 2 + 0.8, th = p.kind === 'vista' ? 0.7 : 0.55;
       if (p.style === 'sheer') {
@@ -231,6 +241,7 @@ export function lookoutTreeParts(tree, discs) {
   const P = [];
   const H = tree.top - tree.base + 0.5;
   if (tree.palm) return lookoutPalmParts(tree, discs);
+  if (tree.basalt) return lookoutBasaltParts(tree, discs);
   const at = (g, color, t, extra = {}) => { const q = part(g, color, { ...t, ...extra }); q.translate(tree.x, 0, tree.z); return q; };
   if (tree.spire) {
     // drums that narrow as they rise, each a little off true

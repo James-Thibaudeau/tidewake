@@ -3,7 +3,7 @@
 // countdown and hails for the rival. Methods are mixed into UI (see ../ui.js),
 // so `this` is the UI instance.
 import { fmtDist } from '../quests.js';
-import { PROLOGUE, EPILOGUE } from '../story-text.js';
+import { PROLOGUE, EPILOGUE, REFIT } from '../story-text.js';
 import { bearingDeg } from '../util.js';
 import { $, PX_PER_DEG, fillVars, clampN, esc, fmt } from './shared.js';
 import { ICONS, STORY_ART } from './icons.js';
@@ -22,6 +22,16 @@ export class StoryUI {
     bits.push(left.coins ? `${left.coins} coin${left.coins === 1 ? '' : 's'} left` : 'All coins found');
     if (left.chest) bits.push('a chest is hidden here');
     this.el.apLeft.textContent = bits.join(' · ');
+  }
+
+  /** The storm countdown while the anchor drags (seconds left; null hides it). */
+  setAnchorDrag(left) {
+    const el = this.el.apDrag;
+    if (!el) return;
+    el.classList.toggle('hidden', left == null);
+    if (left == null) return;
+    const s = Math.ceil(left);
+    el.textContent = fillVars(REFIT.dragging, { time: `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` });
   }
 
   // ------------------------------------------------------------ found!

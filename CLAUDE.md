@@ -29,8 +29,9 @@ wave set in plain sea, in home waters and over a rogue wave (pitch and bow slams
 `ride`), rough water's rogue waves and ice (the wave is the same on the CPU as
 in the shaders, always arrives and costs the right share of the hull, `rogue`),
 150 generated ashore layouts per landable biome, a test
-climber (the real controller) that walks 12 generated islands per biome to
-the summit, the living sea's rules (what turns up where, bounties, 3,000
+climber (the real controller, steam vents and crumbling basalt included) that
+walks 12 generated islands per biome to the summit, how high a vent's throw
+really goes, the living sea's rules (what turns up where, bounties, 3,000
 placements in a toy sea), the score (themes parse and stay in key, every
 note is in its instrument's range, changes of cue, the rain and night
 colours, which cue each situation gets, no flip-flopping at a band's edge,
@@ -75,6 +76,8 @@ tidewake.debug.restoreSave()              // when you're done: real save back, r
   `debug.start()` backs it up. **Always finish with `debug.restoreSave()`**:
   it puts the save back and reloads to the title. Skip it and the test voyage
   is written over the real save when the tab closes.
+- A storm while you're ashore drags the anchor below refit 3:
+  `debug.weather('storm')` then `debug.step(…)` runs its countdown.
 - Visual effects: `?fx=0` turns them all off, `?fx=edges,bloom` picks some.
   The sea's large features likewise: `?sea=0`, or `?sea=shallows,gusts,shade`.
 - The score is written onto the audio clock, which runs in real time: after
@@ -111,7 +114,7 @@ gallery.frame()                            // draw before a screenshot when the 
 - Subjects: `outfit`, `ship`, `prop`, `tree`, `arch`, `wreck`, `grove`,
   `archway`, `level`, `sealife`. A big subject takes `at=<place>` with `view=spot` for
   a close look at one place (`show=archway&at=keystone&view=spot`; a
-  generated island's `level` takes `at=moat|cliff|mesa|chest`). The
+  generated island's `level` takes `at=moat|cliff|mesa|chest|top`). The
   same parameters work in the URL: `gallery.html?show=ship&tier=4&light=night`.
 - **After changing how something looks, take the contact sheet that covers
   it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `paints`, `paint-parts`, `cloths`, `emblems`, `flags`, `figureheads`, `sealife`, `sea`, `shallows`, `rough`, `rogue`, `islands`, `island-places`…, or

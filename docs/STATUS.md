@@ -788,8 +788,95 @@ Updated 2026-11-27.
       see *Open questions* in the design), the pacing check (chapter V now
       needs Hull 2 and the coral flukes), and the temple's music (it waits
       for the landmark themes, Phase 12).
-  - [ ] 4.8 Volcanic islands (with the steam-vent launch) and 4.9 Mount
-    Cinderhorn
+  - [x] 4.8 Volcanic islands ([#67](https://github.com/James-Thibaudeau/tidewake/pull/67)). `volcanic` is in `ASHORE_BIOMES`, so the
+    tempered chain refit (tier 3) is live: it's offered once you own Keel 2,
+    and its fitting, old chain links, waits on a tropical island (Tern Crag
+    from Star Cay). Until it's fitted, volcanic shores say "The heat here
+    would soften your anchor chain. Ask the shipwright."
+    - Volcanic levels (`modules.js` `POOLS.volcanic`; pieces and staircases
+      now in the new `ashore/stairs.js`; art in the new
+      `ashore/volcanic-art.js`): black sand; the ground is dark rock and ash
+      with only a few tufts of hardy grass (and sounds like stone underfoot);
+      glowing lava veins wander across it and run down the cliff faces (for
+      the look only: they don't burn, and keep clear of the paths and of
+      everything you climb); burnt trees, dark boulders, dark rock spires
+      offshore; dark banded walls. The moat is lava, crossed by a basalt
+      causeway near home or on basalt columns further out; on hard islands
+      every other column crumbles. The climbs are hexagonal basalt columns,
+      basalt steps near home, basalt slabs that hold, and cinder ledges that
+      crumble. The chest sits
+      on a stack of basalt columns. The top is a crater, not a plateau: a rim
+      round a pool of lava 3 m down (fall in and you're back at the summit
+      lantern), and the summit is an outcrop of basalt that runs out from
+      where you arrive over the crater's mouth, a jagged lip hanging under
+      its tip; the summit's gold waits there, and the lantern, coins and vault
+      are round the rim.
+    - The steam-vent launch, built here for any level (`ashore/hazards.js`,
+      `ctl.launch()` in `controller.js`): stand in a vent's mouth and it
+      throws you straight up, `ASHORE.vent.over` (2.6 m) higher than the
+      ledge it serves, and you drift only a little until the climb slows,
+      so you can't catch the rock beside you. Every cliff 1 starts at a vent
+      (near home it throws you to the top, further out to a basalt shelf part
+      way up); the mesa's does too from medium on. Required throws stay
+      inside `ASHORE.design.launchUp` (6 m) and `launchReach` (1.6 m), with
+      nothing overhead; the layout check enforces it. Coins hang in the steam.
+    - Crumbling basalt (`hazards.js`): it shakes for 1 s after you land on
+      it (its cracks flare), falls, and is back 3.5 s later. Never a rest,
+      a lantern's footing, or on an island near home. A fall from a cinder
+      ledge lands you on the tier below; into the lava sends you back to your
+      last lantern ("Too hot!") and puts every fallen piece back.
+    - The moving parts (`ashore/volcanic-life.js`): lava that flows round the
+      moat and glows at night, bubbles that swell and pop, wisps over each
+      vent and a column of steam when one fires, crumbling pieces that shake,
+      drop and rise back. Sound: the vent, rock giving way, the lava's hiss;
+      lava bubbling and the mountain rumbling as the island's ambience.
+      Rendered offline and measured against the others: the vent peaks at
+      0.076 (a stone landing 0.063), rock giving way 0.059, the hiss 0.062
+      (the moat's splash 0.048); the rumble and the bubbles sit with the
+      wind's whistle and the far gull (RMS 0.0012-0.0018). Nobody has
+      listened yet.
+    - Difficulty: volcanic islands count 1 km nearer home (`BIOME_EASE`), so
+      the world's nearer seven are medium (Star Cay, Thistle Point, Puffin
+      Heights, Sprat Islet, Amber Key, Orca Skerry, Willow Rest) and the far
+      six hard; walls are ×1.15 and summits ×1.22, the tallest. Over 300
+      islands: medium 20.6 jumps, 2 throws and 3.4 crumbling pieces
+      (tropical 24.9 jumps), hard 25.8 jumps, 2 throws and 5.5 crumbling
+      (30.9); the widest required gap 1.44 m (limit 1.9).
+    - The tempered chain's perk, "holds in storms" (`ashore/anchor-drag.js`):
+      before it, a storm while you're ashore drags the anchor. The island
+      panel counts down 90 s (`ANCHOR_DRAG`); if the storm eases first the
+      anchor holds again, and if not she takes a fifth of her hull on the
+      rocks (never all of it) and you row out after her. With the chain, a
+      storm only tells you it holds.
+    - The anchor at the bow shows tier 3 while stowed: blued iron and a few
+      links of the tempered chain hanging from the ring (the chain from the
+      cathead hides behind the bulwark).
+    - Gallery: the `level` subject takes `biome=volcanic` and `at=top` (the
+      summit, every biome; now a column of `island-places`); levels now have the
+      game's still moat water (`calm`), and a volcanic level's lava moves
+      while the gallery plays. New piece kinds `basalt`, `vent`, `shelf`.
+    - `node tools/check.mjs climb`: the test climber runs the vents and the
+      crumbling pieces as the game does, pushes for the ledge all the way up a
+      throw, and steps aside when caught on a rail (which also cleared one of
+      temperate's known misses); it also checks that a throw really rises as
+      high as it is laid out for. With 60 islands per biome, the known misses
+      on easy islands' railed ledges remain (temperate 1, rocky 1, tropical 1,
+      volcanic 3).
+    - Splitting `modules.js` left every temperate, rocky and tropical island
+      laid out exactly as before (checked against `main` over 200 islands per
+      biome).
+    - Played in the preview through the real game: Star Cay blocked at tier 2
+      with the heat line; the offer → the links picked up at Tern Crag's vault
+      → a storm there (the countdown, the storm easing, and held on until she
+      dragged: hull 600 → 480, back aboard, the links kept) → fitted at Port
+      Haven. A scripted climber driving the game's own stick, jump and camera
+      climbed Star Cay (medium, 26 s) and Drift Rock (hard, 42 s, all 8
+      crumbling pieces fell behind it) to the summit; a fall into the lava;
+      a storm at tier 3. A volcanic level is about 72k triangles; 3.0 ms a
+      frame on High at 2048×1536 (a tropical one 4.0 ms from the same spot).
+    - Not done: a play by hand, a look on a phone, a listen to the new sounds,
+      and the pacing check (chapter VI now needs Keel 2 and the tempered chain).
+  - [ ] 4.9 Mount Cinderhorn
   - [ ] 4.10 Cold islands and 4.11 Frostspire
   - [x] Retrieve quests, including "Find the lost map fragment": offered by
     Harbormasters (Cartographers for the fragment) once the anchor is fitted.

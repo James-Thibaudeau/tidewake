@@ -1382,6 +1382,24 @@ const checks = {
     if (D.gapRun > reach(ASHORE.run) * 0.8) errors.push(`a run-jump covers ${reach(ASHORE.run).toFixed(2)} m: too close to design.gapRun ${D.gapRun}`);
     if (LIMITS.optional.up > arc.up * 0.92) errors.push(`optional climbs up to ${LIMITS.optional.up.toFixed(2)} m, but a jump goes ${arc.up.toFixed(2)} m`);
     if (LIMITS.optional.gap > reach(ASHORE.walk) * 0.92) errors.push(`optional gaps up to ${LIMITS.optional.gap.toFixed(2)} m, but a walking jump covers ${reach(ASHORE.walk).toFixed(2)} m`);
+    // a steam vent's throw really reaches the height it is laid out for, and
+    // while rising fast you drift less than its column's margin
+    const { CharacterController } = await load('ashore/controller.js');
+    const { launchSpeed } = await load('ashore/hazards.js');
+    const { VENT } = await load('ashore/stairs.js');
+    for (const lift of [3, D.launchUp + ASHORE.vent.over]) {
+      const ctl = new CharacterController({ colliders: [], groundAt: () => 0, waterY: -9 }, ASHORE);
+      ctl.teleport(0, 0, 0, 0);
+      ctl.launch(launchSpeed(lift, ASHORE));
+      let top = 0, drift = 0;
+      for (let k = 0; k < 400 && !(ctl.grounded && k > 2); k++) {
+        ctl.update(1 / 120, { wishX: 1, wishZ: 0 });
+        top = Math.max(top, ctl.pos.y);
+        if (ctl.vel.y > ASHORE.vent.steerAbove) drift = ctl.pos.x;
+      }
+      if (top < lift - 0.1) errors.push(`a vent throw meant to rise ${lift} m rises ${top.toFixed(2)} m`);
+      if (drift > VENT.clear - ASHORE.radius - 0.2) errors.push(`steering hard while a vent throws you up drifts ${drift.toFixed(2)} m sideways: into the shelf beside it`);
+    }
     const climber = await testClimber();
     const notes = [];
     for (const biome of ASHORE_BIOMES) {
@@ -1398,7 +1416,7 @@ const checks = {
       }
       notes.push(`${biome} ${Math.round(secs / count)} s, ${Math.round(jumps / count)} jumps`);
     }
-    return { errors, note: `a held jump ${arc.up.toFixed(2)} m up, ${arc.air.toFixed(2)} s in the air; ${count} islands per biome to the summit, on average ${notes.join('; ')}; ${climber.stats.retries} hops needed a second try` };
+    return { errors, note: `a held jump ${arc.up.toFixed(2)} m up, ${arc.air.toFixed(2)} s in the air; ${count} islands per biome to the summit, on average ${notes.join('; ')}; ${climber.stats.launches} throws from steam vents; ${climber.stats.retries} hops needed a second try, ${climber.stats.dodges} a step aside` };
   },
 
   // The Elder Grove: the layout keeps its design limits, and a test climber
@@ -1486,14 +1504,20 @@ const checks = {
  * (level, nodes, label, errors, tries = 1) => seconds taken; problems go into
  * `errors`. With tries > 1 a missed hop is tried again from its start at the
  * other pace (walk ↔ run), as a player would; stats.retries counts them.
- * `level` needs groundAt, colliders and pieces (with footprints).
+ * `level` needs groundAt, colliders and pieces (with footprints). Its vents
+ * and crumbling pieces (hazards.js) work as in the game: on a 'launch' edge
+ * the climber steps into the vent's mouth and pushes for the ledge all the
+ * way up; crumbling pieces fall if it dawdles. Caught on a rail or a corner, it
+ * steps aside for a moment (stats.dodges).
  */
 async function testClimber() {
   const { footGap, nodeFoot, supportAt } = await load('ashore/grove-layout.js');
   const { CharacterController } = await load('ashore/controller.js');
+  const { Hazards } = await load('ashore/hazards.js');
   const { ASHORE } = await load('config.js');
   const climb = (L, nodes, label, errors, tries = 1) => {
     const ctl = new CharacterController(L, ASHORE);
+    const hz = new Hazards(L, ASHORE);
     ctl.teleport(nodes[0].x, nodes[0].y + 0.05, nodes[0].z, 0);
     let t = 0;
     for (let i = 1; i < nodes.length; i++) {
@@ -1501,22 +1525,36 @@ async function testClimber() {
       const what = `${label}[${i}] ${A.piece?.kind || 'ground'}→${B.piece?.kind || 'ground'}`;
       let problem = null;
       for (let attempt = 0; attempt < tries; attempt++) {
-        if (attempt) { climb.stats.retries++; ctl.teleport(A.x, A.y + 0.05, A.z, 0); }
+        if (attempt) { climb.stats.retries++; hz.reset(); ctl.teleport(A.x, A.y + 0.05, A.z, 0); }
         const run = attempt % 2 ? !wide : wide;
         problem = null;
-        let held = 0;
+        let held = 0, best = Infinity, still = 0, side = 0, dodge = 0;
         for (let k = 0; ; k++) {
-          const p = ctl.pos, dx = B.x - p.x, dz = B.z - p.z, d = Math.hypot(dx, dz) || 1;
+          const p = ctl.pos, d = Math.hypot(B.x - p.x, B.z - p.z) || 1;
           // a spot on the ground counts if you're on something just above it (a bridge's end, say)
           if (ctl.grounded && d < 0.7 && p.y - B.y > -0.25 && p.y - B.y < (B.piece ? 0.25 : 0.6)) break;
           if (k > 60 * 25) { problem = `the climber got stuck at ${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`; break; }
           if (p.y < Math.min(A.y, B.y) - 2.5) { problem = `the climber fell (to ${p.y.toFixed(1)} m)`; break; }
+          // a launch: into the vent's mouth, then pushing for the ledge all the way up, as a player would
+          const launch = B.edge === 'launch';
+          const to = launch && ctl.grounded ? A : B;
+          const dx = to.x - p.x, dz = to.z - p.z, dl = Math.hypot(dx, dz) || 1;
           // the footing ends if both looks ahead find nothing near (one alone may fall in a seam between joined steps)
-          const ahead = Math.max(...[0.45, 0.65].map((s) => supportAt(L, p.x + (dx / d) * s, p.z + (dz / d) * s, p.y + 0.4)));
+          const ahead = Math.max(...[0.45, 0.65].map((s) => supportAt(L, p.x + (dx / dl) * s, p.z + (dz / dl) * s, p.y + 0.4)));
           const wall = B.y > p.y + ASHORE.stepUp && (B.piece ? footGap(B.piece.foot, [[p.x, p.z]]) < 0.75 : d < 1.2);
-          const jump = ctl.grounded && (wall || ahead < p.y - 0.5);
+          const jump = !launch && ctl.grounded && (wall || ahead < p.y - 0.5);
           if (jump) held = 30;
-          ctl.update(1 / 60, { wishX: dx / d, wishZ: dz / d, run, jumpPressed: jump, jumpHeld: held-- > 0 });
+          const near = launch && to === A && dl < 0.15; // (stand still in the mouth)
+          // caught on a rail or a corner (no nearer for half a second on the ground): step
+          // aside for a moment, one way then the other, as a player steers round it
+          if (d < best - 0.03) { best = d; still = 0; } else if (ctl.grounded && !launch && (still += 1 / 60) > 0.5) { still = 0; dodge = 0.35; side = side > 0 ? -1 : 1; climb.stats.dodges++; }
+          let wx = dx / dl, wz = dz / dl;
+          if (dodge > 0) { dodge -= 1 / 60; wx = 0.5 * dx / dl - side * 0.85 * dz / dl; wz = 0.5 * dz / dl + side * 0.85 * dx / dl; }
+          ctl.update(1 / 60, { wishX: near ? 0 : wx, wishZ: near ? 0 : wz, run, jumpPressed: jump, jumpHeld: held-- > 0 });
+          if (hz.update(1 / 60, ctl).launched) {
+            climb.stats.launches++;
+            if (B.piece?.kind === 'vent') break; // (hopped into the mouth on the way to the vent: thrown already)
+          }
           t += 1 / 60;
         }
         if (!problem) break;
@@ -1525,7 +1563,7 @@ async function testClimber() {
     }
     return t;
   };
-  climb.stats = { retries: 0 };
+  climb.stats = { retries: 0, launches: 0, dodges: 0 };
   return climb;
 }
 

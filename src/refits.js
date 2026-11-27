@@ -39,6 +39,8 @@ export class Refits {
   holds(I) { const need = refitFor(I.biome); return need >= 0 && this.tier >= need; }
   /** How far from the shore you can drop anchor. */
   get landRange() { return refitPerk(this.tier, 'range', LAND_RANGE); }
+  /** Does the anchor hold in a storm while you're ashore (the tempered chain)? */
+  get holdsInStorm() { return !!refitPerk(this.tier, 'storm', false); }
   /** The fastest you can be going and still drop anchor (m/s). */
   get landSpeed() { return refitPerk(this.tier, 'speed', LAND_SPEED); }
   /** What a shore you can't land on says (null if the anchor holds there). */

@@ -74,7 +74,7 @@ Two rules hold for every piece:
 | 4.5b | (done, #45) | Archway Isle's story: Journal IV at the keystone, the sou'wester, the storm lantern; the crab report quest and the crab pin | 4.5a |
 | 4.6 | (done, #57) | Tropical islands (palm-top hops, tide pools, rope bridges) and the coral flukes, tier 2. Sable's relic scramble moves here | 4.3 |
 | 4.7 | (done) | The Sunken Temple: flooded ruins, Journal V, the gold circlet; the temple rebuilt at sea | 4.6 |
-| 4.8 | `feature/volcanic-biome` | Volcanic islands (lava, crumbling basalt) with the steam-vent launch, and the tempered chain, tier 3 | 4.3 |
+| 4.8 | (done, #67) | Volcanic islands (lava, crumbling basalt) with the steam-vent launch, and the tempered chain, tier 3 | 4.3 |
 | 4.9 | `feature/mount-cinderhorn` | Mount Cinderhorn: the crater descent, Journal VI, a cosmetic of its own (the circlet went to the temple); the volcano rebuilt at sea | 4.8 |
 | 4.10 | `feature/cold-biome` | Cold islands (ice that slides, snow pines, wind gusts) and the ice spikes, tier 4 | 4.3 |
 | 4.11 | `feature/frostspire` | Frostspire: the vertical climb, Journal VII, the fur hood; the spire rebuilt at sea | 4.10 |
@@ -1437,10 +1437,11 @@ the browser preview (`tidewake-dev` in `.claude/launch.json`):
   chapter's upgrades by doing side quests, without grinding.
 - **Port islands:** should ports be explorable towns later? That's out of
   scope here. Ports stay menus.
-- **Sea time while ashore:** the day/night clock keeps running. Weather keeps
-  changing too, but the anchored ship is safe. If that feels too safe, a
-  storm could later drag the anchor and give you a timer. (Refit 3 could
-  then be the fix: the anchor holds in storms.)
+- **Sea time while ashore (settled in 4.8):** the day/night clock and the
+  weather keep running. Before refit 3 a storm drags the anchor: you have
+  90 s to get back aboard, or she takes a fifth of her hull on the rocks and
+  you row out after her. The tempered chain holds. If playtests find the
+  timer stressful, lengthen it before taking it away.
 - **Refit order (decided 2026-11-23):** refits follow the story (rocky →
   tropical → volcanic → cold), so each one unlocks the next journal. The
   cost is that rocky, with its sheer ledges, comes before the gentler

@@ -720,6 +720,7 @@ body.ashore #btnReturnShip { display: inline-flex; }
 #ashorePanel .apRow { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 600; }
 #ashorePanel .apRow small { font-size: 11px; font-weight: 400; opacity: 0.8; margin-left: auto; }
 #ashorePanel .apLeft { font-size: 12px; font-weight: 400; opacity: 0.85; }
+#ashorePanel .apDrag { font-size: 12px; font-weight: 700; color: #ffd2cc; }
 #ashorePanel .ico { width: 16px; height: 16px; flex: none; }
 
 /* ------------------------------------------------------- the rival captain */
