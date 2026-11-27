@@ -5,8 +5,9 @@
 // foot, pickups, lantern checkpoints, splash respawns and per-island saves.
 //
 // state.ashore[islandId] = { visited, coins: [id], caches: [id], chest: bool }
-// A level may carry story spots (level.spots), a chest with a cosmetic of its
-// own (chest.cosmetic) and life of its own (level.update): see wreck.js, grove.js.
+// A level may carry story spots (level.spots, with `looks`: places that show a
+// line), a chest with a cosmetic of its own (chest.cosmetic) and life of its
+// own (level.update): see wreck.js, grove.js, temple.js.
 // Quest items (retrieve quests, an anchor refit's fitting) wait at the level's
 // vault; their state lives in the quest, not here. Which islands the anchor
 // will hold at, and from how far out, is refits.js.
@@ -22,6 +23,7 @@ import { generateLevel } from './levelgen.js';
 import { buildWreckLevel } from './wreck.js';
 import { buildGroveLevel } from './grove.js';
 import { buildArchwayLevel } from './archway.js';
+import { buildTempleLevel } from './temple.js';
 import { shoalOf } from './shapes.js';
 import { setSeaOrigin } from '../waves.js';
 import { CharacterController } from './controller.js';
@@ -30,7 +32,7 @@ import { GroundShadow } from './ground-shadow.js';
 import { LandRace } from './pacer.js';
 
 // Hand-built levels for landmark islands, by island.landmark; the rest are generated.
-const LANDMARK_LEVELS = { grove: buildGroveLevel, arch: buildArchwayLevel };
+const LANDMARK_LEVELS = { grove: buildGroveLevel, arch: buildArchwayLevel, ruins: buildTempleLevel };
 
 // ------------------------------------------------------------- pickup art
 let coinGeo = null, pileGeo = null, postGeo = null, handGeo = null, bundleGeo = null, scrollGeo = null, fittingGeo = null;
@@ -565,6 +567,11 @@ export class Ashore {
         else if (st.has(id)) { prompt = J.read || "Read grandfather's journal by his carving"; action = () => g.ui.openJournal('story', id); }
         else { prompt = J.look || 'Look at the carving'; action = () => g.ui.toast(J.lookText || LINES.carving, 'info'); }
       } else if (near(L.spots.note)) { prompt = L.spots.note.prompt || 'Read the note on the tent'; action = () => this.readNote(); }
+      else {
+        // things to look at (the temple's carved fish, his camp stool): a line, nothing more
+        const look = L.spots.looks?.find(near);
+        if (look) { prompt = look.prompt; action = () => g.ui.toast(look.line, 'info'); }
+      }
     }
     for (const c of this.chests) {
       if (c.opened || Math.hypot(c.x - p.x, c.z - p.z) > 1.8 || Math.abs(c.y - p.y) > 1.5) continue;

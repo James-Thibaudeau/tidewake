@@ -33,6 +33,10 @@ import { buildArchwayLevel } from '../ashore/archway.js';
 import { buildArchwayLayout } from '../ashore/archway-layout.js';
 import { pieceArt as archwayPieceArt } from '../ashore/archway-art.js';
 import { buildSeaArch, ARCH } from '../sea-arch.js';
+import { buildSeaTemple, TEMPLE_SEA } from '../sea-temple.js';
+import { buildTempleLevel } from '../ashore/temple.js';
+import { buildTempleLayout } from '../ashore/temple-layout.js';
+import { pieceArt as templePieceArt } from '../ashore/temple-art.js';
 import { buildWhale, buildDolphin, buildTurtle } from '../sea-life.js';
 import { buildWaterspout, buildIceberg, buildBottle } from '../sea-wonders.js';
 import { buildGull, buildFish } from '../sea-ambient.js';
@@ -249,6 +253,48 @@ function archway(q, stage) {
 }
 const ARCHWAY_PLACES = ['keystone', 'lantern', 'cove', 'cave', 'stack', 'arch'];
 
+// The Sunken Temple: the whole level, or `kind=capital&n=2` for one of its
+// pieces. `at` picks a place for the `spot` view, and `journal=0` shows the
+// treasury after Journal V has been taken.
+function ruins(q, stage) {
+  initProps();
+  const warnings = [];
+  const L = buildTempleLayout();
+  if (q.kind) {
+    const { holder, geo } = onePiece(L.pieces, q, (p, i) => templePieceArt(p, i), warnings);
+    stage.add(holder);
+    return { group: holder, ground: 'floor', warnings, note: holder.userData.note, dispose() { geo.dispose(); } };
+  }
+  const level = buildTempleLevel({ name: 'Sunken Temple Isle' }, { quality: 'high' });
+  level.syncStory({ journal: q.journal !== '0' });
+  stage.add(level.group);
+  const lamp = (id) => L.checkpoints.find((c) => c.id === id);
+  const PLACES = {
+    beach: { x: L.camp.x - 2, y: L.camp.y + 1.2, z: L.camp.z - 2, span: 9 },
+    causeway: { x: L.slabs[2].cx, y: 0.5, z: L.slabs[2].cz, span: 16 },
+    colonnade: { x: 0, y: 6, z: -32, span: 34 },
+    portico: { x: 0, y: 11, z: 4, span: 24 },
+    hall: { x: 0, y: 1, z: 23, span: 24, yaw: Math.PI + 0.35, pitch: 1.15 },
+    treasury: { x: L.crate.x + 0.6, y: L.crate.y + 1, z: L.crate.z + 0.6, span: 6, yaw: Math.PI, pitch: 0.35 },
+    gable: { x: L.chests[0].x, y: L.chests[0].y + 0.8, z: L.chests[0].z, span: 8 },
+    shrine: { x: L.vault.x, y: L.vault.y + 1.5, z: L.vault.z, span: 9, yaw: -Math.PI / 2 - 0.3, pitch: 0.3 },   // from the water, into its open front
+    breach: { x: 10.5, y: 2.6, z: L.breach.z, span: 13, yaw: Math.PI / 2 + 0.4, pitch: 0.25 },   // from the beach outside
+    lantern: { ...lamp('colonnade'), y: lamp('colonnade').y + 1.3, span: 5 },
+    // the whole temple: from above the beach, and from the sea as the rowboat comes in
+    overview: { x: 4, y: 2, z: -12, span: 105, yaw: 0.9, pitch: 0.8 },
+    sea: { x: 4, y: 6, z: -18, span: 72, yaw: Math.PI + 0.55, pitch: 0.3 },
+  };
+  let at = q.at || 'treasury';
+  if (!PLACES[at]) { warnings.push(`at=${at} is not a place here (${Object.keys(PLACES).join(', ')})`); at = 'treasury'; }
+  const pos = { x: 0, y: 5, z: -200 };
+  return {
+    group: level.group, ground: 'sea', warnings, shoal: { x: 0, z: 0, r: L.bounds.r * 0.94, fade: 300 }, calm: L.calm, spot: PLACES[at], note: q.at ? at : undefined,
+    update(dt, t, env) { level.update(dt, t, { pos, night: env.night, play: () => {} }); },
+    dispose() { level.dispose(); },
+  };
+}
+const TEMPLE_PLACES = ['overview', 'sea', 'beach', 'causeway', 'colonnade', 'portico', 'hall', 'treasury', 'gable', 'shrine', 'breach', 'lantern'];
+
 // The great arch as seen from the sea (sea-arch.js). The `spot` view is the
 // storm lantern on its keystone.
 function arch(q, stage) {
@@ -259,6 +305,35 @@ function arch(q, stage) {
     group: A.group, ground: 'sea', warnings: [], spot: { x: 0.8, y: ARCH.crown + 5, z: -3.4, span: 9 },
     update(dt, t, env) { A.update(t, env.night); },
     dispose() {}, // its geometry is shared with the game's own arch
+  };
+}
+
+// The Sunken Temple as seen from the sea (sea-temple.js), on a sand mound that
+// stands in for the island. `at` picks a close look for the `spot` view.
+const TEMPLE_SEA_PLACES = ['portico', 'colonnade', 'steps', 'face', 'hall'];
+function temple(q, stage) {
+  initProps();
+  const warnings = [], deck = 14;
+  const M = buildSeaTemple({ deck, glowMap: glowTexture() });
+  const mound = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 12), new THREE.MeshLambertMaterial({ color: '#e8d6a6' }));
+  mound.scale.set(150, deck + 4, 130);
+  mound.position.set(0, -6, 95);
+  M.group.add(mound);
+  stage.add(M.group);
+  const H = TEMPLE_SEA.hall;
+  const PLACES = {
+    portico: { x: 0, y: deck + 22, z: TEMPLE_SEA.porticoZ, span: 70, yaw: Math.PI + 0.4, pitch: 0.25 },
+    colonnade: { x: 0, y: 10, z: -75, span: 120, yaw: Math.PI + 0.3, pitch: 0.2 },
+    steps: { x: 0, y: deck / 2, z: -14, span: 64, yaw: Math.PI + 1.0, pitch: 0.22 },
+    face: { x: -33, y: 0, z: -58, span: 22, yaw: Math.PI - 0.6, pitch: 0.5 },
+    hall: { x: 0, y: deck, z: (H.z0 + H.z1) / 2, span: 80, yaw: Math.PI + 0.2, pitch: 0.9 },
+  };
+  let at = q.at || 'portico';
+  if (!PLACES[at]) { warnings.push(`at=${at} is not a place here (${Object.keys(PLACES).join(', ')})`); at = 'portico'; }
+  return {
+    group: M.group, ground: 'sea', warnings, spot: PLACES[at], note: q.at ? at : undefined,
+    update(dt, t, env) { M.update(t, env.night, null); },
+    dispose() { M.group.traverse((o) => o.geometry?.dispose()); mound.material.dispose(); },
   };
 }
 
@@ -374,7 +449,7 @@ function levelPlaces(L) {
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v));
 }
 
-export const SUBJECTS = { outfit, ship, prop, tree, arch, wreck, grove, archway, level, sealife };
+export const SUBJECTS = { outfit, ship, prop, tree, arch, temple, wreck, grove, archway, ruins, level, sealife };
 
 // Every parameter a subject reads, so a misspelt one is reported instead of ignored.
 const DRESS = [...SLOTS, ...SLOTS.map((s) => s + 'Color'), 'shirt', 'skin', 'head', 'eyeColor', 'eyeShape', 'blush', 'freckles', 'profile'];
@@ -386,7 +461,9 @@ const PARAMS = {
   wreck: ['sea'],
   grove: ['kind', 'n'],
   arch: [],
+  temple: ['at'],
   archway: ['kind', 'n', 'at', 'journal'],
+  ruins: ['kind', 'n', 'at', 'journal'],
   level: ['biome', 'seed', 'r', 'dist', 'kind', 'n', 'at'],
   sealife: ['kind'],
 };
@@ -408,6 +485,8 @@ export function controlsFor(show) {
     case 'prop': return [['id', Object.keys(initProps())]];
     case 'grove': return [['kind', [...new Set(buildGroveLayout().pieces.map((p) => p.kind))]], ['n', TIERS]];
     case 'archway': return [['at', ARCHWAY_PLACES], ['journal', ['0']], ['kind', [...new Set(buildArchwayLayout().pieces.map((p) => p.kind))]], ['n', TIERS]];
+    case 'temple': return [['at', TEMPLE_SEA_PLACES]];
+    case 'ruins': return [['at', TEMPLE_PLACES], ['journal', ['0']], ['kind', [...new Set(buildTempleLayout().pieces.map((p) => p.kind))]], ['n', TIERS]];
     case 'level': return [['biome', [...ASHORE_BIOMES]], ['kind', PIECE_KINDS], ['n', TIERS], ['seed', ['4401', '1121', '77', '31337']]];
     case 'sealife': return [['kind', SEALIFE]];
     default: return [];

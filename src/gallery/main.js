@@ -250,6 +250,8 @@ function boot() {
       floor.visible = subject.ground === 'floor';
       ocean.mesh.visible = subject.ground === 'sea';
       ocean.setShoal(subject.shoal || null);
+      // still water inside a level that asks for it (the temple's flooded courts)
+      ocean.uniforms.uCalm.value.set(subject.calm?.x || 0, subject.calm?.z || 0, subject.calm?.r || 0);
       // let poses, sails and the hull's ride settle before framing it
       applyView(q.view || 'quarter');
       placeCamera();

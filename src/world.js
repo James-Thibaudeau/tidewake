@@ -9,6 +9,7 @@ import { WAVE_GLSL, waveUniforms } from './waves.js';
 import { buildWreckModel, WRECK_STACKS, WRECK_SOLID, WRECK_MOORING } from './ashore/wreck.js';
 import { buildElderTree } from './elder-tree.js';
 import { buildSeaArch, ARCH } from './sea-arch.js';
+import { buildSeaTemple, buildSeaTempleRocks, TEMPLE_SEA } from './sea-temple.js';
 
 const PREFIX = ['Gull', 'Coral', 'Ember', 'Whale', 'Mist', 'Thorn', 'Kelp', 'Sable', 'Amber', 'Moss',
   'Drift', 'Shell', 'Pebble', 'Storm', 'Sun', 'Moon', 'Star', 'Otter', 'Heron', 'Crab', 'Pelican',
@@ -298,6 +299,12 @@ export class World {
     // Treasure in the shallows, away from the dock
     let ta = rng() * TAU;
     if (I.port) ta = I.dockAngle + Math.PI * (0.6 + rng() * 0.8);
+    // the Sunken Temple stands on the shore facing Port Haven; its treasure lies elsewhere
+    if (I.landmark === 'ruins') {
+      this.placeTemple(I);
+      const off = Math.atan2(Math.sin(ta - I.temple.a), Math.cos(ta - I.temple.a));
+      if (Math.abs(off) < 0.7) ta = I.temple.a + (off < 0 ? -1 : 1) * 1.1;
+    }
     const td = marchOut(ta, -2.6, 2);
     I.treasure = {
       x: I.x + Math.cos(ta) * td, z: I.z + Math.sin(ta) * td,
@@ -307,6 +314,7 @@ export class World {
     // Sea stacks
     const avoid = (a) => (I.port && Math.abs(Math.atan2(Math.sin(a - I.dockAngle), Math.cos(a - I.dockAngle))) < 0.7) ||
       (I.bay && Math.abs(Math.atan2(Math.sin(a - I.bay.a), Math.cos(a - I.bay.a))) < 0.8) ||
+      (I.temple && Math.abs(Math.atan2(Math.sin(a - I.temple.a), Math.cos(a - I.temple.a))) < 0.7) ||
       Math.abs(Math.atan2(Math.sin(a - ta), Math.cos(a - ta))) < 0.35;
     if (I.id !== 0 && (rng() < 0.45 || I.landmark === 'frost')) {
       const base = rng() * TAU;
@@ -340,8 +348,31 @@ export class World {
     // nothing else in the world moves.
     if (I.landmark) {
       const H = this.islands[0];
-      I.landmarkAt = I.archPos || { x: I.x, z: I.z, rot: I.landmark === 'grove' ? Math.atan2(H.x - I.x, H.z - I.z) : 0 };
+      I.landmarkAt = I.archPos || I.temple?.at || { x: I.x, z: I.z, rot: I.landmark === 'grove' ? Math.atan2(H.x - I.x, H.z - I.z) : 0 };
     }
+  }
+
+  /**
+   * Where the Sunken Temple stands (sea-temple.js): over the edge of the island
+   * on the side facing Port Haven, its stair running down into the sea and its
+   * colonnade out into it, the hall inland. The portico is raised clear of the
+   * ground under the hall. The colonnade's columns, the stair and the sunken
+   * face are hidden collision rocks; the avenue between the rows stays open.
+   * (No rng() here, so nothing else in the world moves.)
+   */
+  placeTemple(I) {
+    const H = this.islands[0], a = Math.atan2(H.z - I.z, H.x - I.x), dx = Math.cos(a), dz = Math.sin(a);
+    let d = I.r * 0.4;
+    while (d < I.bound && islandHeight(I, I.x + dx * d, I.z + dz * d) > 1.2) d += 1;
+    const rot = Math.atan2(-dx, -dz);   // temple space -z points home
+    const at = { x: I.x + dx * d, z: I.z + dz * d, rot };
+    const toWorld = (x, z) => [at.x + x * Math.cos(rot) + z * Math.sin(rot), at.z - x * Math.sin(rot) + z * Math.cos(rot)];
+    let high = 0;
+    for (let z = 0; z <= TEMPLE_SEA.hall.z1; z += 4) for (let x = -TEMPLE_SEA.half; x <= TEMPLE_SEA.half; x += 4) high = Math.max(high, islandHeight(I, ...toWorld(x, z)));
+    const deck = Math.max(13, Math.ceil(high + 1.5));
+    I.temple = { a, at, deck, toWorld };
+    const T = buildSeaTempleRocks(deck);
+    for (const R of T) { const [x, z] = toWorld(R.x, R.z); I.rocks.push({ x, z, r: R.r, h: 0, type: 'hidden' }); }
   }
 
   key(cx, cz) { return (cx + 1000) * 4096 + (cz + 1000); }
@@ -813,21 +844,8 @@ export class IslandStreamer {
     if (I.landmark === 'grove') {
       this.buildGrove(I, group);
       exclusions.push([ox, oz, 80]);
-    } else if (I.landmark === 'ruins') {
-      for (let k = 0; k < 10; k++) {
-        const a = (k / 10) * TAU;
-        const lx = ox + Math.cos(a) * I.r * 0.32, lz = oz + Math.sin(a) * I.r * 0.32;
-        const o = this.placeOnGround(I, group, 'pillar', lx, lz, a, 1.6);
-        o.scale.y = k % 3 === 1 ? 0.6 : 1.6;
-        exclusions.push([lx, lz, 6]);
-      }
-      for (let k = 0; k < 5; k++) {
-        const a = I.treasureAngle + (k - 2) * 0.25;
-        const d = I.r * edgeFactor(I, a) * 1.03;
-        const o = propMesh('pillar'); o.position.set(Math.cos(a) * d, -3, Math.sin(a) * d);
-        o.rotation.z = 0.3 * (k - 2); o.scale.setScalar(1.4);
-        group.add(o);
-      }
+    } else if (I.landmark === 'ruins' && I.temple) {
+      this.buildTemple(I, group, exclusions);
     } else if (I.landmark === 'arch' && I.archPos) {
       this.buildArch(I, group);
     } else if (I.landmark === 'volcano') {
@@ -841,6 +859,20 @@ export class IslandStreamer {
         this.smoke.push({ owner: I, mesh: m });
       }
     }
+  }
+
+  /** The Sunken Temple over the island's edge (sea-temple.js), with its surf, turtles, birds, mist and glow. */
+  buildTemple(I, group, exclusions) {
+    const P = I.landmarkAt, Tp = I.temple;
+    const M = buildSeaTemple({ deck: Tp.deck, world: Tp.toWorld, glowMap: glowTexture() });
+    M.group.position.set(P.x - I.x, 0, P.z - I.z);
+    M.group.rotation.y = P.rot;
+    for (const o of M.outlines) o.userData.lod = 'outline';
+    for (const o of M.detail) o.userData.lod = 'detail';
+    group.add(M.group);
+    this.anims.push({ owner: I, update: M.update });
+    // no huts or trees on the platform or in the hall
+    for (const z of [0, 30, 60]) { const [x, zz] = Tp.toWorld(0, z); exclusions.push([x - I.x, zz - I.z, 40]); }
   }
 
   /** The great arch standing off Archway Isle (sea-arch.js), with its surf, gulls and crabs. */
@@ -1022,7 +1054,7 @@ export class IslandStreamer {
     }
   }
 
-  animate(time, night) {
+  animate(time, night, boat) {
     beamMat.uniforms.uIntensity.value = smoothstep(0.2, 0.65, night);
     for (const L of this.lamps) {
       L.glow.material.opacity = 0.25 + night * 0.75;
@@ -1030,7 +1062,7 @@ export class IslandStreamer {
       L.beam.visible = night > 0.2;
       L.beam.rotation.y = time * 0.6;
     }
-    for (const A of this.anims) A.update(time, night);
+    for (const A of this.anims) A.update(time, night, boat);
     for (const S of this.smoke) {
       const b = S.mesh.userData.base;
       const t = (time * 0.08 + b.k / 9) % 1;

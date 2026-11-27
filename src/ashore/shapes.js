@@ -6,7 +6,7 @@
 //   box(minX, minY, minZ, maxX, maxY, maxZ, tag)   axis-aligned box
 //   obox(cx, cy, cz, hx, hy, hz, rotY, tag)        box rotated about y by rotY
 //   cyl(x, z, r, y0, y1, tag)                      vertical cylinder
-// `tag` is the surface: 'sand' | 'grass' | 'stone' | 'wood' | 'leaf' (footsteps
+// `tag` is the surface: 'sand' | 'grass' | 'stone' | 'wood' | 'leaf' | 'water' (footsteps
 // and future surface rules like ice).
 //
 // A level (from levelgen.generateLevel) is:

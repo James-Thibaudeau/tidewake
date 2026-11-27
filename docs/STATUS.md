@@ -6,7 +6,7 @@ work, and update it in the same pull request as the change.**
 - Designs for work that hasn't started: [feature-plan.md](feature-plan.md)
 - Original designs of what has shipped (reference only): [shipped-plans.md](shipped-plans.md)
 
-Updated 2026-11-26.
+Updated 2026-11-27.
 
 ## Done
 
@@ -711,7 +711,83 @@ Updated 2026-11-26.
       (`ashore.js`: no prompts once you've set off).
     - Not done: a play by hand, a listen to the new voices, and the pacing
       check (the scramble now needs Hull 2 and the coral flukes).
-  - [ ] 4.7 the Sunken Temple
+  - [x] 4.7 The Sunken Temple (design in
+    [sunken-temple-level.md](sunken-temple-level.md)): flooded ruins, Journal
+    V, the gold circlet, the temple rebuilt at sea. One PR, sea view, level
+    and story together. No shaped coast: the temple stands over the edge of
+    the round island, facing Port Haven.
+    - The walkable level (`temple-layout.js`, `temple.js`, `temple-art.js`,
+      `temple-life.js`): the beach with grandfather's hammock and camp table,
+      the tide shrine (the vault), the drowned causeway (wading, with gaps of
+      deep water to hop, statues with seaweed beards on plinths), two stumps
+      and a fallen column up onto the colonnade's beams, along the east row,
+      across on a fallen beam and back along the west row to the portico,
+      down a stair of fallen blocks into the flooded hall of carved fish,
+      across on fallen roof slabs, and up onto the treasury's dais. The way
+      out is the breach in the hall's east wall, a one-way drop to the beach.
+      Optional: a pile of fallen blocks from the portico onto the
+      entablature, then up the broken gable's edge to the chest at its top.
+    - Wading: floors 0.2-0.3 m under the water line are walked on (the
+      controller only splashes you 0.6 m down); their footsteps slosh (a
+      `water` surface in `audio/ashore.js`). The sea is opaque, so each wading
+      floor has a pale patch on the still water over it (`level.calm`), and
+      at night those patches and the water round the colonnade glow blue.
+    - Story: chapter V's step is "Go ashore at Sunken Temple Isle. He went in
+      to count the treasure." (`STEPS.ashore.V`, with the no-anchor and
+      no-flukes lines). The note on his camp table, Journal V open on his
+      crate in the treasury, and two things to look at (`spots.looks`, new
+      in `ashore.js`): the carved fish and his one camp stool. Saves that
+      found V at the camp keep it; finding V in the level opens Sable's relic
+      scramble as before (it keys off the chapter).
+    - The gold circlet (`found:ruins`) is the gable's chest. The shell
+      necklace stays a tropical-isle find (still not given by any chest).
+    - Life (decor only): turtles doze on the causeway's plinths and slide in
+      as you come by, fish move as dark shapes under the still water and
+      dart off from your feet, rings spread where you wade.
+    - The sea view (`sea-temple.js`), in place of the ten pillars: the
+      stepped platform and its stair down into the sea, the portico of six
+      columns (two broken) under a broken pediment with a carved fish, the
+      roofless hall, flooded, with palms growing out of it, the drowned
+      colonnade (the avenue between its rows is open to sail up) and a
+      giant stone face half sunk beside it. Surf rings at the columns' feet
+      as the waves come through, water spilling down the stair, turtles on
+      the lowest step that slide in when you sail within 55 m, frigatebirds
+      over the hall, mist off it at dawn and dusk, a glint of gold in the
+      doorway by day, and blue glow round the colonnade at night.
+      `world.js` (`placeTemple`) puts it where the island's shore faces Port
+      Haven, raises the portico clear of the ground under the hall (18 m in
+      this world), makes the columns, the stair's foot, the face and a
+      fallen column hidden collision rocks, and keeps the sunken treasure
+      and sea stacks away from it. Chapter V's camp and marker are beside
+      it. The landmarks' `update` now gets the boat's position.
+    - `node tools/check.mjs temple`: the layout's limits (required gaps up
+      to 1.75 m and climbs up to 1.1 m, the gable up to 2.6 m), wading
+      depths, the one-way breach, and the test climber from the beach to
+      the treasury (45 s, 17 jumps), out by the breach (14 s) and up the
+      gable (9 s, 7 jumps).
+    - Played through the real game loop by a scripted pilot steering the
+      touch stick by the camera, at a walk: beach to the treasury in 45 s
+      with no misses and every lantern on the way lit; the note, Journal V,
+      the stool and the fish lines; a fall off the colonnade back to its
+      lantern; out by the breach and back to the ship; the gable in 10 s,
+      the circlet from the chest, and "Climb down to the beach". It found
+      and fixed: stumps and pile blocks too small to land on after a jump
+      up (now about 2 m across), a stump at a slant to the fallen column's
+      foot, stair blocks too short to step down, and a wet ditch under the
+      breach.
+    - Gallery: subjects `temple` (the sea view, on a sand mound standing in
+      for the island; `at=portico|colonnade|steps|face|hall`) and `ruins`
+      (the level; `at=overview|sea|beach|causeway|colonnade|portico|hall|treasury|gable|shrine|breach|lantern`);
+      sheets `temple`, `temple-places` and `temple-night`, read cell by cell.
+      The gallery now honours a level's `calm`.
+    - 2.7 ms a frame on High at 2048×1536 standing on the portico (the
+      tropical levels: 2.5-2.9).
+    - Not done: a play by hand (especially the camera in the hall and on
+      the gable's edge), a listen to the wading steps and the turtles'
+      splash, frame time on Low, the wording of the new lines (first drafts,
+      see *Open questions* in the design), the pacing check (chapter V now
+      needs Hull 2 and the coral flukes), and the temple's music (it waits
+      for the landmark themes, Phase 12).
   - [ ] 4.8 Volcanic islands (with the steam-vent launch) and 4.9 Mount
     Cinderhorn
   - [ ] 4.10 Cold islands and 4.11 Frostspire
