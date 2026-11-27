@@ -1,5 +1,6 @@
-// The moving parts of a volcanic island: the lava in the moat (a slow,
-// flowing crust over glowing rock, with bubbles that swell and pop), veins
+// The moving parts of a volcanic island: the lava in the moat and in the
+// crater at the top (a slow, flowing crust over glowing rock, with bubbles
+// that swell and pop), the jagged lip under the outcrop over the crater, veins
 // of lava glowing in the cracks of the rock (decoration: they don't burn), the
 // steam from the vents (wisps while they rest, a column when one throws you
 // up) and the crumbling basalt (drawn piece by piece so it can shake, fall
@@ -7,7 +8,7 @@
 // level with `lava`; the rules it shows are hazards.js, passed in each frame.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { propMaterial, thinOutline } from '../props.js';
+import { propMaterial, thinOutline, part, merge, jitter } from '../props.js';
 import { toonMaterial } from '../toon.js';
 import { mulberry32, TAU, clamp } from '../util.js';
 import { pieceParts } from './pieces.js';
@@ -70,6 +71,71 @@ function lavaMesh(T, mat) {
   return m;
 }
 
+/** The crater's pool of lava: a disc that reaches in under its walls (planar texture). */
+function craterLava(T, mat) {
+  const SEG = 72, y = T.crater.lavaY, pos = [0, y, 0], uv = [0, 0], idx = [];
+  for (let j = 0; j <= SEG; j++) {
+    const a = (j / SEG) * TAU, r = T.Rc(a) - 0.6, x = Math.cos(a) * r, z = Math.sin(a) * r;
+    pos.push(x, y, z); uv.push(x / TILE, z / TILE);
+    if (j) idx.push(0, j, j + 1);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeBoundingSphere();
+  const m = new THREE.Mesh(g, mat);
+  m.name = 'lava:crater';
+  return m;
+}
+
+/**
+ * The outcrop over the crater: a slab of basalt laid over the tongue of
+ * ground you walk on (its edges straight, where the terrain's grid would
+ * step), a lip of jagged rock hanging a little past its tip, and fangs of
+ * rock under it, so the tip reads as a ledge out over the lava. For the look
+ * only (the ground under it is what you stand on); nothing above the slab.
+ */
+function outcropLip(T, rng) {
+  const O = T.outcrop, C = T.crater, top = T.summit + C.lip, P = [];
+  const rc = Math.min(T.Rc(Math.atan2(O.uz, O.ux)), 12);
+  const at = (along, side) => [O.ux * along + O.uz * side, O.uz * along - O.ux * side];
+  // the slab: the tongue's outline (a strip narrowing to a round tip), a little wider
+  // than the ground and ragged, its sides running down into the lava
+  const half = (along) => C.tip + (C.width - C.tip) * clamp(along / rc, 0, 1) + 0.1 + 0.12 * Math.abs(Math.sin(along * 2.7 + O.tip * 5));
+  const shape = new THREE.Shape(), N = 10, far = rc + 0.6;
+  shape.moveTo(far, -half(far));
+  for (let i = 1; i <= N; i++) { const s = far - ((far - O.tip) * i) / N; shape.lineTo(s, -half(s)); }
+  for (let i = 1; i < 12; i++) { const t = -Math.PI / 2 - (i / 12) * Math.PI; shape.lineTo(O.tip + Math.cos(t) * half(O.tip), Math.sin(t) * half(O.tip)); }
+  for (let i = 0; i <= N; i++) { const s = O.tip + ((far - O.tip) * i) / N; shape.lineTo(s, half(s)); }
+  const D = C.depth + 0.4;
+  const slab = new THREE.ExtrudeGeometry(shape, { depth: D, bevelEnabled: false, curveSegments: 1 });
+  slab.rotateX(-Math.PI / 2).translate(0, -D + 0.02, 0).rotateY(-Math.atan2(O.uz, O.ux));
+  P.push(part(slab, '#5f5759', { y: top, c2: '#3b3335', split: 0.9 }));
+  // the ends of the columns it is made of, on top
+  for (let along = O.tip + 0.5; along < far - 0.3; along += 0.62) {
+    for (const side of [-0.45, 0.45]) {
+      if (Math.abs(side) > half(along) - 0.45 || rng() < 0.25) continue;
+      const [x, z] = at(along, side + (rng() - 0.5) * 0.12);
+      P.push(part(new THREE.CylinderGeometry(0.29, 0.31, 0.05, 6), rng() < 0.5 ? '#766b6d' : '#6a5f61', { x, y: top + 0.03, z, ry: rng() }));
+    }
+  }
+  const rock = (along, side, y, s, sy, color) => {
+    const [x, z] = at(along, side);
+    P.push(part(jitter(new THREE.DodecahedronGeometry(1, 0), 0.25, (rng() * 997) | 0), color, { x, y, z, s, sy, ry: rng() * TAU }));
+  };
+  // the lip, a little past the tip and just under its surface
+  for (let k = -2; k <= 2; k++) rock(O.tip - 0.2 - (2 - Math.abs(k)) * 0.1, k * 0.38, top - 0.55, 0.42 + rng() * 0.1, 0.5, k % 2 ? '#4a4244' : '#3d3537');
+  // fangs hanging under the tongue, getting longer towards the tip
+  for (let i = 0; i < 6; i++) {
+    const along = O.tip + 0.4 + i * 0.7, side = (rng() - 0.5) * 1.4, len = 2.4 - i * 0.25;
+    const [x, z] = at(along, side);
+    P.push(part(new THREE.ConeGeometry(0.35 + rng() * 0.15, len, 5), '#3a3234', { x, y: top - 1.1 - len / 2, z, rx: Math.PI, ry: rng() * TAU }));
+  }
+  const g = merge(P);
+  return g;
+}
+
 /**
  * Glowing cracks in the rock, for the look only: veins that wander across
  * the meadow, the terrace and the summit, branch now and then and taper
@@ -91,7 +157,7 @@ function veinMesh(L, rng, low, mat) {
   const zones = [
     [(a) => T.R1(a) + 1.6, (a) => T.moatIn(a) - 1.2, low ? 9 : 18],
     [(a) => T.R2(a) + 1.6, (a) => T.R1(a) - T.W1 - 1.2, low ? 6 : 11],
-    [() => 0.8, (a) => T.R2(a) - T.W2 - 1.0, low ? 2 : 3],
+    [(a) => (T.Rc ? T.Rc(a) + 0.7 : 0.8), (a) => T.R2(a) - T.W2 - 1.0, low ? 2 : 3],
   ];
   for (const [lo, hi, n] of zones) {
     const inside = (x, z) => { const r = Math.hypot(x, z), a = Math.atan2(z, x); return r >= lo(a) && r <= hi(a); };
@@ -177,12 +243,20 @@ export function buildVolcanicLife(L, crumbles, quality) {
   const rng = mulberry32(((L.T.Rt * 977) | 0) + 3);
   const bubbleGeo = new THREE.SphereGeometry(0.3, 8, 5, 0, TAU, 0, Math.PI / 2);
   const bubbleMat = new THREE.MeshBasicMaterial({ color: '#ffc450' });
-  const nB = low ? 6 : 14;
-  const bubbles = new THREE.InstancedMesh(bubbleGeo, bubbleMat, nB);
+  // (a few of them in the crater, if there is one)
+  const crater = L.T.crater, nB = low ? 6 : 14, nC = crater ? (low ? 2 : 5) : 0;
+  const bubbles = new THREE.InstancedMesh(bubbleGeo, bubbleMat, nB + nC);
   bubbles.frustumCulled = false;
-  const bub = Array.from({ length: nB }, () => ({ a: rng() * TAU, off: rng() * 2 - 1, life: 1.5 + rng() * 2, t: rng() * 3 }));
+  const bub = Array.from({ length: nB + nC }, (_, i) => ({ a: rng() * TAU, off: rng() * 2 - 1, life: 1.5 + rng() * 2, t: rng() * 3, top: i >= nB }));
   group.add(bubbles);
   own.push(bubbleGeo, bubbleMat);
+  if (crater) {
+    const pool = craterLava(L.T, lavaMat);
+    const lip = outcropLip(L.T, rng);
+    lip.computeBoundingSphere();
+    group.add(pool, new THREE.Mesh(lip, propMaterial), new THREE.Mesh(lip, thinOutline));
+    own.push(pool.geometry, lip);
+  }
   // veins of lava in the rock (they pulse a little, out of step with the moat)
   const veinMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
   const veins = veinMesh(L, mulberry32(((L.T.Rt * 331) | 0) + 11), low, veinMat);
@@ -228,9 +302,9 @@ export function buildVolcanicLife(L, crumbles, quality) {
     bub.forEach((b, i) => {
       b.t += dt;
       if (b.t > b.life) { b.t = 0; b.a = rng() * TAU; b.off = rng() * 2 - 1; b.life = 1.5 + rng() * 2; }
-      const k = b.t / b.life, r = L.T.Rm(b.a) + b.off * L.T.mw(b.a) * 0.7;
+      const k = b.t / b.life, r = b.top ? (0.5 + 0.5 * b.off) * (L.T.Rc(b.a) - 1.4) : L.T.Rm(b.a) + b.off * L.T.mw(b.a) * 0.7;
       // swell slowly, then pop in the last tenth
-      put(bubbles, i, Math.cos(b.a) * r, LAVA_Y - 0.05, Math.sin(b.a) * r, k < 0.9 ? 0.2 + k * 0.9 : 0.001);
+      put(bubbles, i, Math.cos(b.a) * r, (b.top ? crater.lavaY : LAVA_Y) - 0.05, Math.sin(b.a) * r, k < 0.9 ? 0.2 + k * 0.9 : 0.001);
     });
     bubbles.instanceMatrix.needsUpdate = true;
     let n = 0;

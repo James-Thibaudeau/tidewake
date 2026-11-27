@@ -10,6 +10,8 @@
 //                 you above the rim. Its colliders carry `vent: id`.
 // level.crumbles  [{ id, x, y, z }]  one per piece that crumbles; its
 //                 colliders carry `crumble: id`.
+// level.pools     [{ x, z, r, y }]  lava up high (a crater): sink below y
+//                 within r of (x, z) and you've fallen in (`burned`).
 // A vent fires when you stand in its mouth. A crumbling piece shakes for
 // P.crumble.hold s after you land on it, falls (its colliders drop out of the
 // way) and is back P.crumble.back s later, once you're clear of where it was.
@@ -38,17 +40,20 @@ export class Hazards {
     this.vents = (level.vents || []).map((v) => ({ ...v, cool: 0, fired: -1 }));
     this.crumbles = (level.crumbles || []).map((c) => ({ ...c, state: 'solid', t: 0, colliders: own[c.id] || [] }));
     this.byId = Object.fromEntries(this.crumbles.map((c) => [c.id, c]));
+    this.pools = level.pools || [];
     this.clock = 0;
-    this.ev = { launched: null, cracked: null, fell: null, back: null };
+    this.ev = { launched: null, cracked: null, fell: null, back: null, burned: false };
   }
 
   /**
    * One frame, after the controller has moved. Returns what happened (the
-   * same object each time): launched (a vent), cracked, fell, back (a piece).
+   * same object each time): launched (a vent), cracked, fell, back (a
+   * piece), burned (in a pool of lava).
    */
   update(dt, ctl) {
     const ev = this.ev, P = this.P, p = ctl.pos;
     ev.launched = ev.cracked = ev.fell = ev.back = null;
+    ev.burned = this.pools.some((q) => p.y < q.y - 0.3 && Math.hypot(p.x - q.x, p.z - q.z) < q.r);
     this.clock += dt;
     const on = ctl.grounded ? ctl.groundOn : null;
     for (const v of this.vents) {

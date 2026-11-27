@@ -114,7 +114,7 @@ gallery.frame()                            // draw before a screenshot when the 
 - Subjects: `outfit`, `ship`, `prop`, `tree`, `arch`, `wreck`, `grove`,
   `archway`, `level`, `sealife`. A big subject takes `at=<place>` with `view=spot` for
   a close look at one place (`show=archway&at=keystone&view=spot`; a
-  generated island's `level` takes `at=moat|cliff|mesa|chest`). The
+  generated island's `level` takes `at=moat|cliff|mesa|chest|top`). The
   same parameters work in the URL: `gallery.html?show=ship&tier=4&light=night`.
 - **After changing how something looks, take the contact sheet that covers
   it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `paints`, `paint-parts`, `cloths`, `emblems`, `flags`, `figureheads`, `sealife`, `sea`, `shallows`, `rough`, `rogue`, `islands`, `island-places`…, or

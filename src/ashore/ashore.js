@@ -374,7 +374,7 @@ export class Ashore {
     if (hz.launched) g.audio.play('vent');
     if (hz.cracked) g.audio.play('crumble', { volume: 0.45 });
     if (hz.fell) g.audio.play('crumble', { volume: 1, fall: true });
-    if (ev.splashed && this.splashT <= 0) this.splash();
+    if ((ev.splashed || hz.burned) && this.splashT <= 0) this.splash();
     else if (ev.landed && this.splashT <= 0 && this.fellFromLantern(this.lastGroundY - ctl.pos.y)) this.splash(true);
     if (ctl.grounded) this.lastGroundY = ctl.pos.y;
     this.splashT -= dt;

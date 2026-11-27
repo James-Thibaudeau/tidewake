@@ -369,7 +369,8 @@ function level(q, stage) {
 /**
  * Close-ups of a generated level for the `spot` view, each looked at from
  * outside the island: the moat crossing, the start of the climbs up cliff 1
- * and the mesa, and the chest's branch.
+ * and the mesa, the chest's branch, and the top (on a volcano, the crater
+ * and the outcrop over it).
  */
 function levelPlaces(L) {
   const main = L.pieces.filter((p) => p.route === 'main' && p.kind !== 'vista');
@@ -388,6 +389,7 @@ function levelPlaces(L) {
   out.mesa = around(climb.filter((p) => p.top > L.T.h1 + 0.1).slice(0, 4), 3);
   const chest = L.branches.find((b) => b.name === 'chest');
   if (chest) out.chest = { ...around(chest.nodes.filter((n) => n.piece).map((n) => n.piece), 4), y: (chest.tree.base + chest.tree.top) / 2 };
+  { const a = Math.atan2(L.summit.z, L.summit.x) + 0.8; out.top = { x: 0, y: L.summit.y - 1, z: 0, span: L.T.S2 * 2.2, yaw: Math.atan2(Math.cos(a), Math.sin(a)), pitch: 0.7 }; }
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v));
 }
 

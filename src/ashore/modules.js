@@ -21,7 +21,8 @@
 // is lava, crossed by a stone causeway or on basalt columns (on the hardest,
 // every other one crumbles); every climb up cliff 1 starts at a steam vent
 // that throws you up the face, the mesa's often does too, and the rest is
-// basalt columns and cinder ledges that crumble under you.
+// basalt columns and cinder ledges that crumble under you. The top is a
+// crater with lava in it, and the summit is an outcrop over its mouth.
 //
 // The pieces and the staircases built from them are in stairs.js.
 import { mulberry32, noise2, clamp, lerp, smoothstep, TAU } from '../util.js';
@@ -88,8 +89,9 @@ const HEADROOM = ASHORE.height + 0.2;
 const BIOME_EASE = { rocky: 800, tropical: 300, volcanic: 1000 };
 // Per-biome terrain: rock walls `H1` and summits `summit` times as tall
 // (a volcano's are the tallest: a vent throws you up the first part of each).
-// `ground`: what the land inland of the moat is underfoot (volcanic: bare rock).
-const SHAPE = { temperate: { H1: 1, summit: 1 }, rocky: { H1: 1.15, summit: 1.12 }, tropical: { H1: 0.95, summit: 0.95 }, volcanic: { H1: 1.15, summit: 1.22, ground: 'stone' } };
+// `ground`: what the land inland of the moat is underfoot (volcanic: bare rock);
+// `crater`: the top is a crater with an outcrop over it, not a plateau.
+const SHAPE = { temperate: { H1: 1, summit: 1 }, rocky: { H1: 1.15, summit: 1.12 }, tropical: { H1: 0.95, summit: 0.95 }, volcanic: { H1: 1.15, summit: 1.22, ground: 'stone', crater: true } };
 
 // ------------------------------------------------------------------ terrain
 /**
@@ -146,7 +148,33 @@ export function makeTerrain(I, rng, size, diff, cfg = TIERS.medium, shape = SHAP
     const r2 = R2(a);
     if (r >= r2) return lerp(h1, tierTop, smoothstep(r1 - W1, r2 + 1, r)) + n * 0.18 * smoothstep(r1 - W1, r1 - W1 - 2, r) * smoothstep(r2, r2 + 2, r);
     if (r >= r2 - W2) return lerp(tierTop, summit, smoothstep(r2, r2 - W2, r));
+    if (shape.crater) return craterH(r, a, x, z, r2 - W2);
     return summit + 0.25 * (1 - r / (r2 - W2));
+  };
+  // ---- a volcano's top (shape.crater): a rim round a crater with lava in it,
+  // and an outcrop, a tongue of rock from the rim out over the crater's mouth
+  // (setOutcrop, once the layout knows where the climb arrives)
+  const CRATER = { depth: 4, lip: 0.2, wall: 1.3, tip: 1.0, width: 1.5, edge: 0.8 };
+  const Rc = (a) => { const rin = R2(a) - W2; return clamp(rin * 0.55, 2.6, rin - 3.4); };
+  // the outcrop's direction from the centre, and how far past the centre its tip reaches (set: once placed)
+  const out = { set: false, ux: 1, uz: 0, tip: 0 };
+  const craterH = (r, a, x, z, rin) => {
+    const rc = Rc(a), top = summit + CRATER.lip;
+    if (r >= rc) return summit + CRATER.lip * smoothstep(rin, rc, r);
+    let h = top - CRATER.depth * smoothstep(rc, rc - CRATER.wall, r);
+    if (out.set) {
+      // distance to the tongue's edge: a strip that narrows towards a rounded tip
+      const along = x * out.ux + z * out.uz, perp = Math.abs(x * out.uz - z * out.ux);
+      const d = along > out.tip ? perp - lerp(CRATER.tip, CRATER.width, clamp(along / rc, 0, 1)) : Math.hypot(along - out.tip, perp) - CRATER.tip;
+      h = Math.max(h, top - CRATER.depth * smoothstep(0, CRATER.edge, d));
+    }
+    return h;
+  };
+  /** Point the outcrop along angle a (where the climb reaches the summit); returns the spot at its tip. */
+  const setOutcrop = (a) => {
+    const tip = -0.1 * Rc(a);
+    Object.assign(out, { set: true, ux: Math.cos(a), uz: Math.sin(a), tip });
+    return { x: Math.cos(a) * (tip + 0.3), z: Math.sin(a) * (tip + 0.3) };
   };
   const heightAt = (x, z) => hRA(Math.hypot(x, z), Math.atan2(z, x), x, z);
   const groundAt = (x, z) => { const h = heightAt(x, z); return h < -0.55 ? -Infinity : h; };
@@ -170,7 +198,8 @@ export function makeTerrain(I, rng, size, diff, cfg = TIERS.medium, shape = SHAP
     return Rm(a);
   };
   return { Rt, S1, W1, S2, W2, Sm, MW, BANK, beachTop, meadowLo, meadowHi, h1, tierTop, summit,
-    Rs, Rb, Rm, mw, moatIn, moatOut, R1, R2, meadowR, terraceR, hRA, heightAt, groundAt, groundTag, at, moatEdge };
+    Rs, Rb, Rm, mw, moatIn, moatOut, R1, R2, meadowR, terraceR, hRA, heightAt, groundAt, groundTag, at, moatEdge,
+    ...(shape.crater ? { Rc, setOutcrop, outcrop: out, crater: { ...CRATER, lavaY: summit + CRATER.lip - CRATER.depth + 1 } } : {}) };
 }
 
 export const MODULE_TYPES = ['moat:stones', 'moat:log', 'moat:planks', 'moat:bridge', 'moat:stacks', 'moat:pools', 'moat:ropeBridge',
@@ -529,6 +558,7 @@ function layoutOnce(I, opts, attempt) {
     if (k < c1 - 1) {
       const v = vistaAfter(T, { Rw: T.R1, a: aNow, dir, prevHalf: lastHalf, top: yNow + (tier === 'easy' ? 0 : 0.2), route: 'main', gap: tier === 'easy' ? 0.04 : 0.9, wide: tier === 'easy' });
       if (tier === 'easy') { v.joined = true; list[list.length - 1].joined = true; }
+      if (kit.basalt) v.style = 'slabs'; // (a rest of basalt, not a grassy ledge)
       addPieces([v]);
       route.push(pieceNode(v));
       modules.push({ type: 'vista' });
@@ -582,6 +612,7 @@ function layoutOnce(I, opts, attempt) {
     if (k < mP - 1) {
       const v = vistaAfter(T, { Rw: T.R2, a: aNow, dir, prevHalf: lastHalf, top: yNow + (tier === 'easy' ? 0 : 0.25), route: 'main', gap: tier === 'easy' ? 0.04 : 0.9, wide: tier === 'easy' });
       if (tier === 'easy') { v.joined = true; v.rail = cfg.rails; list[list.length - 1].joined = true; }
+      if (kit.basalt) v.style = 'slabs';
       addPieces([v]);
       route.push(pieceNode(v));
       modules.push({ type: 'vista' });
@@ -594,17 +625,22 @@ function layoutOnce(I, opts, attempt) {
   const topEdge = rimFor(T, pieces.filter((p) => p.route === 'main').slice(-1)[0], T.R2);
   route.push({ type: 'ground', x: topEdge.x, z: topEdge.z, y: T.summit, edge: 'jump', rim: true });
   const topRim = T.at(T.R2(aTop) - T.W2 - 0.35, aTop);
-  const summit = { x: 0, y: groundAt(0, 0), z: 0 };
+  // on a volcano the summit is the tip of the outcrop over the crater, which
+  // runs out from where you arrive; the lantern, coins and vault go round the rim
+  const crater = !!T.setOutcrop;
+  const tip = crater ? T.setOutcrop(aTop) : { x: 0, z: 0 };
+  const rimR = (a) => (T.Rc(a) + T.R2(a) - T.W2) / 2;
+  const summit = { x: tip.x, y: groundAt(tip.x, tip.z), z: tip.z };
   modules.push({ type: 'summit' });
   caches.push({ id: 'g0', x: summit.x, y: summit.y, z: summit.z, value: Math.round(40 + diff * 30 + size * 10 + rng() * 10) });
-  { const c = T.at(Math.min(3.2, T.R2(aTop) * 0.4), aTop); cp(c.x, groundAt(c.x, c.z), c.z); }
-  for (let i = 0; i < 4; i++) { const a = aTop + (i / 4) * TAU + 0.4; const p = T.at(T.R2(a) * 0.5, a); coinAt(p.x, groundAt(p.x, p.z), p.z, 2); }
+  { const c = crater ? T.at(rimR(aTop + 0.9), aTop + 0.9) : T.at(Math.min(3.2, T.R2(aTop) * 0.4), aTop); cp(c.x, groundAt(c.x, c.z), c.z); }
+  for (let i = 0; i < 4; i++) { const a = aTop + (i / 4) * TAU + 0.4; const p = T.at(crater ? rimR(a) : T.R2(a) * 0.5, a); coinAt(p.x, groundAt(p.x, p.z), p.z, 2); }
   walks.push([[topRim.x, topRim.z], [summit.x + 0.01, summit.z]]);
-  keepOut.push([0, 0, 2.5]);
+  keepOut.push([summit.x, summit.z, 2.5]);
   // the vault: where a quest item waits (retrieve quests, anchor refits), across
   // the summit from where you arrive, between two of the summit coins
   const aV = aTop + 0.4 + Math.PI * 0.75;
-  const vp = T.at(Math.min(2.2, T.R2(aV) * 0.35), aV);
+  const vp = crater ? T.at(rimR(aV), aV) : T.at(Math.min(2.2, T.R2(aV) * 0.35), aV);
   const vault = { x: vp.x, y: groundAt(vp.x, vp.z), z: vp.z };
   keepOut.push([vault.x, vault.z, 1.6]);
 
@@ -650,7 +686,7 @@ function layoutOnce(I, opts, attempt) {
     const a = free.mid + free.width * off;
     const yN = T.summit - (3.6 + rng() * 1.2);
     const Rn = T.R2(a) + 0.95;
-    const nook = rectPiece('ledge', Math.cos(a) * Rn, Math.sin(a) * Rn, yN, 1.25, 0.95, rotOf(a), { tag: 'stone', base: -2, route: 'secret', branch: true, angle: a });
+    const nook = rectPiece('ledge', Math.cos(a) * Rn, Math.sin(a) * Rn, yN, 1.25, 0.95, rotOf(a), { tag: 'stone', base: -2, route: 'secret', branch: true, angle: a, ...(kit.basalt ? { style: 'slabs' } : {}) });
     const clash = pieces.some((p) => Math.hypot(p.cx - nook.cx, p.cz - nook.cz) < 2.5 + (p.r || Math.max(p.hx, p.hz)) && Math.abs(p.top - nook.top) < 4);
     if (!clash) {
       addPieces([nook]);
@@ -674,8 +710,10 @@ function layoutOnce(I, opts, attempt) {
 
   // what crumbles under you, by piece (hazards.js); the moat is lava on a volcano
   const crumbles = pieces.filter((p) => p.crumble).map((p) => ({ id: p.id, x: p.cx, y: p.top, z: p.cz }));
+  // lava in a crater: below this, you've fallen in (hazards.js)
+  const pools = crater ? [{ x: 0, z: 0, r: Math.max(...Array.from({ length: 48 }, (_, i) => T.Rc((i / 48) * TAU))), y: T.crater.lavaY }] : [];
   return { biome, tier, size, diff, dir, a0, T, pieces, colliders, route, branches, walks, modules, coins, caches, chests, checkpoints,
-    keepOut, spawn, exit, rowboat, summit, vault, arches, vents, crumbles, lava: biome === 'volcanic' };
+    keepOut, spawn, exit, rowboat, summit, vault, arches, vents, crumbles, pools, lava: biome === 'volcanic' };
 }
 
 /** The widest angular gap between the given angles: { mid, width }. */

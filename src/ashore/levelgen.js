@@ -54,9 +54,12 @@ const DECOR = {
 function buildTerrain(T, pal, seed) {
   const { Rt, S1, S2, W1, W2, Sm, MW, BANK } = T;
   const nom = (len, step) => Math.max(2, Math.round(len / step));
-  // [radius function, rows to the next knot]
+  // [radius function, rows to the next knot]; a crater's wall and the outcrop
+  // over it need rows close together (the outcrop's sides run along the columns)
+  const top = T.Rc ? [[() => 0.3, nom(S2 * 0.55 - 1.7, 0.45)], [(a) => T.Rc(a) - T.crater.wall - 0.1, 7], [(a) => T.Rc(a) + 0.1, nom(S2 * 0.45 - 0.7, 0.9)]]
+    : [[() => 0.6, nom(S2 - W2 - 1.2, 1.2)]];
   const knots = [
-    [() => 0.6, nom(S2 - W2 - 1.2, 1.2)],
+    ...top,
     [(a) => T.R2(a) - W2 - 0.6, 3], [(a) => T.R2(a) - W2, 5], [(a) => T.R2(a), 3], [(a) => T.R2(a) + 0.6, nom(S1 - S2, 1.15)],
     [(a) => T.R1(a) - W1 - 0.6, 3], [(a) => T.R1(a) - W1, 5], [(a) => T.R1(a), 3], [(a) => T.R1(a) + 0.6, nom(Sm - S1 - MW - BANK, 1.15)],
     [(a) => T.moatIn(a) - 0.4, nom(2 * (MW + BANK) + 0.8, 0.45)], [(a) => T.moatOut(a) + 0.4, nom(Rt * 0.06, 1)],
@@ -88,6 +91,8 @@ function buildTerrain(T, pal, seed) {
       const n = noise2(x * 0.11, z * 0.11, seed + 5);
       const cliff = (r < r1 && r >= r1 - W1 - 0.05) || (r < r2 && r >= r2 - W2 - 0.05);
       if (h < -0.4) tmp.copy(C.seabed);
+      // inside a crater: banded rock, scorched hotter towards the lava
+      else if (T.Rc && r < T.Rc(a) + 0.05 && h < T.summit - 0.1) tmp.copy(C.rock).lerp(C.rock2, 0.5 + 0.5 * Math.sin(h * 2.3 + n * 2)).lerp(C.ember, clamp((T.summit - h) / T.crater.depth, 0, 1) * 0.8);
       else if (cliff) tmp.copy(C.rock).lerp(C.rock2, 0.5 + 0.5 * Math.sin(h * 1.7 + n * 2)); // strata
       else if (h < 0.35) tmp.copy(C.ember && Math.abs(r - T.Rm(a)) < T.mw(a) + T.BANK ? C.ember : C.wet);
       else if (T.groundTag(x, z) === 'sand') tmp.copy(C.sand);
@@ -174,7 +179,9 @@ function buildDecor(L, group, colliders, quality, seed) {
   scatter(Math.round(clamp(meadowArea / 45, 20, 90) * k * D.density), meadowIn, meadowOut, D.trees, 0.85, 0.4);
   const terraceArea = Math.PI * ((T.S1 - T.W1 - 1.5) ** 2 - (T.S2 + 2.5) ** 2);
   scatter(Math.round(clamp(terraceArea / 60, 10, 50) * k * D.density), terIn, terOut, D.trees, 0.78, 0.4);
-  scatter(Math.round(10 * k), c(1.2), (a) => T.R2(a) - T.W2 - 1.2, D.summit || [['flower', 0.6], ['bush', 0.25], ['rock', 0.15]], 0.5, 0.2);
+  // (round a crater, on its rim)
+  const topIn = (pad) => (T.Rc ? (a) => T.Rc(a) + pad : c(pad));
+  scatter(Math.round(10 * k), topIn(1.2), (a) => T.R2(a) - T.W2 - 1.2, D.summit || [['flower', 0.6], ['bush', 0.25], ['rock', 0.15]], 0.5, 0.2);
   // beach: rocks and bushes; flowers along the outer moat bank
   scatter(Math.round(10 * k), (a) => T.moatOut(a) + 0.5, (a) => T.Rs(a) - 1, D.beach || [['rock', 0.6], ['bush', 0.4]], 0.6, 0.3);
   scatter(Math.round(10 * k * D.flowers), (a) => T.moatOut(a) - 1.2, (a) => T.moatOut(a) + 0.8, [['flower', 1]], 0.5, 0.2);
@@ -184,7 +191,7 @@ function buildDecor(L, group, colliders, quality, seed) {
     scatter(40, (a) => T.Rb(a) - 2, (a) => T.Rs(a) - 0.6, [['pebble', 1]], 1, 0.1);
     scatter(Math.round(130 * D.tufts), meadowIn, (a) => T.moatIn(a) - 0.6, [['grassTuft', 1]], 1, 0.1);
     scatter(Math.round(80 * D.tufts), (a) => T.R2(a) + 1.5, (a) => T.R1(a) - T.W1 - 0.8, [['grassTuft', 1]], 1, 0.1);
-    scatter(16, c(0.8), (a) => T.R2(a) - T.W2 - 0.6, [['grassTuft', 1]], 1, 0.1);
+    scatter(16, topIn(0.8), (a) => T.R2(a) - T.W2 - 0.6, [['grassTuft', 1]], 1, 0.1);
   }
   // boulders tumbled against the foot of each rock face break up the rings
   const boulders = (Rf, every) => {
@@ -325,6 +332,7 @@ export function generateLevel(island, opts = {}) {
     // hazards (hazards.js): steam vents, crumbling basalt, and lava for water
     vents: L.vents,
     crumbles: L.crumbles,
+    pools: L.pools,
     lava: L.lava,
     update: life ? (dt, t, ctx) => life.update(dt, t, ctx.hazards) : undefined,
     // extras (not in the contract, handy for debugging and hints)

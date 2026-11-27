@@ -729,7 +729,12 @@ Updated 2026-11-27.
       every other column crumbles. The climbs are hexagonal basalt columns,
       basalt steps near home, basalt slabs that hold, and cinder ledges that
       crumble. The chest sits
-      on a stack of basalt columns.
+      on a stack of basalt columns. The top is a crater, not a plateau: a rim
+      round a pool of lava 3 m down (fall in and you're back at the summit
+      lantern), and the summit is an outcrop of basalt that runs out from
+      where you arrive over the crater's mouth, a jagged lip hanging under
+      its tip; the summit's gold waits there, and the lantern, coins and vault
+      are round the rim.
     - The steam-vent launch, built here for any level (`ashore/hazards.js`,
       `ctl.launch()` in `controller.js`): stand in a vent's mouth and it
       throws you straight up, `ASHORE.vent.over` (2.6 m) higher than the
@@ -770,7 +775,8 @@ Updated 2026-11-27.
     - The anchor at the bow shows tier 3 while stowed: blued iron and a few
       links of the tempered chain hanging from the ring (the chain from the
       cathead hides behind the bulwark).
-    - Gallery: the `level` subject takes `biome=volcanic`; levels now have the
+    - Gallery: the `level` subject takes `biome=volcanic` and `at=top` (the
+      summit, every biome; now a column of `island-places`); levels now have the
       game's still moat water (`calm`), and a volcanic level's lava moves
       while the gallery plays. New piece kinds `basalt`, `vent`, `shelf`.
     - `node tools/check.mjs climb`: the test climber runs the vents and the
