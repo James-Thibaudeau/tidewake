@@ -712,7 +712,7 @@ Updated 2026-11-27.
     - Not done: a play by hand, a listen to the new voices, and the pacing
       check (the scramble now needs Hull 2 and the coral flukes).
   - [ ] 4.7 the Sunken Temple
-  - [x] 4.8 Volcanic islands. `volcanic` is in `ASHORE_BIOMES`, so the
+  - [x] 4.8 Volcanic islands ([#67](https://github.com/James-Thibaudeau/tidewake/pull/67)). `volcanic` is in `ASHORE_BIOMES`, so the
     tempered chain refit (tier 3) is live: it's offered once you own Keel 2,
     and its fitting, old chain links, waits on a tropical island (Tern Crag
     from Star Cay). Until it's fitted, volcanic shores say "The heat here

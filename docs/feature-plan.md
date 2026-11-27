@@ -74,7 +74,7 @@ Two rules hold for every piece:
 | 4.5b | (done, #45) | Archway Isle's story: Journal IV at the keystone, the sou'wester, the storm lantern; the crab report quest and the crab pin | 4.5a |
 | 4.6 | (done, #57) | Tropical islands (palm-top hops, tide pools, rope bridges) and the coral flukes, tier 2. Sable's relic scramble moves here | 4.3 |
 | 4.7 | `feature/sunken-temple` | The Sunken Temple: flooded ruins, Journal V, the shell necklace; the temple rebuilt at sea | 4.6 |
-| 4.8 | (done) | Volcanic islands (lava, crumbling basalt) with the steam-vent launch, and the tempered chain, tier 3 | 4.3 |
+| 4.8 | (done, #67) | Volcanic islands (lava, crumbling basalt) with the steam-vent launch, and the tempered chain, tier 3 | 4.3 |
 | 4.9 | `feature/mount-cinderhorn` | Mount Cinderhorn: the crater descent, Journal VI, the gold circlet; the volcano rebuilt at sea | 4.8 |
 | 4.10 | `feature/cold-biome` | Cold islands (ice that slides, snow pines, wind gusts) and the ice spikes, tier 4 | 4.3 |
 | 4.11 | `feature/frostspire` | Frostspire: the vertical climb, Journal VII, the fur hood; the spire rebuilt at sea | 4.10 |
