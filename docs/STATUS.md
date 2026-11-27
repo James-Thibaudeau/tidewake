@@ -1146,7 +1146,7 @@ Updated 2026-11-27.
   ship stage by stage at Port Haven and sail her; a paint yard for the
   ship (paints, sail cloth, emblems, figureheads); fireworks. Nothing adds
   stats. Four PRs, 10.1–10.4.
-  - [x] **10.1 The paint yard** (`feature/paint-yard`):
+  - [x] **10.1 The paint yard** ([#65](https://github.com/James-Thibaudeau/tidewake/pull/65)):
     - **A section of the shipwright's tab**, in every port. Pick a part
       (hull, trim, deck, sails, emblem, flag, pennant, figurehead), then a
       paint: one you own goes straight on, free; anything else is tried on a
