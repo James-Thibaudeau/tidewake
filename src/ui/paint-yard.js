@@ -1,4 +1,4 @@
-// UI part: the paint yard, a section of the shipwright's tab. Pick a part of
+// UI part: the paint yard, a tab of its own at port. Pick a part of
 // the ship, then a paint for it: what you own goes straight on (it's free),
 // anything else is tried on the side view first, with a Buy button.
 // Methods are mixed into UI (see ../ui.js), so `this` is the UI instance.
@@ -66,9 +66,6 @@ export class PaintYardUI {
     this.el.paintYard?.addEventListener('keydown', (e) => {
       if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-try]')) { e.preventDefault(); e.target.click(); }
     });
-    for (const b of document.querySelectorAll('#shipwrightNav button[data-jump]')) {
-      b.addEventListener('click', () => { this.click(); $(b.dataset.jump)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
-    }
   }
 
   /** Leaving the port (or the tab): drop anything being tried on. */
@@ -76,8 +73,8 @@ export class PaintYardUI {
 
   refreshPaintYard() {
     const box = this.el.paintYard, g = this.game, Y = g.paintYard, st = g.state;
-    // only while the port is open (refreshPort also runs behind the scenes): the pictures cost a render each
-    if (!box || !Y || !st || this.el.portScreen?.classList.contains('hidden')) return;
+    // only while its tab is showing (refreshPort also runs behind the scenes): the pictures cost a render each
+    if (!box || !Y || !st || this.portTab !== 'paintyard' || this.el.portScreen?.classList.contains('hidden')) return;
     const part = this.yardPart, kind = kindOf(part), K = KINDS[kind];
     const worn = st.livery?.[part] ?? null;
     const trying = this.yardTry !== undefined && this.yardTry !== worn ? this.yardTry : undefined;
