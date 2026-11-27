@@ -1373,10 +1373,17 @@ Updated 2026-11-27.
       against 1.6 at 1024×768); the differences are other things in view.
     - **Sound** (`audio/fireworks.js`): a whoosh going up, then the boom,
       late by the distance at 340 m/s as thunder is; a crackle for the shells
-      that pop again; a crowd's cheer. Rendered offline and measured: the
-      boom peaks at −19 dB (the bow slam −19, thunder −20), the whoosh at
-      −26 (a gull −25), the cheer at −26, and a volley of three booms at −7
-      with nothing clipped. **Nobody has listened to them yet.**
+      that pop again; a crowd's cheer. The boom is a crack, a thump with
+      enough above 200 Hz for small speakers to carry it, three seconds of
+      rolling away and two echoes off the water, and it goes through a
+      limiter of its own so a volley doesn't add up past full scale. It is
+      the loudest sound in the game. Rendered offline and measured (loudest
+      50 ms): the boom −17 dB (a whale's breach −22, thunder −27), still
+      −23 dB over its second second; a boom 550 m off −23; the whoosh −34;
+      the finale's last twelve booms peak at −6 with nothing clipped.
+      The first boom was a 0.9 s thump almost all below 120 Hz, which small
+      speakers turned into a little pop; the user heard that and it was
+      rebuilt. **The new one has been measured, not yet listened to.**
     - **Who notices:** with the Redwing in sight and Sable free (not in a
       race, in tow or with the kraken), Sable answers 6 times in 10 with a
       crimson one of their own, at most every 25 s, and a line that goes in
