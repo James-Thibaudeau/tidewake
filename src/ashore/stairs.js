@@ -124,6 +124,10 @@ export const STAIRS = {
   basalt: { kind: 'basalt', r: [0.82, 0.98], rise: [0.6, 0.9], gap: [0.6, 1.3], off: 0.4, tag: 'stone' },
   basaltWide: { kind: 'basalt', r: [1.1, 1.25], rise: [0.5, 0.66], gap: [0.35, 0.75], off: 0.4, tag: 'stone' },
   cinders: { kind: 'ledge', w: [1.5, 1.85], d: [1.2, 1.32], rise: [0.7, 0.95], gap: [0.5, 1.15], off: 0.0, tag: 'stone', crumble: true },
+  // …and slabs of basalt on the face that hold: the sizes of `sheer`, `ledges` and `ledgesRail`
+  slabs: { kind: 'ledge', w: [1.5, 1.9], d: [1.2, 1.32], rise: [0.85, 1.05], gap: [0.5, 1.2], off: 0.0, tag: 'stone' },
+  slabsWide: { kind: 'ledge', w: [1.9, 2.4], d: [1.3, 1.55], rise: [0.8, 1.0], gap: [0.55, 1.35], off: 0.0, tag: 'stone' },
+  slabsRail: { kind: 'ledge', w: [2.6, 3.0], d: [2.1, 2.4], rise: [0.5, 0.64], gap: [0.45, 0.85], off: 0.0, tag: 'stone' },
 };
 // Kinds whose top is a disc (r) rather than a rectangle (w × d).
 export const ROUND = new Set(['disc', 'stack', 'palm', 'basalt', 'vent']);

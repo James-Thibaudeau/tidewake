@@ -719,11 +719,16 @@ Updated 2026-11-27.
     would soften your anchor chain. Ask the shipwright."
     - Volcanic levels (`modules.js` `POOLS.volcanic`; pieces and staircases
       now in the new `ashore/stairs.js`; art in the new
-      `ashore/volcanic-art.js`): black sand, ash and olive grass, dark banded
-      rock, dark stacks offshore. The moat is lava, crossed by a basalt
+      `ashore/volcanic-art.js`): black sand; the ground is dark rock and ash
+      with only a few tufts of hardy grass (and sounds like stone underfoot);
+      glowing lava veins wander across it and run down the cliff faces (for
+      the look only: they don't burn, and keep clear of the paths and of
+      everything you climb); burnt trees, dark boulders, dark rock spires
+      offshore; dark banded walls. The moat is lava, crossed by a basalt
       causeway near home or on basalt columns further out; on hard islands
       every other column crumbles. The climbs are hexagonal basalt columns,
-      basalt steps near home, and cinder ledges that crumble. The chest sits
+      basalt steps near home, basalt slabs that hold, and cinder ledges that
+      crumble. The chest sits
       on a stack of basalt columns.
     - The steam-vent launch, built here for any level (`ashore/hazards.js`,
       `ctl.launch()` in `controller.js`): stand in a vent's mouth and it

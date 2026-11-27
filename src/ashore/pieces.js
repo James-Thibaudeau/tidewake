@@ -127,7 +127,7 @@ function pieceBody(p) {
       break;
     }
     case 'ledge': case 'vista': {
-      if (p.style === 'cinders') return cinderParts(p);
+      if (p.style === 'cinders' || p.style?.startsWith('slabs')) return cinderParts(p, p.style !== 'cinders');
       // the slab reaches 0.8 m back into the rock so it looks attached to the face
       const w = p.hx * 2, d = p.hz * 2 + 0.8, th = p.kind === 'vista' ? 0.7 : 0.55;
       if (p.style === 'sheer') {

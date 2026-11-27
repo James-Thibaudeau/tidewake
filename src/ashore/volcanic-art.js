@@ -79,14 +79,18 @@ export function basaltDiscParts(p) {
   ];
 }
 
-/** A cinder ledge: a cracked slab of dark, rust-brown rock jutting from the face (+z is into the wall). */
-export function cinderParts(p) {
+/**
+ * A cinder ledge: a cracked slab of dark, rust-brown rock jutting from the
+ * face (+z is into the wall). `solid`: a slab of plain basalt that holds.
+ */
+export function cinderParts(p, solid = false) {
   const w = p.hx * 2, d = p.hz * 2 + 0.8, seed = seedOf(p);
+  const [body, dark, top] = solid ? [C.basalt, C.basaltDark, C.basaltTop2] : [C.cinder, C.cinderDark, C.cinderTop];
   return [
-    placed(jitter(new THREE.BoxGeometry(w, 0.44, d, 3, 1, 2), 0.09, seed), C.cinder, p, { y: p.top - 0.22, z: 0.4 }, { c2: C.cinderDark, split: 0.55 }),
-    placed(jitter(new THREE.BoxGeometry(w * 0.95, 0.06, d * 0.9, 3, 1, 2), 0.03, seed + 1), C.cinderTop, p, { y: p.top, z: 0.4 }),
-    placed(new THREE.ConeGeometry(Math.min(w, d) * 0.25, 0.7, 5), C.cinderDark, p, { x: w * 0.15, y: p.top - 0.75, z: 0.5, rx: Math.PI }),
-    placed(new THREE.DodecahedronGeometry(0.22, 0), C.cinderDark, p, { x: -w * 0.3, y: p.top - 0.5, z: -p.hz + 0.25 }),
+    placed(jitter(new THREE.BoxGeometry(w, 0.44, d, 3, 1, 2), 0.09, seed), body, p, { y: p.top - 0.22, z: 0.4 }, { c2: dark, split: 0.55 }),
+    placed(jitter(new THREE.BoxGeometry(w * 0.95, 0.06, d * 0.9, 3, 1, 2), 0.03, seed + 1), top, p, { y: p.top, z: 0.4 }),
+    placed(new THREE.ConeGeometry(Math.min(w, d) * 0.25, 0.7, 5), dark, p, { x: w * 0.15, y: p.top - 0.75, z: 0.5, rx: Math.PI }),
+    placed(new THREE.DodecahedronGeometry(0.22, 0), dark, p, { x: -w * 0.3, y: p.top - 0.5, z: -p.hz + 0.25 }),
   ];
 }
 

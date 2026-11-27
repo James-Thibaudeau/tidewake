@@ -88,7 +88,8 @@ const HEADROOM = ASHORE.height + 0.2;
 const BIOME_EASE = { rocky: 800, tropical: 300, volcanic: 1000 };
 // Per-biome terrain: rock walls `H1` and summits `summit` times as tall
 // (a volcano's are the tallest: a vent throws you up the first part of each).
-const SHAPE = { temperate: { H1: 1, summit: 1 }, rocky: { H1: 1.15, summit: 1.12 }, tropical: { H1: 0.95, summit: 0.95 }, volcanic: { H1: 1.15, summit: 1.22 } };
+// `ground`: what the land inland of the moat is underfoot (volcanic: bare rock).
+const SHAPE = { temperate: { H1: 1, summit: 1 }, rocky: { H1: 1.15, summit: 1.12 }, tropical: { H1: 0.95, summit: 0.95 }, volcanic: { H1: 1.15, summit: 1.22, ground: 'stone' } };
 
 // ------------------------------------------------------------------ terrain
 /**
@@ -155,7 +156,7 @@ export function makeTerrain(I, rng, size, diff, cfg = TIERS.medium, shape = SHAP
     if ((r < r1 && r >= r1 - W1 - 0.1) || (r < r2 && r >= r2 - W2 - 0.1)) return 'stone';
     // everything seaward of the moat is beach and dunes; the inner bank is sand too
     if (r >= Rm(a) || Math.abs(r - Rm(a)) < mw(a) + BANK * 0.6) return 'sand';
-    return 'grass';
+    return shape.ground || 'grass';
   };
   const at = (r, a) => ({ x: Math.cos(a) * r, z: Math.sin(a) * r });
   /** Radius of the moat's waterline on its outer / inner side, at angle a. */
@@ -200,9 +201,9 @@ const POOLS = {
   },
   volcanic: {
     spire: true, basalt: true,
-    easy: { vent: { cliff: true, toRim: true }, moat: ['causeway'], cliff: ['basaltWide', 'basaltSteps'], mesa: ['basaltSteps', 'basaltWide', 'ledgesRail', 'basaltSteps'] },
-    medium: { vent: { cliff: true, mesa: true }, moat: ['basalt'], cliff: ['basalt', 'cinders', 'ledges'], mesa: ['basalt', 'cinders', 'sheer', 'scaffold'] },
-    hard: { vent: { cliff: true, mesa: true }, moat: ['basaltCrumble'], cliff: ['cinders', 'basalt'], mesa: ['cinders', 'basalt', 'sheer', 'basalt'] },
+    easy: { vent: { cliff: true, toRim: true }, moat: ['causeway'], cliff: ['basaltWide', 'basaltSteps'], mesa: ['basaltSteps', 'basaltWide', 'slabsRail', 'basaltSteps'] },
+    medium: { vent: { cliff: true, mesa: true }, moat: ['basalt'], cliff: ['basalt', 'cinders', 'slabsWide'], mesa: ['basalt', 'cinders', 'slabs', 'scaffold'] },
+    hard: { vent: { cliff: true, mesa: true }, moat: ['basaltCrumble'], cliff: ['cinders', 'basalt'], mesa: ['cinders', 'basalt', 'slabs', 'basalt'] },
   },
 };
 

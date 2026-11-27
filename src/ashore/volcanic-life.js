@@ -1,5 +1,6 @@
 // The moving parts of a volcanic island: the lava in the moat (a slow,
-// flowing crust over glowing rock, with bubbles that swell and pop), the
+// flowing crust over glowing rock, with bubbles that swell and pop), veins
+// of lava glowing in the cracks of the rock (decoration: they don't burn), the
 // steam from the vents (wisps while they rest, a column when one throws you
 // up) and the crumbling basalt (drawn piece by piece so it can shake, fall
 // into the lava or down the face, and come back). levelgen.js builds it for a
@@ -70,6 +71,95 @@ function lavaMesh(T, mat) {
 }
 
 /**
+ * Glowing cracks in the rock, for the look only: veins that wander across
+ * the meadow, the terrace and the summit, branch now and then and taper
+ * out, kept clear of the walked paths and of everything you climb (so they
+ * never look like something to jump over), and a few that run down the cliff
+ * faces from the rim. One unlit mesh, a hot core between dark red edges.
+ */
+function veinMesh(L, rng, low, mat) {
+  const { T, walks, keepOut } = L;
+  const segs = [];
+  for (const w of walks) for (let i = 1; i < w.length; i++) segs.push([w[i - 1], w[i]]);
+  const nearWalk = (x, z, r) => segs.some(([[x0, z0], [x1, z1]]) => {
+    const dx = x1 - x0, dz = z1 - z0, t = clamp(((x - x0) * dx + (z - z0) * dz) / (dx * dx + dz * dz || 1), 0, 1);
+    return Math.hypot(x - x0 - dx * t, z - z0 - dz * t) < r;
+  });
+  const clear = (x, z) => !nearWalk(x, z, 1.4) && !keepOut.some(([kx, kz, kr]) => Math.hypot(kx - x, kz - z) < kr);
+  const lines = []; // each [[x, z, half-width, out]]: out pushes a point off a cliff face, outwards
+  // ---- across the flat ground: [inner edge, outer edge, how many]
+  const zones = [
+    [(a) => T.R1(a) + 1.6, (a) => T.moatIn(a) - 1.2, low ? 9 : 18],
+    [(a) => T.R2(a) + 1.6, (a) => T.R1(a) - T.W1 - 1.2, low ? 6 : 11],
+    [() => 0.8, (a) => T.R2(a) - T.W2 - 1.0, low ? 2 : 3],
+  ];
+  for (const [lo, hi, n] of zones) {
+    const inside = (x, z) => { const r = Math.hypot(x, z), a = Math.atan2(z, x); return r >= lo(a) && r <= hi(a); };
+    const grow = (x, z, h, len, w0) => {
+      const pts = [];
+      for (let s = 0; s < len && inside(x, z) && clear(x, z); s++) {
+        const w = w0 * (1 - s / len) + 0.03;
+        pts.push([x, z, w, 0]);
+        if (s > 2 && rng() < 0.15) grow(x, z, h + (rng() < 0.5 ? 1 : -1) * (0.6 + rng() * 0.6), Math.floor((len - s) * 0.6), w * 0.75);
+        h += (rng() - 0.5) * 0.9;
+        x += Math.cos(h) * 0.5; z += Math.sin(h) * 0.5;
+      }
+      if (pts.length >= 3) lines.push(pts);
+    };
+    for (let i = 0, made = 0; i < n * 6 && made < n; i++) {
+      const a = rng() * TAU, r = lo(a) + rng() * Math.max(0, hi(a) - lo(a)), x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (!clear(x, z)) continue;
+      grow(x, z, rng() * TAU, 12 + Math.floor(rng() * 16), 0.16 + rng() * 0.1);
+      made++;
+    }
+  }
+  // ---- down the cliff faces, from just behind the rim to the foot
+  for (let i = 0, made = 0; i < 40 && made < (low ? 3 : 7); i++) {
+    const a = rng() * TAU, mesa = rng() < 0.4, Rf = mesa ? T.R2 : T.R1, W = mesa ? T.W2 : T.W1;
+    const r0 = Rf(a) - W - 0.5, r1 = Rf(a) + 0.4;
+    if (!clear(Math.cos(a) * r0, Math.sin(a) * r0) || !clear(Math.cos(a) * r1, Math.sin(a) * r1)) continue;
+    const pts = [], w0 = 0.1 + rng() * 0.06;
+    for (let r = r0; r <= r1; r += 0.12) {
+      const wob = Math.sin(r * 9 + i) * 0.05 / Math.max(1, r);
+      pts.push([Math.cos(a + wob) * r, Math.sin(a + wob) * r, w0 * (0.6 + 0.4 * Math.sin(r * 5 + i)), 0.06]);
+    }
+    lines.push(pts);
+    made++;
+  }
+  // ---- one strip per vein, five across: scorched rock, glowing edge, the hot core, edge, scorched rock
+  const pos = [], col = [], idx = [];
+  const scorch = new THREE.Color('#3e2420'), edge = new THREE.Color('#d2481a'), core = new THREE.Color('#ffc04a');
+  const ACROSS = [[-2, scorch], [-0.6, edge], [0, core], [0.6, edge], [2, scorch]];
+  for (const pts of lines) {
+    const base = pos.length / 3;
+    pts.forEach(([x, z, w, out], i) => {
+      const [ax, az] = pts[Math.max(0, i - 1)], [bx, bz] = pts[Math.min(pts.length - 1, i + 1)];
+      const tl = Math.hypot(bx - ax, bz - az) || 1, nx = -(bz - az) / tl, nz = (bx - ax) / tl;
+      const r = Math.hypot(x, z) || 1, ox = (x / r) * out, oz = (z / r) * out;
+      for (const [k, c] of ACROSS) {
+        const px = x + nx * w * k, pz = z + nz * w * k;
+        pos.push(px + ox, T.heightAt(px, pz) + (out ? 0 : 0.05), pz + oz);
+        col.push(c.r, c.g, c.b);
+      }
+    });
+    for (let i = 0; i < pts.length - 1; i++) {
+      for (let j = 0; j < ACROSS.length - 1; j++) {
+        const a = base + i * ACROSS.length + j, b = a + ACROSS.length;
+        idx.push(a, a + 1, b, a + 1, b + 1, b);
+      }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeBoundingSphere();
+  const m = new THREE.Mesh(g, mat);
+  m.name = 'veins';
+  return m;
+}
+
+/**
  * Build the moving parts for layout L. `crumbles` are its pieces that
  * crumble (levelgen leaves them out of the merged mesh). Returns { group,
  * update(dt, t, hazards), dispose() }.
@@ -93,6 +183,11 @@ export function buildVolcanicLife(L, crumbles, quality) {
   const bub = Array.from({ length: nB }, () => ({ a: rng() * TAU, off: rng() * 2 - 1, life: 1.5 + rng() * 2, t: rng() * 3 }));
   group.add(bubbles);
   own.push(bubbleGeo, bubbleMat);
+  // veins of lava in the rock (they pulse a little, out of step with the moat)
+  const veinMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const veins = veinMesh(L, mulberry32(((L.T.Rt * 331) | 0) + 11), low, veinMat);
+  group.add(veins);
+  own.push(veinMat, veins.geometry);
   // ---- steam: wisps over each vent, and a column when it fires
   const vents = L.vents || [];
   const puffGeo = new THREE.IcosahedronGeometry(0.5, 0);
@@ -129,6 +224,7 @@ export function buildVolcanicLife(L, crumbles, quality) {
   function update(dt, t, hz) {
     tex.offset.x = (tex.offset.x + dt * 0.012) % 1;
     lavaMat.color.setScalar(0.94 + 0.06 * Math.sin(t * 0.9));
+    veinMat.color.setScalar(0.85 + 0.15 * Math.sin(t * 1.3 + 1));
     bub.forEach((b, i) => {
       b.t += dt;
       if (b.t > b.life) { b.t = 0; b.a = rng() * TAU; b.off = rng() * 2 - 1; b.life = 1.5 + rng() * 2; }
