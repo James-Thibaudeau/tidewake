@@ -1344,7 +1344,7 @@ Updated 2026-11-27.
   - [ ] Paint yard follow-ups: tune prices against measured late-game income
     (the plan's numbers are starting points); each ship keeps its own livery
     once there are two (10.4).
-  - [x] **10.2 Fireworks** (PR-LINK):
+  - [x] **10.2 Fireworks** ([#69](https://github.com/James-Thibaudeau/tidewake/pull/69)):
     - **A Stores tab at every port** sells a box of rockets (6, for 120
       gold), a festival crate (20 rockets and 4 specials, 450) and a grand
       finale (40 shells in half a minute, 1,500). The hold takes 40 rockets

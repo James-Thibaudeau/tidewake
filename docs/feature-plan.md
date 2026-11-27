@@ -769,7 +769,7 @@ the above in these ways:
 | PR | Branch | What it adds | Depends on |
 | --- | --- | --- | --- |
 | 10.1 | `feature/paint-yard` | The paint yard: paints, cloth, emblems, flags, figureheads, earned paints; the crimson dye moved in; gallery sheets | — |
-| 10.2 | (done) | Stores, rockets, specials and the finale; the sea flash; Sable's answer | — |
+| 10.2 | (done, #69) | Stores, rockets, specials and the finale; the sea flash; Sable's answer | — |
 | 10.3 | `feature/restore-ship` | The restoration quest and its six stages at the slipway; the wreck site retired; the stage cards | The epilogue (done); landmark items as each landmark ships |
 | 10.4 | `feature/his-ship` | His ship as a hull style (bigger and more ornate than any tier); the launch scene with the town's fireworks; the sail with Grandma; switching ships at Port Haven | 10.2, 10.3 |
 
