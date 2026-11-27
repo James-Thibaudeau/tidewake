@@ -10,9 +10,11 @@
 // own (level.update): see wreck.js, grove.js, temple.js.
 // Quest items (retrieve quests, an anchor refit's fitting) wait at the level's
 // vault; their state lives in the quest, not here. Which islands the anchor
-// will hold at, and from how far out, is refits.js. Steam vents and crumbling
-// basalt (level.vents, level.crumbles) are run by hazards.js; a level with
-// `lava` has lava for water. The anchor dragging in a storm is anchor-drag.js.
+// will hold at, and from how far out, is refits.js. Steam vents, crumbling
+// basalt and gusts of wind (level.vents, level.crumbles, level.gusts) are run
+// by hazards.js; a level with `lava` has lava for water; ice slides because
+// its surface is tagged 'ice' (controller.js). The anchor dragging in a storm
+// is anchor-drag.js.
 import * as THREE from 'three';
 import { toonMaterial, glowBoost } from '../toon.js';
 import { ASHORE, ASHORE_BIOMES } from '../config.js';
@@ -376,6 +378,12 @@ export class Ashore {
     if (hz.launched) g.audio.play('vent');
     if (hz.cracked) g.audio.play('crumble', { volume: 0.45 });
     if (hz.fell) g.audio.play('crumble', { volume: 1, fall: true });
+    // a gust nearby begins to stir: you hear it coming, louder the nearer it is
+    if (hz.gust && hz.gust.far < 18) g.audio.play('gust', { volume: Math.min(1, 1.2 - hz.gust.far / 18) });
+    // the first time: what ice does, and what the pennant is for
+    const tips = g.state.story.flags;
+    if (ctl.onIce && !tips.iceTip) { tips.iceTip = true; g.ui.toast(LINES.ice, 'info'); }
+    if (hz.gust && hz.gust.far < 14 && !tips.gustTip) { tips.gustTip = true; g.ui.toast(LINES.gust, 'info'); }
     if ((ev.splashed || hz.burned) && this.splashT <= 0) this.splash();
     else if (ev.landed && this.splashT <= 0 && this.fellFromLantern(this.lastGroundY - ctl.pos.y)) this.splash(true);
     if (ctl.grounded) this.lastGroundY = ctl.pos.y;
@@ -390,7 +398,9 @@ export class Ashore {
     const turn = dt > 0 ? Math.atan2(Math.sin(ctl.yaw - lastYaw), Math.cos(ctl.yaw - lastYaw)) / dt : 0;
     this.lastYaw = ctl.yaw;
     const hs = Math.hypot(ctl.vel.x, ctl.vel.z);
-    ex.update(dt, t, { footSpeed: hs, grounded: ctl.grounded, vy: ctl.vel.y, turn, windStrength: g.weather.windStrength * 0.6, windRel: Math.PI });
+    // (in a gust the scarf and hair fly with it, whichever way you face)
+    const blown = hz.wind ? { windStrength: 0.9 * hz.wind.k + 0.3, windRel: Math.atan2(hz.wind.dx, hz.wind.dz) } : { windStrength: g.weather.windStrength * 0.6, windRel: Math.PI };
+    ex.update(dt, t, { footSpeed: hs, grounded: ctl.grounded, vy: ctl.vel.y, turn, ...blown });
     // a footfall each time a foot comes down: twice a stride (explorer.js, gait)
     const foot = Math.floor(ex.gait * 2);
     if (foot !== this.lastFoot && ctl.grounded && hs > 0.8 && !ev.landed) g.audio.play('step', { surface: ctl.groundTag, volume: 0.75 + 0.45 * Math.min(1, hs / ASHORE.run) });

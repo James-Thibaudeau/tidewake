@@ -1,9 +1,10 @@
 // On-foot sound, mixed into SoundSystem (audio.js): footsteps by surface, jump
 // and land, the coin chime, the chest fanfare, what an island sounds like
 // (birds, crickets, gulls, wind in the rocks, parrots, doves and tree frogs,
-// lava bubbling and the mountain rumbling), a volcano's steam vents, crumbling
-// rock and the hiss of lava, and the on-foot turn of the score. Made from the
-// same oscillators and noise as the rest; no samples.
+// lava bubbling and the mountain rumbling, wind and ice creaking in the cold),
+// a volcano's steam vents, crumbling rock and the hiss of lava, a gust of wind
+// on a cold island, and the on-foot turn of the score. Made from the same
+// oscillators and noise as the rest; no samples.
 
 import { hz } from '../music/notation.js';
 
@@ -21,6 +22,8 @@ const STEPS = {
   stone: ['highpass', 2300, 0.7, 0.035, 0.055, 135],
   wood: ['bandpass', 900, 2.2, 0.04, 0.07, 195],
   water: ['bandpass', 1250, 0.7, 0.17, 0.2, 0],   // wading: a slosh
+  snow: ['bandpass', 1050, 1.1, 0.13, 0.21, 0],   // a soft, squeaky crunch (footfall adds the squeak)
+  ice: ['highpass', 3400, 0.8, 0.03, 0.05, 240],  // a hard tick, higher and thinner than stone
 };
 
 // What plays on an island, by biome and by day or night: [voice, shortest and
@@ -31,9 +34,10 @@ const AMBIENCE = {
   rocky: { day: [['farGull', 6, 15], ['whistle', 5, 12]], night: [['whistle', 4, 10]] },
   tropical: { day: [['parrot', 7, 16], ['dove', 4, 10], ['songbird', 5, 12]], night: [['treeFrog', 0.7, 2.2], ['cricket', 1.4, 3.5]] },
   volcanic: { day: [['blub', 1.2, 4], ['rumble', 9, 20], ['farGull', 10, 24]], night: [['blub', 1.2, 4], ['rumble', 8, 18], ['cricket', 2.5, 6]] },
+  cold: { day: [['whistle', 5, 12], ['iceCreak', 7, 17], ['farGull', 12, 28]], night: [['whistle', 4, 10], ['iceCreak', 6, 14]] },
 };
 // Voices that carry on in the rain (the rest shelter from it).
-const RAIN_PROOF = new Set(['whistle', 'treeFrog', 'blub', 'rumble']);
+const RAIN_PROOF = new Set(['whistle', 'treeFrog', 'blub', 'rumble', 'iceCreak']);
 
 export class AshoreSounds {
   /** Called once from build(): the island ambience's own bus, spread left to right. */
@@ -138,6 +142,15 @@ export class AshoreSounds {
     s.start(t, Math.random() * 1.5); s.stop(t + dur + 0.05);
   }
 
+  /** Ice somewhere, taking the strain: a low groan that bends, then a tick or two as it gives. */
+  iceCreak(t, dest) {
+    const f = rand(150, 230), dur = rand(0.5, 0.9);
+    this.tone(f, t, dur, { type: 'triangle', vol: rand(0.022, 0.032), attack: 0.12, glide: f * rand(0.72, 0.85), dest });
+    this.tone(f * 2.02, t + 0.04, dur * 0.8, { type: 'sine', vol: 0.008, attack: 0.1, glide: f * 1.6, dest });
+    const n = 1 + ((Math.random() * 2) | 0);
+    for (let i = 0; i < n; i++) this.tone(rand(1900, 2600), t + dur * rand(0.7, 0.95) + i * rand(0.07, 0.16), 0.03, { type: 'sine', vol: 0.02, attack: 0.002, dest });
+  }
+
   /** A parrot somewhere in the palms: one or two harsh squawks that rise and drop. */
   parrot(t, dest) {
     const n = 1 + ((Math.random() * 2) | 0), f0 = rand(1300, 1700);
@@ -200,8 +213,10 @@ export class AshoreSounds {
   footfall(t, surface, k) {
     const [type, freq, q, dur, vol, knock] = STEPS[surface] || STEPS.grass;
     const tune = rand(0.86, 1.16);
-    this.noise(t, dur, { type, freq: freq * tune, q, vol: vol * k, attack: 0.004, sweep: type === 'lowpass' ? freq * 0.5 : null });
+    this.noise(t, dur, { type, freq: freq * tune, q, vol: vol * k, attack: 0.004, sweep: type === 'lowpass' ? freq * 0.5 : surface === 'snow' ? freq * 0.6 : null });
     if (knock) this.tone(knock * tune, t, 0.07, { type: 'sine', vol: 0.08 * k, attack: 0.003, glide: knock * 0.6 });
+    // snow squeaks as it packs under the boot
+    if (surface === 'snow') this.noise(t + 0.03, 0.07, { type: 'bandpass', freq: 2500 * tune, q: 5, vol: 0.05 * k, attack: 0.02 });
   }
 
   /**
@@ -259,6 +274,13 @@ export class AshoreSounds {
           this.tone(85, t, 0.35, { type: 'sine', vol: 0.18 * v, glide: 45 });
           for (let i = 0; i < 4; i++) this.noise(t + 0.15 + i * rand(0.06, 0.12), 0.06, { type: 'bandpass', freq: rand(1200, 2400), q: 1.5, vol: 0.1 * v, attack: 0.002 });
         }
+        return true;
+      case 'gust':
+        // a gust of wind: it gathers for a second, blows for two and dies away
+        // (as long as ASHORE.gust's warning and blow): three swells, one into the next
+        for (const [at, k] of [[0, 0.55], [0.8, 1], [1.7, 0.8]]) this.noise(t + at, 1.9, { type: 'bandpass', freq: 420 + at * 180, sweep: 950, q: 0.8, vol: 0.145 * v * k, attack: 0.8 });
+        this.noise(t + 0.9, 2.3, { type: 'highpass', freq: 2600, vol: 0.034 * v, attack: 0.6 });
+        this.noise(t + 0.3, 3.0, { type: 'lowpass', freq: 240, vol: 0.085 * v, attack: 0.9, buf: this.brown });
         return true;
       case 'sizzle':
         // falling into the lava: a hiss and a puff of steam

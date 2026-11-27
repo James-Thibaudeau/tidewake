@@ -1,7 +1,8 @@
 // The on-foot character controller: a kinematic capsule with a cozy-platformer
 // feel (snappy acceleration, coyote time, jump buffering, variable jump height,
 // a jump that hangs at the top and falls quickly, step-up and ground snapping,
-// and a launch from a steam vent: launch()).
+// a launch from a steam vent: launch(), ice that slides underfoot: a surface
+// tagged 'ice', and wind that carries you: `wind`).
 // Physics runs in fixed steps; drawn() gives the place between the last two to
 // draw at, so a screen that refreshes at 90 or 144 Hz doesn't stutter. Pure JS
 // so it can be tested in Node; the tuning constants (config.js ASHORE) are
@@ -57,6 +58,7 @@ export class CharacterController {
     this.buffer = 0;
     this.jump = null;         // the jump in progress: 'held', 'cut', 'launch' (from a vent) or null (gravityScale)
     this.groundOn = null;     // the collider we stand on (null on the terrain or in the air)
+    this.wind = { x: 0, z: 0 }; // the air's own speed here (m/s): a gust, set each frame by hazards.js
     this.splashed = false;    // fired once per fall into the water
     this.acc = 0;
     this.prev = { x: 0, y: 0, z: 0 }; // where the step before the last one left us (drawn)
@@ -73,6 +75,7 @@ export class CharacterController {
     this.yaw = yaw;
     this.grounded = false; this.coyote = 0; this.buffer = 0; this.jump = null; this.splashed = false;
     this.groundOn = null;
+    this.wind.x = this.wind.z = 0;
     this.acc = 0;
     // settle onto whatever is below so we start grounded
     this.snapDown(1.0);
@@ -90,6 +93,9 @@ export class CharacterController {
     this.vel.x = 0; this.vel.z = 0;
     this.grounded = false; this.groundOn = null; this.coyote = 0; this.buffer = 0; this.jump = 'launch';
   }
+
+  /** Standing on ice? (It slides: P.ice.) */
+  get onIce() { return this.grounded && this.groundTag === 'ice'; }
 
   /** Horizontal speed (m/s). */
   get speed() { return Math.hypot(this.vel.x, this.vel.z); }
@@ -140,7 +146,9 @@ export class CharacterController {
     const tz = amt > 1e-3 ? (wz / Math.max(wl, 1e-6)) * top : 0;
 
     // ---- horizontal acceleration (toward the target velocity)
-    let rate = this.grounded ? (amt > 0.05 ? P.accel : P.friction) : P.airAccel * (rising ? P.vent.steer : 1);
+    // (on ice both are a fraction of what they are elsewhere: you slide)
+    const ice = this.onIce;
+    let rate = this.grounded ? (amt > 0.05 ? (ice ? P.ice.accel : P.accel) : (ice ? P.ice.friction : P.friction)) : P.airAccel * (rising ? P.vent.steer : 1);
     // turning back on yourself: brake harder so reversals feel crisp, not skiddy
     if (amt > 0.05 && v.x * tx + v.z * tz < 0) rate *= this.grounded ? 1.6 : 1.3;
     let dvx = tx - v.x, dvz = tz - v.z;
@@ -170,6 +178,9 @@ export class CharacterController {
     const p = this.pos, d = this._d;
     const x0 = p.x, z0 = p.z, y0 = p.y;
     d.x = v.x * dt; d.y = v.y * dt; d.z = v.z * dt;
+    // a gust carries you with it: all of it in the air, less while your feet grip
+    const w = this.wind;
+    if (w.x || w.z) { const k = (wasGrounded ? (ice ? P.gust.ice : P.gust.ground) : 1) * dt; d.x += w.x * k; d.z += w.z * k; }
     if (wasGrounded) d.y -= 0.01; // keep in contact with the ground we're standing on
     let res = moveCapsule(this.level, p, d, this.opts, this._res);
 

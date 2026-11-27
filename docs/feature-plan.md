@@ -76,7 +76,7 @@ Two rules hold for every piece:
 | 4.7 | (done) | The Sunken Temple: flooded ruins, Journal V, the gold circlet; the temple rebuilt at sea | 4.6 |
 | 4.8 | (done, #67) | Volcanic islands (lava, crumbling basalt) with the steam-vent launch, and the tempered chain, tier 3 | 4.3 |
 | 4.9 | `feature/mount-cinderhorn` | Mount Cinderhorn: the crater descent, Journal VI, a cosmetic of its own (the circlet went to the temple); the volcano rebuilt at sea | 4.8 |
-| 4.10 | `feature/cold-biome` | Cold islands (ice that slides, snow pines, wind gusts) and the ice spikes, tier 4 | 4.3 |
+| 4.10 | (done, #70) | Cold islands (ice that slides, snow pines, wind gusts), with the slide and the gust built for any level, and the ice spikes, tier 4. Until 4.11 Frostspire is a generated cold island | 4.3 |
 | 4.11 | `feature/frostspire` | Frostspire: the vertical climb, Journal VII, the fur hood; the spire rebuilt at sea | 4.10 |
 | 4.12 | `feature/ashore-critters` | Crabs that bump you back and gulls that swoop, on every biome | any biome |
 

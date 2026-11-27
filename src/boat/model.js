@@ -393,9 +393,10 @@ function anchorParts(tier) {
       P.push(part(new THREE.SphereGeometry(0.11, 7, 5), gilded ? GOLD : '#d9735a', { x, y: -0.12, z, rx, rz, sx: sz ? 1 : 0.45, sy: 1.25, sz: sx ? 1 : 0.45 }));
       P.push(part(new THREE.ConeGeometry(0.03, 0.1, 4), '#f6b09a', { x: x * 1.15, y: -0.03, z: z * 1.15, rx, rz }));
     } else P.push(part(new THREE.ConeGeometry(0.09, 0.2, 4), IRON2, { x, y: -0.13, z, rx, rz }));
-    if (tier >= 4) P.push(part(new THREE.ConeGeometry(0.035, 0.15, 4), '#dff3ff', { x: x * 0.92, y: -0.28, z: z * 0.92, rx: Math.PI + rx, rz }));
+    // the ice spikes: a pale steel point under each fluke, splayed out a little, long enough to see from the helm
+    if (tier >= 4) P.push(part(new THREE.ConeGeometry(0.05, 0.3, 5), '#dff3ff', { x: x * 1.12, y: -0.31, z: z * 1.12, rx: Math.PI + rx * 1.6, rz: rz * 1.6 }));
   }
-  if (tier >= 4) P.push(part(new THREE.ConeGeometry(0.045, 0.18, 4), '#dff3ff', { y: -0.6, rx: Math.PI }));
+  if (tier >= 4) P.push(part(new THREE.ConeGeometry(0.06, 0.28, 5), '#dff3ff', { y: -0.64, rx: Math.PI }));
   // the tempered chain, a few links hanging from the ring down past the stock
   if (tier >= 3) P.push(...chainParts(V3(0.04, 0.46, 0.08), V3(0.2, -0.02, 0.12), 4, TEMPERED));
   return P;
