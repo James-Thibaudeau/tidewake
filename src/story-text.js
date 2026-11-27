@@ -172,6 +172,9 @@ export const LINES = {
   groveNote: '"Gone up the big tree. Back for supper."',
   groveNoteText: 'His handwriting, in a hurry. A worn path runs inland, towards the great tree.',
   lava: 'Too hot! Back at your last lantern.',
+  // the first time on a cold island (ashore.js): ice underfoot, and a gust of wind stirring nearby
+  ice: 'Ice! You slide on after you let go.',
+  gust: 'A gust of wind! Cross when the pennant hangs still.',
   carving: 'A lopsided heart, two sets of initials worn soft by the weather, and a little anchor underneath.',
   flowerCrown: "Somebody wove it and left it at the top of the oldest tree. Try it on at any port's Tailor.",
   archNote: '"Glass dropping. Up to the arch for a look. If it\'s coming, I\'m going through first."',

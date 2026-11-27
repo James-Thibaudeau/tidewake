@@ -1492,6 +1492,7 @@ const checks = {
     // moves, and the optional ones (fixed numbers, so islands don't change)
     const arc = jumpArc(ASHORE), D = ASHORE.design;
     const reach = (top) => top * arc.air;
+    let physics = '';
     if (D.jumpUp > arc.up * 0.8) errors.push(`a jump goes ${arc.up.toFixed(2)} m up: too close to design.jumpUp ${D.jumpUp}`);
     if (D.gapRun > reach(ASHORE.run) * 0.8) errors.push(`a run-jump covers ${reach(ASHORE.run).toFixed(2)} m: too close to design.gapRun ${D.gapRun}`);
     if (LIMITS.optional.up > arc.up * 0.92) errors.push(`optional climbs up to ${LIMITS.optional.up.toFixed(2)} m, but a jump goes ${arc.up.toFixed(2)} m`);
@@ -1514,6 +1515,39 @@ const checks = {
       if (top < lift - 0.1) errors.push(`a vent throw meant to rise ${lift} m rises ${top.toFixed(2)} m`);
       if (drift > VENT.clear - ASHORE.radius - 0.2) errors.push(`steering hard while a vent throws you up drifts ${drift.toFixed(2)} m sideways: into the shelf beside it`);
     }
+    // ice slides: let go at a walk and you carry on a few metres (on grass you
+    // stop at once), steer back and you stop well inside a shelf, and a hop
+    // from a standstill still clears design.iceGap. A gust stops a jump short;
+    // on your feet you can walk into it, and standing still it only edges you back
+    {
+      const flat = (tag) => new CharacterController({ colliders: [], groundAt: () => 0, groundTag: () => tag, waterY: -9 }, ASHORE);
+      const run = (ctl, secs, input, until = () => false) => { for (let k = 0; k < secs * 120 && !until(k); k++) ctl.update(1 / 120, typeof input === 'function' ? input(k) : input); return ctl.pos.x; };
+      const at = (tag) => { const ctl = flat(tag); ctl.teleport(0, 0, 0, 0); return ctl; };
+      const walking = (tag) => { const ctl = at(tag); run(ctl, 1.5, { wishX: 1, wishZ: 0 }); return ctl; };
+      let ctl = walking('ice');
+      const slide = -ctl.pos.x + run(ctl, 6, {});
+      ctl = walking('grass');
+      const stop = -ctl.pos.x + run(ctl, 2, {});
+      ctl = walking('ice');
+      const brake = -ctl.pos.x + run(ctl, 2, { wishX: -1, wishZ: 0 }, () => ctl.vel.x <= 0);
+      ctl = at('ice');
+      const hop = run(ctl, 2, (k) => ({ wishX: 1, wishZ: 0, jumpPressed: k === 0, jumpHeld: true }), (k) => k > 5 && ctl.grounded);
+      if (!(slide > 2.5 && slide < 5)) errors.push(`letting go on ice at a walk slides ${slide.toFixed(2)} m (expected 2.5-5)`);
+      if (stop > 0.6) errors.push(`letting go on grass at a walk carries you ${stop.toFixed(2)} m: only ice should slide`);
+      if (brake > D.iceWidth * 0.6) errors.push(`steering back on ice takes ${brake.toFixed(2)} m to stop: too much of a shelf ${D.iceWidth} m wide`);
+      if (hop < D.iceGap + 0.6) errors.push(`a hop from a standstill on ice covers ${hop.toFixed(2)} m: too little for design.iceGap ${D.iceGap}`);
+      const G = ASHORE.gust, blow = (c) => { c.wind.x = -G.push; return c; };
+      ctl = blow(walking('grass'));
+      const short = -ctl.pos.x + run(ctl, 2, (k) => ({ wishX: 1, wishZ: 0, jumpPressed: k === 0, jumpHeld: k < 40 }), (k) => k > 5 && ctl.grounded);
+      ctl = blow(walking('grass'));
+      const into = -ctl.pos.x + run(ctl, 1, { wishX: 1, wishZ: 0 });
+      ctl = blow(at('grass'));
+      const back = -run(ctl, 1, {});
+      if (short > 1) errors.push(`a walking jump into a gust still covers ${short.toFixed(2)} m: the lull should be the only time to cross`);
+      if (into < ASHORE.walk * 0.5) errors.push(`walking into a gust makes ${into.toFixed(2)} m a second: you should be able to lean into it`);
+      if (!(back > 0.3 && back < 1.6)) errors.push(`standing in a gust moves you ${back.toFixed(2)} m a second (expected 0.3-1.6)`);
+      physics = `on ice letting go slides ${slide.toFixed(1)} m and steering back stops in ${brake.toFixed(1)} m; a jump into a gust covers ${short.toFixed(1)} m`;
+    }
     const climber = await testClimber();
     const notes = [];
     for (const biome of ASHORE_BIOMES) {
@@ -1530,7 +1564,7 @@ const checks = {
       }
       notes.push(`${biome} ${Math.round(secs / count)} s, ${Math.round(jumps / count)} jumps`);
     }
-    return { errors, note: `a held jump ${arc.up.toFixed(2)} m up, ${arc.air.toFixed(2)} s in the air; ${count} islands per biome to the summit, on average ${notes.join('; ')}; ${climber.stats.launches} throws from steam vents; ${climber.stats.retries} hops needed a second try, ${climber.stats.dodges} a step aside` };
+    return { errors, note: `a held jump ${arc.up.toFixed(2)} m up, ${arc.air.toFixed(2)} s in the air; ${count} islands per biome to the summit, on average ${notes.join('; ')}; ${climber.stats.launches} throws from steam vents, ${climber.stats.ice} hops onto ice, ${climber.stats.gusts} hops across a gust after waiting ${climber.stats.waited.toFixed(0)} s for the lull; ${climber.stats.retries} hops needed a second try, ${climber.stats.dodges} a step aside; ${physics}` };
   },
 
   // The Elder Grove: the layout keeps its design limits, and a test climber
@@ -1621,13 +1655,15 @@ const checks = {
  * `level` needs groundAt, colliders and pieces (with footprints). Its vents
  * and crumbling pieces (hazards.js) work as in the game: on a 'launch' edge
  * the climber steps into the vent's mouth and pushes for the ledge all the
- * way up; crumbling pieces fall if it dawdles. Caught on a rail or a corner, it
- * steps aside for a moment (stats.dodges).
+ * way up; crumbling pieces fall if it dawdles. Ice slides under it and gusts
+ * push it as they do you: before a hop that a gust blows across it waits on
+ * the rest for the gust to die away (stats.gusts, stats.waited). Caught on a
+ * rail or a corner, it steps aside for a moment (stats.dodges).
  */
 async function testClimber() {
   const { footGap, nodeFoot, supportAt } = await load('ashore/grove-layout.js');
   const { CharacterController } = await load('ashore/controller.js');
-  const { Hazards } = await load('ashore/hazards.js');
+  const { Hazards, inGust } = await load('ashore/hazards.js');
   const { ASHORE } = await load('config.js');
   const climb = (L, nodes, label, errors, tries = 1) => {
     const ctl = new CharacterController(L, ASHORE);
@@ -1637,13 +1673,22 @@ async function testClimber() {
     for (let i = 1; i < nodes.length; i++) {
       const A = nodes[i - 1], B = nodes[i], wide = footGap(nodeFoot(A), nodeFoot(B)) > 1.5;
       const what = `${label}[${i}] ${A.piece?.kind || 'ground'}→${B.piece?.kind || 'ground'}`;
+      // a gust blows across this hop: `first` if it is the hop off the rest, where you wait
+      const gust = hz.gusts.find((g) => g.hops && inGust(g, (A.x + B.x) / 2, Math.max(A.y, B.y) + 0.5, (A.z + B.z) / 2));
+      const first = gust && A.piece?.id === gust.from;
+      if (gust) climb.stats.gusts++;
+      if (B.piece?.tag === 'ice') climb.stats.ice++;
       let problem = null;
       for (let attempt = 0; attempt < tries; attempt++) {
         if (attempt) { climb.stats.retries++; hz.reset(); ctl.teleport(A.x, A.y + 0.05, A.z, 0); }
         const run = attempt % 2 ? !wide : wide;
         problem = null;
         let held = 0, best = Infinity, still = 0, side = 0, dodge = 0;
+        // wait for the lull: set off just after the gust has died away (on a second try, from the rest again)
+        let wait = !!gust && (first || attempt > 0);
         for (let k = 0; ; k++) {
+          if (wait && gust.state === 'calm' && gust.calm > ASHORE.gust.rest + ASHORE.gust.warn - 0.5) wait = false;
+          if (wait) { ctl.update(1 / 60, {}); hz.update(1 / 60, ctl); t += 1 / 60; climb.stats.waited += 1 / 60; if (k > 60 * 20) wait = false; continue; }
           const p = ctl.pos, d = Math.hypot(B.x - p.x, B.z - p.z) || 1;
           // a spot on the ground counts if you're on something just above it (a bridge's end, say)
           if (ctl.grounded && d < 0.7 && p.y - B.y > -0.25 && p.y - B.y < (B.piece ? 0.25 : 0.6)) break;
@@ -1677,7 +1722,7 @@ async function testClimber() {
     }
     return t;
   };
-  climb.stats = { retries: 0, launches: 0, dodges: 0 };
+  climb.stats = { retries: 0, launches: 0, dodges: 0, ice: 0, gusts: 0, waited: 0 };
   return climb;
 }
 

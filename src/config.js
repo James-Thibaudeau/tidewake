@@ -199,7 +199,7 @@ export const REFITS = [
 export const ANCHOR_DRAG = { start: 0.6, end: 0.3, time: 90, hull: 0.2 };
 // Biomes that have ashore levels. Each Phase 4 biome PR adds its own; a
 // refit is only offered once its biome is here.
-export const ASHORE_BIOMES = new Set(['temperate', 'rocky', 'tropical', 'volcanic']);
+export const ASHORE_BIOMES = new Set(['temperate', 'rocky', 'tropical', 'volcanic', 'cold']);
 export const LAND_RANGE = 46; // how close to the shore the boat must be to land (before the grapnel)
 export const LAND_SPEED = 5;  // boat speed (m/s) below which you can drop anchor (before the coral flukes)
 
@@ -238,7 +238,10 @@ export const ASHORE = {
   // Level design limits for *required* moves (comfortable, not frame-perfect);
   // launchUp and launchReach: the most a steam vent throws you up, and how far
   // from the vent's middle what it throws you to may start
-  design: { jumpUp: 1.15, gapWalk: 1.9, gapRun: 3.4, safeDrop: 6, launchUp: 6, launchReach: 1.6 },
+  // iceGap and iceWidth: the widest gap a required jump onto or off ice may
+  // cross, and the narrowest that ice may be; gustHops: the most hops one
+  // gust may blow across
+  design: { jumpUp: 1.15, gapWalk: 1.9, gapRun: 3.4, safeDrop: 6, launchUp: 6, launchReach: 1.6, iceGap: 1.1, iceWidth: 1.5, gustHops: 2 },
   // Steam vents (ashore/hazards.js): a vent throws you `over` m higher than
   // what it serves, so there is time at the top to step across; while still
   // rising faster than `steerAbove` m/s you only drift (`steer` of your speed
@@ -248,6 +251,15 @@ export const ASHORE = {
   // Crumbling basalt: it shakes for `hold` s after you land on it, then falls,
   // and is back `back` s later
   crumble: { hold: 1.0, back: 3.5 },
+  // Ice (a surface tagged 'ice', ashore/controller.js): on it you speed up
+  // and turn at `accel` and slow down at `friction`, a fraction of the grip
+  // of other ground, so you slide on when you let go of the stick
+  ice: { accel: 9, friction: 2.5 },
+  // Wind gusts (ashore/hazards.js): a gust rests `rest` s, gives `warn` s of
+  // warning, then blows for `blow` s, carrying you along at `push` m/s while
+  // you are in the air; on your feet you feel `ground` of it, on ice `ice`
+  // of it. It builds and dies away over `ramp` s
+  gust: { rest: 3.6, warn: 0.9, blow: 2.2, push: 3.2, ground: 0.35, ice: 0.8, ramp: 0.25 },
 };
 
 // The score (music-cues.js, audio/music.js).

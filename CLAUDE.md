@@ -29,7 +29,7 @@ wave set in plain sea, in home waters and over a rogue wave (pitch and bow slams
 `ride`), rough water's rogue waves and ice (the wave is the same on the CPU as
 in the shaders, always arrives and costs the right share of the hull, `rogue`),
 150 generated ashore layouts per landable biome, a test
-climber (the real controller, steam vents and crumbling basalt included) that
+climber (the real controller, steam vents, crumbling basalt, ice and gusts of wind included) that
 walks 12 generated islands per biome to the summit, how high a vent's throw
 really goes, the living sea's rules (what turns up where, bounties, 3,000
 placements in a toy sea), the score (themes parse and stay in key, every
@@ -115,10 +115,11 @@ gallery.frame()                            // draw before a screenshot when the 
 - Subjects: `outfit`, `ship`, `prop`, `tree`, `arch`, `wreck`, `grove`,
   `archway`, `level`, `sealife`, `fireworks` (one shell held at its best moment over a ship: `show=fireworks&kind=willow&view=spot&light=night`; `age=loop` plays it). A big subject takes `at=<place>` with `view=spot` for
   a close look at one place (`show=archway&at=keystone&view=spot`; a
-  generated island's `level` takes `at=moat|cliff|mesa|chest|top`). The
+  generated island's `level` takes `at=moat|cliff|mesa|chest|top`, and a cold one
+  `at=pond|gust` with `gust=calm|warn|blow`). The
   same parameters work in the URL: `gallery.html?show=ship&tier=4&light=night`.
 - **After changing how something looks, take the contact sheet that covers
-  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `paints`, `paint-parts`, `cloths`, `emblems`, `flags`, `figureheads`, `fireworks`, `fireworks-low`, `fireworks-ages`, `sealife`, `sea`, `shallows`, `rough`, `rogue`, `islands`, `island-places`…, or
+  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `paints`, `paint-parts`, `cloths`, `emblems`, `flags`, `figureheads`, `fireworks`, `fireworks-low`, `fireworks-ages`, `sealife`, `sea`, `shallows`, `rough`, `rogue`, `islands`, `island-places`, `cold-places`…, or
   `views` / `lights` / `distance` for the subject showing) and read every
   cell, not only the one you were fixing. A sheet takes the parameters
   already showing, so `gallery.set({ bottom: 'skirt' })` first narrows it.

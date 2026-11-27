@@ -78,7 +78,7 @@ function blob(r, detail = 1) {
 }
 
 // Star-shaped cone: alternate base vertices pulled in for a scalloped skirt.
-function skirtCone(r, h, segs = 10) {
+export function skirtCone(r, h, segs = 10) {
   const g = new THREE.ConeGeometry(r, h, segs, 1);
   const p = g.attributes.position;
   for (let i = 0; i < p.count; i++) {
