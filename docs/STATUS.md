@@ -877,7 +877,7 @@ Updated 2026-11-27.
     - Not done: a play by hand, a look on a phone, a listen to the new sounds,
       and the pacing check (chapter VI now needs Keel 2 and the tempered chain).
   - [ ] 4.9 Mount Cinderhorn
-  - [x] 4.10 Cold islands. `cold` is in `ASHORE_BIOMES`, so the ice spikes
+  - [x] 4.10 Cold islands ([#70](https://github.com/James-Thibaudeau/tidewake/pull/70)). `cold` is in `ASHORE_BIOMES`, so the ice spikes
     refit (tier 4, the last) is live: it's offered once you own Hull 3, and
     its fitting, fire-forged spikes, waits on a volcanic island (Star Cay
     from Whisper Island). Until it's fitted, cold shores say "Your anchor
