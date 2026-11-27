@@ -1,8 +1,8 @@
 // The score's instruments, mixed into SoundSystem (audio.js), and the reverb
 // they play through. All of it is made from oscillators and noise, with no
 // samples: plucked strings (a string model worked out once a note and kept),
-// FM bells and mallets, a squeezebox, pipes, a fiddle, a strings pad and
-// hand drums. The score that plays them is audio/music.js.
+// FM bells and mallets, a squeezebox, pipes, a fiddle, a horn, a strings pad
+// and hand drums. The score that plays them is audio/music.js.
 //
 // One call plays one note: this.voice('flute', 74, when, seconds, volume).
 // What each instrument is written for (its range) is in music/themes.js.
@@ -18,6 +18,7 @@ import { hz } from '../music/notation.js';
 //           sine sits, and how hard it bends the first); ring: seconds;
 //           knock: a mallet's tap
 //   pipe    breath: how much air is in the note; attack: seconds; vibrato: cents
+//   brass   attack: seconds for the tone to open up; bright: how far above the note it opens
 //   drum    from, to: the skin's pitch as it falls, Hz; ring: seconds; slap: Hz of the hand's noise
 export const VOICES = {
   guitar: { kind: 'pluck', ring: 2.2, soft: 0.8, bright: 4, body: 190, level: 0.1 },
@@ -31,6 +32,7 @@ export const VOICES = {
   flute: { kind: 'pipe', breath: 0.05, attack: 0.07, vibrato: 7, level: 0.046 },
   whistle: { kind: 'pipe', breath: 0.1, attack: 0.03, vibrato: 4, level: 0.037 },
   fiddle: { kind: 'bow', level: 0.032 },
+  horn: { kind: 'brass', attack: 0.1, bright: 3, level: 0.03 },
   strings: { kind: 'pad', level: 0.016 },
   framedrum: { kind: 'drum', from: 96, to: 58, ring: 0.42, slap: 320, level: 0.1 },
   bodhran: { kind: 'drum', from: 142, to: 86, ring: 0.2, slap: 750, level: 0.1 },
@@ -38,7 +40,7 @@ export const VOICES = {
 };
 for (const [name, V] of Object.entries(VOICES)) V.name = name;
 
-const KINDS = { pluck: 'playPluck', bell: 'playBell', reed: 'playReed', pipe: 'playPipe', bow: 'playBow', pad: 'playPad', drum: 'playDrum', shake: 'playShake' };
+const KINDS = { pluck: 'playPluck', bell: 'playBell', reed: 'playReed', pipe: 'playPipe', bow: 'playBow', brass: 'playBrass', pad: 'playPad', drum: 'playDrum', shake: 'playShake' };
 
 export class Instruments {
   /**
@@ -215,6 +217,23 @@ export class Instruments {
     const bg = c.createGain(); bg.gain.value = 0.5;
     a.connect(lp); b.connect(bg); bg.connect(lp);
     if (dur > 0.35) this.vibrato([a, b], t, end, 5.6, 12);
+  }
+
+  // ----------------------------------------------------------------- horn
+  // Two saws through a filter that opens as the player blows and then settles back,
+  // so each note speaks with a little brassy swell; a slow, narrow vibrato.
+  playBrass(V, midi, t, dur, vol, dest) {
+    const c = this.ctx, f = hz(midi), end = t + dur + 0.6;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.9;
+    lp.frequency.value = f; lp.frequency.setValueAtTime(f, t);
+    lp.frequency.linearRampToValueAtTime(Math.min(3200, f * V.bright * 1.6), t + V.attack);
+    lp.frequency.setTargetAtTime(Math.min(2200, f * V.bright), t + V.attack, 0.25);
+    const g = this.noteGain(t, dur, vol, V.attack, 0.22, dest);
+    lp.connect(g);
+    const a = this.osc('sawtooth', f, t, end), b = this.osc('sawtooth', f, t, end, -6);
+    const bg = c.createGain(); bg.gain.value = 0.6;
+    a.connect(lp); b.connect(bg); bg.connect(lp);
+    if (dur > 0.4) this.vibrato([a, b], t, end, 4.5, 7);
   }
 
   // ---------------------------------------------------------- strings pad

@@ -3,8 +3,8 @@
 // themselves are in music/themes.js; the player is audio/music.js.
 //
 // RULES is in priority order and the first row that applies wins ("Cues at
-// sea" in docs/feature-plan.md). Still to come, each above the bands: Sable
-// at the very top, and a landmark in sight just under the fog.
+// sea" in docs/feature-plan.md). Still to come: a landmark in sight just
+// under the fog.
 import { MUSIC } from './config.js';
 
 // How much of a cue plays, 1-3, from a number and the two marks it has to pass.
@@ -12,8 +12,21 @@ const level = (x, [two, three]) => (x >= three ? 3 : x >= two ? 2 : 1);
 const bySpeed = (s) => level(Math.abs(s.speed || 0), [MUSIC.brisk, MUSIC.fast]);
 const inStorm = (s) => (s.storm || 0) >= MUSIC.storm;
 
+// Sable's moments (rival.musicMoment()), and their cues: what each version
+// of the theme is for is in music/themes.js.
+const SABLE = { meet: 'sable', race: 'sable-race', fog: 'sable-fog', pacer: 'sable-pacer', tow: 'sable-tow', kraken: 'sable-kraken' };
+// A race goes up to everything while you lead or it's close, and holds one back while Sable leads.
+const sableLevel = ({ kind, start, lead = 0 }) => {
+  if (kind === 'kraken') return 3;
+  if (start) return 1;
+  if (kind === 'race') return lead > MUSIC.sableLead ? 2 : 3;
+  return 2;
+};
+
 const RULES = [
   { cue: () => 'title', when: (s) => s.title, intensity: () => 2 },
+  // Sable, wherever they turn up: at sea above any weather, and ashore for the foot race.
+  { cue: (s) => SABLE[s.sable.kind], when: (s) => SABLE[s.sable?.kind], intensity: (s) => sableLevel(s.sable), urgent: (s) => s.sable.kind !== 'meet' && s.sable.kind !== 'tow' },
   // Ashore still has the old on-foot line (audio/ashore.js), so the sea's score stops there.
   { cue: () => null, when: (s) => s.ashore },
   // In port the weather is outside: Port Haven's own tune, or the harbour's.
@@ -33,6 +46,9 @@ const RULES = [
 /**
  * What should be playing. `s` is the situation:
  *   title, ashore, docked, homePort   where the player is (true or not)
+ *   sable       what Sable is up to, or null: { kind: meet | race | fog | pacer | tow | kraken,
+ *               start: true before the off (a countdown, or adrift before the tow),
+ *               lead: metres Sable leads a race by (negative: behind) }
  *   ghost       the ghost ship is out there
  *   band        'home' | 'coastal' | 'open' (bandAt)
  *   zone        the rough zone the boat is well inside (an id), or null; `rough` 0-1, how far in
@@ -51,7 +67,7 @@ export function cueFor(s) {
     intensity: (rule?.intensity || bySpeed)(s),
     rain: (s.rain || 0) >= MUSIC.rain,
     night: (s.night || 0) > 0.5,
-    urgent: !!rule?.urgent,
+    urgent: typeof rule?.urgent === 'function' ? rule.urgent(s) : !!rule?.urgent,
   };
 }
 

@@ -472,7 +472,7 @@ const checks = {
     const expect = (ok, msg) => { if (!ok) errors.push(msg); };
     const N = await load('music/notation.js');
     const { THEMES, CUES, RANGES, DRUMS, STINGS } = await load('music/themes.js');
-    const { Score, compileCue, EXTRAS } = await load('music/score.js');
+    const { Score, compileCue, EXTRAS, stingNotes } = await load('music/score.js');
     const { cueFor, CueHold } = await load('music-cues.js');
     const { VOICES } = await load('audio/instruments.js');
     const { MUSIC } = await load('config.js');
@@ -588,13 +588,16 @@ const checks = {
       expect(out[0].phase === 'out' && out[1].cue === null && !out[1].events.length, `${first} to silence: expected one bar going out, then nothing; got ${out.map((x) => `${x.cue}:${x.phase}`).join(', ')}`);
     }
 
-    // a cue in another key than its theme's: every note moved by the same amount, and still in the key
+    // a cue in another key than its theme's: every note moved by the same amount (or, in
+    // another mode, to the same step of that mode), and still in the key
     for (const [name, Q] of Object.entries(CUES)) {
       if (!Q.key || errors.length) continue;
       const C = compileCue(name), T = THEMES[Q.theme], semis = N.noteMidi(Q.key.split(' ')[0] + '4') - N.noteMidi(T.key.split(' ')[0] + '4');
+      const from = N.parseKey(T.key), moved = N.parseKey(Q.key.split(' ')[0] + ' ' + from.mode), mode = C.keyInfo.mode;
       for (const id of Q.form) {
         const was = N.parseTune(T.phrases[id].tune, T.steps).flat(), now = C.phrases[id].tune.flat();
-        expect(now.every((n, i) => (((n.midi - was[i].midi - semis) % 12) + 12) % 12 === 0), `cue ${name}: phrase ${id} is not its theme moved from ${T.key} to ${Q.key}`);
+        const step = (midi) => moved.scale.indexOf((((midi + semis) % 12) + 12) % 12);
+        expect(now.every((n, i) => mode === from.mode ? (((n.midi - was[i].midi - semis) % 12) + 12) % 12 === 0 : C.keyInfo.scale.indexOf(n.midi % 12) === step(was[i].midi)), `cue ${name}: phrase ${id} is not its theme moved from ${T.key} to ${Q.key}`);
         for (const n of now) expect(C.keyInfo.scale.includes(n.midi % 12), `cue ${name}: ${N.noteName(n.midi)} is not in ${Q.key}`);
         for (const c of C.phrases[id].chords.flat()) expect(C.keyInfo.scale.includes(c.root), `cue ${name}: a chord on ${N.noteName(c.root + 60)} is not in ${Q.key}`);
       }
@@ -631,15 +634,22 @@ const checks = {
     }
     expect(coloured >= 4, `only ${coloured} coloured versions of cues: the calm cues should have rain and night`);
 
-    // the one-off phrases
+    // the one-off phrases: over a cue in any key, every note on its instrument and in that key
+    let stung = 0;
     for (const [id, S] of Object.entries(STINGS)) {
       const R = RANGES[S.voice];
       expect(R, `sting ${id}: no range for "${S.voice}"`);
       if (!R) continue;
-      // in the lowest and the highest key there is
-      for (let tonic = 0; tonic < 12; tonic++) for (const step of S.steps) {
-        const midi = (S.oct + 1) * 12 + tonic + N.MODES.major.scale[step % 7] + 12 * Math.floor(step / 7);
-        expect(midi >= N.noteMidi(R[0]) && midi <= N.noteMidi(R[1]), `sting ${id}: ${N.noteName(midi)} is outside the ${S.voice}'s range`);
+      for (let tonic = 0; tonic < 12; tonic++) for (const mode of Object.keys(N.MODES)) {
+        const key = N.noteName(60 + tonic).slice(0, -1) + ' ' + mode, K = N.parseKey(key);
+        let notes;
+        try { notes = stingNotes(id, key); } catch (e) { errors.push(e.message); break; }
+        expect(notes.length > 0, `sting ${id}: no notes`);
+        for (const n of notes) {
+          stung++;
+          expect(n.midi >= N.noteMidi(R[0]) && n.midi <= N.noteMidi(R[1]), `sting ${id} over ${key}: ${N.noteName(n.midi)} is outside the ${S.voice}'s range`);
+          expect(K.scale.includes(n.midi % 12), `sting ${id} over ${key}: ${N.noteName(n.midi)} is not in the key`);
+        }
       }
     }
 
@@ -671,6 +681,19 @@ const checks = {
       [{ ...clear, band: 'home', docked: true, homePort: true }, 'haven', 2],
       [{ ...clear, band: 'home', title: true, docked: false }, 'title', 2],
       [{ ...clear, storm: 1, ashore: true }, null, 1],
+      // Sable: above every weather, and ashore for the foot race
+      [{ ...clear, sable: { kind: 'meet' } }, 'sable', 2],
+      [{ ...clear, sable: { kind: 'race', start: true, lead: 0 } }, 'sable-race', 1],
+      [{ ...clear, storm: 1, rain: 1, sable: { kind: 'race', lead: -60 } }, 'sable-race', 3],
+      [{ ...clear, band: 'open', zone: 'reach', rough: 1, sable: { kind: 'race', lead: MUSIC.sableLead + 1 } }, 'sable-race', 2],
+      [{ ...clear, fog: 0.18, sable: { kind: 'fog', lead: 0 } }, 'sable-fog', 2],
+      [{ ...clear, ashore: true, sable: { kind: 'pacer', start: true } }, 'sable-pacer', 1],
+      [{ ...clear, ashore: true, sable: { kind: 'pacer' } }, 'sable-pacer', 2],
+      [{ ...clear, sable: { kind: 'tow', start: true } }, 'sable-tow', 1],
+      [{ ...clear, band: 'home', night: 1, sable: { kind: 'tow' } }, 'sable-tow', 2],
+      [{ ...clear, rain: 1, fog: 0.5, sable: { kind: 'kraken' } }, 'sable-kraken', 3],
+      [{ ...clear, fog: 0.18, ghost: true, sable: null }, 'ghost', 1],
+      [{ ...clear, title: true, sable: { kind: 'meet' } }, 'title', 2],
     ]) {
       const got = cueFor(s);
       expect(got.cue === cue && got.intensity === intensity, `cueFor(${JSON.stringify(s)}) gives ${got.cue} at ${got.intensity}, not ${cue} at ${intensity}`);
@@ -686,6 +709,13 @@ const checks = {
       expect(Math.abs(t + 0.1 - secs) < 0.2, `CueHold took ${(t + 0.1).toFixed(1)} s to follow ${urgent ? 'an urgent' : 'an ordinary'} cue, not ${secs}`);
     }
     expect(MUSIC.urgentHold < MUSIC.hold / 2, 'MUSIC.urgentHold should be well under MUSIC.hold');
+    // every Sable moment has its version of the theme; the races and the kraken can't wait for the hold
+    for (const kind of ['meet', 'race', 'fog', 'pacer', 'tow', 'kraken']) {
+      const got = cueFor({ ...clear, sable: { kind } }), Q = CUES[got.cue];
+      expect(Q?.theme === 'sable', `Sable's ${kind}: cueFor gives "${got.cue}", which is not a version of Sable's theme`);
+      expect(!Q || got.urgent === !!Q.urgent, `Sable's ${kind}: the director's hold (urgent ${got.urgent}) disagrees with the cue "${got.cue}" (urgent ${!!Q?.urgent})`);
+    }
+    for (const id of ['sable-horn', 'sable-won', 'sable-lost']) expect(STINGS[id], `no sting "${id}" for Sable`);
     if (CUES.storm && keyOf('storm') !== keyOf('coastal')) {
       const out = run('coastal', 'storm', 2);
       expect(CUES.storm.urgent && out[0].phase === 'pivot' && out[1].cue === 'storm', `coastal to storm: expected one pivot bar, then the storm; got ${out.map((x) => `${x.cue}:${x.phase}`).join(', ')}`);
@@ -717,7 +747,7 @@ const checks = {
     quick.update(0.1, 'home');
     expect(quick.update(0.1, null) === null && quick.update(0.1, 'open') === 'open', 'CueHold: silence (going ashore) and the first cue after it are taken at once');
 
-    return { errors, note: `${Object.keys(THEMES).length} themes, ${Object.keys(CUES).length} cues, ${coloured} more in the rain or at night, ${bars} bars played on paper; ${changes} changes of cue in ${legs} crossings of a band's edge, where the band flipped ${raw} times` };
+    return { errors, note: `${Object.keys(THEMES).length} themes, ${Object.keys(CUES).length} cues, ${coloured} more in the rain or at night, ${bars} bars played on paper, ${Object.keys(STINGS).length} stings in every key (${stung} notes); ${changes} changes of cue in ${legs} crossings of a band's edge, where the band flipped ${raw} times` };
   },
 
   // The sea zones (sea-zones.js): home waters hold Port Haven and grandfather's
