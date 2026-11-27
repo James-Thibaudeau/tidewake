@@ -743,12 +743,33 @@ three ways.
 hanging off `game.fireworks`. The gallery gets a `fireworks` subject that
 holds each shell at its peak, so they can be judged one at a time.
 
+**Shipped** (10.2; see [STATUS.md](STATUS.md)). What was built differs from
+the above in these ways:
+- **Stores is a tab of its own** at every port, as the paint yard became,
+  not a section on the shipwright's tab.
+- **F sets off what is loaded; G changes it** (rockets, specials, the grand
+  finale). The finale has to be loaded on purpose, so nobody burns 1,500
+  gold by pressing F once too often.
+- **The hold takes 40 rockets and specials together**, and up to 3 grand
+  finales crated apart.
+- **"Anchored" means stopped, not ashore.** F works whenever you are
+  sailing, under way or lying still. On an island the sea isn't drawn, so
+  there is nothing to set off there.
+- **The camera looks up** while one of yours is in the air: a burst 60 m
+  over the ship is out of the chase camera's picture otherwise.
+- **By day the smoke takes the shell's colour**, as daytime fireworks do.
+- **The code is three files:** `fireworks.js` (the game's side),
+  `fireworks/shells.js` (the shells and the finale's order, pure) and
+  `fireworks/sky.js` (the sparks). The sounds are `audio/fireworks.js`.
+- **For 10.4:** `game.fireworks.finale({ free: true, from: { x, z, heading } })`
+  runs the town's show from a fixed place without touching the hold.
+
 ### Phase 10 in smaller PRs
 
 | PR | Branch | What it adds | Depends on |
 | --- | --- | --- | --- |
 | 10.1 | `feature/paint-yard` | The paint yard: paints, cloth, emblems, flags, figureheads, earned paints; the crimson dye moved in; gallery sheets | — |
-| 10.2 | `feature/fireworks` | Stores, rockets, specials and the finale; the sea flash; Sable's answer | — |
+| 10.2 | (done, #69) | Stores, rockets, specials and the finale; the sea flash; Sable's answer | — |
 | 10.3 | `feature/restore-ship` | The restoration quest and its six stages at the slipway; the wreck site retired; the stage cards | The epilogue (done); landmark items as each landmark ships |
 | 10.4 | `feature/his-ship` | His ship as a hull style (bigger and more ornate than any tier); the launch scene with the town's fireworks; the sail with Grandma; switching ships at Port Haven | 10.2, 10.3 |
 

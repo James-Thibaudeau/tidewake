@@ -295,6 +295,17 @@ export class Rival {
 
   hideRedwing() { this.redwing?.setVisible(false); }
 
+  /**
+   * Where Sable would answer a firework from (fireworks.js): the Redwing, if she is in
+   * sight and Sable is free to. Not before you've met, in a race, with the kraken, or
+   * while she lies dismasted or in tow.
+   */
+  fireworkFrom() {
+    const s = this.redwing, t = this.act?.type;
+    if (!s || !s.group.visible || s.dismasted || !this.R.flags.met || this.exclusive || t === 'adrift' || t === 'tow') return null;
+    return { x: s.pos.x, z: s.pos.z, ship: s, friend: this.R.chapter >= FINAL_CHAPTER };
+  }
+
   /** Beside the pier, on the far side from where the player ties up. */
   mooring(port) {
     const D = port.dock, a = D.angle;

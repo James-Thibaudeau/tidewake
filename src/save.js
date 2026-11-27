@@ -3,6 +3,7 @@
 import { SAVE_KEY, SETTINGS_KEY, SAVE_VERSION, isTouch } from './config.js';
 import { ENCOUNTERS, CARDS } from './rival-text.js';
 import { normalizeLivery } from './paints.js';
+import { normalizeStock } from './fireworks/shells.js';
 
 export function loadSave() {
   try {
@@ -44,6 +45,8 @@ export function migrate(d) {
     if (d.rival.flags.dyeOn && d.rival.flags.dye && !d.livery.sail) d.livery.sail = 'crimson';
     delete d.rival.flags.dyeOn;
   }
+  // fireworks in the hold and the ports that have cheered one (fireworks.js): none, before there were any
+  d.fireworks = normalizeStock(d.fireworks);
   d.v = SAVE_VERSION;
   return d;
 }

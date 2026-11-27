@@ -2,7 +2,7 @@
 // run) and edge-triggered action counts that the game consumes once per frame.
 //
 // Bindings depend on the control scheme:
-//   'sea'  – sailing: W/S trim the sail, A/D steer, E/Space act
+//   'sea'  – sailing: W/S trim the sail, A/D steer, E/Space act, F lights a firework, G changes which
 //   'land' – on foot: WASD move, Space jumps, E acts, Shift runs
 //   'menu' – nothing but map/pause
 import { TOUCH } from './config.js';
@@ -14,6 +14,7 @@ const KEYMAPS = {
     KeyW: 'sailUp', ArrowUp: 'sailUp',
     KeyS: 'sailDown', ArrowDown: 'sailDown',
     KeyE: 'action', Space: 'action', Enter: 'action', NumpadEnter: 'action',
+    KeyF: 'firework', KeyG: 'fireworkNext',
   },
   land: {
     ...COMMON_KEYS,
@@ -22,7 +23,7 @@ const KEYMAPS = {
   },
   menu: { ...COMMON_KEYS },
 };
-const ACTIONS = ['sailUp', 'sailDown', 'action', 'map', 'pause', 'jump', 'journal'];
+const ACTIONS = ['sailUp', 'sailDown', 'action', 'map', 'pause', 'jump', 'journal', 'firework', 'fireworkNext'];
 const ALWAYS = new Set(['map', 'pause', 'journal']);
 const PREVENT = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
@@ -236,6 +237,8 @@ export class Input {
     tap('btnSailUp', 'sailUp');
     tap('btnSailDown', 'sailDown');
     tap('btnAction', 'action');
+    tap('btnFirework', 'firework');
+    tap('btnFireworkKind', 'fireworkNext');
 
     // On-foot joystick: drag anywhere inside the base, knob follows the finger
     const base = document.getElementById('stick');

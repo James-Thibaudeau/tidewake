@@ -2,13 +2,14 @@
 // Fast checks that need no browser and no dependencies:
 //
 //   node tools/check.mjs            everything (about a second)
-//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | paints | sea | music | seazones | rogue | ride | layout | climb | grove | archway | temple
+//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | paints | fireworks | sea | music | seazones | rogue | ride | layout | climb | grove | archway | temple
 //   node tools/check.mjs layout 500 layouts for 500 synthetic islands (default 150)
 //
 // Run it after every change. It catches the mistakes that otherwise only show
 // up as a blank page: a syntax error, an import of a name the other module
 // doesn't export, a helper left behind when code moved to another file, a
 // text key or element id that doesn't exist, a save that no longer migrates,
+// a firework that makes no sparks or a finale too big for the sky to hold,
 // a sea event that could turn up in the wrong place, a tune with a note out
 // of its key or its instrument's range, music that flips at a zone's edge, sea zones that leave home
 // out, put rough water over a port or a landing, or disagree between the CPU
@@ -301,7 +302,7 @@ const checks = {
     const { SAVE_VERSION } = await load('config.js');
     const v1 = { v: 1, banked: 240, cargo: 0, health: 80, upgrades: { sail: 1 }, discovered: [0, 3], savePort: 0 };
     const cases = { empty: {}, v1, garbage: { quests: 7, story: 'x', rival: null, hold: {}, wardrobe: 'hat', ashore: null } };
-    const objects = { quests: ['active', 'done', 'boards', 'pinned', 'reports'], story: ['chapter', 'journals', 'flags', 'seenCards'], rival: ['chapter', 'wins', 'losses', 'flags', 'log'], ashore: [], sightings: ['seen', 'miss', 'chain'] };
+    const objects = { quests: ['active', 'done', 'boards', 'pinned', 'reports'], story: ['chapter', 'journals', 'flags', 'seenCards'], rival: ['chapter', 'wins', 'losses', 'flags', 'log'], ashore: [], sightings: ['seen', 'miss', 'chain'], fireworks: ['rocket', 'special', 'finale', 'cheered'] };
     const arrays = ['wardrobe', 'hold', 'paints'];
     for (const [label, input] of Object.entries(cases)) {
       const d = migrate(structuredClone(input));
@@ -344,6 +345,15 @@ const checks = {
     if (off.livery.sail !== null || !off.rival.flags.dye) errors.push('a save with the crimson dye off should keep its sails (and its gift)');
     const odd = migrate({ paints: ['paint:plum', 3], livery: { hull: 'plum', sail: 'plum', figurehead: 'owl', mast: 'gold' } });
     if (odd.paints.length !== 1 || odd.livery.hull !== 'plum' || odd.livery.sail !== null || odd.livery.figurehead !== 'owl' || 'mast' in odd.livery) errors.push('migrate should keep good paints and drop what doesn\'t fit its part');
+    // fireworks in the hold: none in an old save; a save's own counts are kept, within what the hold takes
+    for (const [label, input] of Object.entries(cases)) {
+      const F = migrate(structuredClone(input)).fireworks;
+      if (F.rocket || F.special || F.finale || F.cheered.length) errors.push(`${label}: an old save should have no fireworks`);
+    }
+    const stocked = migrate({ fireworks: { rocket: 12, special: 3, finale: 1, cheered: [0, 4, 4, 'x'] } }).fireworks;
+    if (stocked.rocket !== 12 || stocked.special !== 3 || stocked.finale !== 1 || stocked.cheered.join() !== '0,4') errors.push('migrate changed the fireworks in the hold');
+    const over = migrate({ fireworks: { rocket: 99, special: -2, finale: 'lots' } }).fireworks;
+    if (over.rocket !== 40 || over.special !== 0 || over.finale !== 0) errors.push('migrate should hold fireworks to what the hold takes');
     return { errors, note: `${Object.keys(cases).length} saves` };
   },
 
@@ -394,6 +404,110 @@ const checks = {
   // when it should, the pity timer brings the rare one round, events are
   // placed in open water off the bow (`count` placements in a toy sea), and
   // the Sightings log, its milestones and its words all line up.
+  // Fireworks (fireworks/shells.js): the Stores sell what the plan says, every shell
+  // makes sparks, a special is flat on to whoever watches, a rocket gets where it is
+  // aimed, and the grand finale is forty shells in half a minute that the sky can hold
+  // on High and on Low.
+  async fireworks() {
+    const errors = [];
+    const S = await load('fireworks/shells.js');
+    const { FIREWORKS } = await load('config.js');
+    const { STORES } = await load('story-text.js');
+    const { FIREWORK } = await load('rival-text.js');
+    const { SHEETS } = await load('gallery/sheets.js');
+    const ALL = [...S.KINDS, ...S.SPECIALS];
+    // the Stores
+    const want = { box: [120, 6, 0, 0], crate: [450, 20, 4, 0], finale: [1500, 0, 0, 1] };
+    for (const [id, [price, rocket, special, finale]] of Object.entries(want)) {
+      const it = FIREWORKS.items[id];
+      if (!it || it.price !== price || (it.rocket || 0) !== rocket || (it.special || 0) !== special || (it.finale || 0) !== finale) errors.push(`Stores: ${id} should cost ${price} for ${rocket} rockets, ${special} specials, ${finale} finales`);
+      if (!it?.name || !STORES.about[id]) errors.push(`Stores: ${id} needs a name and a line about it`);
+    }
+    if (FIREWORKS.hold !== 40) errors.push(`the hold takes ${FIREWORKS.hold} shells, not 40`);
+    for (const k of ['rocket', 'special', 'finale']) if (!STORES.loads[k] || !STORES.none[k]) errors.push(`story-text.js STORES: no label or "none left" line for ${k}`);
+    for (const who of ['rival', 'friend']) {
+      if (!FIREWORK[who]?.length) errors.push(`rival-text.js FIREWORK.${who}: Sable has nothing to say`);
+      for (const l of FIREWORK[who] || []) if (/\{(?!captain\})\w+\}/.test(l)) errors.push(`rival-text.js FIREWORK.${who}: "${l}" has a blank that is never filled`);
+    }
+    // the hold
+    const hold = (rocket, special = 0, finale = 0) => ({ rocket, special, finale, cheered: [] });
+    if (S.noRoomFor(hold(34), 'box') || S.noRoomFor(hold(30, 5), 'box') !== 'hold') errors.push('a box of rockets should fit a hold with 34 shells in it, and not one with 35');
+    if (S.noRoomFor(hold(10, 6), 'crate') || S.noRoomFor(hold(17), 'crate') !== 'hold') errors.push('a festival crate should fit a hold with 16 shells in it, and not one with 17');
+    if (S.noRoomFor(hold(40, 0, FIREWORKS.finales - 1), 'finale') || S.noRoomFor(hold(0, 0, FIREWORKS.finales), 'finale') !== 'finales') errors.push(`the hold should take ${FIREWORKS.finales} grand finales whatever else is in it, and no more`);
+    const stowed = S.stow(S.stow(S.blankStock(), 'crate'), 'finale');
+    if (stowed.rocket !== 20 || stowed.special !== 4 || stowed.finale !== 1) errors.push('stowing a crate and a finale should leave 20 rockets, 4 specials and 1 finale');
+    if (S.specialsFor(false).includes('wing') || !S.specialsFor(true).includes('wing')) errors.push("Sable's wing should be a special only with the crimson cloth");
+    // how a spark flies: the sum the shader also does, against small steps
+    {
+      const v = [12, 30, -7], drag = 1.7, grav = 5, dt = 1e-4;
+      let p = [0, 0, 0], u = [...v];
+      for (let t = 0; t < 2; t += dt) { p = p.map((x, i) => x + u[i] * dt); u = u.map((x, i) => x + (-drag * x - (i === 1 ? grav : 0)) * dt); }
+      const f = S.fly(v, drag, grav, 2);
+      if (Math.hypot(f[0] - p[0], f[1] - p[1], f[2] - p[2]) > 0.02) errors.push(`fly() is ${Math.hypot(f[0] - p[0], f[1] - p[1], f[2] - p[2]).toFixed(3)} m off the same throw taken in small steps`);
+    }
+    // every shell
+    const counts = {};
+    for (const kind of ALL) {
+      for (const [q, R] of Object.entries(S.RING)) {
+        const s = S.makeShell(kind, { seed: 11, detail: R.detail });
+        counts[`${kind}:${q}`] = s.count;
+        if (!(s.count > 20) || s.data.length !== s.count * S.STRIDE) errors.push(`${kind} (${q}): ${s.count} points`);
+        if (s.data.some((x) => !Number.isFinite(x))) errors.push(`${kind} (${q}): a point is not a number`);
+        if (!(s.peak > 0 && s.peak < s.life) || !S.COLORS[s.color] || s.light.length !== 3) errors.push(`${kind} (${q}): needs a best moment inside its life, a colour and a light for the sea`);
+        if (!S.SHELL_NAMES[kind]) errors.push(`${kind}: no name`);
+        for (let i = 0; i < s.count; i++) {
+          const life = s.data[i * S.STRIDE + 8], drag = s.data[i * S.STRIDE + 10];
+          if (!(life > 0) || !(drag > 0)) { errors.push(`${kind} (${q}): point ${i} never burns, or has no drag`); break; }
+        }
+      }
+      if (!(counts[`${kind}:low`] < counts[`${kind}:high`] * 0.75)) errors.push(`${kind}: Low quality should make clearly fewer sparks (${counts[`${kind}:low`]} against ${counts[`${kind}:high`]})`);
+      if (S.makeShell(kind, { seed: 11 }).data.join() !== S.makeShell(kind, { seed: 11 }).data.join()) errors.push(`${kind}: the same seed should make the same shell`);
+    }
+    for (const kind of S.SPECIALS) {
+      // facing north (face 0) its sparks fly east-west and up-down, hardly at all towards the viewer
+      const s = S.makeShell(kind, { seed: 3, face: 0 });
+      let deep = 0;
+      for (let i = 0; i < s.count; i++) if (s.data[i * S.STRIDE + 13] === S.SPARK) deep = Math.max(deep, Math.abs(s.data[i * S.STRIDE + 5]));
+      if (deep > 2) errors.push(`${kind}: a special should be thrown flat on to the viewer (a spark leaves at ${deep.toFixed(1)} m/s towards them)`);
+    }
+    if (!S.makeShell('crackle', { seed: 2 }).cracks.length || !S.makeShell('crossette', { seed: 2 }).cracks.length) errors.push('a crackle and a crossette should say when they pop');
+    // a rocket
+    const r = S.makeRocket({ height: 60, dx: 10, dz: -5 });
+    if (Math.hypot(r.apex[0] - 10, r.apex[1] - 60, r.apex[2] + 5) > 0.01) errors.push(`a rocket aimed 10 m east, 5 m north and 60 m up gets to ${r.apex.map((x) => x.toFixed(1)).join(', ')}`);
+    if (FIREWORKS.height !== 60) errors.push(`rockets burst ${FIREWORKS.height} m up, not about 60`);
+    // the grand finale, with and without Sable's wing
+    let most = {};
+    for (const wing of [false, true]) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const show = S.finaleShow(seed, { wing }), label = `finale ${seed}${wing ? ' (wing)' : ''}`;
+        if (show.length !== FIREWORKS.finale.shells) errors.push(`${label}: ${show.length} shells, not ${FIREWORKS.finale.shells}`);
+        const end = Math.max(...show.map((x) => x.t)) + FIREWORKS.rise;
+        if (Math.abs(end - FIREWORKS.finale.seconds) > 3) errors.push(`${label}: the last shell bursts at ${end.toFixed(1)} s, not about ${FIREWORKS.finale.seconds}`);
+        if (show.some((x, i) => i && x.t < show[i - 1].t)) errors.push(`${label}: out of order`);
+        for (const x of show) if (!ALL.includes(x.kind) || !S.COLORS[x.color] || Math.abs(x.side) > 1 || !(x.height > 0.7 && x.height < 1.3)) errors.push(`${label}: a ${x.kind} in ${x.color}, ${x.side} to one side and ${x.height} high`);
+        for (const kind of S.KINDS) if (!show.some((x) => x.kind === kind)) errors.push(`${label}: no ${kind}`);
+        const sp = show.filter((x) => S.SPECIALS.includes(x.kind)).map((x) => x.kind);
+        if (sp.length !== 3 || sp.includes('wing') !== wing) errors.push(`${label}: its specials are ${sp.join(', ')}`);
+        // the sky is a ring of points: a shell must not be written over while it still burns
+        for (const [q, R] of Object.entries(S.RING)) {
+          const lit = show.map((x) => {
+            const s = S.makeShell(x.kind, { seed: x.seed, color: x.color, detail: R.detail });
+            return { t: x.t, n: s.count + S.makeRocket({ seed: x.seed, detail: R.detail }).count, end: x.t + FIREWORKS.rise + s.life };
+          });
+          for (const [j, a] of lit.entries()) {
+            const n = a.n + lit.slice(j + 1).filter((b) => b.t < a.end).reduce((sum, b) => sum + b.n, 0);
+            most[q] = Math.max(most[q] || 0, n);
+            if (n > R.points) { errors.push(`${label}, ${q}: ${n} points alight at once, and the sky holds ${R.points}`); break; }
+          }
+        }
+      }
+    }
+    // the gallery's sheet shows every one of them
+    const shown = new Set(SHEETS.fireworks?.make({}).cells.map((c) => c.q.kind));
+    for (const kind of ALL) if (!shown.has(kind)) errors.push(`the gallery's fireworks sheet has no ${kind}`);
+    return { errors, note: `${ALL.length} shells (${S.KINDS.length} kinds, ${S.SPECIALS.length} specials), a peony of ${counts['peony:high']} points (${counts['peony:low']} on Low); 40 finales of ${FIREWORKS.finale.shells} shells, at most ${most.high} points alight of ${S.RING.high.points} (${most.low} of ${S.RING.low.points} on Low)` };
+  },
+
   async sea(count = 3000) {
     const errors = [];
     const S = await load('sightings.js');

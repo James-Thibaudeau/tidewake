@@ -91,6 +91,11 @@
         </div>
         <div id="speedText">0 kn</div>
       </div>
+      <!-- Fireworks (ui/stores.js): there while any are aboard. The rocket sets one off; its label changes what is loaded. -->
+      <div id="fwPanel" class="panel hidden">
+        <button id="btnFirework" aria-label="Set off a firework"><span data-icon="rocket"></span><kbd>F</kbd></button>
+        <button id="btnFireworkKind" aria-label="Change what is loaded"><span id="fwLabel">Rocket</span> <b id="fwCount">0</b><kbd>G</kbd></button>
+      </div>
     </div>
 
     <div id="prompt" class="hidden"></div>
@@ -154,6 +159,7 @@
       <div class="tabs" id="portTabs" role="tablist">
         <button class="tab on" data-tab="shipwright" role="tab"><span class="ico" data-icon="hull"></span> Shipwright</button>
         <button class="tab" data-tab="paintyard" role="tab"><span class="ico" data-icon="flag"></span> Paint Yard</button>
+        <button class="tab" data-tab="stores" role="tab"><span class="ico" data-icon="rocket"></span> Stores</button>
         <button class="tab" data-tab="quests" role="tab"><span class="ico" data-icon="scroll"></span> Quest Board<span class="tabBadge hidden" id="questBadge"></span></button>
         <button class="tab" data-tab="tailor" role="tab"><span class="ico" data-icon="needle"></span> Tailor</button>
       </div>
@@ -172,6 +178,11 @@
           <p class="yardNote"></p>
           <div class="yardTiles"></div>
         </div>
+      </div>
+      <div class="tabPane hidden" id="paneStores" data-pane="stores">
+        <p class="shopIntro" id="storesIntro"></p>
+        <div id="storesGrid" class="grid"></div>
+        <div id="storesHold" class="storesHold"></div>
       </div>
       <div class="tabPane hidden" id="paneQuests" data-pane="quests">
         <div id="rivalNotes"></div>

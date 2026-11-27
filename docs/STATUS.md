@@ -1450,6 +1450,70 @@ Updated 2026-11-27.
   - [ ] Paint yard follow-ups: tune prices against measured late-game income
     (the plan's numbers are starting points); each ship keeps its own livery
     once there are two (10.4).
+  - [x] **10.2 Fireworks** ([#69](https://github.com/James-Thibaudeau/tidewake/pull/69)):
+    - **A Stores tab at every port** sells a box of rockets (6, for 120
+      gold), a festival crate (20 rockets and 4 specials, 450) and a grand
+      finale (40 shells in half a minute, 1,500). The hold takes 40 rockets
+      and specials together, and 3 grand finales. A wreck doesn't take them.
+    - **F sets off what is loaded and G changes it** (rockets, specials, the
+      finale); on touch, a rocket button beside the gauges and the label
+      under it. It works whenever you are sailing, under way or lying
+      stopped. The rocket leaves the stern and bursts 60 m up, over where
+      the ship will be by then, and the camera pulls back and tips up while
+      one of yours is in the air. The grand finale runs by itself while you
+      steer.
+    - **Nine shells:** peony, willow, crossette, ring and crackle out of the
+      box, in mixed colours. The specials are a heart, a star and an owl's
+      face, turned to face you; Sable's crimson wing joins them once the
+      crimson sail cloth is yours.
+    - **Look:** every spark is one point of a single `THREE.Points`, moved by
+      the graphics card (`fireworks/sky.js`): one draw call, and nothing to
+      do per spark each frame. Bright enough to bloom. Tails bend downwind
+      and embers and smoke drift with it. The sea under a burst takes its
+      colour for a moment, in two bands like the lantern's (`seaFlash` in
+      `ocean.js`). By day the sparks are pale and painted over the sky, and
+      the smoke takes the shell's colour. On Low a shell has about a third
+      of the sparks, and only one show goes up at a time.
+    - **Cost:** during a grand finale a frame took no longer than without
+      one, on High (4.3 ms against 5.2 at 2048×1536) or on Low (0.9 ms
+      against 1.6 at 1024×768); the differences are other things in view.
+    - **Sound** (`audio/fireworks.js`): a whoosh going up, then the boom,
+      late by the distance at 340 m/s as thunder is; a crackle for the shells
+      that pop again; a crowd's cheer. The boom is a crack, a thump with
+      enough above 200 Hz for small speakers to carry it, three seconds of
+      rolling away and two echoes off the water, and it goes through a
+      limiter of its own so a volley doesn't add up past full scale. It is
+      the loudest sound in the game. Rendered offline and measured (loudest
+      50 ms): the boom −17 dB (a whale's breach −22, thunder −27), still
+      −23 dB over its second second; a boom 550 m off −23; the whoosh −34;
+      the finale's last twelve booms peak at −6 with nothing clipped.
+      The first boom was a 0.9 s thump almost all below 120 Hz, which small
+      speakers turned into a little pop; the user heard that and it was
+      rebuilt. **Listened to by the user in the game (2026-11-27): "it's
+      good now."** The boom was their only complaint; the whoosh, the
+      crackle and the cheer drew no comment.
+    - **Who notices:** with the Redwing in sight and Sable free (not in a
+      race, in tow or with the kraken), Sable answers 6 times in 10 with a
+      crimson one of their own, at most every 25 s, and a line that goes in
+      the journal; once you are friends it is the crimson wing. A port
+      cheers one set off within 420 m of its dock at night, with a toast
+      the first time at each port.
+    - **From code:** `game.fireworks.finale({ free: true, from: { x, z,
+      heading } })` runs a grand finale from a fixed place without touching
+      the hold: the town's show at the launch of grandfather's ship (10.4).
+      `launch(kind, opts)` lights one rocket.
+    - **Save:** `fireworks: { rocket, special, finale, cheered }` (`cheered`:
+      the ports that have had their toast).
+    - **Gallery:** `show=fireworks` holds one shell at its best moment over a
+      ship (`kind`, `color`, `seed`, `age`, `low`); sheets `fireworks`,
+      `fireworks-low` and `fireworks-ages`. `check.mjs fireworks` checks the
+      shells, the hold and the finale. `debug.fireworks()` sets one off;
+      `debug.give({ fireworks: 'max' })` fills the hold.
+  - [ ] Fireworks follow-ups: tune prices against measured late-game
+    income; the whoosh is now quiet beside the boom (−34 dB against −17); on a phone held upright the finale's
+    side-by-side shells run off the sides of the picture, and the port's
+    five tabs take three rows; rockets can't be set off at a dock or from an
+    island.
 - [ ] **Phase 11, islands with shapes:** variety in the archipelago, as
   Archway Isle's bay gave it a shape: crescents, rings, coves, hooks, twins
   and more, spread so neighbours differ. Moon Island is the first, a
