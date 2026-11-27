@@ -10,6 +10,7 @@ import { stylesFor } from '../cosmetics.js';
 import { POSES, LIGHTS, VIEWS, WEATHERS } from './presets.js';
 import { ASHORE_BIOMES } from '../config.js';
 import { paintsOf } from '../paints.js';
+import { KINDS, SPECIALS } from '../fireworks/shells.js';
 
 const ids = (slot) => stylesFor(slot).map((s) => s.style);
 const paintIds = (kind) => paintsOf(kind).map((p) => p.id);
@@ -84,6 +85,10 @@ export const SHEETS = {
   'figureheads': { about: 'Every figurehead on every hull with a stem (tiers 2-5), close on the bow', tile: LANDSCAPE, make: grid('tier', ['2', '3', '4', '5'], 'figurehead', paintIds('figurehead'), { show: 'ship', view: 'stem', canvas: '0', anchor: 'none' }) },
   // ---- the living sea
   'sealife': { about: 'Everything the living sea turns up, one of each', tile: LANDSCAPE, make: strip('kind', ['whale', 'dolphin', 'turtle', 'gull', 'fish', 'bottle', 'berg', 'spout', 'ghost'], { show: 'sealife', view: 'quarter' }, 3) },
+  // ---- fireworks (fireworks/shells.js)
+  'fireworks': { about: 'Every firework at its best moment, by night and by day: the five kinds, then the specials', tile: [300, 330], make: grid('light', ['night', 'noon'], 'kind', [...KINDS, ...SPECIALS], { show: 'fireworks', view: 'spot' }) },
+  'fireworks-low': { about: 'Every firework on Low quality (fewer sparks), by night and by day', tile: [300, 330], make: grid('light', ['night', 'noon'], 'kind', [...KINDS, ...SPECIALS], { show: 'fireworks', view: 'spot', low: '1' }) },
+  'fireworks-ages': { about: 'One firework from just after the burst to its last sparks (kind=peony unless the page shows another), by night and by day', tile: [300, 330], make: (base) => grid('light', ['night', 'noon'], 'age', ['0.08', '0.3', '0.8', '1.5', '2.2', '3'], { show: 'fireworks', view: 'spot', kind: base.show === 'fireworks' && base.kind ? base.kind : 'peony' })(base) },
   // ---- the sea
   'sea': { about: 'The sea in every weather: from the helm, low over the water, from a tall masthead and from a gull', tile: LANDSCAPE, make: grid('view', ['sail', 'horizon', 'aloft', 'high'], 'weather', WEATHERS, { show: 'ship', tier: '2' }) },
   'sea-lights': { about: 'The sea under every light: from the helm, a tall masthead and a gull', tile: LANDSCAPE, make: grid('view', ['sail', 'aloft', 'high'], 'light', Object.keys(LIGHTS), { show: 'ship', tier: '2' }) },

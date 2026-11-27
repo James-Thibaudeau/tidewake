@@ -5,6 +5,7 @@
 // SoundSystem is one class split over several files. This one holds the
 // core: the buses, the sea's beds and the one-shots heard
 // at sea. Mixed in from audio/:
+//   fireworks.js    a rocket's whoosh, a shell's boom and crackle, a port's cheer
 //   ashore.js       footsteps, jump and land, the coin chime, the chest
 //                   fanfare, an island's ambience and the on-foot score
 //   instruments.js  the score's instruments (this.voice) and its reverb
@@ -12,6 +13,7 @@
 import { mixin } from './util.js';
 import { hz } from './music/notation.js';
 import { AshoreSounds } from './audio/ashore.js';
+import { FireworkSounds } from './audio/fireworks.js';
 import { Instruments } from './audio/instruments.js';
 import { MusicPlayer } from './audio/music.js';
 
@@ -413,9 +415,9 @@ export class SoundSystem {
         this.noise(t + 0.12, 0.12, { type: 'bandpass', freq: 900, q: 2, vol: 0.12 });
         break;
       default:
-        this.playAshore(name, opts, t, shift);
+        if (!this.playFirework(name, opts, t)) this.playAshore(name, opts, t, shift);
         break;
     }
   }
 }
-mixin(SoundSystem, AshoreSounds, Instruments, MusicPlayer);
+mixin(SoundSystem, AshoreSounds, FireworkSounds, Instruments, MusicPlayer);

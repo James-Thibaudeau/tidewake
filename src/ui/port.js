@@ -1,5 +1,5 @@
 // UI part: the port screen (shipwright, quest board, tailor, harbor talk) and
-// the journal. Methods are mixed into UI (see ../ui.js), so `this` is the UI
+// the journal. (The paint yard and the Stores are tabs with files of their own.) Methods are mixed into UI (see ../ui.js), so `this` is the UI
 // instance.
 import { UPGRADES } from '../config.js';
 import { STYLES, owns } from '../cosmetics.js';
@@ -275,6 +275,7 @@ export class PortUI {
     this.refreshQuests();
     this.refreshRivalNotes();
     this.refreshPaintYard();
+    this.refreshStores();
     const maxH = (b && b.maxHealth) || 100;
     this.el.portHull.textContent = `Hull ${Math.ceil(st.health || 0)}/${maxH}`;
     const cost = g.repairCost ? g.repairCost() : 0;

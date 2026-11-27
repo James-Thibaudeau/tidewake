@@ -16,6 +16,8 @@ import { crossing, openSides } from './debug-pilot.js';
 import { CUES } from './music/themes.js';
 import { cueFor } from './music-cues.js';
 import { PAINTS, keyOf } from './paints.js';
+import { KINDS, SPECIALS } from './fireworks/shells.js';
+import { FIREWORKS } from './config.js';
 
 const BACKUP_KEY = SAVE_KEY + '.debug-backup';
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
@@ -30,8 +32,12 @@ const HELP = `tidewake.debug
                            A rough zone's id (reach | rip | swell) puts it in the worst of that zone, bow to the island
   zone()                   the sea where the boat is: band (home | coastal | open), zone, what it does to the waves,
                            and in rough water its name, severity, swell and what it costs the hull a kilometre and a second
-  give({ gold, cargo, health, upgrades, paints })   upgrades: 'max' or { sail: 3, hull: 2, … };
-                           paints: 'all' or ['paint:harborBlue', 'figurehead:owl', …] for the paint yard
+  give({ gold, cargo, health, upgrades, paints, fireworks })   upgrades: 'max' or { sail: 3, hull: 2, … };
+                           paints: 'all' or ['paint:harborBlue', 'figurehead:owl', …] for the paint yard;
+                           fireworks: 'max' (a full hold) or { rocket, special, finale }
+  fireworks(what?)         set one off now, free: peony | willow | crossette | ring | crackle | heart | star | owl | wing,
+                           'finale' (a free grand finale), 'answer' (Sable's, if the Redwing is in sight);
+                           no argument = what's in the hold, loaded and in the air
   journals(n, { anchor })  story: the first n journals found (0-7); anchor: true fits grandfather's anchor
   refit(tier, { open })    grandfather's anchor at refit tier 0-4 (fits the anchor too); open: biomes to
                            treat as having levels, e.g. ['rocky'], so their refit is offered (until reload)
@@ -180,8 +186,13 @@ export function installDebug(game) {
       };
     },
 
-    give({ gold, cargo, health, upgrades, paints } = {}) {
+    give({ gold, cargo, health, upgrades, paints, fireworks } = {}) {
       const s = g.state;
+      if (fireworks) {
+        const want = fireworks === 'max' ? { rocket: FIREWORKS.hold - 8, special: 8, finale: FIREWORKS.finales } : fireworks;
+        for (const k of ['rocket', 'special', 'finale']) if (want[k] != null) s.fireworks[k] = Math.max(0, Math.floor(want[k]));
+        g.fireworks.settle();
+      }
       if (paints) for (const k of paints === 'all' ? PAINTS.map(keyOf) : paints) if (!s.paints.includes(k)) s.paints.push(k);
       if (gold != null) s.banked += gold;
       if (cargo != null) s.cargo += cargo;
@@ -219,6 +230,18 @@ export function installDebug(game) {
     },
 
     rival(chapter) { return g.rival.debug(chapter); },
+
+    /** Fireworks (fireworks.js): set one off without spending a shell, or say what is aboard. */
+    fireworks(what) {
+      const F = g.fireworks;
+      if (what === 'finale') { if (!F.finale({ free: true })) throw new Error('A grand finale is already going.'); }
+      else if (what === 'answer') { if (!F.reply()) throw new Error("Sable can't answer: the Redwing isn't in sight, or Sable is busy."); }
+      else if (what != null) {
+        if (![...KINDS, ...SPECIALS].includes(what)) throw new Error(`No firework "${what}". Try: ${[...KINDS, ...SPECIALS].join(', ')}, finale, answer.`);
+        F.launch(what);
+      }
+      return F.debugState();
+    },
 
     /** A rogue wave now (rough-water.js). It needs open water all the way in. */
     rogue(from = null, { severity = 3 } = {}) {

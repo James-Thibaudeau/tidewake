@@ -270,3 +270,28 @@ export const MUSIC = {
   storm: 0.3, stormLevels: [0.6, 0.85], roughLevels: [0.7, 0.9], fog: 0.4, rain: 0.3,
   ahead: 0.25, level: 1, sableLead: 30,
 };
+
+// Fireworks (fireworks.js; the shells themselves are fireworks/shells.js). None of it
+// touches a stat: it is gold spent on the sky.
+//   items    what the Stores sell at every port, and what each one puts in the hold
+//   hold     the most rockets and specials carried, counted together; `finales` the most
+//            grand finales
+//   height   metres above the sea a rocket bursts; `rise` the seconds it takes to get there
+//   gap      the least time between two of your rockets, in seconds
+//   finale   the grand finale: how many shells, set off over how many seconds
+//   sound    metres a second: the boom arrives late by the distance, as thunder does
+//   cheer    a port cheers a rocket set off within this many metres of its dock, at night
+//   answer   Sable's own: only within this many metres, this often, `wait` seconds after
+//            yours bursts, and then not again for `rest` seconds
+export const FIREWORKS = {
+  items: {
+    box: { name: 'Box of rockets', price: 120, rocket: 6 },
+    crate: { name: 'Festival crate', price: 450, rocket: 20, special: 4 },
+    finale: { name: 'Grand finale', price: 1500, finale: 1 },
+  },
+  hold: 40, finales: 3,
+  height: 60, rise: 1.5, gap: 0.5,
+  finale: { shells: 40, seconds: 30 },
+  sound: 340, cheer: 420,
+  answer: { within: 700, chance: 0.6, wait: 2.6, rest: 25 },
+};
