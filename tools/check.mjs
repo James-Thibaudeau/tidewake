@@ -2,7 +2,7 @@
 // Fast checks that need no browser and no dependencies:
 //
 //   node tools/check.mjs            everything (about a second)
-//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | paints | fireworks | sea | music | seazones | rogue | ride | layout | climb | grove | archway | temple
+//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | paints | fireworks | sea | music | seazones | rogue | ride | layout | climb | grove | archway | temple | cinderhorn
 //   node tools/check.mjs layout 500 layouts for 500 synthetic islands (default 150)
 //
 // Run it after every change. It catches the mistakes that otherwise only show
@@ -1642,6 +1642,30 @@ const checks = {
     const gable = climber(L, L.gable, 'gable', errors, 2);
     const s = v.stats;
     return { errors, note: `${s.pieces} pieces, ${s.coins} coins; beach to the treasury in ${main.toFixed(0)} s (${s.jumps} jumps), out by the breach in ${out.toFixed(0)} s, the gable in ${gable.toFixed(0)} s (${s.gableJumps} jumps); ${climber.stats.retries} hops needed a second try` };
+  },
+
+  // Mount Cinderhorn: the layout keeps its design limits (the vents' throws
+  // among them), and a test climber gets from the beach to the knoll in the
+  // crater, out by the chimney, and along the crest and up the Horn.
+  async cinderhorn() {
+    const { buildCinderhornLayout, validateCinderhorn } = await load('ashore/cinderhorn-layout.js');
+    const L = buildCinderhornLayout();
+    const v = validateCinderhorn(L);
+    const errors = [...v.errors];
+    const { STYLES } = await load('cosmetics.js');
+    const { STEPS, LINES } = await load('story-text.js');
+    for (const c of L.chests) if (c.cosmetic && !STYLES.some((s) => s.id === c.cosmetic)) errors.push(`chest: no cosmetic "${c.cosmetic}"`);
+    const step = STEPS.ashore[L.spots.journal?.id];
+    if (!step?.text || !step.noAnchor || !step.noRefit || !step.where) errors.push(`story: STEPS.ashore.${L.spots.journal?.id} needs text, noAnchor, noRefit and where`);
+    for (const s of L.spots.looks) if (!LINES[`cinder${s.text[0].toUpperCase()}${s.text.slice(1)}`]) errors.push(`story: no line for the ${s.id} spot`);
+    const climber = await testClimber();
+    const before = climber.stats.launches;
+    const main = climber(L, L.route, 'main', errors, 2);
+    const out = climber(L, L.out, 'out', errors, 2);
+    const horn = climber(L, L.horn, 'horn', errors, 2);
+    const s = v.stats;
+    if (climber.stats.launches - before < s.launches + s.outLaunches) errors.push(`the climber was thrown ${climber.stats.launches - before} times, but the routes have ${s.launches + s.outLaunches} vents`);
+    return { errors, note: `${s.pieces} pieces, ${s.coins} coins, ${s.crumbles} that crumble; beach to the knoll in ${main.toFixed(0)} s (${s.jumps} jumps, ${s.launches} throws), out by the chimney in ${out.toFixed(0)} s (${s.outLaunches} throws), the Horn in ${horn.toFixed(0)} s (${s.hornJumps} jumps); ${climber.stats.retries} hops needed a second try` };
   },
 };
 

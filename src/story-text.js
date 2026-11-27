@@ -126,6 +126,12 @@ export const STEPS = {
       noRefit: "Grandpa's fifth journal is ashore at Sunken Temple Isle. Your anchor drags in the coral sand there. Ask the shipwright about a refit.",
       where: 'the treasury',
     },
+    VI: {
+      text: 'Go ashore at Mount Cinderhorn. He went up for a look inside.',
+      noAnchor: "Grandpa's sixth journal is ashore at Mount Cinderhorn. You'll need an anchor to land there, and a refit that can take the heat.",
+      noRefit: "Grandpa's sixth journal is ashore at Mount Cinderhorn. The heat there would soften your anchor chain. Ask the shipwright about a refit.",
+      where: 'the crater',
+    },
   },
   searchChest: { title: 'The chest under the bunk', text: "Return to Grandpa's wreck near Port Haven, climb aboard and open the old chest under his bunk." },
   letterHome: { title: 'The letter home', text: "Bring Grandpa's letters home to Grandma in Port Haven." },
@@ -186,6 +192,12 @@ export const LINES = {
   templeFish: 'Rows and rows of carved fish. Every single one of them looks slightly disappointed in you.',
   templeStool: 'One camp stool, pulled up to the gold. Just the one.',
   circlet: "A thin band of old gold. It has long forgotten what it was for. Try it on at any port's Tailor.",
+  cinderNote: '"Kettle\'s on. Gone up for a look inside."',
+  cinderNoteText: 'Pinned to the sailcloth, in his hand. The kettle is still on, over a crack in the rock, and still boiling. White chalk arrows lead up the old lava flow.',
+  cinderView: 'The whole sea on one side, and the fire on the other. Worth a pair of singed eyebrows.',
+  cinderTally: 'Tally marks scratched in the rock, in fives. Rows and rows of them. One mark near the end has a ring round it.',
+  cinderBedroll: 'A bedroll, laid out where the rock is warm.',
+  goggles: "Brass goggles with smoked glass, for looking into craters. Somebody liked their eyebrows. Try them on at any port's Tailor.",
 };
 
 // The sea zones (sea-zones.js), by id: the name shown on sailing in, and the warnings

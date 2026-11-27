@@ -6,6 +6,8 @@
 // up) and the crumbling basalt (drawn piece by piece so it can shake, fall
 // into the lava or down the face, and come back). levelgen.js builds it for a
 // level with `lava`; the rules it shows are hazards.js, passed in each frame.
+// The lava's texture, the vents' steam and the crumbling pieces are exported
+// for Mount Cinderhorn's hand-built level (cinderhorn-life.js).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { propMaterial, thinOutline, part, merge, jitter } from '../props.js';
@@ -19,8 +21,8 @@ const TILE = 7;          // metres of lava one repeat of its texture covers
 const BURST = 1.4;       // seconds a vent's column of steam lasts
 const WISPS = 3, PUFFS = 10;
 
-/** The lava's look: dark crust plates with glowing seams, on a canvas that tiles. */
-function lavaTexture(seed) {
+/** The lava's look: dark crust plates with glowing seams, on a canvas that tiles. (Also the lava of Mount Cinderhorn, at sea and ashore.) */
+export function lavaTexture(seed) {
   const W = 256, H = 128, cv = document.createElement('canvas');
   cv.width = W; cv.height = H;
   const g = cv.getContext('2d'), rng = mulberry32(seed);
@@ -262,32 +264,10 @@ export function buildVolcanicLife(L, crumbles, quality) {
   const veins = veinMesh(L, mulberry32(((L.T.Rt * 331) | 0) + 11), low, veinMat);
   group.add(veins);
   own.push(veinMat, veins.geometry);
-  // ---- steam: wisps over each vent, and a column when it fires
-  const vents = L.vents || [];
-  const puffGeo = new THREE.IcosahedronGeometry(0.5, 0);
-  const puffMat = toonMaterial({ color: '#f4f1ec' });
-  const puffs = new THREE.InstancedMesh(puffGeo, puffMat, Math.max(1, vents.length * (WISPS + PUFFS)));
-  puffs.frustumCulled = false;
-  const puffInk = new THREE.InstancedMesh(puffGeo, thinOutline, puffs.count);
-  puffInk.instanceMatrix = puffs.instanceMatrix;
-  puffInk.frustumCulled = false;
-  group.add(puffs, puffInk);
-  own.push(puffGeo, puffMat);
-  // ---- crumbling pieces, each its own mesh with its glowing cracks
-  const emberDim = new THREE.MeshBasicMaterial({ vertexColors: true, color: '#b35a2a' });
-  const emberHot = new THREE.MeshBasicMaterial({ vertexColors: true, color: '#ffffff' });
-  own.push(emberDim, emberHot);
-  const pieces = crumbles.map((p) => {
-    const body = mergeGeometries(pieceParts(p)), cracks = mergeGeometries(emberParts(p));
-    for (const g of [body, cracks]) { g.translate(-p.cx, -p.top, -p.cz); g.computeBoundingSphere(); }
-    const holder = new THREE.Group();
-    const glow = new THREE.Mesh(cracks, emberDim);
-    holder.add(new THREE.Mesh(body, propMaterial), new THREE.Mesh(body, thinOutline), glow);
-    holder.position.set(p.cx, p.top, p.cz);
-    group.add(holder);
-    own.push(body, cracks);
-    return { id: p.id, holder, glow, x: p.cx, y: p.top, z: p.cz, was: 'solid', grow: 1 };
-  });
+  // ---- steam from the vents, and the crumbling pieces
+  const steam = ventSteam(L.vents || []);
+  const fallers = crumblingPieces(crumbles, pieceParts);
+  group.add(steam.group, fallers.group);
 
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), s = new THREE.Vector3();
   const put = (mesh, i, x, y, z, k, ry = 0) => {
@@ -307,12 +287,45 @@ export function buildVolcanicLife(L, crumbles, quality) {
       put(bubbles, i, Math.cos(b.a) * r, (b.top ? crater.lavaY : LAVA_Y) - 0.05, Math.sin(b.a) * r, k < 0.9 ? 0.2 + k * 0.9 : 0.001);
     });
     bubbles.instanceMatrix.needsUpdate = true;
+    steam.update(t, hz);
+    fallers.update(dt, t, hz);
+  }
+  update(0, 0, null);
+
+  return {
+    group, update,
+    dispose() { for (const o of own) o.dispose(); bubbles.dispose(); steam.dispose(); fallers.dispose(); },
+  };
+}
+
+/**
+ * The steam of a level's vents (`vents`: the level's list, hazards.js):
+ * wisps over each while it rests, and a column when it throws you up.
+ * Returns { group, update(t, hazards), dispose() }. Any level with vents can
+ * use it (generated volcanic islands, Mount Cinderhorn).
+ */
+export function ventSteam(vents) {
+  const group = new THREE.Group();
+  const puffGeo = new THREE.IcosahedronGeometry(0.5, 0);
+  const puffMat = toonMaterial({ color: '#f4f1ec' });
+  const puffs = new THREE.InstancedMesh(puffGeo, puffMat, Math.max(1, vents.length * (WISPS + PUFFS)));
+  puffs.frustumCulled = false;
+  const puffInk = new THREE.InstancedMesh(puffGeo, thinOutline, puffs.count);
+  puffInk.instanceMatrix = puffs.instanceMatrix;
+  puffInk.frustumCulled = false;
+  group.add(puffs, puffInk);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), s = new THREE.Vector3();
+  const put = (i, x, y, z, k, ry = 0) => {
+    q.setFromAxisAngle(v.set(0, 1, 0), ry);
+    puffs.setMatrixAt(i, m.compose(v.set(x, y, z), q, s.set(k, k * 0.85, k)));
+  };
+  function update(t, hz) {
     let n = 0;
     vents.forEach((vent, vi) => {
       const fired = hz?.vents[vi]?.fired ?? -9, age = (hz?.clock ?? 0) - fired;
       for (let i = 0; i < WISPS; i++) {
         const k = (t * 0.45 + i / WISPS + vi * 0.37) % 1;
-        put(puffs, n++, vent.x + Math.sin(t + i) * 0.15 * k, vent.y + 0.1 + k * 2.4, vent.z + Math.cos(t * 0.7 + i) * 0.15 * k, (0.25 + k * 0.45) * (1 - k * k), t + i);
+        put(n++, vent.x + Math.sin(t + i) * 0.15 * k, vent.y + 0.1 + k * 2.4, vent.z + Math.cos(t * 0.7 + i) * 0.15 * k, (0.25 + k * 0.45) * (1 - k * k), t + i);
       }
       // the column: puffs shot up one after another, the first ones furthest,
       // racing up behind you, then billowing and thinning out where they stop
@@ -320,11 +333,38 @@ export function buildVolcanicLife(L, crumbles, quality) {
         const k = clamp((age - i * 0.03) / BURST, 0, 1), rise = 1 - (1 - Math.min(1, k * 2.2)) ** 3;
         const up = vent.lift * 0.85 * rise * (1 - (i / PUFFS) * 0.75);
         const size = k <= 0 || k >= 1 ? 0.001 : (0.5 + 0.8 * rise + 0.25 * (i % 3)) * (1 - k ** 4);
-        put(puffs, n++, vent.x + Math.sin(i * 2.3) * 0.35 * rise, vent.y + 0.2 + up, vent.z + Math.cos(i * 1.7) * 0.35 * rise, size, i);
+        put(n++, vent.x + Math.sin(i * 2.3) * 0.35 * rise, vent.y + 0.2 + up, vent.z + Math.cos(i * 1.7) * 0.35 * rise, size, i);
       }
     });
     puffs.count = puffInk.count = n;
     puffs.instanceMatrix.needsUpdate = true;
+  }
+  return { group, update, dispose() { puffGeo.dispose(); puffMat.dispose(); puffs.dispose(); } };
+}
+
+/**
+ * A level's crumbling pieces (`crumbles`: the pieces themselves), each drawn
+ * on its own with its glowing cracks, so it can shake, fall and rise back as
+ * hazards.js says. bodyOf(piece): its parts. Returns { group, update(dt, t,
+ * hazards), dispose() }.
+ */
+export function crumblingPieces(crumbles, bodyOf) {
+  const group = new THREE.Group(), own = [];
+  const emberDim = new THREE.MeshBasicMaterial({ vertexColors: true, color: '#b35a2a' });
+  const emberHot = new THREE.MeshBasicMaterial({ vertexColors: true, color: '#ffffff' });
+  own.push(emberDim, emberHot);
+  const pieces = crumbles.map((p) => {
+    const body = mergeGeometries(bodyOf(p)), cracks = mergeGeometries(emberParts(p));
+    for (const g of [body, cracks]) { g.translate(-p.cx, -p.top, -p.cz); g.computeBoundingSphere(); }
+    const holder = new THREE.Group();
+    const glow = new THREE.Mesh(cracks, emberDim);
+    holder.add(new THREE.Mesh(body, propMaterial), new THREE.Mesh(body, thinOutline), glow);
+    holder.position.set(p.cx, p.top, p.cz);
+    group.add(holder);
+    own.push(body, cracks);
+    return { id: p.id, holder, glow, x: p.cx, y: p.top, z: p.cz, was: 'solid', grow: 1 };
+  });
+  function update(dt, t, hz) {
     for (const c of pieces) {
       const st = hz?.byId[c.id], state = st?.state || 'solid', h = c.holder;
       if (state === 'solid' && c.was === 'fallen') c.grow = 0; // back: rises into place
@@ -344,10 +384,5 @@ export function buildVolcanicLife(L, crumbles, quality) {
       h.position.set(c.x + Math.sin(t * 61) * shake, c.y - (1 - c.grow) * 0.6 - shake * 0.5, c.z + Math.cos(t * 53) * shake);
     }
   }
-  update(0, 0, null);
-
-  return {
-    group, update,
-    dispose() { for (const o of own) o.dispose(); bubbles.dispose(); puffs.dispose(); },
-  };
+  return { group, update, dispose() { for (const o of own) o.dispose(); } };
 }

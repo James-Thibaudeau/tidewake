@@ -10,6 +10,7 @@ import { buildWreckModel, WRECK_STACKS, WRECK_SOLID, WRECK_MOORING } from './ash
 import { buildElderTree } from './elder-tree.js';
 import { buildSeaArch, ARCH } from './sea-arch.js';
 import { buildSeaTemple, buildSeaTempleRocks, TEMPLE_SEA } from './sea-temple.js';
+import { buildSeaVolcano, VOLCANO_SEA } from './sea-volcano.js';
 
 const PREFIX = ['Gull', 'Coral', 'Ember', 'Whale', 'Mist', 'Thorn', 'Kelp', 'Sable', 'Amber', 'Moss',
   'Drift', 'Shell', 'Pebble', 'Storm', 'Sun', 'Moon', 'Star', 'Otter', 'Heron', 'Crab', 'Pelican',
@@ -342,6 +343,7 @@ export class World {
         I.rocks.push({ x: I.archPos.x + px * off * s, z: I.archPos.z + pz * off * s, r: 6 * ARCH.scale, h: 0, type: 'hidden' });
       }
     }
+    if (I.landmark === 'volcano') this.placeVolcano(I);
     // Where the landmark stands, for the sea view (buildLandmark) and the chart
     // (ui/landmarks.js) alike: the arch at the bay's mouth, the rest at the
     // island's heart (the grove's tree faces Port Haven). No rng() here, so
@@ -373,6 +375,28 @@ export class World {
     I.temple = { a, at, deck, toWorld };
     const T = buildSeaTempleRocks(deck);
     for (const R of T) { const [x, z] = toWorld(R.x, R.z); I.rocks.push({ x, z, r: R.r, h: 0, type: 'hidden' }); }
+  }
+
+  /**
+   * How Mount Cinderhorn's fire lies (sea-volcano.js): the river of lava runs
+   * down the flank facing Port Haven, a little to one side, clear of the
+   * island's sunken treasure and its sea stacks (grandfather's camp is on the
+   * beach that faces home); the lake of lava stands above every lump of ground
+   * inside the rim. Nothing about the coast changes. (No rng() here, so
+   * nothing else in the world moves.)
+   */
+  placeVolcano(I) {
+    const H = this.islands[0], home = Math.atan2(H.z - I.z, H.x - I.x);
+    const off = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+    const taken = [I.treasureAngle, ...I.rocks.map((R) => Math.atan2(R.z - I.z, R.x - I.x))];
+    let a = home + 0.55;
+    for (const c of [0.55, -0.55, 0.8, -0.8, 1.05, -1.05]) if (!taken.some((t) => off(home + c, t) < 0.4)) { a = home + c; break; }
+    const rot = Math.atan2(-Math.cos(a), -Math.sin(a));   // volcano space -z runs down the river
+    let high = 0;
+    for (let x = -VOLCANO_SEA.rimR; x <= VOLCANO_SEA.rimR; x += 6) for (let z = -VOLCANO_SEA.rimR; z <= VOLCANO_SEA.rimR; z += 6) {
+      if (Math.hypot(x, z) < VOLCANO_SEA.rimR) high = Math.max(high, islandHeight(I, I.x + x, I.z + z));
+    }
+    I.volcano = { a, rot, lake: Math.ceil(high + 4) };
   }
 
   key(cx, cz) { return (cx + 1000) * 4096 + (cz + 1000); }
@@ -617,6 +641,27 @@ const beamMat = new THREE.ShaderMaterial({
 });
 const beamGeo = new THREE.ConeGeometry(7, 70, 24, 6, true).translate(0, -35, 0).rotateZ(Math.PI / 2);
 
+/**
+ * An island's terrain as its mesh draws it (buildTerrain's grid, each square
+ * split corner to corner the same way), in island space: what is laid on the
+ * ground has to follow the triangles, not the smooth height they sample.
+ */
+function drawnHeight(I) {
+  const B = I.r * 1.3, seg = clamp(Math.round((B * 2) / (I.r > 200 ? 5 : 4)), 40, 160), S = (2 * B) / seg, memo = new Map();
+  const at = (i, j) => {
+    const k = j * (seg + 1) + i;
+    let h = memo.get(k);
+    if (h === undefined) memo.set(k, (h = Math.max(-8, islandHeight(I, I.x - B + i * S, I.z - B + j * S))));
+    return h;
+  };
+  return (lx, lz) => {
+    const fx = (lx + B) / S, fz = (lz + B) / S, i = Math.floor(fx), j = Math.floor(fz);
+    if (i < 0 || j < 0 || i >= seg || j >= seg) return -8;
+    const u = fx - i, v = fz - j, a = at(i, j), b = at(i + 1, j), c = at(i, j + 1), d = at(i + 1, j + 1);
+    return u + v <= 1 ? a + u * (b - a) + v * (c - a) : d + (1 - u) * (c - d) + (1 - v) * (b - d);
+  };
+}
+
 export class IslandStreamer {
   constructor(scene, world, quality) {
     this.scene = scene;
@@ -625,8 +670,7 @@ export class IslandStreamer {
     this.range = quality === 'low' ? 2000 : 2800;
     this.quality = quality;
     this.lamps = [];
-    this.smoke = [];
-    this.anims = []; // { owner, update(time, night) }
+    this.anims = []; // { owner, update(time, night, boat), dispose? }
   }
 
   update(px, pz, budget = 1) {
@@ -654,7 +698,7 @@ export class IslandStreamer {
       if (o.userData.own && o.geometry) o.geometry.dispose();
     });
     this.lamps = this.lamps.filter((l) => l.owner !== F);
-    this.smoke = this.smoke.filter((l) => l.owner !== F);
+    for (const A of this.anims) if (A.owner === F) A.dispose?.();
     this.anims = this.anims.filter((l) => l.owner !== F);
     this.built.delete(F);
   }
@@ -848,17 +892,22 @@ export class IslandStreamer {
       this.buildTemple(I, group, exclusions);
     } else if (I.landmark === 'arch' && I.archPos) {
       this.buildArch(I, group);
-    } else if (I.landmark === 'volcano') {
-      const geo = new THREE.IcosahedronGeometry(1, 1);
-      const mat = toonMaterial({ color: 0x8d8a8a, gradientMap: toonGradient() });
-      const top = islandHeight(I, P.x + I.r * 0.2, P.z);
-      for (let k = 0; k < 9; k++) {
-        const m = new THREE.Mesh(geo, mat);
-        m.userData.base = { y: top + 10 + k * 14, x: ox + Math.sin(k * 1.7) * 8, z: oz + Math.cos(k * 2.3) * 8, s: 10 + k * 3.5, k };
-        group.add(m);
-        this.smoke.push({ owner: I, mesh: m });
-      }
+    } else if (I.landmark === 'volcano' && I.volcano) {
+      this.buildVolcano(I, group, exclusions);
     }
+  }
+
+  /** Mount Cinderhorn's top and its fire (sea-volcano.js): the rim and the Horn, the lake, the river of lava, its smoke, steam and sparks. */
+  buildVolcano(I, group, exclusions) {
+    const Vp = I.volcano, drawn = drawnHeight(I), cr = Math.cos(Vp.rot), sr = Math.sin(Vp.rot);
+    const local = (x, z) => [x * cr + z * sr, -x * sr + z * cr];   // volcano space → island space
+    const M = buildSeaVolcano({ ground: (x, z) => drawn(...local(x, z)), lake: Vp.lake, glowMap: glowTexture() });
+    M.group.rotation.y = Vp.rot;
+    for (const o of M.outlines) o.userData.lod = 'outline';
+    group.add(M.group);
+    this.anims.push({ owner: I, update: M.update, dispose: M.dispose });
+    // no burnt trees or boulders standing in the river
+    for (const p of M.river) if (Math.round(p.d / 6) % 4 === 0) exclusions.push([...local(p.x, p.z), 44]);
   }
 
   /** The Sunken Temple over the island's edge (sea-temple.js), with its surf, turtles, birds, mist and glow. */
@@ -1063,12 +1112,6 @@ export class IslandStreamer {
       L.beam.rotation.y = time * 0.6;
     }
     for (const A of this.anims) A.update(time, night, boat);
-    for (const S of this.smoke) {
-      const b = S.mesh.userData.base;
-      const t = (time * 0.08 + b.k / 9) % 1;
-      S.mesh.position.set(b.x + t * 30, b.y + t * 60, b.z + t * 10);
-      S.mesh.scale.setScalar(b.s * (0.6 + t * 0.8));
-    }
     for (const rec of this.built.values()) {
       if (rec.beacon && rec.beacon.visible) {
         const g = rec.beacon.userData.glint;

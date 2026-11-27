@@ -125,6 +125,8 @@ src/
                   (its bark, moss and fungus) + grove-life.js (its owl guide and fireflies),
                   archway.js + archway-layout.js + archway-art.js (Archway Isle, hand-built)
                   + archway-life.js (its gulls),
+                  cinderhorn.js + cinderhorn-layout.js + cinderhorn-art.js (Mount Cinderhorn,
+                  hand-built) + cinderhorn-life.js (its lava lake, sparks and steam),
                   controller.js + collide.js (movement), camera.js, ground-shadow.js (the
                   spot under the explorer), pacer.js (races on foot),
                   shapes.js (the collider shapes they all share)
@@ -139,6 +141,7 @@ src/
   props.js        low-poly prop library (trees, huts, lighthouse, rocks, chests…)
   elder-tree.js   the Elder Tree landmark, as seen from the sea
   sea-arch.js     the great arch of Archway Isle, as seen from the sea
+  sea-volcano.js  Mount Cinderhorn's crater, Horn, river of lava, smoke and sparks, as seen from the sea
   boat.js         the Boat class (the player's boat and the Redwing): sailing physics, collisions
   boat/           the rest of Boat: model.js (hull, mast, sails), fittings.js (helm, keel, lanterns,
                   crow's nest), rig.js (upgrades, rig layout, animation), livery.js (colours, cloth, flags,

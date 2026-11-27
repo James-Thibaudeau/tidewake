@@ -39,9 +39,13 @@ import { buildArchwayLayout } from '../ashore/archway-layout.js';
 import { pieceArt as archwayPieceArt } from '../ashore/archway-art.js';
 import { buildSeaArch, ARCH } from '../sea-arch.js';
 import { buildSeaTemple, TEMPLE_SEA } from '../sea-temple.js';
+import { buildSeaVolcano, VOLCANO_SEA } from '../sea-volcano.js';
 import { buildTempleLevel } from '../ashore/temple.js';
 import { buildTempleLayout } from '../ashore/temple-layout.js';
 import { pieceArt as templePieceArt } from '../ashore/temple-art.js';
+import { buildCinderhornLevel } from '../ashore/cinderhorn.js';
+import { buildCinderhornLayout, CINDER } from '../ashore/cinderhorn-layout.js';
+import { pieceArt as cinderPieceArt } from '../ashore/cinderhorn-art.js';
 import { buildWhale, buildDolphin, buildTurtle } from '../sea-life.js';
 import { buildWaterspout, buildIceberg, buildBottle } from '../sea-wonders.js';
 import { buildGull, buildFish } from '../sea-ambient.js';
@@ -313,6 +317,56 @@ function ruins(q, stage) {
 }
 const TEMPLE_PLACES = ['overview', 'sea', 'beach', 'causeway', 'colonnade', 'stair', 'portico', 'hall', 'treasury', 'gable', 'shrine', 'breach', 'lantern'];
 
+// Mount Cinderhorn: the whole level, or `kind=crag&n=2` for one of its
+// pieces. `at` picks a place for the `spot` view, and `journal=0` shows the
+// knoll after Journal VI has been taken.
+function cinderhorn(q, stage) {
+  initProps();
+  const warnings = [];
+  const L = buildCinderhornLayout();
+  if (q.kind) {
+    const { holder, geo } = onePiece(L.pieces, q, (p) => cinderPieceArt(p), warnings);
+    stage.add(holder);
+    return { group: holder, ground: 'floor', warnings, note: holder.userData.note, dispose() { geo.dispose(); } };
+  }
+  const level = buildCinderhornLevel({ name: 'Mount Cinderhorn' }, { quality: 'high' });
+  level.syncStory({ journal: q.journal !== '0' });
+  stage.add(level.group);
+  const lamp = (id) => L.checkpoints.find((c) => c.id === id);
+  const [A, B, Cs] = L.shelves, mid = L.spiral[Math.floor(L.spiral.length / 2)], F = L.fall, fy = (F.y0 + F.y1) / 2;
+  // (yaw: where the camera stands, as a heading from the spot; the beach is to the south)
+  const PLACES = {
+    beach: { x: L.camp.x + 1, y: L.camp.y + 1.1, z: L.camp.z - 0.5, span: 9, yaw: Math.PI + 0.5, pitch: 0.3 },
+    forge: { x: L.forge.x + 0.6, y: L.forge.y + 1.2, z: L.forge.z + 0.6, span: 10, yaw: Math.PI + 0.9, pitch: 0.3 },
+    flow: { x: 0, y: 4, z: -52, span: 26, yaw: Math.PI + 0.5, pitch: 0.45 },
+    wall: { x: (A.cx + Cs.cx) / 2, y: (A.top + Cs.top) / 2, z: (A.cz + Cs.cz) / 2 - 2, span: 30, yaw: Math.PI - 0.45, pitch: 0.2 },
+    vent: { x: B.cx, y: B.top + 2.5, z: B.cz, span: 13, yaw: Math.PI - 0.7, pitch: 0.35 },
+    shoulder: { x: 0, y: CINDER.notch + 1, z: -25.5, span: 16, yaw: Math.PI + 0.7, pitch: 0.5 },
+    crater: { x: 0, y: 14, z: 0, span: 56, yaw: Math.PI, pitch: 0.85 },   // down into it, from over the shoulder
+    descent: { x: mid.cx * 0.8, y: mid.top, z: mid.cz * 0.8, span: 26, yaw: Math.atan2(-mid.cx, -mid.cz), pitch: 0.4 },   // looking out at the wall from over the lake
+    fall: { x: F.path[5][0] * Math.cos(F.a), y: fy, z: F.path[5][0] * Math.sin(F.a), span: 22, yaw: Math.atan2(-Math.cos(F.a), -Math.sin(F.a)) + 0.3, pitch: 0.3 },
+    ridge: { x: 7 * Math.cos(L.aF), y: CINDER.lake + 1, z: 7 * Math.sin(L.aF), span: 22, yaw: L.aF - 0.4, pitch: 0.6 },
+    knoll: { x: 1, y: L.knoll.top + 0.8, z: 1.2, span: 9, yaw: Math.PI + 0.5, pitch: 0.5 },
+    tally: { x: L.tally.x, y: L.knoll.top + 1, z: L.tally.z - 0.3, span: 3.6, yaw: Math.PI, pitch: 0.1 },
+    chimney: { x: 0, y: 16, z: -17.5, span: 22, yaw: 0.25, pitch: 0.25 },   // from over the lake, looking south at the wall under the notch
+    rim: { x: L.crags[3].cx, y: L.crags[3].top - 2, z: L.crags[3].cz, span: 34, yaw: Math.PI + 0.9, pitch: 0.3 },   // the stacks on the broken rim, from outside
+    horn: { x: L.hornAt.x, y: CINDER.horn.top - 2, z: L.hornAt.z, span: 26, yaw: Math.PI + 1.3, pitch: 0.25 },
+    tip: { x: L.chests[0].x, y: L.chests[0].y + 1, z: L.chests[0].z, span: 9, yaw: 1.2, pitch: 0.35 },
+    lantern: { ...lamp('half'), y: lamp('half').y + 1.3, span: 6, yaw: Math.atan2(-lamp('half').x, -lamp('half').z), pitch: 0.3 },
+    // the whole mountain: from above the beach, and from the sea as the rowboat comes in
+    overview: { x: 0, y: 10, z: -8, span: 130, yaw: Math.PI + 0.5, pitch: 0.75 },
+    sea: { x: 0, y: 12, z: -20, span: 110, yaw: Math.PI + 0.25, pitch: 0.22 },
+  };
+  let at = q.at || 'overview';
+  if (!PLACES[at]) { warnings.push(`at=${at} is not a place here (${Object.keys(PLACES).join(', ')})`); at = 'overview'; }
+  return {
+    group: level.group, ground: 'sea', warnings, shoal: shoalOf(level), spot: PLACES[at], note: q.at ? at : undefined,
+    update(dt, t, env) { level.update(dt, t, { night: env.night }); },
+    dispose() { level.dispose(); },
+  };
+}
+const CINDER_PLACES = ['overview', 'sea', 'beach', 'forge', 'flow', 'wall', 'vent', 'shoulder', 'crater', 'descent', 'fall', 'ridge', 'knoll', 'tally', 'chimney', 'rim', 'horn', 'tip', 'lantern'];
+
 // The great arch as seen from the sea (sea-arch.js). The `spot` view is the
 // storm lantern on its keystone.
 function arch(q, stage) {
@@ -352,6 +406,38 @@ function temple(q, stage) {
     group: M.group, ground: 'sea', warnings, spot: PLACES[at], note: q.at ? at : undefined,
     update(dt, t, env) { M.update(t, env.night, null); },
     dispose() { M.group.traverse((o) => o.geometry?.dispose()); mound.material.dispose(); },
+  };
+}
+
+// Mount Cinderhorn as seen from the sea (sea-volcano.js), on a plain cone that
+// stands in for the island. `at` picks a close look for the `spot` view.
+const VOLCANO_SEA_PLACES = ['mountain', 'crown', 'horn', 'river', 'shore'];
+function volcano(q, stage) {
+  initProps();
+  const warnings = [], R = 300, PEAK = 240, lake = 176;
+  // the island's own shape (world.js, islandHeight), without its lumps
+  const ground = (x, z) => { const s = 1 - Math.hypot(x, z) / R; return s <= 0 ? Math.max(-40, s * 43) : PEAK * Math.pow(s, 1.9) + 1.3 * Math.min(1, s * 10) - (s > 0.8 ? Math.min(1, (s - 0.8) / 0.12) * PEAK * 0.3 : 0); };
+  const M = buildSeaVolcano({ ground, lake, glowMap: glowTexture() });
+  const cone = new THREE.PlaneGeometry(R * 2.2, R * 2.2, 120, 120).rotateX(-Math.PI / 2);
+  { const p = cone.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, Math.max(-8, ground(p.getX(i), p.getZ(i)))); }
+  cone.computeVertexNormals();
+  const coneMat = new THREE.MeshLambertMaterial({ color: '#4a3d3a' });
+  M.group.add(new THREE.Mesh(cone, coneMat));
+  stage.add(M.group);
+  const hx = Math.cos(VOLCANO_SEA.hornA) * VOLCANO_SEA.rimR, hz = Math.sin(VOLCANO_SEA.hornA) * VOLCANO_SEA.rimR, mid = M.river[Math.floor(M.river.length / 2)];
+  const PLACES = {
+    mountain: { x: 0, y: 150, z: 0, span: 640, yaw: Math.PI + 0.5, pitch: 0.12 },   // as you come from Port Haven
+    crown: { x: 0, y: lake + 14, z: 0, span: 190, yaw: Math.PI + 0.35, pitch: 0.55 },
+    horn: { x: hx, y: lake + 52, z: hz, span: 130, yaw: -1.5, pitch: 0.15 },   // from outside the rim, clear of the smoke
+    river: { x: mid.x, y: mid.y, z: mid.z, span: 170, yaw: Math.PI + 0.7, pitch: 0.4 },
+    shore: { x: M.mouth.x, y: 14, z: M.mouth.z, span: 110, yaw: Math.PI + 0.6, pitch: 0.25 },
+  };
+  let at = q.at || 'mountain';
+  if (!PLACES[at]) { warnings.push(`at=${at} is not a place here (${Object.keys(PLACES).join(', ')})`); at = 'mountain'; }
+  return {
+    group: M.group, ground: 'sea', warnings, spot: PLACES[at], note: q.at ? at : undefined,
+    update(dt, t, env) { M.update(t, env.night); },
+    dispose() { M.dispose(); cone.dispose(); coneMat.dispose(); },
   };
 }
 
@@ -538,7 +624,7 @@ function levelPlaces(L) {
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v));
 }
 
-export const SUBJECTS = { outfit, ship, prop, tree, arch, temple, wreck, grove, archway, ruins, level, sealife, fireworks };
+export const SUBJECTS = { outfit, ship, prop, tree, arch, temple, volcano, wreck, grove, archway, ruins, cinderhorn, level, sealife, fireworks };
 
 // Every parameter a subject reads, so a misspelt one is reported instead of ignored.
 const DRESS = [...SLOTS, ...SLOTS.map((s) => s + 'Color'), 'shirt', 'skin', 'head', 'eyeColor', 'eyeShape', 'blush', 'freckles', 'profile'];
@@ -551,8 +637,10 @@ const PARAMS = {
   grove: ['kind', 'n'],
   arch: [],
   temple: ['at'],
+  volcano: ['at'],
   archway: ['kind', 'n', 'at', 'journal'],
   ruins: ['kind', 'n', 'at', 'journal'],
+  cinderhorn: ['kind', 'n', 'at', 'journal'],
   level: ['biome', 'seed', 'r', 'dist', 'kind', 'n', 'at', 'gust'],
   sealife: ['kind'],
   fireworks: ['kind', 'seed', 'color', 'age', 'low', 'ship'],
@@ -577,7 +665,9 @@ export function controlsFor(show) {
     case 'grove': return [['kind', [...new Set(buildGroveLayout().pieces.map((p) => p.kind))]], ['n', TIERS]];
     case 'archway': return [['at', ARCHWAY_PLACES], ['journal', ['0']], ['kind', [...new Set(buildArchwayLayout().pieces.map((p) => p.kind))]], ['n', TIERS]];
     case 'temple': return [['at', TEMPLE_SEA_PLACES]];
+    case 'volcano': return [['at', VOLCANO_SEA_PLACES]];
     case 'ruins': return [['at', TEMPLE_PLACES], ['journal', ['0']], ['kind', [...new Set(buildTempleLayout().pieces.map((p) => p.kind))]], ['n', TIERS]];
+    case 'cinderhorn': return [['at', CINDER_PLACES], ['journal', ['0']], ['kind', [...new Set(buildCinderhornLayout().pieces.map((p) => p.kind))]], ['n', TIERS]];
     case 'level': return [['biome', [...ASHORE_BIOMES]], ['kind', PIECE_KINDS], ['n', TIERS], ['seed', ['4401', '1121', '77', '31337']]];
     case 'sealife': return [['kind', SEALIFE]];
     case 'fireworks': return [['kind', FIREWORK_KINDS], ['color', Object.keys(COLORS)], ['age', ['0.1', '0.4', '1.5', '2.5', 'loop']], ['seed', ['1', '2', '3']], ['low', ['1']], ['ship', ['0']]];

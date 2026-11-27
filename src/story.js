@@ -5,9 +5,10 @@
 // state.story = { chapter, journals: [id], flags: {}, seenCards: [id] }
 //   chapter 0   prologue not yet shown
 //   chapter 1   visit the wreck → Journal I + the brass spyglass
-//   chapter 2-7 find Journals II-VII at grandfather's old camps (III and IV
-//               are ashore: up the great tree in the Elder Grove level, and
-//               at the keystone of the arch on Archway Isle)
+//   chapter 2-7 find Journals II-VII at grandfather's old camps (III to VI
+//               are ashore: up the great tree in the Elder Grove level, at
+//               the keystone of the arch on Archway Isle, in the Sunken
+//               Temple's treasury and down in Mount Cinderhorn's crater)
 //   chapter 8   back to the wreck: the chest under the bunk
 //   chapter 9   bring the letters home to Grandma in Port Haven
 //   chapter 10  complete (free roam)
@@ -23,7 +24,7 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
 const LANDMARK_FOR = { III: 'grove', IV: 'arch', V: 'ruins', VI: 'volcano', VII: 'frost' };
 // Journals that have moved into their landmark's level. There's no searching
 // for these from the sea: you drop anchor by the camp and go ashore.
-const IN_LEVEL = new Set(['III', 'IV', 'V']);
+const IN_LEVEL = new Set(['III', 'IV', 'V', 'VI']);
 export const FINAL_CHAPTER = 10;
 
 const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] ?? m));

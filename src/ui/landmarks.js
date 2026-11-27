@@ -67,7 +67,7 @@ const PICTURES = {
     water(g, -1, 1, 0.42, 0.9);
   },
 
-  /** A cone with a glowing orange crater and a puff of smoke. */
+  /** A cone with a glowing orange crater, the Horn hooked over its rim, and a puff of smoke. */
   volcano(g, lw) {
     const glow = g.createRadialGradient(0, -0.34, 0, 0, -0.34, 0.6);
     glow.addColorStop(0, 'rgba(255,150,60,0.75)'); glow.addColorStop(1, 'rgba(255,150,60,0)');
@@ -79,9 +79,13 @@ const PICTURES = {
     g.fillStyle = '#ff7a24'; g.beginPath(); g.moveTo(-0.12, -0.34); g.lineTo(-0.02, -0.34); g.lineTo(-0.1, 0.1); g.lineTo(-0.2, 0.26); g.closePath(); g.fill(); // a lava run
     g.restore();
     cone(); g.stroke();
+    // the Horn, on the far side of the rim, curling in over the crater
+    g.beginPath(); g.moveTo(0.14, -0.3); g.quadraticCurveTo(0.24, -0.62, 0.2, -0.78); g.quadraticCurveTo(0.14, -0.92, -0.02, -0.9);
+    g.quadraticCurveTo(0.34, -1.02, 0.4, -0.7); g.quadraticCurveTo(0.42, -0.5, 0.36, -0.3); g.closePath();
+    g.fillStyle = '#806a5c'; g.fill(); g.stroke();
     g.beginPath(); g.ellipse(0, -0.34, 0.32, 0.1, 0, 0, TAU); g.fillStyle = '#ff7a24'; g.fill(); g.stroke();
     g.beginPath(); g.ellipse(0, -0.35, 0.18, 0.05, 0, 0, TAU); g.fillStyle = '#ffd54a'; g.fill();
-    blobs(g, lw, [[-0.08, -0.6, 0.16], [0.16, -0.76, 0.17], [0.42, -0.86, 0.12]], '#d8d2cc');
+    blobs(g, lw, [[-0.1, -0.6, 0.15], [-0.32, -0.74, 0.17], [-0.58, -0.84, 0.12]], '#d8d2cc');
   },
 
   /** A tall white needle of ice, shaded ice-blue. */
