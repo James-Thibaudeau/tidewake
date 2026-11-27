@@ -1489,7 +1489,9 @@ Updated 2026-11-27.
       the finale's last twelve booms peak at −6 with nothing clipped.
       The first boom was a 0.9 s thump almost all below 120 Hz, which small
       speakers turned into a little pop; the user heard that and it was
-      rebuilt. **The new one has been measured, not yet listened to.**
+      rebuilt. **Listened to by the user in the game (2026-11-27): "it's
+      good now."** The boom was their only complaint; the whoosh, the
+      crackle and the cheer drew no comment.
     - **Who notices:** with the Redwing in sight and Sable free (not in a
       race, in tow or with the kraken), Sable answers 6 times in 10 with a
       crimson one of their own, at most every 25 s, and a line that goes in
@@ -1507,8 +1509,8 @@ Updated 2026-11-27.
       `fireworks-low` and `fireworks-ages`. `check.mjs fireworks` checks the
       shells, the hold and the finale. `debug.fireworks()` sets one off;
       `debug.give({ fireworks: 'max' })` fills the hold.
-  - [ ] Fireworks follow-ups: the sounds need a listen; tune prices against
-    measured late-game income; on a phone held upright the finale's
+  - [ ] Fireworks follow-ups: tune prices against measured late-game
+    income; the whoosh is now quiet beside the boom (−34 dB against −17); on a phone held upright the finale's
     side-by-side shells run off the sides of the picture, and the port's
     five tabs take three rows; rockets can't be set off at a dock or from an
     island.
