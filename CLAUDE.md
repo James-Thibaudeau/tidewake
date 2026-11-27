@@ -24,13 +24,13 @@ node tools/check.mjs
 About a second, no browser. Run it after every change. It checks syntax,
 that every import resolves to a real export and is used, that no helper was
 left behind when code moved between files, text keys (`LINES.x`), element
-ids, save migration, the paint yard's catalogue (`paints`), the sea zones (home waters hold Port Haven and the
+ids, save migration, the paint yard's catalogue (`paints`), fireworks (every shell makes sparks, the grand finale is forty shells the sky can hold, `fireworks`), the sea zones (home waters hold Port Haven and the
 wreck; the CPU and the shaders agree, `seazones`), how the boat rides the
 wave set in plain sea, in home waters and over a rogue wave (pitch and bow slams,
 `ride`), rough water's rogue waves and ice (the wave is the same on the CPU as
 in the shaders, always arrives and costs the right share of the hull, `rogue`),
 150 generated ashore layouts per landable biome, a test
-climber (the real controller, steam vents and crumbling basalt included) that
+climber (the real controller, steam vents, crumbling basalt, ice and gusts of wind included) that
 walks 12 generated islands per biome to the summit, how high a vent's throw
 really goes, the living sea's rules (what turns up where, bounties, 3,000
 placements in a toy sea), the score (themes parse and stay in key, every
@@ -55,12 +55,13 @@ helpers:
 
 ```js
 tidewake.debug.start()                    // new voyage, prologue skipped; backs up the real save
-tidewake.debug.give({ gold: 5000, upgrades: 'max' })   // paints: 'all' owns every paint-yard item
+tidewake.debug.give({ gold: 5000, upgrades: 'max' })   // paints: 'all' owns every paint-yard item; fireworks: 'max' fills the hold
 tidewake.debug.teleport('Frostspire')     // id, name or { x, z }
 tidewake.debug.sea('whale')               // a sea event now: whale | dolphins | turtles | bottle | bloom | iceberg | waterspout | ghostShip; sea() says what's out there
 tidewake.debug.zone()                     // the sea at the boat: band (home | coastal | open), zone, wave and swell factors
 tidewake.debug.rogue(50)                  // a rogue wave now, from 50° off the starboard bow (negative = port); rogue('state') says what's out there
 tidewake.debug.cross({ badly: true })     // a test pilot sails one crossing of the Reach and says what it cost the hull, and where it went
+tidewake.debug.fireworks('heart')         // set one off now, free: a kind, a special, 'finale' or 'answer' (Sable's); fireworks() says what's aboard and in the air
 tidewake.debug.music()                    // the score: cue, intensity, layers, key, bar, and what the game wants; music('storm', 3) forces a cue, music('?') lists them, music('game') hands it back
 tidewake.debug.step(30)                   // 30 s of game time in well under a second
 tidewake.debug.frame()                    // draw a frame before a screenshot
@@ -115,12 +116,13 @@ gallery.frame()                            // draw before a screenshot when the 
   `cloth`, `emblem`, `flag`, `pennant`, `figurehead` (ids from `paints.js`);
   `view=stem` is close on the figurehead, `view=masthead` the flags.
 - Subjects: `outfit`, `ship`, `prop`, `tree`, `arch`, `volcano`, `wreck`, `grove`,
-  `archway`, `cinderhorn`, `level`, `sealife`. A big subject takes `at=<place>` with `view=spot` for
+  `archway`, `cinderhorn`, `level`, `sealife`, `fireworks` (one shell held at its best moment over a ship: `show=fireworks&kind=willow&view=spot&light=night`; `age=loop` plays it). A big subject takes `at=<place>` with `view=spot` for
   a close look at one place (`show=archway&at=keystone&view=spot`; a
-  generated island's `level` takes `at=moat|cliff|mesa|chest|top`). The
+  generated island's `level` takes `at=moat|cliff|mesa|chest|top`, and a cold one
+  `at=pond|gust` with `gust=calm|warn|blow`). The
   same parameters work in the URL: `gallery.html?show=ship&tier=4&light=night`.
 - **After changing how something looks, take the contact sheet that covers
-  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `paints`, `paint-parts`, `cloths`, `emblems`, `flags`, `figureheads`, `sealife`, `sea`, `shallows`, `rough`, `rogue`, `islands`, `island-places`, `volcano`, `cinderhorn-places`, `cinderhorn-night`…, or
+  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `paints`, `paint-parts`, `cloths`, `emblems`, `flags`, `figureheads`, `fireworks`, `fireworks-low`, `fireworks-ages`, `sealife`, `sea`, `shallows`, `rough`, `rogue`, `islands`, `island-places`, `cold-places`, `volcano`, `cinderhorn-places`, `cinderhorn-night`…, or
   `views` / `lights` / `distance` for the subject showing) and read every
   cell, not only the one you were fixing. A sheet takes the parameters
   already showing, so `gallery.set({ bottom: 'skirt' })` first narrows it.
@@ -169,7 +171,7 @@ which the other systems hang off:
 
 ```
 game.world  .streamer  .boat  .ocean  .env (sky)  .weather  .input  .audio  .fx
-game.ui  .creator  .story  .ashore  .quests  .rival  .refits  .reports  .seaEvents  .rough  .paintYard  .debug
+game.ui  .creator  .story  .ashore  .quests  .rival  .refits  .reports  .seaEvents  .rough  .paintYard  .fireworks  .debug
 game.state     everything that is saved (see below)
 game.mode      title | sailing | docking | docked | landing | ashore | wrecking | wrecked
 game.view      { scene, camera } being drawn: the sea, or the ashore level
@@ -188,6 +190,10 @@ game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, 
   (`cueFor`, from `game.musicNow()`), `music/score.js` turns the cue into bars of notes,
   `audio/music.js` writes them onto the audio clock and
   `audio/instruments.js` plays them. The game never plays a note itself.
+- **Fireworks**: `fireworks/shells.js` says what a shell is (points, as numbers), `fireworks/sky.js`
+  draws every spark as one GPU point and lights the sea under a burst, and `fireworks.js` is the
+  game's side: the hold, F and G, the grand finale, Sable's answer, a port's cheer.
+  `game.fireworks.finale({ free: true, from })` runs one from code without spending the player's.
 - **`UI`, `Boat` and `SoundSystem` are each one class split over several
   files.** The core is `src/ui.js` / `src/boat.js` / `src/audio.js`; the rest
   is mixed in from `src/ui/`, `src/boat/` and `src/audio/` (see the header of
@@ -196,7 +202,7 @@ game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, 
   find it. New methods go in the part file that fits.
 - **Pure modules stay pure**: `ashore/modules.js`, `ashore/grove-layout.js`, `ashore/archway-layout.js`, `ashore/cinderhorn-layout.js`, `collide.js`,
   `controller.js`, `shapes.js`, `save.js`, `paints.js`, `config.js`, `util.js`, `sea-zones.js`, `waves.js`, `rogue.js`,
-  `cosmetics.js`, `sightings.js`, `music-cues.js`, `music/notation.js`, `music/themes.js`, `music/score.js` and the text files import no three.js and touch no DOM at
+  `cosmetics.js`, `sightings.js`, `fireworks/shells.js`, `music-cues.js`, `music/notation.js`, `music/themes.js`, `music/score.js` and the text files import no three.js and touch no DOM at
   load, so `tools/check.mjs` can run them in Node. Keep it that way.
 - Tuning numbers live in `src/config.js`; on-foot limits are `ASHORE` there,
   and ashore levels must keep required jumps inside `ASHORE.design`.

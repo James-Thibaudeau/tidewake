@@ -178,6 +178,9 @@ export const LINES = {
   groveNote: '"Gone up the big tree. Back for supper."',
   groveNoteText: 'His handwriting, in a hurry. A worn path runs inland, towards the great tree.',
   lava: 'Too hot! Back at your last lantern.',
+  // the first time on a cold island (ashore.js): ice underfoot, and a gust of wind stirring nearby
+  ice: 'Ice! You slide on after you let go.',
+  gust: 'A gust of wind! Cross when the pennant hangs still.',
   carving: 'A lopsided heart, two sets of initials worn soft by the weather, and a little anchor underneath.',
   flowerCrown: "Somebody wove it and left it at the top of the oldest tree. Try it on at any port's Tailor.",
   archNote: '"Glass dropping. Up to the arch for a look. If it\'s coming, I\'m going through first."',
@@ -566,4 +569,34 @@ export const GHOST_LOG = {
   cardIsland: 'She was making for {place}.',
   cardDone: "You found her captain's log.",
   read: 'Read the log again',
+};
+
+// The Stores at every port and the fireworks they sell (fireworks.js, ui/stores.js).
+// {port} is a port's name, {n} a number.
+export const STORES = {
+  intro: 'Fireworks, for no reason except that they are fun. Best at night. At sea, press F to set one off and G to change what is loaded.',
+  introTouch: 'Fireworks, for no reason except that they are fun. Best at night. At sea, tap the rocket to set one off, and the label under it to change what is loaded.',
+  about: {
+    box: 'Six single bursts in mixed colours.',
+    crate: 'Twenty rockets and four specials.',
+    finale: 'One long show: forty shells in half a minute. It runs by itself while you steer.',
+  },
+  stowed: '{item} stowed in the hold',
+  noRoom: { hold: 'No room in the hold', finales: 'The hold takes {n}' },
+  hold: 'In the hold: {list}.',
+  holdEmpty: 'The hold has no fireworks in it yet.',
+  room: 'Room for {n} more shells.',
+  roomFull: 'No room for more shells.',
+  keep: "A wreck doesn't take them.",
+  specials: 'Specials go up as a heart, a star and an owl’s face.',
+  wingLocked: 'Sable’s crimson wing joins them once the crimson sail cloth is yours.',
+  wingEarned: 'Sable’s crimson wing is among them.',
+  // at sea
+  loads: { rocket: 'Rocket', special: 'Special', finale: 'Finale' },
+  none: { rocket: 'No rockets left', special: 'No specials left', finale: 'No grand finale aboard' },
+  nothing: 'No fireworks aboard. The Stores at any port sell them.',
+  wait: 'One at a time on Low quality',
+  running: 'The grand finale is already going',
+  lit: 'The grand finale is lit!',
+  cheer: '{port} cheers from the harbor wall!',
 };

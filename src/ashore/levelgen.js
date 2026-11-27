@@ -1,8 +1,9 @@
 // Ashore levels: turns a layout (modules.js) into a renderable level that
 // follows the contract in shapes.js. One merged terrain mesh, one merged
 // mesh (+ ink outline) for every platform, instanced decoration. A volcanic
-// island also gets its lava, steam and crumbling pieces (volcanic-life.js)
-// and the lists of what crumbles and throws you up (hazards.js).
+// island also gets its lava, steam and crumbling pieces (volcanic-life.js),
+// a cold one its ice, pennants and falling snow (cold-life.js), and both the
+// lists of what crumbles, throws you up and blows (hazards.js).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PROPS, propMaterial, propOutline, thinOutline } from '../props.js';
@@ -12,6 +13,7 @@ import { cyl } from './shapes.js';
 import { layoutLevel, validateLayout, LIMITS, MODULE_TYPES } from './modules.js';
 import { pieceParts, lookoutTreeParts, rowboatParts } from './pieces.js';
 import { buildVolcanicLife } from './volcanic-life.js';
+import { buildColdLife } from './cold-life.js';
 
 export { validateLayout, LIMITS, MODULE_TYPES };
 
@@ -27,6 +29,12 @@ const PALETTE = {
   // band; the lava's banks scorched orange-brown (ember)
   volcanic: { sand: '#5b5556', wet: '#433d3e', grass: '#4d4648', grass2: '#5a5254', scree: '#7b726e', patch: '#6e7546', tuft: '#767d4c',
     rock: '#5b5355', rock2: '#6c4a41', seabed: '#4a4243', ember: '#8a4a2e' },
+  // cold: grey shingle; the meadow is frosted grass (grass, grass2) with
+  // drifts of snow (scree) and the odd patch still green (patch); above
+  // cliff 1 it is all snow, in two tones with blue shadow (snow, snow2,
+  // snowShade); blue-grey walls with a pale band of ice
+  cold: { sand: '#cfd2d2', wet: '#a7afb4', grass: '#a9c3a0', grass2: '#bfd2b6', scree: '#eef3fa', patch: '#86ab78', tuft: '#93ad8a',
+    rock: '#8d97a3', rock2: '#a9bccb', seabed: '#8a9aa6', snow: '#f4f8ff', snow2: '#e6edf7', snowShade: '#cfdcec' },
 };
 
 // What grows (or lies about) on each biome's land. density scales the tree
@@ -44,6 +52,11 @@ const DECOR = {
   volcanic: { trees: [['darkRock', 0.5], ['deadTree', 0.28], ['rock', 0.1], ['bush', 0.07], ['pine', 0.05]],
     density: 0.5, tufts: 0.18, flowers: 0, boulders: [3.6, 3.4], boulder: 'darkRock', seaStacks: 8, dark: true,
     summit: [['darkRock', 0.6], ['rock', 0.3], ['deadTree', 0.1]], beach: [['darkRock', 0.7], ['rock', 0.3]] },
+  // cold: snow pines thick on the meadow and the terrace, snowy boulders, a
+  // bare tree here and there; hardly a tuft; ice standing offshore
+  cold: { trees: [['snowPine', 0.6], ['snowRock', 0.22], ['pine', 0.1], ['deadTree', 0.08]],
+    density: 0.9, tufts: 0.3, flowers: 0, boulders: [3.8, 3.6], boulder: 'snowRock', seaStacks: 12, ice: true,
+    summit: [['snowRock', 0.75], ['rock', 0.25]], beach: [['snowRock', 0.5], ['rock', 0.5]] },
 };
 
 // ----------------------------------------------------------------- terrain
@@ -96,6 +109,8 @@ function buildTerrain(T, pal, seed) {
       else if (cliff) tmp.copy(C.rock).lerp(C.rock2, 0.5 + 0.5 * Math.sin(h * 1.7 + n * 2)); // strata
       else if (h < 0.35) tmp.copy(C.ember && Math.abs(r - T.Rm(a)) < T.mw(a) + T.BANK ? C.ember : C.wet);
       else if (T.groundTag(x, z) === 'sand') tmp.copy(C.sand);
+      // (snow above cliff 1: blue in the hollows, and under the mesa's wall)
+      else if (C.snow && r < r1) tmp.copy(n < -0.25 ? C.snowShade : n > 0.15 ? C.snow2 : C.snow);
       else if (C.scree && n < -0.12) tmp.copy(C.scree);
       else if (C.patch && n > 0.7) tmp.copy(C.patch);
       else tmp.copy(n > 0.1 ? C.grass2 : C.grass);
@@ -128,7 +143,7 @@ function buildTerrain(T, pal, seed) {
 }
 
 // ------------------------------------------------------------------ decor
-const TALL = new Set(['roundTree', 'pine', 'birch', 'fruitTree', 'deadTree', 'palm']);
+const TALL = new Set(['roundTree', 'pine', 'birch', 'fruitTree', 'deadTree', 'palm', 'snowPine']);
 
 function buildDecor(L, group, colliders, quality, seed) {
   const { T, keepOut, walks } = L, D = DECOR[L.biome] || DECOR.temperate;
@@ -231,11 +246,11 @@ function buildDecor(L, group, colliders, quality, seed) {
     if (T.heightAt(p.x, p.z) > -3) continue;
     const w = 1.6 + rng() * 2.6, hgt = 4 + rng() * 11;
     e.set((rng() - 0.5) * 0.12, rng() * TAU, (rng() - 0.5) * 0.12); q.setFromEuler(e);
-    if (D.dark) {
-      // on a volcano, tall lumps of dark rock (a sea stack's top is turf)
-      const sy = (hgt + 4) / 2;
+    if (D.dark || D.ice) {
+      // on a volcano, tall lumps of dark rock (a sea stack's top is turf); in the cold, of ice
+      const sy = (hgt + 4) / 2 * (D.ice ? 0.6 : 1);
       v.set(p.x, -4 + 0.75 * sy, p.z); sc.set(w * 0.6, sy, w * 0.6);
-      (buckets.darkRock ||= []).push(m.compose(v, q, sc).clone());
+      (buckets[D.ice ? 'snowRock' : 'darkRock'] ||= []).push(m.compose(v, q, sc).clone());
     } else {
       v.set(p.x, -4, p.z); sc.set(w, hgt + 4, w);
       (buckets.seaStack ||= []).push(m.compose(v, q, sc).clone());
@@ -309,7 +324,7 @@ export function generateLevel(island, opts = {}) {
 
   const colliders = [...L.colliders];
   const decor = buildDecor(L, group, colliders, opts.quality, island.seed | 0);
-  const life = L.lava ? buildVolcanicLife(L, L.pieces.filter((p) => p.crumble), opts.quality) : null;
+  const life = L.lava ? buildVolcanicLife(L, L.pieces.filter((p) => p.crumble), opts.quality) : L.snow ? buildColdLife(L, opts.quality) : null;
   if (life) group.add(life.group);
 
   const level = {
@@ -329,12 +344,13 @@ export function generateLevel(island, opts = {}) {
     vault: L.vault,
     // still water: the moat lies inside this radius, the beach takes the swell
     calm: { x: 0, z: 0, r: calmRadius(T) },
-    // hazards (hazards.js): steam vents, crumbling basalt, and lava for water
+    // hazards (hazards.js): steam vents, crumbling basalt, lava for water, gusts of wind
     vents: L.vents,
     crumbles: L.crumbles,
     pools: L.pools,
     lava: L.lava,
-    update: life ? (dt, t, ctx) => life.update(dt, t, ctx.hazards) : undefined,
+    gusts: L.gusts,
+    update: life ? (dt, t, ctx) => life.update(dt, t, ctx.hazards, ctx) : undefined,
     // extras (not in the contract, handy for debugging and hints)
     modules: L.modules,
     layout: L,

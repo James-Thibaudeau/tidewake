@@ -199,7 +199,7 @@ export const REFITS = [
 export const ANCHOR_DRAG = { start: 0.6, end: 0.3, time: 90, hull: 0.2 };
 // Biomes that have ashore levels. Each Phase 4 biome PR adds its own; a
 // refit is only offered once its biome is here.
-export const ASHORE_BIOMES = new Set(['temperate', 'rocky', 'tropical', 'volcanic']);
+export const ASHORE_BIOMES = new Set(['temperate', 'rocky', 'tropical', 'volcanic', 'cold']);
 export const LAND_RANGE = 46; // how close to the shore the boat must be to land (before the grapnel)
 export const LAND_SPEED = 5;  // boat speed (m/s) below which you can drop anchor (before the coral flukes)
 
@@ -238,7 +238,10 @@ export const ASHORE = {
   // Level design limits for *required* moves (comfortable, not frame-perfect);
   // launchUp and launchReach: the most a steam vent throws you up, and how far
   // from the vent's middle what it throws you to may start
-  design: { jumpUp: 1.15, gapWalk: 1.9, gapRun: 3.4, safeDrop: 6, launchUp: 6, launchReach: 1.6 },
+  // iceGap and iceWidth: the widest gap a required jump onto or off ice may
+  // cross, and the narrowest that ice may be; gustHops: the most hops one
+  // gust may blow across
+  design: { jumpUp: 1.15, gapWalk: 1.9, gapRun: 3.4, safeDrop: 6, launchUp: 6, launchReach: 1.6, iceGap: 1.1, iceWidth: 1.5, gustHops: 2 },
   // Steam vents (ashore/hazards.js): a vent throws you `over` m higher than
   // what it serves, so there is time at the top to step across; while still
   // rising faster than `steerAbove` m/s you only drift (`steer` of your speed
@@ -248,6 +251,15 @@ export const ASHORE = {
   // Crumbling basalt: it shakes for `hold` s after you land on it, then falls,
   // and is back `back` s later
   crumble: { hold: 1.0, back: 3.5 },
+  // Ice (a surface tagged 'ice', ashore/controller.js): on it you speed up
+  // and turn at `accel` and slow down at `friction`, a fraction of the grip
+  // of other ground, so you slide on when you let go of the stick
+  ice: { accel: 9, friction: 2.5 },
+  // Wind gusts (ashore/hazards.js): a gust rests `rest` s, gives `warn` s of
+  // warning, then blows for `blow` s, carrying you along at `push` m/s while
+  // you are in the air; on your feet you feel `ground` of it, on ice `ice`
+  // of it. It builds and dies away over `ramp` s
+  gust: { rest: 3.6, warn: 0.9, blow: 2.2, push: 3.2, ground: 0.35, ice: 0.8, ramp: 0.25 },
 };
 
 // The score (music-cues.js, audio/music.js).
@@ -269,4 +281,29 @@ export const MUSIC = {
   hold: 8, urgentHold: 1.5, brisk: 7, fast: 14,
   storm: 0.3, stormLevels: [0.6, 0.85], roughLevels: [0.7, 0.9], fog: 0.4, rain: 0.3,
   ahead: 0.25, level: 1, sableLead: 30,
+};
+
+// Fireworks (fireworks.js; the shells themselves are fireworks/shells.js). None of it
+// touches a stat: it is gold spent on the sky.
+//   items    what the Stores sell at every port, and what each one puts in the hold
+//   hold     the most rockets and specials carried, counted together; `finales` the most
+//            grand finales
+//   height   metres above the sea a rocket bursts; `rise` the seconds it takes to get there
+//   gap      the least time between two of your rockets, in seconds
+//   finale   the grand finale: how many shells, set off over how many seconds
+//   sound    metres a second: the boom arrives late by the distance, as thunder does
+//   cheer    a port cheers a rocket set off within this many metres of its dock, at night
+//   answer   Sable's own: only within this many metres, this often, `wait` seconds after
+//            yours bursts, and then not again for `rest` seconds
+export const FIREWORKS = {
+  items: {
+    box: { name: 'Box of rockets', price: 120, rocket: 6 },
+    crate: { name: 'Festival crate', price: 450, rocket: 20, special: 4 },
+    finale: { name: 'Grand finale', price: 1500, finale: 1 },
+  },
+  hold: 40, finales: 3,
+  height: 60, rise: 1.5, gap: 0.5,
+  finale: { shells: 40, seconds: 30 },
+  sound: 340, cheer: 420,
+  answer: { within: 700, chance: 0.6, wait: 2.6, rest: 25 },
 };

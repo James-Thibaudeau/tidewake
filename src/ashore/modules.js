@@ -22,13 +22,20 @@
 // every other one crumbles); every climb up cliff 1 starts at a steam vent
 // that throws you up the face, the mesa's often does too, and the rest is
 // basalt columns and cinder ledges that crumble under you. The top is a
-// crater with lava in it, and the summit is an outcrop over its mouth.
+// crater with lava in it, and the summit is an outcrop over its mouth. Cold
+// islands are frosty meadow below and snow above. Near home the moat is frozen
+// over and you slide across it; further out you hop between ice floes. The
+// climbs are drifts and ledges of snow, the snow-laden tops of pines and
+// shelves of ice that slide underfoot; gusts of wind blow across a hop or two
+// after a rest (near home, only across a walk), and the chest sits at the top
+// of a great snow pine. A frozen pond lies off the path on the meadow.
 //
 // The pieces and the staircases built from them are in stairs.js.
 import { mulberry32, noise2, clamp, lerp, smoothstep, TAU } from '../util.js';
 import { obox, cyl, topOf } from './shapes.js';
 import { ASHORE } from '../config.js';
-import { rotOf, toWorld, resetPieceIds, rectPiece, discPiece, piecesColliders, STAIRS, SOLID, pick, rr, stair, vistaAfter, ventClimb, VENT } from './stairs.js';
+import { rotOf, toWorld, resetPieceIds, rectPiece, discPiece, piecesColliders, STAIRS, SOLID, pick, rr, stair, vistaAfter, ventClimb, VENT, gustOver, GUST } from './stairs.js';
+import { inGust } from './hazards.js';
 
 const D = ASHORE.design;
 // Required moves stay comfortably inside the design limits; optional branches
@@ -86,12 +93,21 @@ const HEADROOM = ASHORE.height + 0.2;
 // Volcanic islands come third in the story, but all lie 3-8 km out: counted
 // 1 km nearer, the nearer half are medium (Star Cay, Thistle Point, Puffin
 // Heights, Sprat Islet, Amber Key, Orca Skerry, Willow Rest) and the rest hard.
-const BIOME_EASE = { rocky: 800, tropical: 300, volcanic: 1000 };
+// Cold islands come last and lie furthest out, 3.7-8.2 km: counted 2.5 km
+// nearer, the first one you reach (Whisper Island) is easy, so ice and wind
+// are met where they can't hurt; the four round Frostspire (Sprat Atoll,
+// Brine Key, Juniper Key, Crab Cay) are medium and the rest hard.
+const BIOME_EASE = { rocky: 800, tropical: 300, volcanic: 1000, cold: 2500 };
 // Per-biome terrain: rock walls `H1` and summits `summit` times as tall
 // (a volcano's are the tallest: a vent throws you up the first part of each).
 // `ground`: what the land inland of the moat is underfoot (volcanic: bare rock);
 // `crater`: the top is a crater with an outcrop over it, not a plateau.
-const SHAPE = { temperate: { H1: 1, summit: 1 }, rocky: { H1: 1.15, summit: 1.12 }, tropical: { H1: 0.95, summit: 0.95 }, volcanic: { H1: 1.15, summit: 1.22, ground: 'stone', crater: true } };
+// `high`: what the land above cliff 1 is underfoot (cold: snow, over a frosty meadow).
+const SHAPE = { temperate: { H1: 1, summit: 1 }, rocky: { H1: 1.15, summit: 1.12 }, tropical: { H1: 0.95, summit: 0.95 }, volcanic: { H1: 1.15, summit: 1.22, ground: 'stone', crater: true },
+  cold: { H1: 1.05, summit: 1.12, high: 'snow' } };
+// The top of the ice on a frozen moat and of a floe in it, and the most of the
+// meadow's width a frozen pond may take.
+const ICE = { moat: 0.15, floe: 0.28, pond: 4 };
 
 // ------------------------------------------------------------------ terrain
 /**
@@ -143,7 +159,11 @@ export function makeTerrain(I, rng, size, diff, cfg = TIERS.medium, shape = SHAP
     }
     const n = noise2(x * 0.08, z * 0.08, seed + 11);
     const r1 = R1(a);
-    if (r >= r1) return lerp(meadowHi, meadowLo, smoothstep(r1, mi, r)) + n * 0.3 * smoothstep(r1, r1 + 2, r) * smoothstep(mi, mi - 2, r);
+    if (r >= r1) {
+      const h = lerp(meadowHi, meadowLo, smoothstep(r1, mi, r)) + n * 0.3 * smoothstep(r1, r1 + 2, r) * smoothstep(mi, mi - 2, r);
+      // (level under a frozen pond, and for a little way round it)
+      return pond.set ? lerp(h, pond.y, smoothstep(pond.r + 1.5, pond.r, Math.hypot(x - pond.x, z - pond.z))) : h;
+    }
     if (r >= r1 - W1) return lerp(meadowHi, h1, smoothstep(r1, r1 - W1, r));
     const r2 = R2(a);
     if (r >= r2) return lerp(h1, tierTop, smoothstep(r1 - W1, r2 + 1, r)) + n * 0.18 * smoothstep(r1 - W1, r1 - W1 - 2, r) * smoothstep(r2, r2 + 2, r);
@@ -157,7 +177,9 @@ export function makeTerrain(I, rng, size, diff, cfg = TIERS.medium, shape = SHAP
   const CRATER = { depth: 4, lip: 0.2, wall: 1.3, tip: 1.0, width: 1.5, edge: 0.8 };
   const Rc = (a) => { const rin = R2(a) - W2; return clamp(rin * 0.55, 2.6, rin - 3.4); };
   // the outcrop's direction from the centre, and how far past the centre its tip reaches (set: once placed)
+  const at = (r, a) => ({ x: Math.cos(a) * r, z: Math.sin(a) * r });
   const out = { set: false, ux: 1, uz: 0, tip: 0 };
+  const pond = { set: false, x: 0, z: 0, r: 0, y: 0 }; // (setPond)
   const craterH = (r, a, x, z, rin) => {
     const rc = Rc(a), top = summit + CRATER.lip;
     if (r >= rc) return summit + CRATER.lip * smoothstep(rin, rc, r);
@@ -176,17 +198,30 @@ export function makeTerrain(I, rng, size, diff, cfg = TIERS.medium, shape = SHAP
     Object.assign(out, { set: true, ux: Math.cos(a), uz: Math.sin(a), tip });
     return { x: Math.cos(a) * (tip + 0.3), z: Math.sin(a) * (tip + 0.3) };
   };
+  /**
+   * A frozen pond on the meadow at angle a, as wide as the meadow has room
+   * for (none where that is under 1.8 m from middle to edge): the ground is
+   * levelled under it and it is ice underfoot. Returns { x, y, z, r } or null.
+   */
+  const setPond = (a) => {
+    const r = Math.min(ICE.pond, (moatIn(a) - R1(a)) / 2 - 2.4);
+    if (r < 1.8) return null;
+    const c = at(meadowR(a), a);
+    Object.assign(pond, { x: c.x, z: c.z, r, y: hRA(meadowR(a), a, c.x, c.z) - 0.04, set: true });
+    return { x: pond.x, y: pond.y, z: pond.z, r };
+  };
   const heightAt = (x, z) => hRA(Math.hypot(x, z), Math.atan2(z, x), x, z);
   const groundAt = (x, z) => { const h = heightAt(x, z); return h < -0.55 ? -Infinity : h; };
   const groundTag = (x, z) => {
     const r = Math.hypot(x, z), a = Math.atan2(z, x);
     const r1 = R1(a), r2 = R2(a);
     if ((r < r1 && r >= r1 - W1 - 0.1) || (r < r2 && r >= r2 - W2 - 0.1)) return 'stone';
+    if (pond.set && Math.hypot(x - pond.x, z - pond.z) < pond.r) return 'ice';
+    if (shape.high && r < r1) return shape.high;
     // everything seaward of the moat is beach and dunes; the inner bank is sand too
     if (r >= Rm(a) || Math.abs(r - Rm(a)) < mw(a) + BANK * 0.6) return 'sand';
     return shape.ground || 'grass';
   };
-  const at = (r, a) => ({ x: Math.cos(a) * r, z: Math.sin(a) * r });
   /** Radius of the moat's waterline on its outer / inner side, at angle a. */
   const moatEdge = (a, outer) => {
     let r = outer ? moatOut(a) : moatIn(a);
@@ -198,17 +233,20 @@ export function makeTerrain(I, rng, size, diff, cfg = TIERS.medium, shape = SHAP
     return Rm(a);
   };
   return { Rt, S1, W1, S2, W2, Sm, MW, BANK, beachTop, meadowLo, meadowHi, h1, tierTop, summit,
-    Rs, Rb, Rm, mw, moatIn, moatOut, R1, R2, meadowR, terraceR, hRA, heightAt, groundAt, groundTag, at, moatEdge,
+    Rs, Rb, Rm, mw, moatIn, moatOut, R1, R2, meadowR, terraceR, hRA, heightAt, groundAt, groundTag, at, moatEdge, setPond, pond,
     ...(shape.crater ? { Rc, setOutcrop, outcrop: out, crater: { ...CRATER, lavaY: summit + CRATER.lip - CRATER.depth + 1 } } : {}) };
 }
 
 export const MODULE_TYPES = ['moat:stones', 'moat:log', 'moat:planks', 'moat:bridge', 'moat:stacks', 'moat:pools', 'moat:ropeBridge',
-  'moat:causeway', 'moat:basalt', 'moat:basaltCrumble', ...Object.keys(STAIRS).map((k) => 'stair:' + k), 'vent', 'vista', 'summit',
-  'branch:lookoutTree', 'branch:lookoutSpire', 'branch:lookoutPalm', 'branch:lookoutBasalt', 'branch:summitNook', 'arch'];
+  'moat:causeway', 'moat:basalt', 'moat:basaltCrumble', 'moat:frozen', 'moat:floes', ...Object.keys(STAIRS).map((k) => 'stair:' + k), 'vent', 'vista', 'summit',
+  'branch:lookoutTree', 'branch:lookoutSpire', 'branch:lookoutPalm', 'branch:lookoutBasalt', 'branch:lookoutPine', 'branch:summitNook', 'arch', 'pond', 'gust'];
 // Per-biome module pools, and what the chest branch is (a lookout tree, on
 // bare rock a spire with ledges round it, in the tropics a giant palm, on a
 // volcano a stack of basalt columns). `vent`: which walls start at a steam
 // vent (ventClimb), and whether it throws you straight to the top (`toRim`).
+// `gusts`: where the wind blows (cold islands): across a walk on the terrace
+// (`walk`), or across the hops after this many of the mesa's and the cliff's
+// rests, `hops` hops each in turn.
 const POOLS = {
   temperate: {
     // stone stairs are listed twice: gentle islands are mostly a walk with a few hops
@@ -233,6 +271,13 @@ const POOLS = {
     easy: { vent: { cliff: true, toRim: true }, moat: ['causeway'], cliff: ['basaltWide', 'basaltSteps'], mesa: ['basaltSteps', 'basaltWide', 'slabsRail', 'basaltSteps'] },
     medium: { vent: { cliff: true, mesa: true }, moat: ['basalt'], cliff: ['basalt', 'cinders', 'slabsWide'], mesa: ['basalt', 'cinders', 'slabs', 'scaffold'] },
     hard: { vent: { cliff: true, mesa: true }, moat: ['basaltCrumble'], cliff: ['cinders', 'basalt'], mesa: ['cinders', 'basalt', 'slabs', 'basalt'] },
+  },
+  cold: {
+    pine: true, snow: true,
+    // near home nothing slides or blows where you have to jump: the frozen moat and the gust are walked through
+    easy: { gusts: { walk: true }, moat: ['frozen'], cliff: ['snowSteps', 'snowSteps', 'driftsWide'], mesa: ['snowSteps', 'frostRail', 'snowSteps', 'driftsWide'] },
+    medium: { gusts: { mesa: 1, hops: [1] }, moat: ['floes'], cliff: ['drifts', 'pines', 'frost', 'iceShelves'], mesa: ['frost', 'pines', 'iceShelves', 'scaffold'] },
+    hard: { gusts: { mesa: 2, cliff: 1, hops: [2, 1, 1] }, moat: ['floes'], cliff: ['iceShelves', 'pines', 'frost'], mesa: ['iceShelves', 'pines', 'frost', 'iceShelves'] },
   },
 };
 
@@ -294,6 +339,20 @@ function shuffle(rng, arr) {
 function notFirst(list, style) {
   const k = list.findIndex((s) => s !== style);
   if (list[0] === style && k > 0) [list[0], list[k]] = [list[k], list[0]];
+  return list;
+}
+
+/**
+ * Keep `style` out of the given places in the list, where another style can
+ * take its place: the stretch after a rest that a gust blows across is never
+ * ice.
+ */
+function keepFrom(list, style, places) {
+  for (const i of places) {
+    if (list[i] !== style) continue;
+    const j = list.findIndex((st, k) => st !== style && !places.includes(k));
+    if (j >= 0) [list[i], list[j]] = [list[j], list[i]];
+  }
   return list;
 }
 
@@ -440,7 +499,41 @@ function layoutOnce(I, opts, attempt) {
     let style = pick(rng, pool.moat);
     if (style === 'log' && span > 12) style = 'planks';
     const list = [];
-    if (style === 'bridge' || style === 'ropeBridge' || style === 'causeway') {
+    if (style === 'frozen') {
+      // the moat is frozen over, all the way round: you walk on at one bank and
+      // slide off at the other, wherever you like; the route crosses here
+      const endAt = (from, to) => { // the first point (from `from` towards `to`) where the bank dips under the ice
+        const L = Math.hypot(to.x - from.x, to.z - from.z);
+        for (let t = 0; t <= L; t += 0.05) { const x = from.x + (to.x - from.x) * (t / L), z = from.z + (to.z - from.z) * (t / L); if (T.groundAt(x, z) <= ICE.moat + 0.02) return { x, z }; }
+        return from;
+      };
+      const far = T.at(T.moatOut(am) + 2, am), near = T.at(T.moatIn(am) - 2, am);
+      const eo = endAt(far, near), ei = endAt(near, far);
+      const Lb = Math.hypot(ei.x - eo.x, ei.z - eo.z);
+      list.push(rectPiece('sheet', (eo.x + ei.x) / 2, (eo.z + ei.z) / 2, ICE.moat, Lb / 2 + 0.15, 2.2, rot, { tag: 'ice', base: -2.4, route: 'main', style }));
+      po.x = eo.x - ux * 0.3; po.z = eo.z - uz * 0.3; pi.x = ei.x + ux * 0.3; pi.z = ei.z + uz * 0.3;
+      walks[walks.length - 1][1] = [po.x, po.z];
+      route[route.length - 1] = groundNode(po.x, po.z);
+      const segs = Math.max(48, Math.round((TAU * T.Sm) / 2.2));
+      for (let i = 0; i < segs; i++) {
+        const a = (i / segs) * TAU, r = T.Rm(a);
+        colliders.push(obox(Math.cos(a) * r, ICE.moat - 0.9, Math.sin(a) * r, (TAU * r) / segs / 2 + 0.35, 0.9, T.mw(a) + 1.3, rotOf(a), 'ice'));
+      }
+      for (const f of [0.25, 0.75]) coinAt(eo.x + (ei.x - eo.x) * f, ICE.moat, eo.z + (ei.z - eo.z) * f, 1);
+    } else if (style === 'floes') {
+      // ice floes lying in the channel: flat, wide and slippery, and close
+      // enough together to hop from a standstill (inside design.iceGap)
+      const gMax = Math.min(D.iceGap - 0.1, 0.75 + diff * 0.25);
+      let r = 1.22 - diff * 0.2 + rng() * 0.06;
+      const n = Math.max(1, Math.ceil((span - gMax) / (2 * r + gMax)));
+      r = Math.min(r, (span - (n + 1) * 0.25) / (2 * n));
+      const g = (span - n * 2 * r) / (n + 1);
+      for (let i = 0; i < n; i++) {
+        const t = g * (i + 1) + r * (2 * i + 1);
+        const j = (rng() - 0.5) * 0.3;
+        list.push(discPiece('floe', po.x + ux * t - uz * j, po.z + uz * t + ux * j, ICE.floe + rng() * 0.05, r, { tag: 'ice', base: -2.4, route: 'main', style }));
+      }
+    } else if (style === 'bridge' || style === 'ropeBridge' || style === 'causeway') {
       // a railed footbridge (in the tropics a rope bridge, over lava a stone causeway) from bank to bank: walk on, walk off, no jumping
       const endAt = (from, to) => { // first point (walking from `from` towards `to`) where the bank is ~0.55 high
         const L = Math.hypot(to.x - from.x, to.z - from.z);
@@ -519,6 +612,10 @@ function layoutOnce(I, opts, attempt) {
 
   // ---- module(s) 2: up cliff 1
   const cliffStyles = notFirst(shuffle(rng, pool.cliff), 'arches');
+  if (pool.gusts?.cliff) keepFrom(cliffStyles, 'iceShelves', [1]);
+  // each rest between two staircases, with the staircase that goes on from it (where a gust may blow)
+  const rests = { cliff: [], mesa: [] };
+  let restAt = null;
   const c1Parts = cfg.cliffParts(size, rng);
   const aS1 = a0 + dir * rr(rng, cfg.meadowArc);
   {
@@ -526,6 +623,23 @@ function layoutOnce(I, opts, attempt) {
     walks[walks.length - 1] = path;
     path.forEach(([x, z], i) => { if (i > 0 && i % 2 === 0) coinAt(x, groundAt(x, z), z, 1); });
     if (kit.meadowArch) meadowArch(path);
+  }
+  // a frozen pond on the meadow, off the path: just back from where you cross
+  // the moat, the other way from the climb, with coins on it to draw you over
+  const ponds = [];
+  if (kit.snow) {
+    for (const back of [7.5, 9.5, 12]) {
+      const a = am - dir * back / T.meadowR(am), c = T.at(T.meadowR(a), a);
+      const r = Math.min(ICE.pond, (T.moatIn(a) - T.R1(a)) / 2 - 2.4);
+      if (r < 1.8 || r > back - 3.2 || keepOut.some(([kx, kz, kr]) => Math.hypot(kx - c.x, kz - c.z) < kr * 0.6 + r + 1.5)) continue;
+      const P = T.setPond(a);
+      ponds.push(P);
+      keepOut.push([P.x, P.z, P.r + 1.2]);
+      coinAt(P.x, P.y, P.z, 3);
+      for (let i = 0; i < 4; i++) { const b = a + 0.6 + (i / 4) * TAU; coinAt(P.x + Math.cos(b) * P.r * 0.62, P.y, P.z + Math.sin(b) * P.r * 0.62, 2); }
+      modules.push({ type: 'pond' });
+      break;
+    }
   }
   let aNow = aS1, yNow = 0, lastHalf = 0, rimLaunch = false;
   let c1 = c1Parts; // (one more when a vent's shelf leaves part of the wall to climb)
@@ -552,6 +666,8 @@ function layoutOnce(I, opts, attempt) {
       route.push(groundNode(back.x, back.z));
     }
     addPieces(list);
+    if (restAt) rests.cliff.push({ rest: restAt, next: list });
+    restAt = null;
     list.forEach((p, i) => { route.push(pieceNode(p)); if (i % 2 === 1) coinAt(p.cx, p.top, p.cz, 2); });
     modules.push({ type: 'stair:' + style, wall: 'cliff', pieces: list.length });
     aNow = aEnd; yNow = list[list.length - 1].top; lastHalf = lh;
@@ -559,12 +675,14 @@ function layoutOnce(I, opts, attempt) {
       const v = vistaAfter(T, { Rw: T.R1, a: aNow, dir, prevHalf: lastHalf, top: yNow + (tier === 'easy' ? 0 : 0.2), route: 'main', gap: tier === 'easy' ? 0.04 : 0.9, wide: tier === 'easy' });
       if (tier === 'easy') { v.joined = true; list[list.length - 1].joined = true; }
       if (kit.basalt) v.style = 'slabs'; // (a rest of basalt, not a grassy ledge)
+      if (kit.snow) { v.style = 'frost'; v.tag = 'snow'; restAt = tier === 'easy' ? null : v; }
       addPieces([v]);
       route.push(pieceNode(v));
       modules.push({ type: 'vista' });
       aNow = v.angle; yNow = v.top; lastHalf = v.hx;
     }
   }
+  restAt = null;
   // onto the terrace (landing on the ground just past the rim)
   const aRim = aNow;
   // you land on the top of the rock face (the wall's top is solid), then walk on
@@ -587,6 +705,7 @@ function layoutOnce(I, opts, attempt) {
   }
   aNow = aM; lastHalf = 0;
   const mesaStyles = notFirst(shuffle(rng, pool.mesa), 'arches');
+  if (pool.gusts?.mesa) keepFrom(mesaStyles, 'iceShelves', pool.gusts.mesa > 1 ? [1, 2] : [1]);
   const yGain = T.summit - yNow;
   let midCp = false, mP = mParts, vented = false;
   for (let k = 0; k < mP; k++) {
@@ -606,6 +725,8 @@ function layoutOnce(I, opts, attempt) {
       route.push(groundNode(back.x, back.z));
     }
     addPieces(list);
+    if (restAt) rests.mesa.push({ rest: restAt, next: list });
+    restAt = null;
     list.forEach((p, i) => { route.push(pieceNode(p)); if (i % 2 === 0) coinAt(p.cx, p.top, p.cz, k > 1 ? 3 : 2); });
     modules.push({ type: 'stair:' + style, wall: 'mesa', pieces: list.length });
     aNow = aEnd; yNow = list[list.length - 1].top; lastHalf = lh;
@@ -613,6 +734,7 @@ function layoutOnce(I, opts, attempt) {
       const v = vistaAfter(T, { Rw: T.R2, a: aNow, dir, prevHalf: lastHalf, top: yNow + (tier === 'easy' ? 0 : 0.25), route: 'main', gap: tier === 'easy' ? 0.04 : 0.9, wide: tier === 'easy' });
       if (tier === 'easy') { v.joined = true; v.rail = cfg.rails; list[list.length - 1].joined = true; }
       if (kit.basalt) v.style = 'slabs';
+      if (kit.snow) { v.style = 'frost'; v.tag = 'snow'; restAt = tier === 'easy' ? null : v; }
       addPieces([v]);
       route.push(pieceNode(v));
       modules.push({ type: 'vista' });
@@ -625,6 +747,36 @@ function layoutOnce(I, opts, attempt) {
   const topEdge = rimFor(T, pieces.filter((p) => p.route === 'main').slice(-1)[0], T.R2);
   route.push({ type: 'ground', x: topEdge.x, z: topEdge.z, y: T.summit, edge: 'jump', rim: true });
   const topRim = T.at(T.R2(aTop) - T.W2 - 0.35, aTop);
+  // ---- gusts of wind (hazards.js): across the hop or two after a rest, where
+  // nothing is ice, blowing back the way you came, so the rest is where you
+  // wait for the lull; near home only across a stretch of the terrace walk
+  const gusts = [];
+  if (pool.gusts) {
+    const G = pool.gusts, icy = (p) => p.tag === 'ice' || p.crumble;
+    const over = (list, most) => {
+      for (const { rest, next } of list.slice(0, most || 0)) {
+        const hops = Math.min(D.gustHops, G.hops[gusts.length % G.hops.length], next.length);
+        if (next.slice(0, hops).some(icy)) continue;
+        gusts.push({ ...gustOver(rest, next[hops - 1], 'w' + gusts.length), hops, phase: gusts.length * 2.3 });
+        modules.push({ type: 'gust', hops });
+      }
+    };
+    over(rests.mesa, G.mesa);
+    over(rests.cliff, G.cliff);
+    if (G.walk) {
+      const path = walks[walks.length - 1];
+      for (const f of [0.5, 0.4, 0.6, 0.3, 0.7]) {
+        const i = Math.max(1, Math.min(path.length - 2, Math.round((path.length - 1) * f)));
+        const [x, z] = path[i], [x0, z0] = path[i - 1], [x1, z1] = path[i + 1], l = Math.hypot(x1 - x0, z1 - z0) || 1;
+        const g = { id: 'w' + gusts.length, x, y: groundAt(x, z), z, dx: (x0 - x1) / l, dz: (z0 - z1) / l, along: 2.2, across: 2.6, up: GUST.up, walk: true, hops: 0, phase: 1 };
+        // (clear of everything you stand on: the climbs, and the chest's tree)
+        if (pieces.some((p) => Math.hypot(p.cx - x, p.cz - z) < Math.hypot(g.along, g.across) + 0.4 + (p.r || Math.hypot(p.hx, p.hz)))) continue;
+        gusts.push(g);
+        modules.push({ type: 'gust', hops: 0 });
+        break;
+      }
+    }
+  }
   // on a volcano the summit is the tip of the outcrop over the crater, which
   // runs out from where you arrive; the lantern, coins and vault go round the rim
   const crater = !!T.setOutcrop;
@@ -643,6 +795,14 @@ function layoutOnce(I, opts, attempt) {
   const vp = crater ? T.at(rimR(aV), aV) : T.at(Math.min(2.2, T.R2(aV) * 0.35), aV);
   const vault = { x: vp.x, y: groundAt(vp.x, vp.z), z: vp.z };
   keepOut.push([vault.x, vault.z, 1.6]);
+  // on a cold island, a cairn at the top with a pennant in the wind: across the summit's gold from the vault
+  let cairn = null;
+  if (kit.snow) {
+    const k = -1.75 / (Math.hypot(vault.x - summit.x, vault.z - summit.z) || 1), x = summit.x + (vault.x - summit.x) * k, z = summit.z + (vault.z - summit.z) * k;
+    cairn = { x, y: groundAt(x, z), z };
+    colliders.push(cyl(x, z, 0.42, cairn.y - 0.4, cairn.y + 0.85, 'stone'));
+    keepOut.push([x, z, 1.2]);
+  }
 
   // ---- optional branches go in the widest free arc around the mesa
   const used = [aRim, aM, ...arc(() => 1, aRim, aM, 0.05).map(([x, z]) => Math.atan2(z, x)),
@@ -663,7 +823,7 @@ function layoutOnce(I, opts, attempt) {
     for (let i = 0; i < n; i++) {
       y += i === 0 ? TC.first : Math.min(rr(rng, TC.rise), LIMITS.optional.up - 0.08);
       const r = i === n - 1 ? TC.top : TC.r;
-      list.push(discPiece('disc', c.x + Math.cos(phi) * orbit, c.z + Math.sin(phi) * orbit, y, r, { tag: kit.spire ? 'stone' : 'leaf', base: g0, route: 'chest', trunk: 0, branch: true, hub: [c.x, c.z], palm: !!kit.palm, ...(kit.basalt ? { basalt: true } : {}) }));
+      list.push(discPiece('disc', c.x + Math.cos(phi) * orbit, c.z + Math.sin(phi) * orbit, y, r, { tag: kit.spire ? 'stone' : kit.pine ? 'snow' : 'leaf', base: g0, route: 'chest', trunk: 0, branch: true, hub: [c.x, c.z], palm: !!kit.palm, ...(kit.basalt ? { basalt: true } : {}), ...(kit.pine ? { pine: true } : {}) }));
       phi += TC.dphi * dir;
     }
     const trunkTop = y + 1.4;
@@ -673,11 +833,11 @@ function layoutOnce(I, opts, attempt) {
     const f = list[0];
     const sx = f.cx + ((f.cx - c.x) / orbit) * 1.6, sz = f.cz + ((f.cz - c.z) / orbit) * 1.6;
     const nodes = [groundNode(sx, sz), ...list.map((p) => pieceNode(p))];
-    branches.push({ name: 'chest', nodes, tree: { x: c.x, z: c.z, base: g0, top: trunkTop, orbit, spire: !!kit.spire, palm: !!kit.palm, ...(kit.basalt ? { basalt: true } : {}) } });
+    branches.push({ name: 'chest', nodes, tree: { x: c.x, z: c.z, base: g0, top: trunkTop, orbit, spire: !!kit.spire, palm: !!kit.palm, ...(kit.basalt ? { basalt: true } : {}), ...(kit.pine ? { pine: true } : {}) } });
     const top = list[list.length - 1];
     chests.push({ id: 'chest', x: top.cx, y: top.top, z: top.cz, yaw: Math.atan2(c.x - top.cx, c.z - top.cz) });
     list.forEach((p, i) => { if (i % 2 === 1 && i < n - 1) coinAt(p.cx, p.top, p.cz, 3); });
-    modules.push({ type: kit.basalt ? 'branch:lookoutBasalt' : kit.spire ? 'branch:lookoutSpire' : kit.palm ? 'branch:lookoutPalm' : 'branch:lookoutTree', pieces: list.length });
+    modules.push({ type: kit.basalt ? 'branch:lookoutBasalt' : kit.spire ? 'branch:lookoutSpire' : kit.palm ? 'branch:lookoutPalm' : kit.pine ? 'branch:lookoutPine' : 'branch:lookoutTree', pieces: list.length });
     break;
   }
 
@@ -686,7 +846,7 @@ function layoutOnce(I, opts, attempt) {
     const a = free.mid + free.width * off;
     const yN = T.summit - (3.6 + rng() * 1.2);
     const Rn = T.R2(a) + 0.95;
-    const nook = rectPiece('ledge', Math.cos(a) * Rn, Math.sin(a) * Rn, yN, 1.25, 0.95, rotOf(a), { tag: 'stone', base: -2, route: 'secret', branch: true, angle: a, ...(kit.basalt ? { style: 'slabs' } : {}) });
+    const nook = rectPiece('ledge', Math.cos(a) * Rn, Math.sin(a) * Rn, yN, 1.25, 0.95, rotOf(a), { tag: kit.snow ? 'snow' : 'stone', base: -2, route: 'secret', branch: true, angle: a, ...(kit.basalt ? { style: 'slabs' } : {}), ...(kit.snow ? { style: 'frost' } : {}) });
     const clash = pieces.some((p) => Math.hypot(p.cx - nook.cx, p.cz - nook.cz) < 2.5 + (p.r || Math.max(p.hx, p.hz)) && Math.abs(p.top - nook.top) < 4);
     if (!clash) {
       addPieces([nook]);
@@ -713,7 +873,8 @@ function layoutOnce(I, opts, attempt) {
   // lava in a crater: below this, you've fallen in (hazards.js)
   const pools = crater ? [{ x: 0, z: 0, r: Math.max(...Array.from({ length: 48 }, (_, i) => T.Rc((i / 48) * TAU))), y: T.crater.lavaY }] : [];
   return { biome, tier, size, diff, dir, a0, T, pieces, colliders, route, branches, walks, modules, coins, caches, chests, checkpoints,
-    keepOut, spawn, exit, rowboat, summit, vault, arches, vents, crumbles, pools, lava: biome === 'volcanic' };
+    keepOut, spawn, exit, rowboat, summit, vault, arches, vents, crumbles, pools, lava: biome === 'volcanic',
+    gusts, ponds, cairn, frozen: modules.some((m) => m.type === 'moat:frozen'), snow: !!kit.snow };
 }
 
 /** The widest angular gap between the given angles: { mid, width }. */
@@ -735,9 +896,9 @@ export function walkableEdge(A, B) {
   return lineGap(A, B) <= 0.2 && dy <= ASHORE.stepUp + 1e-6 && -dy <= 0.8;
 }
 
-/** Numbers for comparing difficulty: route length, jumps, launches from vents, worst gap/rise, summit height. */
+/** Numbers for comparing difficulty: route length, jumps, launches from vents, hops onto ice, hops a gust blows across, worst gap/rise, summit height. */
 export function routeStats(L) {
-  let length = 0, jumps = 0, launches = 0, maxGap = 0, maxRise = 0, run = 0, maxRun = 0;
+  let length = 0, jumps = 0, launches = 0, maxGap = 0, maxRise = 0, run = 0, maxRun = 0, ice = 0;
   const R = L.route;
   for (let i = 1; i < R.length; i++) {
     const A = R[i - 1], B = R[i];
@@ -745,12 +906,13 @@ export function routeStats(L) {
     if (B.edge === 'launch') { launches++; run = 0; continue; }
     if (walkableEdge(A, B)) { run = 0; continue; }
     jumps++; run++; maxRun = Math.max(maxRun, run);
+    if (B.piece?.tag === 'ice') ice++;
     maxGap = Math.max(maxGap, lineGap(A, B));
     maxRise = Math.max(maxRise, B.y - A.y);
   }
   // walked polylines add their own length
   for (const w of L.walks) for (let i = 1; i < w.length; i++) length += Math.hypot(w[i][0] - w[i - 1][0], w[i][1] - w[i - 1][1]);
-  return { tier: L.tier, length: Math.round(length), jumps, launches, maxConsecutiveJumps: maxRun, maxGap: +maxGap.toFixed(2), maxRise: +maxRise.toFixed(2),
+  return { tier: L.tier, length: Math.round(length), jumps, launches, ice, gusts: (L.gusts || []).length, gustHops: (L.gusts || []).reduce((n, g) => n + g.hops, 0), maxConsecutiveJumps: maxRun, maxGap: +maxGap.toFixed(2), maxRise: +maxRise.toFixed(2),
     summitAboveMeadow: +(L.T.summit - L.T.meadowLo).toFixed(1), modules: L.modules.map((m) => m.type).join(', ') };
 }
 
@@ -778,7 +940,7 @@ function polysOverlap(A, B) {
   return true;
 }
 // Kinds that are a thin top over open air (what's under them may pass beneath).
-const THIN = new Set(['disc', 'ledge', 'plank', 'vista', 'palm', 'rope']);
+const THIN = new Set(['disc', 'ledge', 'plank', 'vista', 'palm', 'rope', 'pine']);
 const footOf = (n) => (n.type === 'piece' ? n.piece.foot : null);
 /** Horizontal gap along the straight line between two nodes' centres (edge to edge). */
 function lineGap(A, B) {
@@ -859,6 +1021,36 @@ export function validateLayout(L) {
   for (const p of L.pieces) {
     if (!p.crumble) continue;
     if (p.landing || p.kind === 'vista' || cpOn.has(p.id) || L.tier === 'easy') errors.push(`${p.id} ${p.kind}: crumbles, but is a ${L.tier === 'easy' ? 'piece near home' : 'rest'}`);
+  }
+  // ice slides: wide, and never a long hop onto or off it; near home never a hop at all
+  const icy = (n) => n.type === 'piece' && n.piece.tag === 'ice';
+  const hop = (i) => L.route[i].edge !== 'launch' && !walkableEdge(L.route[i - 1], L.route[i]);
+  for (let i = 1; i < L.route.length; i++) {
+    const A = L.route[i - 1], B = L.route[i];
+    if (!hop(i) || (!icy(A) && !icy(B))) continue;
+    const gap = lineGap(A, B);
+    if (gap > D.iceGap + 1e-6) errors.push(`main[${i}]: a hop of ${gap.toFixed(2)} m onto or off ice (at most ${D.iceGap})`);
+    if (L.tier === 'easy') errors.push(`main[${i}]: a hop onto or off ice on an island near home`);
+  }
+  for (const p of L.pieces) if (p.tag === 'ice' && p.route === 'main' && p.minWidth < D.iceWidth - 1e-6) errors.push(`${p.id} ${p.kind}: ice only ${p.minWidth.toFixed(2)} m wide (at least ${D.iceWidth})`);
+  // a gust: never over ice, a crumbling piece or a lantern; over a hop only
+  // after a rest to wait on, at most design.gustHops of them, and never near home
+  for (const g of L.gusts || []) {
+    let hops = 0;
+    for (let i = 1; i < L.route.length; i++) {
+      const A = L.route[i - 1], B = L.route[i];
+      if (hop(i) && inGust(g, (A.x + B.x) / 2, Math.max(A.y, B.y) + 0.5, (A.z + B.z) / 2)) hops++;
+    }
+    if (hops !== g.hops) errors.push(`gust ${g.id}: blows across ${hops} hops, laid out for ${g.hops}`);
+    if (hops > D.gustHops) errors.push(`gust ${g.id}: blows across ${hops} hops (at most ${D.gustHops})`);
+    if (hops && L.tier === 'easy') errors.push(`gust ${g.id}: blows across a hop on an island near home`);
+    if (hops && L.pieces.find((p) => p.id === g.from)?.kind !== 'vista') errors.push(`gust ${g.id}: no rest to wait on before it`);
+    const box = [[1, 1], [1, -1], [-1, -1], [-1, 1]].map(([u, v]) => [g.x + g.dx * g.along * u + g.dz * g.across * v, g.z + g.dz * g.along * u - g.dx * g.across * v]);
+    for (const p of L.pieces) {
+      if (!(p.tag === 'ice' || p.crumble) || p.top < g.y - 0.5 || p.top > g.y + g.up || !polysOverlap(box, p.foot)) continue;
+      errors.push(`gust ${g.id}: blows over ${p.id} ${p.kind}, which ${p.crumble ? 'crumbles' : 'is ice'}`);
+    }
+    if (L.checkpoints.some((c) => inGust(g, c.x, c.y + 0.5, c.z))) errors.push(`gust ${g.id}: blows over a lantern`);
   }
   for (const b of L.branches) check(b.nodes, LIMITS.optional, b.name);
   // gentle islands: never more than a few jumps without a walkable rest

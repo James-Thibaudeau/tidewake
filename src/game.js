@@ -13,12 +13,17 @@ import { loadSave, writeSave, clearSave, encodeBytes, decodeBytes, loadSettings,
 import { Emitter } from './events.js';
 import { STYLES, normalizeProfile } from './cosmetics.js';
 import { blankLivery } from './paints.js';
+import { blankStock } from './fireworks/shells.js';
 import { LINES, SIGHTINGS, SEAS } from './story-text.js';
 
 const SPYGLASS_HINT = LINES.spyglassHint;
 // Sea camera: the lowest it orbits (radians above the boat), and how far past
 // that the view can tilt up to take in tall landmarks.
 const CAM_LOW = 0.04, CAM_LOOK_UP = 0.55;
+// Where the sea camera goes to watch your fireworks: at least this far back (further on a
+// screen taller than it is wide), this low, and tipped up this much: the ship stays in the
+// bottom of the picture, clear of the gauges, with a burst 60 m up whole above her.
+const SKY_VIEW = { dist: 110, tall: 1.3, pitch: 0.1, up: 0.27, upTall: 0.2 };
 
 const TUTORIAL = isTouch ? [
   'Raise your sail with the ▲ button.',
@@ -83,6 +88,8 @@ export class Game {
       sightings: { seen: {}, miss: {}, chain: null },
       // the paint yard (paint-yard.js): what you own ('kind:id') and what the ship wears
       paints: [], livery: blankLivery(),
+      // fireworks in the hold, and the ports that have cheered one (fireworks.js)
+      fireworks: blankStock(),
     };
   }
 
@@ -117,7 +124,7 @@ export class Game {
     // Things that persist the moment they happen (not banked like gold)
     d.profile = s.profile; d.wardrobe = s.wardrobe; d.quests = s.quests;
     d.story = s.story; d.ashore = s.ashore; d.hold = s.hold; d.rival = s.rival; d.sightings = s.sightings;
-    d.paints = s.paints; d.livery = s.livery;
+    d.paints = s.paints; d.livery = s.livery; d.fireworks = s.fireworks;
     migrate(d); // stamps the current version
     return d;
   }
@@ -188,7 +195,7 @@ export class Game {
     s.tutorial = d.tutorial ?? 5;
     s.profile = normalizeProfile(d.profile); s.wardrobe = d.wardrobe; s.quests = d.quests;
     s.story = d.story; s.ashore = d.ashore; s.hold = d.hold; s.rival = d.rival; s.sightings = d.sightings;
-    s.paints = d.paints; s.livery = d.livery;
+    s.paints = d.paints; s.livery = d.livery; s.fireworks = d.fireworks;
     this.state = s;
     this.saveData = d;
     this.paintYard?.apply();
@@ -631,6 +638,7 @@ export class Game {
       if (this.mode !== 'title') this.updateFlotsam(dt);
       this.updateEffects(dt);
       if (this.mode !== 'title') { this.quests?.update(dt, this.elapsed); this.story?.update(dt, this.elapsed); this.rival?.update(dt, this.elapsed, wind); this.reports?.update(dt); this.seaEvents?.update(dt, this.elapsed); }
+      if (this.mode !== 'title') this.fireworks?.update(dt, acts);
       this.updateCamera(dt);
     }
     this.env.update(dt, s.dayT, w.p, this.camera, w.wind, this.elapsed);
@@ -881,10 +889,13 @@ export class Game {
     boat.lookYaw = this.elapsed - c.lastLook < 4 ? c.yaw : null;
     const p = boat.group.position;
     tx = p.x; ty = p.y + 3.5; tz = p.z;
-    const orbit = Math.max(c.pitch, CAM_LOW), lookUp = CAM_LOW - Math.min(c.pitch, CAM_LOW);
+    // while a firework of yours is in the air the view pulls back and tips up to take it in (fireworks.js)
+    const sky = this.fireworks?.watch || 0, tall = cam.aspect < 1;
+    const dist = lerp(c.dist, Math.max(c.dist, SKY_VIEW.dist * (tall ? SKY_VIEW.tall : 1)), sky);
+    const orbit = lerp(Math.max(c.pitch, CAM_LOW), SKY_VIEW.pitch, sky), lookUp = lerp(CAM_LOW - Math.min(c.pitch, CAM_LOW), tall ? SKY_VIEW.upTall : SKY_VIEW.up, sky);
     const cp = Math.cos(orbit), sp = Math.sin(orbit);
-    let x = tx - Math.sin(c.yaw) * c.dist * cp, z = tz - Math.cos(c.yaw) * c.dist * cp;
-    let y = ty + c.dist * sp;
+    let x = tx - Math.sin(c.yaw) * dist * cp, z = tz - Math.cos(c.yaw) * dist * cp;
+    let y = ty + dist * sp;
     y = Math.max(y, waveHeight(x, z) + 1.8, this.world.heightAt(x, z) + 3);
     if (c.shake > 0) {
       c.shake = Math.max(0, c.shake - dt * 2);

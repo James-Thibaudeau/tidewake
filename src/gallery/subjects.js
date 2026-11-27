@@ -24,7 +24,9 @@ import { Boat, pointOfSail } from '../boat.js';
 import { MAX_TIER } from '../boat/parts.js';
 import { LIVERY_PARTS, paintsOf, paintInfo, liveryFor } from '../paints.js';
 import { PAINT_PARAMS } from './sheets.js';
-import { UPGRADES, ASHORE_BIOMES, upgradeValue } from '../config.js';
+import { UPGRADES, ASHORE_BIOMES, FIREWORKS, upgradeValue } from '../config.js';
+import { FireworkSky } from '../fireworks/sky.js';
+import { KINDS, SPECIALS, COLORS, makeShell, makeRocket } from '../fireworks/shells.js';
 import { PROPS, initProps, propMesh, propMaterial, thinOutline } from '../props.js';
 import { buildElderTree } from '../elder-tree.js';
 import { glowTexture } from '../world.js';
@@ -503,9 +505,68 @@ function sealife(q, stage) {
   };
 }
 
+// A firework (fireworks/shells.js, drawn by fireworks/sky.js), held still over a ship
+// for scale. `kind` is the shell; `seed` another of the same kind; `color` a colour of
+// its own; `age` the seconds after the burst to hold it at (unless said, its best
+// moment), or `age=loop` to play the rocket and the burst round and round; `low=1` the
+// fewer sparks of Low quality; `ship=0` leaves the ship out. The sea is lit as it is the
+// moment the shell bursts. Look at it with `view=spot`: from low on the water, as in the game.
+const FIREWORK_KINDS = [...KINDS, ...SPECIALS];
+function fireworks(q, stage) {
+  const warnings = [];
+  let kind = q.kind || 'peony';
+  if (!FIREWORK_KINDS.includes(kind)) { warnings.push(`kind=${kind} is not a firework (${FIREWORK_KINDS.join(', ')})`); kind = 'peony'; }
+  if (q.color && !COLORS[q.color]) warnings.push(`color=${q.color} is not a colour (${Object.keys(COLORS).join(', ')})`);
+  const group = new THREE.Group();
+  stage.add(group);
+  let boat = null, values = null;
+  if (q.ship !== '0') {
+    boat = new Boat(group, { npc: true });
+    const levels = Object.fromEntries(UPGRADES.map((U) => [U.key, 2]));
+    values = Object.fromEntries(UPGRADES.map((U) => [U.key, upgradeValue(levels, U.key)]));
+    boat.applyUpgrades(levels, values);
+    boat.setAnchor('none');
+    boat.place(0, 0, 0);
+    boat.lookYaw = 0;
+    boat.sailLevel = 1; boat.sailVis = 0.55;
+  }
+  // (an unseen box the size of the whole show, so the fitted cameras frame the burst and not just the ship)
+  const H = FIREWORKS.height, T = FIREWORKS.rise, k = boat?.sizeScale || 1;
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(84, H + 38, 20).translate(0, (H + 38) / 2, 0), new THREE.MeshBasicMaterial({ visible: false }));
+  group.add(frame);
+  const sky = new FireworkSky(group, { low: q.low === '1' });
+  const from = { x: 0, y: 1.3 * k, z: -3.3 * k }, at = { x: 0, y: H, z: 0 };
+  const rocket = makeRocket({ seed: int(q.seed, 7), height: H - from.y, dz: -from.z, detail: sky.detail });
+  const shell = makeShell(kind, { seed: int(q.seed, 7), color: q.color, detail: sky.detail, face: 0 });
+  const loop = q.age === 'loop', age = loop ? 0 : clamp(num(q.age, shell.peak), 0, shell.life + 6);
+  const light = () => {
+    sky.clear();
+    sky.clock = 0;
+    sky.add(rocket, from, 0);
+    sky.add(shell, at, T);
+    sky.light(at, shell.light, loop ? T : T + age - 0.06);
+  };
+  light();
+  let round = 0;
+  return {
+    group, ground: 'sea', warnings, boat, look: { y: 3.5 },
+    spot: { x: 0, y: (H + 30) / 2, z: 0, span: H + 52, yaw: 0, pitch: -0.2 },
+    note: `${kind} (${shell.color}), ${shell.count} points${loop ? '' : `, ${age} s after the burst`}`,
+    update(dt, t, env) {
+      if (boat) { boat.relWind = 1.8; boat.wakeMat.uniforms.uLight.value.copy(env.light); boat.animate(dt, t, { angle: 0, strength: 0.85 }, 1, env.night, values); }
+      const period = T + shell.life + 1.2;
+      if (loop && Math.floor(t / period) !== round) { round = Math.floor(t / period); light(); }
+      sky.clock = loop ? t % period : T + age;
+      sky.update(0, { night: env.night, wind: { x: 5, z: 1.5 }, light: env.light });
+    },
+    dispose() { sky.dispose(); boat?.dispose(); frame.geometry.dispose(); frame.material.dispose(); },
+  };
+}
+
 // A generated island level: `biome`, `seed`, `r` (island radius) and `dist`
 // (metres from Port Haven, which sets how hard it is). With `kind=arch&n=0`,
-// one of its pieces on its own.
+// one of its pieces on its own. `gust=calm|warn|blow` holds a cold island's
+// gusts at one point of their round (otherwise they come and go as it plays).
 function level(q, stage) {
   initProps();
   const warnings = [];
@@ -520,19 +581,23 @@ function level(q, stage) {
   }
   const lv = generateLevel(I, opts);
   stage.add(lv.group);
+  const GUSTS = { calm: { state: 'calm', k: 0, stir: 0 }, warn: { state: 'warn', k: 0, stir: 0.8 }, blow: { state: 'blow', k: 1, stir: 1 } };
+  if (q.gust && !GUSTS[q.gust]) warnings.push(`gust=${q.gust} is not one of ${Object.keys(GUSTS).join(', ')}`);
+  const hazards = GUSTS[q.gust] ? { gusts: (lv.gusts || []).map(() => GUSTS[q.gust]) } : null;
   const PLACES = levelPlaces(lv.layout);
   let at = q.at || 'cliff';
   if (!PLACES[at]) { warnings.push(`at=${at} is not a place here (${Object.keys(PLACES).join(', ')})`); at = Object.keys(PLACES)[0]; }
   return { group: lv.group, ground: 'sea', warnings, shoal: shoalOf(lv), calm: lv.calm, spot: PLACES[at], note: `${lv.layout.biome}, ${lv.layout.tier}${q.at ? ', ' + at : ''}`,
-    // (a volcanic island's lava flows and bubbles, and its vents steam)
-    update: lv.update ? (dt, t, env) => lv.update(dt, t, { night: env.night }) : undefined, dispose() { lv.dispose(); } };
+    // (a volcanic island's lava flows and bubbles, and its vents steam; a cold one's pennants fly and its snow falls)
+    update: lv.update ? (dt, t, env) => lv.update(dt, t, { night: env.night, hazards }) : undefined, dispose() { lv.dispose(); } };
 }
 
 /**
  * Close-ups of a generated level for the `spot` view, each looked at from
  * outside the island: the moat crossing, the start of the climbs up cliff 1
  * and the mesa, the chest's branch, and the top (on a volcano, the crater
- * and the outcrop over it).
+ * and the outcrop over it); on a cold island its first gust of wind and its
+ * frozen pond.
  */
 function levelPlaces(L) {
   const main = L.pieces.filter((p) => p.route === 'main' && p.kind !== 'vista');
@@ -551,11 +616,15 @@ function levelPlaces(L) {
   out.mesa = around(climb.filter((p) => p.top > L.T.h1 + 0.1).slice(0, 4), 3);
   const chest = L.branches.find((b) => b.name === 'chest');
   if (chest) out.chest = { ...around(chest.nodes.filter((n) => n.piece).map((n) => n.piece), 4), y: (chest.tree.base + chest.tree.top) / 2 };
+  const G = (L.gusts || [])[0];
+  if (G) { const a = Math.atan2(G.z, G.x); out.gust = { x: G.x, y: G.y + 1.2, z: G.z, span: G.along * 2 + 7, yaw: Math.atan2(Math.cos(a), Math.sin(a)), pitch: 0.3 }; }
+  const P = (L.ponds || [])[0];
+  if (P) { const a = Math.atan2(P.z, P.x); out.pond = { x: P.x, y: P.y + 0.5, z: P.z, span: P.r * 2 + 5, yaw: Math.atan2(Math.cos(a), Math.sin(a)), pitch: 0.5 }; }
   { const a = Math.atan2(L.summit.z, L.summit.x) + 0.8; out.top = { x: 0, y: L.summit.y - 1, z: 0, span: L.T.S2 * 2.2, yaw: Math.atan2(Math.cos(a), Math.sin(a)), pitch: 0.7 }; }
   return Object.fromEntries(Object.entries(out).filter(([, v]) => v));
 }
 
-export const SUBJECTS = { outfit, ship, prop, tree, arch, temple, volcano, wreck, grove, archway, ruins, cinderhorn, level, sealife };
+export const SUBJECTS = { outfit, ship, prop, tree, arch, temple, volcano, wreck, grove, archway, ruins, cinderhorn, level, sealife, fireworks };
 
 // Every parameter a subject reads, so a misspelt one is reported instead of ignored.
 const DRESS = [...SLOTS, ...SLOTS.map((s) => s + 'Color'), 'shirt', 'skin', 'head', 'eyeColor', 'eyeShape', 'blush', 'freckles', 'profile'];
@@ -572,8 +641,9 @@ const PARAMS = {
   archway: ['kind', 'n', 'at', 'journal'],
   ruins: ['kind', 'n', 'at', 'journal'],
   cinderhorn: ['kind', 'n', 'at', 'journal'],
-  level: ['biome', 'seed', 'r', 'dist', 'kind', 'n', 'at'],
+  level: ['biome', 'seed', 'r', 'dist', 'kind', 'n', 'at', 'gust'],
   sealife: ['kind'],
+  fireworks: ['kind', 'seed', 'color', 'age', 'low', 'ship'],
 };
 /** The keys in `q` that the subject `show` doesn't read (`also`: the page's own parameters). */
 export function unknownParams(show, q, also) {
@@ -581,7 +651,7 @@ export function unknownParams(show, q, also) {
   return Object.keys(q).filter((k) => !known.has(k));
 }
 
-const PIECE_KINDS = ['block', 'bridge', 'column', 'disc', 'ledge', 'vista', 'plank', 'stone', 'stack', 'arch', 'log', 'palm', 'pool', 'rope', 'basalt', 'vent', 'shelf'];
+const PIECE_KINDS = ['block', 'bridge', 'column', 'disc', 'ledge', 'vista', 'plank', 'stone', 'stack', 'arch', 'log', 'palm', 'pool', 'rope', 'basalt', 'vent', 'shelf', 'pine', 'floe'];
 const TIERS = ['0', '1', '2', '3', '4', '5'];
 /** The parameters a subject takes, as [key, choices] pairs, for the page's menus. */
 export function controlsFor(show) {
@@ -600,6 +670,7 @@ export function controlsFor(show) {
     case 'cinderhorn': return [['at', CINDER_PLACES], ['journal', ['0']], ['kind', [...new Set(buildCinderhornLayout().pieces.map((p) => p.kind))]], ['n', TIERS]];
     case 'level': return [['biome', [...ASHORE_BIOMES]], ['kind', PIECE_KINDS], ['n', TIERS], ['seed', ['4401', '1121', '77', '31337']]];
     case 'sealife': return [['kind', SEALIFE]];
+    case 'fireworks': return [['kind', FIREWORK_KINDS], ['color', Object.keys(COLORS)], ['age', ['0.1', '0.4', '1.5', '2.5', 'loop']], ['seed', ['1', '2', '3']], ['low', ['1']], ['ship', ['0']]];
     default: return [];
   }
 }

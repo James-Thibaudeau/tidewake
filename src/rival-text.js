@@ -221,3 +221,19 @@ export const LINES = {
   towSlow: 'Towing: your ship is slower',
   record: 'Races with Sable: {wins} won, {losses} lost',
 };
+
+// Sable answers a firework of yours with one of their own (fireworks.js): one line, by
+// whether you are friends yet.
+export const FIREWORK = {
+  title: 'Fireworks',
+  rival: [
+    'Is that all, {captain}? Watch this.',
+    'Mine go higher. Everything of mine goes higher.',
+    'Showing off? Two can do that.',
+  ],
+  friend: [
+    'Ha! I saw that, {captain}. Here is one back.',
+    'I was saving this one for something. You will do.',
+    'Red, of course. What other colour is there?',
+  ],
+};

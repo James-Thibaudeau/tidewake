@@ -1,9 +1,10 @@
 // The pieces of a generated ashore level and the staircases built from them:
 // what a piece is (its footprint and colliders), the climbing styles
 // (STAIRS), a staircase up a wall, the rests between staircases, and a steam
-// vent with what it throws you up to (volcanic islands). Pure data, no
-// three.js; modules.js lays these out round the island and checks them, and
-// pieces.js (with tropical-art.js and volcanic-art.js) draws them.
+// vent with what it throws you up to (volcanic islands), and the box a gust of
+// wind blows through (cold islands). Pure data, no three.js; modules.js lays
+// these out round the island and checks them, and pieces.js (with
+// tropical-art.js, volcanic-art.js and cold-art.js) draws them.
 //
 // Rotations (obox.rot, piece.rot) use the three.js rotation.y convention:
 // a local (x, z) maps to world (x cos r + z sin r, -x sin r + z cos r).
@@ -68,6 +69,15 @@ function pieceBody(p) {
     case 'rope':
       // a slatted deck hung on the face; its handrope (outer side) comes from `rail`
       return [obox(p.cx, p.top - 0.12, p.cz, p.hx, 0.12, p.hz, p.rot, 'wood')];
+    case 'pine':
+      // the flat, snow-laden top of a pine on its trunk
+      return [cyl(p.cx, p.cz, p.r, p.top - 0.3, p.top, 'snow'), cyl(p.cx, p.cz, PINE_TRUNK, p.base - 0.5, p.top - 0.3, 'wood')];
+    case 'floe':
+      // an ice floe in the moat: slippery (ASHORE.ice)
+      return [cyl(p.cx, p.cz, p.r, -1.4, p.top, 'ice')];
+    case 'sheet':
+      // the way over a frozen moat: the ice itself is the level's (modules.js, frozenMoat)
+      return [];
     case 'stack': case 'basalt':
       // a sea stack, or a basalt column: solid rock from below the ground (or the water) to its top
       return [cyl(p.cx, p.cz, p.r, Math.min(p.base, 0) - 1, p.top, 'stone')];
@@ -128,13 +138,25 @@ export const STAIRS = {
   slabs: { kind: 'ledge', w: [1.5, 1.9], d: [1.2, 1.32], rise: [0.85, 1.05], gap: [0.5, 1.2], off: 0.0, tag: 'stone' },
   slabsWide: { kind: 'ledge', w: [1.9, 2.4], d: [1.3, 1.55], rise: [0.8, 1.0], gap: [0.55, 1.35], off: 0.0, tag: 'stone' },
   slabsRail: { kind: 'ledge', w: [2.6, 3.0], d: [2.1, 2.4], rise: [0.5, 0.64], gap: [0.45, 0.85], off: 0.0, tag: 'stone' },
+  // cold islands: steps and drifts of snow over rock (a wide kind near home),
+  // snowy ledges on the face (a railed kind near home), the flat snow-laden
+  // tops of pines a step out from the wall, and shelves of ice, which slide
+  // underfoot (ASHORE.ice): wide and close together, inside design.iceGap
+  snowSteps: { kind: 'block', w: [0.95, 1.1], d: [2.3, 2.6], rise: [0.27, 0.32], gap: [0.02, 0.05], off: 0.3, tag: 'snow', joined: true, carved: true },
+  drifts: { kind: 'block', w: [1.8, 2.2], d: [1.8, 2.2], rise: [0.6, 0.85], gap: [0.25, 1.0], off: 0.35, tag: 'snow' },
+  driftsWide: { kind: 'block', w: [2.4, 2.8], d: [2.4, 2.8], rise: [0.5, 0.66], gap: [0.35, 0.8], off: 0.35, tag: 'snow' },
+  frost: { kind: 'ledge', w: [1.9, 2.4], d: [1.3, 1.55], rise: [0.8, 1.0], gap: [0.55, 1.35], off: 0.0, tag: 'snow' },
+  frostRail: { kind: 'ledge', w: [2.6, 3.0], d: [2.1, 2.4], rise: [0.5, 0.64], gap: [0.45, 0.85], off: 0.0, tag: 'snow' },
+  pines: { kind: 'pine', r: [1.0, 1.14], rise: [0.7, 0.95], gap: [0.9, 1.45], off: 0.6, tag: 'snow' },
+  iceShelves: { kind: 'ledge', w: [2.3, 2.8], d: [1.55, 1.75], rise: [0.6, 0.8], gap: [0.4, 0.9], off: 0.0, tag: 'ice' },
 };
 // Kinds whose top is a disc (r) rather than a rectangle (w × d).
-export const ROUND = new Set(['disc', 'stack', 'palm', 'basalt', 'vent']);
+export const ROUND = new Set(['disc', 'stack', 'palm', 'basalt', 'vent', 'pine', 'floe']);
 // Kinds that are solid down to the ground (steps you stand on top of).
 export const SOLID = new Set(['block', 'column', 'pool', 'vent', 'shelf']);
 export const ARCH_LEG = 0.42; // half-width of an arch's legs along the span
 export const PALM_TRUNK = 0.3; // radius of a palm-top's trunk
+export const PINE_TRUNK = 0.32; // …and of a pine-top's
 
 export const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
 export const rr = (rng, [a, b], t = rng()) => a + (b - a) * t;
@@ -259,4 +281,22 @@ export function ventClimb(T, { Rw, aStart, dir, yTo, toRim, groundAt, route, lau
     { tag: 'stone', style: 'vent', base: Number.isFinite(sg) ? sg : -2, route, angle: a2, wallTop });
   vent.lift = top - vTop + over;
   return { pieces: [vent, shelf], aEnd: a2, lastHalf: hx, top, rim: false };
+}
+
+// --------------------------------------------------------------- wind gusts
+// A gust's box (hazards.js): how far it laps onto the footing at each end,
+// how far it reaches either side of the line you cross on, and how high.
+export const GUST = { lap: 0.5, across: 2.4, up: 4 };
+
+/**
+ * The gust across the hop (or hops) from a rest `from` to a piece `to`
+ * further along the same wall: its box runs from just inside the rest's far
+ * edge to just inside `to`'s near edge, and it blows back the way you came,
+ * so on your feet it only holds you up, and the rest is where you wait.
+ */
+export function gustOver(from, to, id) {
+  const dx = to.cx - from.cx, dz = to.cz - from.cz, L = Math.hypot(dx, dz), ux = dx / L, uz = dz / L;
+  const s0 = (from.r || from.hx) - GUST.lap, s1 = L - (to.r || to.hx) + GUST.lap, mid = (s0 + s1) / 2;
+  return { id, x: from.cx + ux * mid, y: Math.min(from.top, to.top), z: from.cz + uz * mid, dx: -ux, dz: -uz,
+    along: (s1 - s0) / 2, across: GUST.across, up: Math.abs(to.top - from.top) + GUST.up, from: from.id, to: to.id };
 }

@@ -295,6 +295,17 @@ export class Rival {
 
   hideRedwing() { this.redwing?.setVisible(false); }
 
+  /**
+   * Where Sable would answer a firework from (fireworks.js): the Redwing, if she is in
+   * sight and Sable is free to. Not before you've met, in a race, with the kraken, or
+   * while she lies dismasted or in tow.
+   */
+  fireworkFrom() {
+    const s = this.redwing, t = this.act?.type;
+    if (!s || !s.group.visible || s.dismasted || !this.R.flags.met || this.exclusive || t === 'adrift' || t === 'tow') return null;
+    return { x: s.pos.x, z: s.pos.z, ship: s, friend: this.R.chapter >= FINAL_CHAPTER };
+  }
+
   /** Beside the pier, on the far side from where the player ties up. */
   mooring(port) {
     const D = port.dock, a = D.angle;
@@ -894,7 +905,8 @@ export class Rival {
     const g = this.game, R = this.R, enc = ENCOUNTERS.find((e) => e.id === id), port = g.dockedIsland;
     if (!enc || !port || R.chapter !== FINAL_CHAPTER) return false;
     if (enc.kind === 'summit' || enc.kind === 'relics') {
-      const land = this.world.islands.filter((I) => g.ashore?.canLandNow(I) && !I.landmark)
+      // (never a cold island: Sable runs the route at a set pace and takes no notice of ice or wind)
+      const land = this.world.islands.filter((I) => g.ashore?.canLandNow(I) && !I.landmark && I.biome !== 'cold')
         .sort((a, b) => dist(a, port) - dist(b, port))[0];
       if (!land || !g.story.canGoAshore) { g.ui.toast('There is nowhere nearby to race on foot.', 'info'); return false; }
       R.flags.rematch = { id, island: land.id };

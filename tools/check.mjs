@@ -2,13 +2,14 @@
 // Fast checks that need no browser and no dependencies:
 //
 //   node tools/check.mjs            everything (about a second)
-//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | paints | sea | music | seazones | rogue | ride | layout | climb | grove | archway | temple | cinderhorn
+//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | paints | fireworks | sea | music | seazones | rogue | ride | layout | climb | grove | archway | temple | cinderhorn
 //   node tools/check.mjs layout 500 layouts for 500 synthetic islands (default 150)
 //
 // Run it after every change. It catches the mistakes that otherwise only show
 // up as a blank page: a syntax error, an import of a name the other module
 // doesn't export, a helper left behind when code moved to another file, a
 // text key or element id that doesn't exist, a save that no longer migrates,
+// a firework that makes no sparks or a finale too big for the sky to hold,
 // a sea event that could turn up in the wrong place, a tune with a note out
 // of its key or its instrument's range, music that flips at a zone's edge, sea zones that leave home
 // out, put rough water over a port or a landing, or disagree between the CPU
@@ -301,7 +302,7 @@ const checks = {
     const { SAVE_VERSION } = await load('config.js');
     const v1 = { v: 1, banked: 240, cargo: 0, health: 80, upgrades: { sail: 1 }, discovered: [0, 3], savePort: 0 };
     const cases = { empty: {}, v1, garbage: { quests: 7, story: 'x', rival: null, hold: {}, wardrobe: 'hat', ashore: null } };
-    const objects = { quests: ['active', 'done', 'boards', 'pinned', 'reports'], story: ['chapter', 'journals', 'flags', 'seenCards'], rival: ['chapter', 'wins', 'losses', 'flags', 'log'], ashore: [], sightings: ['seen', 'miss', 'chain'] };
+    const objects = { quests: ['active', 'done', 'boards', 'pinned', 'reports'], story: ['chapter', 'journals', 'flags', 'seenCards'], rival: ['chapter', 'wins', 'losses', 'flags', 'log'], ashore: [], sightings: ['seen', 'miss', 'chain'], fireworks: ['rocket', 'special', 'finale', 'cheered'] };
     const arrays = ['wardrobe', 'hold', 'paints'];
     for (const [label, input] of Object.entries(cases)) {
       const d = migrate(structuredClone(input));
@@ -344,6 +345,15 @@ const checks = {
     if (off.livery.sail !== null || !off.rival.flags.dye) errors.push('a save with the crimson dye off should keep its sails (and its gift)');
     const odd = migrate({ paints: ['paint:plum', 3], livery: { hull: 'plum', sail: 'plum', figurehead: 'owl', mast: 'gold' } });
     if (odd.paints.length !== 1 || odd.livery.hull !== 'plum' || odd.livery.sail !== null || odd.livery.figurehead !== 'owl' || 'mast' in odd.livery) errors.push('migrate should keep good paints and drop what doesn\'t fit its part');
+    // fireworks in the hold: none in an old save; a save's own counts are kept, within what the hold takes
+    for (const [label, input] of Object.entries(cases)) {
+      const F = migrate(structuredClone(input)).fireworks;
+      if (F.rocket || F.special || F.finale || F.cheered.length) errors.push(`${label}: an old save should have no fireworks`);
+    }
+    const stocked = migrate({ fireworks: { rocket: 12, special: 3, finale: 1, cheered: [0, 4, 4, 'x'] } }).fireworks;
+    if (stocked.rocket !== 12 || stocked.special !== 3 || stocked.finale !== 1 || stocked.cheered.join() !== '0,4') errors.push('migrate changed the fireworks in the hold');
+    const over = migrate({ fireworks: { rocket: 99, special: -2, finale: 'lots' } }).fireworks;
+    if (over.rocket !== 40 || over.special !== 0 || over.finale !== 0) errors.push('migrate should hold fireworks to what the hold takes');
     return { errors, note: `${Object.keys(cases).length} saves` };
   },
 
@@ -394,6 +404,110 @@ const checks = {
   // when it should, the pity timer brings the rare one round, events are
   // placed in open water off the bow (`count` placements in a toy sea), and
   // the Sightings log, its milestones and its words all line up.
+  // Fireworks (fireworks/shells.js): the Stores sell what the plan says, every shell
+  // makes sparks, a special is flat on to whoever watches, a rocket gets where it is
+  // aimed, and the grand finale is forty shells in half a minute that the sky can hold
+  // on High and on Low.
+  async fireworks() {
+    const errors = [];
+    const S = await load('fireworks/shells.js');
+    const { FIREWORKS } = await load('config.js');
+    const { STORES } = await load('story-text.js');
+    const { FIREWORK } = await load('rival-text.js');
+    const { SHEETS } = await load('gallery/sheets.js');
+    const ALL = [...S.KINDS, ...S.SPECIALS];
+    // the Stores
+    const want = { box: [120, 6, 0, 0], crate: [450, 20, 4, 0], finale: [1500, 0, 0, 1] };
+    for (const [id, [price, rocket, special, finale]] of Object.entries(want)) {
+      const it = FIREWORKS.items[id];
+      if (!it || it.price !== price || (it.rocket || 0) !== rocket || (it.special || 0) !== special || (it.finale || 0) !== finale) errors.push(`Stores: ${id} should cost ${price} for ${rocket} rockets, ${special} specials, ${finale} finales`);
+      if (!it?.name || !STORES.about[id]) errors.push(`Stores: ${id} needs a name and a line about it`);
+    }
+    if (FIREWORKS.hold !== 40) errors.push(`the hold takes ${FIREWORKS.hold} shells, not 40`);
+    for (const k of ['rocket', 'special', 'finale']) if (!STORES.loads[k] || !STORES.none[k]) errors.push(`story-text.js STORES: no label or "none left" line for ${k}`);
+    for (const who of ['rival', 'friend']) {
+      if (!FIREWORK[who]?.length) errors.push(`rival-text.js FIREWORK.${who}: Sable has nothing to say`);
+      for (const l of FIREWORK[who] || []) if (/\{(?!captain\})\w+\}/.test(l)) errors.push(`rival-text.js FIREWORK.${who}: "${l}" has a blank that is never filled`);
+    }
+    // the hold
+    const hold = (rocket, special = 0, finale = 0) => ({ rocket, special, finale, cheered: [] });
+    if (S.noRoomFor(hold(34), 'box') || S.noRoomFor(hold(30, 5), 'box') !== 'hold') errors.push('a box of rockets should fit a hold with 34 shells in it, and not one with 35');
+    if (S.noRoomFor(hold(10, 6), 'crate') || S.noRoomFor(hold(17), 'crate') !== 'hold') errors.push('a festival crate should fit a hold with 16 shells in it, and not one with 17');
+    if (S.noRoomFor(hold(40, 0, FIREWORKS.finales - 1), 'finale') || S.noRoomFor(hold(0, 0, FIREWORKS.finales), 'finale') !== 'finales') errors.push(`the hold should take ${FIREWORKS.finales} grand finales whatever else is in it, and no more`);
+    const stowed = S.stow(S.stow(S.blankStock(), 'crate'), 'finale');
+    if (stowed.rocket !== 20 || stowed.special !== 4 || stowed.finale !== 1) errors.push('stowing a crate and a finale should leave 20 rockets, 4 specials and 1 finale');
+    if (S.specialsFor(false).includes('wing') || !S.specialsFor(true).includes('wing')) errors.push("Sable's wing should be a special only with the crimson cloth");
+    // how a spark flies: the sum the shader also does, against small steps
+    {
+      const v = [12, 30, -7], drag = 1.7, grav = 5, dt = 1e-4;
+      let p = [0, 0, 0], u = [...v];
+      for (let t = 0; t < 2; t += dt) { p = p.map((x, i) => x + u[i] * dt); u = u.map((x, i) => x + (-drag * x - (i === 1 ? grav : 0)) * dt); }
+      const f = S.fly(v, drag, grav, 2);
+      if (Math.hypot(f[0] - p[0], f[1] - p[1], f[2] - p[2]) > 0.02) errors.push(`fly() is ${Math.hypot(f[0] - p[0], f[1] - p[1], f[2] - p[2]).toFixed(3)} m off the same throw taken in small steps`);
+    }
+    // every shell
+    const counts = {};
+    for (const kind of ALL) {
+      for (const [q, R] of Object.entries(S.RING)) {
+        const s = S.makeShell(kind, { seed: 11, detail: R.detail });
+        counts[`${kind}:${q}`] = s.count;
+        if (!(s.count > 20) || s.data.length !== s.count * S.STRIDE) errors.push(`${kind} (${q}): ${s.count} points`);
+        if (s.data.some((x) => !Number.isFinite(x))) errors.push(`${kind} (${q}): a point is not a number`);
+        if (!(s.peak > 0 && s.peak < s.life) || !S.COLORS[s.color] || s.light.length !== 3) errors.push(`${kind} (${q}): needs a best moment inside its life, a colour and a light for the sea`);
+        if (!S.SHELL_NAMES[kind]) errors.push(`${kind}: no name`);
+        for (let i = 0; i < s.count; i++) {
+          const life = s.data[i * S.STRIDE + 8], drag = s.data[i * S.STRIDE + 10];
+          if (!(life > 0) || !(drag > 0)) { errors.push(`${kind} (${q}): point ${i} never burns, or has no drag`); break; }
+        }
+      }
+      if (!(counts[`${kind}:low`] < counts[`${kind}:high`] * 0.75)) errors.push(`${kind}: Low quality should make clearly fewer sparks (${counts[`${kind}:low`]} against ${counts[`${kind}:high`]})`);
+      if (S.makeShell(kind, { seed: 11 }).data.join() !== S.makeShell(kind, { seed: 11 }).data.join()) errors.push(`${kind}: the same seed should make the same shell`);
+    }
+    for (const kind of S.SPECIALS) {
+      // facing north (face 0) its sparks fly east-west and up-down, hardly at all towards the viewer
+      const s = S.makeShell(kind, { seed: 3, face: 0 });
+      let deep = 0;
+      for (let i = 0; i < s.count; i++) if (s.data[i * S.STRIDE + 13] === S.SPARK) deep = Math.max(deep, Math.abs(s.data[i * S.STRIDE + 5]));
+      if (deep > 2) errors.push(`${kind}: a special should be thrown flat on to the viewer (a spark leaves at ${deep.toFixed(1)} m/s towards them)`);
+    }
+    if (!S.makeShell('crackle', { seed: 2 }).cracks.length || !S.makeShell('crossette', { seed: 2 }).cracks.length) errors.push('a crackle and a crossette should say when they pop');
+    // a rocket
+    const r = S.makeRocket({ height: 60, dx: 10, dz: -5 });
+    if (Math.hypot(r.apex[0] - 10, r.apex[1] - 60, r.apex[2] + 5) > 0.01) errors.push(`a rocket aimed 10 m east, 5 m north and 60 m up gets to ${r.apex.map((x) => x.toFixed(1)).join(', ')}`);
+    if (FIREWORKS.height !== 60) errors.push(`rockets burst ${FIREWORKS.height} m up, not about 60`);
+    // the grand finale, with and without Sable's wing
+    let most = {};
+    for (const wing of [false, true]) {
+      for (let seed = 1; seed <= 20; seed++) {
+        const show = S.finaleShow(seed, { wing }), label = `finale ${seed}${wing ? ' (wing)' : ''}`;
+        if (show.length !== FIREWORKS.finale.shells) errors.push(`${label}: ${show.length} shells, not ${FIREWORKS.finale.shells}`);
+        const end = Math.max(...show.map((x) => x.t)) + FIREWORKS.rise;
+        if (Math.abs(end - FIREWORKS.finale.seconds) > 3) errors.push(`${label}: the last shell bursts at ${end.toFixed(1)} s, not about ${FIREWORKS.finale.seconds}`);
+        if (show.some((x, i) => i && x.t < show[i - 1].t)) errors.push(`${label}: out of order`);
+        for (const x of show) if (!ALL.includes(x.kind) || !S.COLORS[x.color] || Math.abs(x.side) > 1 || !(x.height > 0.7 && x.height < 1.3)) errors.push(`${label}: a ${x.kind} in ${x.color}, ${x.side} to one side and ${x.height} high`);
+        for (const kind of S.KINDS) if (!show.some((x) => x.kind === kind)) errors.push(`${label}: no ${kind}`);
+        const sp = show.filter((x) => S.SPECIALS.includes(x.kind)).map((x) => x.kind);
+        if (sp.length !== 3 || sp.includes('wing') !== wing) errors.push(`${label}: its specials are ${sp.join(', ')}`);
+        // the sky is a ring of points: a shell must not be written over while it still burns
+        for (const [q, R] of Object.entries(S.RING)) {
+          const lit = show.map((x) => {
+            const s = S.makeShell(x.kind, { seed: x.seed, color: x.color, detail: R.detail });
+            return { t: x.t, n: s.count + S.makeRocket({ seed: x.seed, detail: R.detail }).count, end: x.t + FIREWORKS.rise + s.life };
+          });
+          for (const [j, a] of lit.entries()) {
+            const n = a.n + lit.slice(j + 1).filter((b) => b.t < a.end).reduce((sum, b) => sum + b.n, 0);
+            most[q] = Math.max(most[q] || 0, n);
+            if (n > R.points) { errors.push(`${label}, ${q}: ${n} points alight at once, and the sky holds ${R.points}`); break; }
+          }
+        }
+      }
+    }
+    // the gallery's sheet shows every one of them
+    const shown = new Set(SHEETS.fireworks?.make({}).cells.map((c) => c.q.kind));
+    for (const kind of ALL) if (!shown.has(kind)) errors.push(`the gallery's fireworks sheet has no ${kind}`);
+    return { errors, note: `${ALL.length} shells (${S.KINDS.length} kinds, ${S.SPECIALS.length} specials), a peony of ${counts['peony:high']} points (${counts['peony:low']} on Low); 40 finales of ${FIREWORKS.finale.shells} shells, at most ${most.high} points alight of ${S.RING.high.points} (${most.low} of ${S.RING.low.points} on Low)` };
+  },
+
   async sea(count = 3000) {
     const errors = [];
     const S = await load('sightings.js');
@@ -1378,6 +1492,7 @@ const checks = {
     // moves, and the optional ones (fixed numbers, so islands don't change)
     const arc = jumpArc(ASHORE), D = ASHORE.design;
     const reach = (top) => top * arc.air;
+    let physics = '';
     if (D.jumpUp > arc.up * 0.8) errors.push(`a jump goes ${arc.up.toFixed(2)} m up: too close to design.jumpUp ${D.jumpUp}`);
     if (D.gapRun > reach(ASHORE.run) * 0.8) errors.push(`a run-jump covers ${reach(ASHORE.run).toFixed(2)} m: too close to design.gapRun ${D.gapRun}`);
     if (LIMITS.optional.up > arc.up * 0.92) errors.push(`optional climbs up to ${LIMITS.optional.up.toFixed(2)} m, but a jump goes ${arc.up.toFixed(2)} m`);
@@ -1400,6 +1515,39 @@ const checks = {
       if (top < lift - 0.1) errors.push(`a vent throw meant to rise ${lift} m rises ${top.toFixed(2)} m`);
       if (drift > VENT.clear - ASHORE.radius - 0.2) errors.push(`steering hard while a vent throws you up drifts ${drift.toFixed(2)} m sideways: into the shelf beside it`);
     }
+    // ice slides: let go at a walk and you carry on a few metres (on grass you
+    // stop at once), steer back and you stop well inside a shelf, and a hop
+    // from a standstill still clears design.iceGap. A gust stops a jump short;
+    // on your feet you can walk into it, and standing still it only edges you back
+    {
+      const flat = (tag) => new CharacterController({ colliders: [], groundAt: () => 0, groundTag: () => tag, waterY: -9 }, ASHORE);
+      const run = (ctl, secs, input, until = () => false) => { for (let k = 0; k < secs * 120 && !until(k); k++) ctl.update(1 / 120, typeof input === 'function' ? input(k) : input); return ctl.pos.x; };
+      const at = (tag) => { const ctl = flat(tag); ctl.teleport(0, 0, 0, 0); return ctl; };
+      const walking = (tag) => { const ctl = at(tag); run(ctl, 1.5, { wishX: 1, wishZ: 0 }); return ctl; };
+      let ctl = walking('ice');
+      const slide = -ctl.pos.x + run(ctl, 6, {});
+      ctl = walking('grass');
+      const stop = -ctl.pos.x + run(ctl, 2, {});
+      ctl = walking('ice');
+      const brake = -ctl.pos.x + run(ctl, 2, { wishX: -1, wishZ: 0 }, () => ctl.vel.x <= 0);
+      ctl = at('ice');
+      const hop = run(ctl, 2, (k) => ({ wishX: 1, wishZ: 0, jumpPressed: k === 0, jumpHeld: true }), (k) => k > 5 && ctl.grounded);
+      if (!(slide > 2.5 && slide < 5)) errors.push(`letting go on ice at a walk slides ${slide.toFixed(2)} m (expected 2.5-5)`);
+      if (stop > 0.6) errors.push(`letting go on grass at a walk carries you ${stop.toFixed(2)} m: only ice should slide`);
+      if (brake > D.iceWidth * 0.6) errors.push(`steering back on ice takes ${brake.toFixed(2)} m to stop: too much of a shelf ${D.iceWidth} m wide`);
+      if (hop < D.iceGap + 0.6) errors.push(`a hop from a standstill on ice covers ${hop.toFixed(2)} m: too little for design.iceGap ${D.iceGap}`);
+      const G = ASHORE.gust, blow = (c) => { c.wind.x = -G.push; return c; };
+      ctl = blow(walking('grass'));
+      const short = -ctl.pos.x + run(ctl, 2, (k) => ({ wishX: 1, wishZ: 0, jumpPressed: k === 0, jumpHeld: k < 40 }), (k) => k > 5 && ctl.grounded);
+      ctl = blow(walking('grass'));
+      const into = -ctl.pos.x + run(ctl, 1, { wishX: 1, wishZ: 0 });
+      ctl = blow(at('grass'));
+      const back = -run(ctl, 1, {});
+      if (short > 1) errors.push(`a walking jump into a gust still covers ${short.toFixed(2)} m: the lull should be the only time to cross`);
+      if (into < ASHORE.walk * 0.5) errors.push(`walking into a gust makes ${into.toFixed(2)} m a second: you should be able to lean into it`);
+      if (!(back > 0.3 && back < 1.6)) errors.push(`standing in a gust moves you ${back.toFixed(2)} m a second (expected 0.3-1.6)`);
+      physics = `on ice letting go slides ${slide.toFixed(1)} m and steering back stops in ${brake.toFixed(1)} m; a jump into a gust covers ${short.toFixed(1)} m`;
+    }
     const climber = await testClimber();
     const notes = [];
     for (const biome of ASHORE_BIOMES) {
@@ -1416,7 +1564,7 @@ const checks = {
       }
       notes.push(`${biome} ${Math.round(secs / count)} s, ${Math.round(jumps / count)} jumps`);
     }
-    return { errors, note: `a held jump ${arc.up.toFixed(2)} m up, ${arc.air.toFixed(2)} s in the air; ${count} islands per biome to the summit, on average ${notes.join('; ')}; ${climber.stats.launches} throws from steam vents; ${climber.stats.retries} hops needed a second try, ${climber.stats.dodges} a step aside` };
+    return { errors, note: `a held jump ${arc.up.toFixed(2)} m up, ${arc.air.toFixed(2)} s in the air; ${count} islands per biome to the summit, on average ${notes.join('; ')}; ${climber.stats.launches} throws from steam vents, ${climber.stats.ice} hops onto ice, ${climber.stats.gusts} hops across a gust after waiting ${climber.stats.waited.toFixed(0)} s for the lull; ${climber.stats.retries} hops needed a second try, ${climber.stats.dodges} a step aside; ${physics}` };
   },
 
   // The Elder Grove: the layout keeps its design limits, and a test climber
@@ -1531,13 +1679,15 @@ const checks = {
  * `level` needs groundAt, colliders and pieces (with footprints). Its vents
  * and crumbling pieces (hazards.js) work as in the game: on a 'launch' edge
  * the climber steps into the vent's mouth and pushes for the ledge all the
- * way up; crumbling pieces fall if it dawdles. Caught on a rail or a corner, it
- * steps aside for a moment (stats.dodges).
+ * way up; crumbling pieces fall if it dawdles. Ice slides under it and gusts
+ * push it as they do you: before a hop that a gust blows across it waits on
+ * the rest for the gust to die away (stats.gusts, stats.waited). Caught on a
+ * rail or a corner, it steps aside for a moment (stats.dodges).
  */
 async function testClimber() {
   const { footGap, nodeFoot, supportAt } = await load('ashore/grove-layout.js');
   const { CharacterController } = await load('ashore/controller.js');
-  const { Hazards } = await load('ashore/hazards.js');
+  const { Hazards, inGust } = await load('ashore/hazards.js');
   const { ASHORE } = await load('config.js');
   const climb = (L, nodes, label, errors, tries = 1) => {
     const ctl = new CharacterController(L, ASHORE);
@@ -1547,13 +1697,22 @@ async function testClimber() {
     for (let i = 1; i < nodes.length; i++) {
       const A = nodes[i - 1], B = nodes[i], wide = footGap(nodeFoot(A), nodeFoot(B)) > 1.5;
       const what = `${label}[${i}] ${A.piece?.kind || 'ground'}→${B.piece?.kind || 'ground'}`;
+      // a gust blows across this hop: `first` if it is the hop off the rest, where you wait
+      const gust = hz.gusts.find((g) => g.hops && inGust(g, (A.x + B.x) / 2, Math.max(A.y, B.y) + 0.5, (A.z + B.z) / 2));
+      const first = gust && A.piece?.id === gust.from;
+      if (gust) climb.stats.gusts++;
+      if (B.piece?.tag === 'ice') climb.stats.ice++;
       let problem = null;
       for (let attempt = 0; attempt < tries; attempt++) {
         if (attempt) { climb.stats.retries++; hz.reset(); ctl.teleport(A.x, A.y + 0.05, A.z, 0); }
         const run = attempt % 2 ? !wide : wide;
         problem = null;
         let held = 0, best = Infinity, still = 0, side = 0, dodge = 0;
+        // wait for the lull: set off just after the gust has died away (on a second try, from the rest again)
+        let wait = !!gust && (first || attempt > 0);
         for (let k = 0; ; k++) {
+          if (wait && gust.state === 'calm' && gust.calm > ASHORE.gust.rest + ASHORE.gust.warn - 0.5) wait = false;
+          if (wait) { ctl.update(1 / 60, {}); hz.update(1 / 60, ctl); t += 1 / 60; climb.stats.waited += 1 / 60; if (k > 60 * 20) wait = false; continue; }
           const p = ctl.pos, d = Math.hypot(B.x - p.x, B.z - p.z) || 1;
           // a spot on the ground counts if you're on something just above it (a bridge's end, say)
           if (ctl.grounded && d < 0.7 && p.y - B.y > -0.25 && p.y - B.y < (B.piece ? 0.25 : 0.6)) break;
@@ -1587,7 +1746,7 @@ async function testClimber() {
     }
     return t;
   };
-  climb.stats = { retries: 0, launches: 0, dodges: 0 };
+  climb.stats = { retries: 0, launches: 0, dodges: 0, ice: 0, gusts: 0, waited: 0 };
   return climb;
 }
 

@@ -975,7 +975,113 @@ Updated 2026-11-27.
       the beach (the temple's shrine has the same mismatch with the chain's
       offer). `README.md` and `CLAUDE.md` don't list the temple's files and
       gallery names from 4.7.
-  - [ ] 4.10 Cold islands and 4.11 Frostspire
+  - [x] 4.10 Cold islands ([#70](https://github.com/James-Thibaudeau/tidewake/pull/70)). `cold` is in `ASHORE_BIOMES`, so the ice spikes
+    refit (tier 4, the last) is live: it's offered once you own Hull 3, and
+    its fitting, fire-forged spikes, waits on a volcanic island (Star Cay
+    from Whisper Island). Until it's fitted, cold shores say "Your anchor
+    would skid on the ice. Ask the shipwright." Frostspire can be landed on
+    too: until 4.11 it is a generated cold island (hard), and Journal VII
+    stays at the camp.
+    - Cold levels (`modules.js` `POOLS.cold`; art in the new
+      `ashore/cold-art.js`): grey shingle, a meadow of frosted grass with
+      drifts of snow, and snow from cliff 1 up; snow pines, snowy boulders,
+      ice standing offshore, blue-grey walls. Near home the moat is frozen
+      over all the way round and you slide across wherever you like; further
+      out you hop between ice floes. The climbs are steps and drifts of snow
+      near home, then snowy ledges hung with icicles, the flat snow-laden
+      tops of pines, and shelves of ice. Each rest between climbs has a
+      snowman. The chest sits at the top of a great snow pine; the summit
+      has a cairn with a pennant. A frozen pond with coins on it lies on the
+      meadow, off the path, just back from where you cross the moat (on 8
+      islands in 10 near home, nearly all further out).
+    - Ice that slides, built here for any level (`controller.js`,
+      `ASHORE.ice`): anything tagged `ice` (a collider, or the level's
+      `groundTag`). On it you speed up and turn at a fifth of the usual
+      rate and slow down at a tenth, so letting go at a walk slides you 3.7 m
+      and steering back stops you in 0.6 m. Required hops onto or off ice
+      stay inside `ASHORE.design.iceGap` (1.1 m; a hop from a standstill on
+      ice covers 2.1 m) on ice at least `iceWidth` (1.5 m) wide, and near
+      home there are none at all: the frozen moat and the pond are walked.
+      The layout check enforces both.
+    - Wind gusts, built here for any level (`hazards.js` `level.gusts`,
+      `ctl.wind`, `ASHORE.gust`): a gust rests 3.6 s, stirs for 0.9 s as a
+      warning, then blows for 2.2 s through its box and carries you at
+      3.2 m/s in the air (a walking jump into it covers 0.7 m), a third of
+      that on your feet. It blows back the way you came, so on your feet it
+      only holds you up. Each one is across the hop after a rest (two hops
+      for the first on a hard island), the rest being where you wait; a
+      pennant on the rest hangs in the lull, stirs, and streams while it
+      blows, with streaks of snow in the air and the sound of it coming.
+      Medium islands have one, hard ones three. Near home the one gust is
+      across a stretch of the terrace walk. Never over ice, a lantern, more
+      than `design.gustHops` (2) hops, or a hop near home; the layout check
+      enforces it.
+    - The moving parts (the new `ashore/cold-life.js`): the ice on the moat
+      and the pond, the pennants, the gusts' streaks, and light snow falling
+      round you. The first time on ice and the first gust each show a tip
+      ("Ice! You slide on after you let go.", "A gust of wind! Cross when
+      the pennant hangs still."). In a gust your scarf flies with it.
+    - Sound: footsteps on snow (a soft crunch with a squeak) and ice (a hard
+      tick), ice creaking as the island's ambience with the wind's whistle
+      and a far gull, and a gust that gathers, blows and dies away (only
+      from gusts within 18 m). Rendered offline and measured against the
+      others: a step on snow peaks at 0.0115 (grass 0.0132, sand 0.0091), on
+      ice 0.0178 (stone 0.0169); ice creaking sits with the whistle and the
+      far gull (RMS 0.0012 against 0.0013); the gust peaked at 0.064 (the
+      vent 0.074) and was then turned down by 15%. Nobody has listened yet.
+    - Difficulty: cold islands count 2.5 km nearer home (`BIOME_EASE`), so
+      Whisper Island (3.7 km), the first you reach, is easy, the four round
+      Frostspire are medium (Sprat Atoll, Brine Key, Juniper Key, Crab Cay)
+      and the other twelve hard; walls are ×1.05 and summits ×1.12. Over 300
+      islands: easy 9.4 jumps (temperate 9.2), medium 27.3 jumps, 7.7 of
+      them onto ice, and 1 gust (rocky 26.5 jumps, temperate 24.7), hard
+      34.7 jumps, 13.6 onto ice, and 3 gusts over 4 hops (rocky 33.0,
+      temperate 30.9): the hardest biome, as the last one. The widest
+      required gap is 1.59 m (limit 1.9), onto ice 1.1.
+    - The anchor at the bow shows tier 4: gilded, with the ice spikes made
+      long enough to see under the flukes.
+    - Sable: the story's foot races stay where they were (a temperate island,
+      and the scramble's tropical one). A rematch on foot goes to the nearest
+      island you can land on that is not cold, because Sable runs the route
+      at a set pace and takes no notice of ice or wind (with the spikes
+      fitted, rematches from Coralgate and Frostharbor would otherwise have
+      gone to cold islands). Quests only pick islands the anchor holds at.
+    - Gallery: the `level` subject takes `biome=cold`, `at=pond|gust` and
+      `gust=calm|warn|blow`; new sheet `cold-places`; `islands` and
+      `island-places` have a fourth column, 7.5 km out, because cold islands
+      at the old three distances are easy, easy and medium. New piece kinds
+      `pine`, `floe`.
+    - `node tools/check.mjs layout` runs 150 cold islands; `climb` walks 12
+      to the summit (32 s, 22 jumps on average): ice slides under the test
+      climber and gusts push it, and before a hop a gust blows across it
+      waits on the rest for the lull. It also checks the slide, the stop,
+      the hop from a standstill and what a gust does to a jump. With 60
+      islands per biome cold has one of the known misses on easy islands'
+      railed ledges. Every temperate, rocky, tropical and volcanic island is
+      laid out exactly as before (checked against `main` over 200 islands
+      per biome).
+    - Played in the preview through the real game: Whisper Island blocked at
+      tier 3 with the ice line; the offer → the spikes picked up at Star
+      Cay's vault → fitted at Port Haven (tier 4, "It has been everywhere").
+      A scripted climber driving the game's own stick, jump and camera
+      climbed Whisper Island (easy, 22 s), Sprat Atoll and Brine Key (medium,
+      35 s), Minnow Island, Bramble Highlands, Gull Rock and Saltire Cay
+      (hard, 51-56 s, waiting 10-14 s for lulls) and Frostspire (55 s), with
+      no misses and every lantern lit; a slide across the pond; a jump into
+      a gust on purpose, which lands you on the tier below. A save from
+      before this change loads. On High at 2048×1536 a cold level takes
+      2.3-2.5 ms a frame from the beach and 2.8-3.5 ms from the top (a
+      volcanic one 2.8 and 3.5, a tropical one 2.9 and 3.5); on Low at
+      1024×768, 0.4-0.5 and 0.55 ms (0.4-0.6 and 0.55).
+    - Not done: a play by hand, above all how the slide feels on a phone's
+      stick and whether the gusts' lull is long enough to read; a listen to
+      the new sounds; a look on a phone; the wording of the two tips; the
+      pacing check (chapter VII now needs Hull 3 and the ice spikes).
+    - Seen on the way, not fixed: with a wider sample than the check's, 4 of
+      300 volcanic islands laid out as *easy* fail their vent's reach (no
+      volcanic island in this world is near enough to be easy); and
+      `modules.js` is now 1,100 lines, due a split.
+  - [ ] 4.11 Frostspire
   - [x] Retrieve quests, including "Find the lost map fragment": offered by
     Harbormasters (Cartographers for the fragment) once the anchor is fitted.
     The item waits at the level's vault (on generated islands, by the summit)
@@ -1442,6 +1548,70 @@ Updated 2026-11-27.
   - [ ] Paint yard follow-ups: tune prices against measured late-game income
     (the plan's numbers are starting points); each ship keeps its own livery
     once there are two (10.4).
+  - [x] **10.2 Fireworks** ([#69](https://github.com/James-Thibaudeau/tidewake/pull/69)):
+    - **A Stores tab at every port** sells a box of rockets (6, for 120
+      gold), a festival crate (20 rockets and 4 specials, 450) and a grand
+      finale (40 shells in half a minute, 1,500). The hold takes 40 rockets
+      and specials together, and 3 grand finales. A wreck doesn't take them.
+    - **F sets off what is loaded and G changes it** (rockets, specials, the
+      finale); on touch, a rocket button beside the gauges and the label
+      under it. It works whenever you are sailing, under way or lying
+      stopped. The rocket leaves the stern and bursts 60 m up, over where
+      the ship will be by then, and the camera pulls back and tips up while
+      one of yours is in the air. The grand finale runs by itself while you
+      steer.
+    - **Nine shells:** peony, willow, crossette, ring and crackle out of the
+      box, in mixed colours. The specials are a heart, a star and an owl's
+      face, turned to face you; Sable's crimson wing joins them once the
+      crimson sail cloth is yours.
+    - **Look:** every spark is one point of a single `THREE.Points`, moved by
+      the graphics card (`fireworks/sky.js`): one draw call, and nothing to
+      do per spark each frame. Bright enough to bloom. Tails bend downwind
+      and embers and smoke drift with it. The sea under a burst takes its
+      colour for a moment, in two bands like the lantern's (`seaFlash` in
+      `ocean.js`). By day the sparks are pale and painted over the sky, and
+      the smoke takes the shell's colour. On Low a shell has about a third
+      of the sparks, and only one show goes up at a time.
+    - **Cost:** during a grand finale a frame took no longer than without
+      one, on High (4.3 ms against 5.2 at 2048×1536) or on Low (0.9 ms
+      against 1.6 at 1024×768); the differences are other things in view.
+    - **Sound** (`audio/fireworks.js`): a whoosh going up, then the boom,
+      late by the distance at 340 m/s as thunder is; a crackle for the shells
+      that pop again; a crowd's cheer. The boom is a crack, a thump with
+      enough above 200 Hz for small speakers to carry it, three seconds of
+      rolling away and two echoes off the water, and it goes through a
+      limiter of its own so a volley doesn't add up past full scale. It is
+      the loudest sound in the game. Rendered offline and measured (loudest
+      50 ms): the boom −17 dB (a whale's breach −22, thunder −27), still
+      −23 dB over its second second; a boom 550 m off −23; the whoosh −34;
+      the finale's last twelve booms peak at −6 with nothing clipped.
+      The first boom was a 0.9 s thump almost all below 120 Hz, which small
+      speakers turned into a little pop; the user heard that and it was
+      rebuilt. **Listened to by the user in the game (2026-11-27): "it's
+      good now."** The boom was their only complaint; the whoosh, the
+      crackle and the cheer drew no comment.
+    - **Who notices:** with the Redwing in sight and Sable free (not in a
+      race, in tow or with the kraken), Sable answers 6 times in 10 with a
+      crimson one of their own, at most every 25 s, and a line that goes in
+      the journal; once you are friends it is the crimson wing. A port
+      cheers one set off within 420 m of its dock at night, with a toast
+      the first time at each port.
+    - **From code:** `game.fireworks.finale({ free: true, from: { x, z,
+      heading } })` runs a grand finale from a fixed place without touching
+      the hold: the town's show at the launch of grandfather's ship (10.4).
+      `launch(kind, opts)` lights one rocket.
+    - **Save:** `fireworks: { rocket, special, finale, cheered }` (`cheered`:
+      the ports that have had their toast).
+    - **Gallery:** `show=fireworks` holds one shell at its best moment over a
+      ship (`kind`, `color`, `seed`, `age`, `low`); sheets `fireworks`,
+      `fireworks-low` and `fireworks-ages`. `check.mjs fireworks` checks the
+      shells, the hold and the finale. `debug.fireworks()` sets one off;
+      `debug.give({ fireworks: 'max' })` fills the hold.
+  - [ ] Fireworks follow-ups: tune prices against measured late-game
+    income; the whoosh is now quiet beside the boom (−34 dB against −17); on a phone held upright the finale's
+    side-by-side shells run off the sides of the picture, and the port's
+    five tabs take three rows; rockets can't be set off at a dock or from an
+    island.
 - [ ] **Phase 11, islands with shapes:** variety in the archipelago, as
   Archway Isle's bay gave it a shape: crescents, rings, coves, hooks, twins
   and more, spread so neighbours differ. Moon Island is the first, a

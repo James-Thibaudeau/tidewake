@@ -13,6 +13,13 @@ import { WAVE_GLSL, WAVE_LOD_GLSL, NOISE_GLSL, waveUniforms } from './waves.js';
 import { ROGUE } from './config.js';
 import { clamp, smoothstep } from './util.js';
 
+// A firework's light on the sea (fireworks/sky.js writes it; every Ocean reads it, as the
+// waves are shared): where the burst is, how far its light reaches and how strong it is now.
+export const seaFlash = {
+  uBurst: { value: new THREE.Vector4(0, 0, 1, 0) },
+  uBurstCol: { value: new THREE.Color(1, 1, 1) },
+};
+
 /**
  * A map of how near a shore every piece of the sea is, for the depth tint: one byte a
  * texel, 0 at a shore and 255 in open water. `shores` is a list of
@@ -175,6 +182,8 @@ uniform vec4 uLantern;
 uniform float uLanternR;
 uniform float uRain;
 uniform vec4 uBloom; // (x, z, radius, strength): a patch of glowing sea; strength 0 = off
+uniform vec4 uBurst; // (x, z, radius, strength): a firework's light on the water under it; strength 0 = off
+uniform vec3 uBurstCol;
 uniform vec2 uWindDir;
 uniform float uWindStr;
 uniform vec3 uCalm;
@@ -387,7 +396,10 @@ void main() {
   vec3 light = uAmbient + uLightCol * (1.0 - shade * 0.75);
   float ld = length(vWorld - uLantern.xyz);
   light += vec3(1.0, 0.72, 0.38) * uLantern.w * (step(ld, uLanternR * 0.45) * 0.35 + step(ld, uLanternR) * 0.35);
-  vec3 lit = col * light;
+  // a firework overhead colours the water under it for a moment, in two bands like the lantern's
+  float burst = (step(distance(vWorld.xz, uBurst.xy), uBurst.z * 0.5) * 0.55 + step(distance(vWorld.xz, uBurst.xy), uBurst.z) * 0.45) * uBurst.w;
+  light += uBurstCol * burst;
+  vec3 lit = col * light + uBurstCol * burst * 0.07; // (and a little of it straight off the surface: red light is lost on blue water)
   // sky reflection toward grazing angles: hazy grey-teal near the horizon
   float F = 0.02 + 0.98 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
   lit = mix(lit, uSkyColor * 0.9, clamp(F, 0.0, 1.0) * 0.24);
@@ -438,6 +450,7 @@ export class Ocean {
     this.uniforms = {
       ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
       ...waveUniforms,
+      ...seaFlash,
       uTrough: { value: new THREE.Color('#0d2f5e') },
       uDeep: { value: new THREE.Color('#114b7a') },
       uMid: { value: new THREE.Color('#1b6492') },

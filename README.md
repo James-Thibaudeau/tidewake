@@ -13,6 +13,7 @@ Built with [three.js](https://threejs.org/) as plain ES modules, plus [postproce
 | Dock, haul treasure | `E` / `Space` | Gold action button |
 | Look around / zoom | Drag mouse / wheel | Drag / pinch |
 | Spyglass (once upgraded) | Hold `Z` | Spyglass button |
+| Set off a firework / change which | `F` / `G` | Rocket button / its label |
 | Sea chart | `M` | Map button |
 | Journal (quests) | `J` | Journal button |
 
@@ -40,6 +41,7 @@ On foot (once grandfather's anchor is fitted):
 - Every port has a **Quest Board**: chart rumoured islands, carry parcels between ports and salvage wrecks (cyan beams). Up to three at a time; rewards are paid when you dock. A parcel or salvage aboard sinks with your ship, just like gold.
 - **Captain Sable:** once you have your grandfather's first journal, the Redwing, a ship with crimson sails, starts turning up. She is rigged to match your own upgrades, and her captain will race you at sea (round buoys, and once through fog by compass bearing) and on foot, and the story moves on whether you win or lose. Harbor talk on the Quest Board says where the crimson sails were last seen.
 - **A living sea:** every few minutes of sailing something turns up off the bow: a whale in cool water, dolphins on a fine day, sea turtles in the warm south, icebergs in the north, a waterspout in a storm, a bottle with a message in it, and at night the sea glowing blue or a pale ship with green lanterns. Sail close, or hold it in the spyglass for a moment, and it goes in the journal's **Sightings** tab. Sail slowly beside a whale and it stays up; sail fast near dolphins and they ride your bow wave and pull you along; go gently among turtles; keep clear of ice and waterspouts; follow the ghost ship, not too close, and see where she stops. The first time you see each one, somebody at the nearest port wants to hear about it, and pays, if you get there before the news is stale. Quest boards sometimes ask for a sighting too.
+- **Fireworks:** every port has **Stores** that sell rockets, a festival crate with specials in it (a heart, a star, an owl's face) and a grand finale. At sea, press `F` (or tap the rocket) to set one off and `G` (or tap its label) to change what is loaded. They are best at night, a port will cheer one set off beside it after dark, and a wreck doesn't take them.
 - Every new voyage starts with the character creator. Restyle any time for free at a port's **Tailor** tab, where new hats, coats and boots are sold. Rarer pieces are hidden on the islands.
 - With a spyglass, hold `Z` (or the spyglass button) to look through it from the explorer's eyes; drag to pan. Islands you spot through it are charted from afar.
 
@@ -114,9 +116,10 @@ src/
   tow.js          a tow line between two boats
   kraken.js       the finale set piece
   ashore/         going ashore: ashore.js (visit flow, pickups), levelgen.js + modules.js +
-                  stairs.js + pieces.js + tropical-art.js + volcanic-art.js (island levels) +
-                  volcanic-life.js (lava, steam, crumbling basalt), hazards.js (steam vents and
-                  crumbling pieces, on any level), anchor-drag.js (the anchor in a storm while
+                  stairs.js + pieces.js + tropical-art.js + volcanic-art.js + cold-art.js
+                  (island levels) + volcanic-life.js (lava, steam, crumbling basalt) +
+                  cold-life.js (ice, pennants, falling snow), hazards.js (steam vents, crumbling
+                  pieces and gusts of wind, on any level), anchor-drag.js (the anchor in a storm while
                   you're ashore), wreck.js (grandfather's wreck, hand-built),
                   grove.js + grove-layout.js (the Elder Grove, hand-built) + grove-art.js
                   (its bark, moss and fungus) + grove-life.js (its owl guide and fireflies),
@@ -130,6 +133,9 @@ src/
   cosmetics.js    wardrobe catalogue: palettes, styles, unlock sources, appearance profile
   paints.js       the paint yard's catalogue: paints, cloth, emblems, flags, figureheads, what's earned, liveries (pure)
   paint-yard.js   the paint yard in the game: buying, wearing, earned unlocks, the side view of your ship
+  fireworks.js    fireworks in the game: the hold, lighting a rocket, the grand finale, Sable's answer, a port's cheer
+  fireworks/      shells.js (the shell kinds and specials, a rocket's climb, the finale's running order, what the
+                  hold takes; pure), sky.js (every spark as one GPU point: the sparks, the smoke, the light on the sea)
   creator.js      character creator / port wardrobe (studio scene + panel)
   world.js        procedural islands, terrain height (and Archway Isle's bay), island streaming
   props.js        low-poly prop library (trees, huts, lighthouse, rocks, chests…)
@@ -156,12 +162,13 @@ src/
   ui.js           the UI class: HUD, banners and toasts, title, pause and wreck screens
   ui/             the rest of UI: chart.js (minimap, sea chart), chart-seas.js (rough water on the chart),
                   landmarks.js (the landmarks' pictures on the chart), port.js (port screen, journal),
-                  paint-yard.js (the paint yard tab at port),
+                  paint-yard.js (the paint yard tab at port), stores.js (the Stores tab and the firework button at sea),
                   story.js (Found! pop-up, story cards, quest tracker, races), icons.js, shared.js
   input.js        keyboard, mouse and touch controls
   audio.js        procedural WebAudio sound and music: the buses, the sea's beds, one-shots
   audio/          the rest of the sound: ashore.js (footsteps, jump and land, coin chime, chest fanfare,
-                  island ambience, the on-foot score), instruments.js (the score's instruments and reverb),
+                  island ambience, the on-foot score), fireworks.js (a rocket's whoosh, a shell's boom and crackle,
+                  a port's cheer), instruments.js (the score's instruments and reverb),
                   music.js (the score's player: bars written onto the audio clock)
   music/          the score as data: notation.js (notes, chords, keys, the text format tunes are written in),
                   themes.js (the tunes and the cues that play them), score.js (the sequencer: what the next
@@ -177,7 +184,7 @@ src/
                   subjects.js (what it can show), presets.js (poses, lights, views), sheets.js (contact sheets)
 tools/
   serve.py        static dev server, caching off
-  check.mjs       quick checks in Node: syntax, imports, text keys, element ids, the gallery, saves, the paint yard's catalogue, how the boat rides the waves, ashore layouts, the grove and Archway climbs
+  check.mjs       quick checks in Node: syntax, imports, text keys, element ids, the gallery, saves, the paint yard's catalogue, fireworks, how the boat rides the waves, ashore layouts, the grove and Archway climbs
 docs/
   STATUS.md       what has shipped, what's next, known issues
   feature-plan.md designs for phases not built yet; shipped-plans.md keeps the designs of built ones
