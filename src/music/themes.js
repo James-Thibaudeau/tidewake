@@ -20,6 +20,7 @@ export const RANGES = {
   flute: ['C4', 'C7'],
   whistle: ['D5', 'D7'],
   fiddle: ['G3', 'E6'],
+  horn: ['F2', 'F5'],
   strings: ['C2', 'C5'],
 };
 
@@ -124,11 +125,46 @@ export const THEMES = {
       },
     },
   },
+
+  // Sable's theme: a rakish jig in A Dorian, the minor with the bright major
+  // fourth chord, so it swaggers instead of sulking. A long note and a quick
+  // three, a climb to a cheeky D major, then a high turn that shows off.
+  // No C or F# chords: the tow plays it in A Mixolydian (major), where those
+  // would turn diminished.
+  sable: {
+    key: 'A dorian', steps: 6, beats: 2,
+    phrases: {
+      dare: {
+        chords: 'Am | G | Am | D',
+        tune: 'E5 - A5 A5 G5 A5 | B5 - G5 D5 - G5 | E5 - A5 A5 B5 C6 | D6 - A5 F#5 - D5',
+      },
+      grin: {
+        chords: 'Am | G | Em D | Am',
+        tune: 'E5 - A5 A5 G5 A5 | B5 - G5 D5 E5 G5 | B5 A5 G5 F#5 - D5 | A5 - E5 A4 - -',
+      },
+      flourish: {
+        chords: 'D | G | D | Em',
+        tune: 'F#5 - A5 D6 - A5 | B5 - G5 D6 - B5 | A5 - F#5 D5 E5 F#5 | G5 - E5 B4 C5 D5',
+      },
+      // a race won: up to the top and held
+      won: {
+        chords: 'G | Am',
+        tune: 'D5 G5 B5 D6 - B5 | E6 - - - - -',
+      },
+      // a race lost: down to the bottom, with a shrug
+      lost: {
+        chords: 'D | Am',
+        tune: 'A5 - F#5 D5 - B4 | G4 - B4 A4 - -',
+      },
+    },
+  },
 };
 
 // A cue: a theme as it is played somewhere.
 //
-//   key      the key it is played in, if not the theme's own (the same mode)
+//   key      the key it is played in, if not the theme's own. In another mode
+//            on the same note, every note and chord takes that mode's step
+//            (A Dorian to A Mixolydian: C becomes C#, Am becomes A)
 //   calm     true: at night it slows, loses its drums and gains a celesta
 //   plain    true: no colours for rain or night (a storm, the fog)
 //   quiet    true: meant to be faint, so not held to the others' loudness
@@ -325,6 +361,100 @@ export const CUES = {
   },
 };
 
+// Sable's theme. The director plays it from the moment the Redwing turns
+// up (the horn sting comes first, before the sails are in sight) until
+// Sable sails off: an encounter, a race, the tow and the kraken. Races are
+// `plain`: in the rain they keep their drums.
+Object.assign(CUES, {
+  // Sable coming to meet you: the jig at an easy swagger.
+  sable: {
+    theme: 'sable', tempo: 96, gain: 1,
+    form: ['dare', 'grin', 'flourish', 'grin'], rest: [8, 20],
+    drift: 'Am | G | Am | D',
+    layers: {
+      bed: { voice: 'strings', vol: 0.3, oct: 3 },
+      bass: { voice: 'guitar', vol: 0.75, from: 1, oct: 2, pattern: '1 - 5 8 - 5' },
+      melody: { voice: 'fiddle', vol: 1, from: 1 },
+      counter: { voice: 'harp', vol: 0.45, from: 1, oct: 3, pattern: '. 3 5 . 3 5' },
+      rhythm: { vol: 0.32, from: 2, pattern: 'b . s b . s' },
+      descant: { voice: 'whistle', vol: 0.4, from: 3, shift: 12 },
+    },
+  },
+
+  // A race: the full jig at tempo, with drums. The director turns it up to
+  // everything while you're ahead or neck and neck, and down one while Sable leads.
+  'sable-race': {
+    theme: 'sable', tempo: 116, gain: 0.9, plain: true, urgent: true,
+    form: ['dare', 'grin', 'flourish', 'grin'], rest: [3, 8],
+    drift: 'Am | Am | G | D',
+    layers: {
+      bed: { voice: 'strings', vol: 0.32, oct: 3 },
+      bass: { voice: 'guitar', vol: 0.8, from: 0, oct: 2, pattern: '1 - 5 8 - 5' },
+      melody: { voice: 'fiddle', vol: 1, from: 1 },
+      counter: { voice: 'harp', vol: 0.45, from: 1, oct: 3, pattern: '8 3 5 8 3 5' },
+      rhythm: { vol: 0.34, from: 1, pattern: 'b . s b s s' },
+      drums: { vol: 0.32, from: 2, pattern: 'd . . d . .' },
+      descant: { voice: 'whistle', vol: 0.42, from: 3, shift: 12 },
+    },
+  },
+
+  // The fog run: nothing to see, so only the bass line and a heartbeat.
+  'sable-fog': {
+    theme: 'sable', tempo: 84, gain: 1.4, plain: true, urgent: true,
+    form: ['dare', 'grin', 'flourish', 'grin'], rest: [3, 8],
+    drift: 'Am | Am | G | D',
+    layers: {
+      bed: { voice: 'strings', vol: 0.4, oct: 2 },
+      bass: { voice: 'guitar', vol: 0.9, from: 1, oct: 2, pattern: '1 - 5 8 - 5' },
+      rhythm: { vol: 0.4, from: 0, pattern: 'd d . . . .' },
+    },
+  },
+
+  // The foot race ashore: quick and light, a tin whistle over a ukulele.
+  'sable-pacer': {
+    theme: 'sable', tempo: 120, gain: 1, plain: true, urgent: true,
+    form: ['dare', 'grin', 'flourish', 'grin'], rest: [3, 8],
+    drift: 'Am | G | Am | D',
+    layers: {
+      bed: { voice: 'strings', vol: 0.22, oct: 3 },
+      bass: { voice: 'guitar', vol: 0.6, from: 0, oct: 2, pattern: '1 . . 5 . .' },
+      melody: { voice: 'whistle', vol: 1, from: 1, shift: 12 },
+      counter: { voice: 'ukulele', vol: 0.55, from: 1, oct: 4, pattern: '. 1 3 . 1 3' },
+      rhythm: { vol: 0.3, from: 2, pattern: 's . s s . s' },
+    },
+  },
+
+  // The tow: Sable's jig slowed to an air and turned major. Tired and kind.
+  'sable-tow': {
+    theme: 'sable', key: 'A mixolydian', tempo: 44, gain: 1.3, calm: true,
+    form: ['dare', 'grin', 'flourish', 'grin'], rest: [15, 35],
+    drift: 'Am | G | Am | D',
+    layers: {
+      bed: { voice: 'strings', vol: 0.34, oct: 3 },
+      bass: { voice: 'harp', vol: 0.8, from: 1, oct: 2, pattern: '1 - - 5 - -' },
+      melody: { voice: 'fiddle', vol: 0.95, from: 1 },
+      counter: { voice: 'guitar', vol: 0.45, from: 2, oct: 3, pattern: '. 5 8 . 5 3' },
+    },
+  },
+
+  // The kraken: Sable's theme down in the deep, huge and slow, under the
+  // storm's drums and the squeezebox's stabs.
+  'sable-kraken': {
+    theme: 'sable', tempo: 42, gain: 1.15, plain: true, urgent: true,
+    form: ['dare', 'grin', 'flourish', 'grin'], rest: [6, 14],
+    drift: 'Am | Am | G | Am',
+    layers: {
+      bed: { voice: 'strings', vol: 0.4, oct: 2 },
+      bass: { voice: 'guitar', vol: 0.85, from: 0, oct: 2, pattern: '1 1 . 1 1 .' },
+      rhythm: { vol: 0.42, from: 0, pattern: 'd . . d . b' },
+      melody: { voice: 'strings', vol: 1.6, from: 1, shift: -24 },
+      descant: { voice: 'guitar', vol: 0.6, from: 1, shift: -12 },
+      counter: { voice: 'squeezebox', vol: 0.8, from: 2, oct: 3, pattern: '. . 5 . . 5' },
+      drums: { vol: 0.34, from: 2, pattern: '. b s . b s' },
+    },
+  },
+});
+
 // Rough water in a storm: the zone's cue, quicker, over the storm's drums.
 for (const zone of ['reach', 'rip', 'swell']) {
   const Z = CUES[zone];
@@ -334,10 +464,17 @@ for (const zone of ['reach', 'rip', 'swell']) {
   };
 }
 
-// A phrase played once over whatever cue is on, in its key: `steps` are
-// steps of the key's scale above its tonic in octave `oct` (7 = the octave),
-// each held `each` seconds.
+// A phrase played once over whatever cue is on, in its key. Either `steps`
+// of the key's scale above its tonic in octave `oct` (7 = the octave), each
+// held `each` seconds; or a `phrase` of a `theme` (its first `bars`, or all),
+// at `tempo`, moved by `shift` semitones and into the key that shares the
+// playing cue's notes, as the one-shots are.
 export const STINGS = {
   // a whale breaching: long and low
   whale: { voice: 'strings', oct: 2, steps: [0, 4, 5, 4, 0], each: 1.7, vol: 1.6 },
+  // Sable's horn, faint on the wind, before the crimson sails are in sight
+  'sable-horn': { voice: 'horn', theme: 'sable', phrase: 'dare', bars: 2, tempo: 88, shift: -12, vol: 0.7 },
+  // a race won, or lost
+  'sable-won': { voice: 'fiddle', theme: 'sable', phrase: 'won', tempo: 116, shift: 0, vol: 1.1 },
+  'sable-lost': { voice: 'fiddle', theme: 'sable', phrase: 'lost', tempo: 116, shift: 0, vol: 1.1 },
 };

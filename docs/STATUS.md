@@ -6,7 +6,7 @@ work, and update it in the same pull request as the change.**
 - Designs for work that hasn't started: [feature-plan.md](feature-plan.md)
 - Original designs of what has shipped (reference only): [shipped-plans.md](shipped-plans.md)
 
-Updated 2026-11-26.
+Updated 2026-11-27.
 
 ## Done
 
@@ -1321,7 +1321,85 @@ Updated 2026-11-26.
     `home`: are the colours a change of mood, or just wrong notes? Is
     the ghost's music box eerie, and is the whale's phrase too much? In
     the game: does the storm's music now arrive with the storm?
-  - [ ] 12.3 island music, 12.4 Sable's theme.
+  - [ ] 12.3 island music.
+  - [x] **12.4 Sable's theme** (PR to come):
+    - **The theme** (`sable` in `src/music/themes.js`): a rakish jig in
+      A Dorian, in six. A long note and a quick three, a climb to a
+      cheeky D major chord, a high turn that shows off. Sixteen bars,
+      plus a two-bar phrase for a race won (ends up) and one for a race
+      lost (ends down, with a shrug).
+    - **Its versions**, six cues, all `sable…`:
+      - `sable`: Sable coming to meet you. The jig at an easy swagger on
+        the fiddle, guitar and harp under it, a bodhrán at speed.
+      - `sable-race`: the full jig at 116, with drums. Everything while
+        you lead or it's close; the whistle drops out while Sable leads
+        by more than 30 m (`MUSIC.sableLead`). The countdown gets only
+        the first layers.
+      - `sable-fog`: the fog run. Only the bass line and a heartbeat.
+      - `sable-pacer`: the foot race ashore. Quick and light: a tin
+        whistle an octave up over a ukulele.
+      - `sable-tow`: slow, tired and kind, in a major key (A Mixolydian;
+        the theme has no chords that turn diminished there). Also while
+        Sable is adrift, waiting for the line.
+      - `sable-kraken`: the theme down on the low strings and guitar,
+        huge and slow, under the storm's drums and squeezebox stabs.
+    - **Heard before the sails are seen.** A new instrument, the horn
+      (two saws through a filter that opens as it speaks), plays the
+      theme's first two bars, faint, in the key of whatever is playing
+      (`sable-horn`). It sounds 450 m further out than the Redwing
+      appears (1,400 m from where Sable waits), and for the first
+      encounter, where Sable cuts across your bows out of nowhere, the
+      Redwing now comes 5 s after the horn. A race's end plays the won
+      or lost phrase instead of the treasure or dock one-shot (those
+      still play with the music off).
+    - **The director** (`src/music-cues.js`): Sable is second only to the
+      title screen, above the weather, the ghost ship and being ashore.
+      `rival.musicMoment()` says what Sable is up to: an approach, a race
+      (and how far Sable leads, from `SeaRace.lead`), the fog run, adrift
+      and the tow, the kraken, the foot race. Sailing off after a race,
+      or moored in a port, is nothing, and the sea's music comes back.
+      The races and the kraken are urgent (1.5 s hold); the meeting and
+      the tow take the usual 8 s. Ashore the score is no longer ducked
+      for the on-foot line while it has a cue, and the line stops.
+    - **The engine:** a cue can play its theme in another mode on the
+      same note (the tow); a sting can be a phrase of a theme, moved
+      into the key that shares the playing cue's notes and by an octave
+      if that keeps it on its instrument (`stingNotes` in
+      `music/score.js`, which the player and the check share).
+    - **Check:** the director's table has twelve Sable rows (a race in a
+      storm, in rough water, Sable leading, the countdown, the fog run,
+      the foot race, the tow, the kraken in the rain, the title above
+      it all); every Sable moment has a version of the theme, and the
+      hold agrees with the cue; every phrase over every key in every
+      mode stays in key and on its instrument.
+    - **In the game** (preview): chapter 1's horn sounded at 1,320 m
+      with no Redwing yet; the Redwing came at 950 m and the music
+      followed through a pivot into `sable` (A Dorian, five layers). The
+      race: intensity 1 in the countdown, 3 neck and neck, 2 with Sable
+      83 m ahead; Sable won, `sable-lost` played in A Dorian and the
+      coastal cue came back. Adrift asked for `sable-tow` at 1; the
+      kraken for `sable-kraken` at 3, urgent, out of the open sea in
+      one pivot bar; ashore, `sable-pacer` at 1 when meeting Sable and
+      2 at the off, with the score at full level; the fog run played
+      `sable-fog` (bed, bass, heartbeat), and the meeting before it
+      played over the fog's cue. No console errors.
+    - **Measured**, 60 s of each at full intensity, after setting the
+      gains: all six between −40.5 and −40.7 dB, beside home, open and
+      the storm at −40.5 to −40.6; none clips, peaks −24.3 dB or lower.
+      The phrases on their own (over D major): the horn −50 dB while it
+      sounds (meant to be faint), won and lost −44.7 and −43, the
+      whale's −45.7.
+    - Not done: the flare at dusk before the kraken has no music of its
+      own (it plays whatever the sea plays until the kraken comes).
+      Sable waiting in a port, or for a rematch off an island, is not a
+      moment. Not measured on Low quality.
+  - [ ] Only a person can do, 12.4: **listen to it.** Nobody has heard a
+    note of Sable's theme. In `jukebox.html`: is the jig cheeky and
+    spirited rather than menacing? Play `sable-race` at 2 and 3, then
+    `sable-tow` (is it kind, not sad?), `sable-kraken` (huge, or just
+    muddy?) and `sable-fog`. Try the stings over `coastal`: is the horn
+    faint enough to feel far off, and does it sound like a horn? In the
+    game: do you hear the horn before you see the crimson sails?
 
 ## Known issues
 

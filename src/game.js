@@ -666,6 +666,7 @@ export class Game {
     return {
       title: this.mode === 'title', ashore: this.mode === 'ashore',
       docked: this.mode === 'docked', homePort: this.dockedIsland === this.world.home,
+      sable: this.rival?.musicMoment() ?? null,
       ghost: this.seaEvents?.live?.kind === 'ghostShip',
       band: bandAt(b.x, b.z), zone: sea.rough >= 0.5 ? sea.roughZone : null, rough: sea.rough,
       storm: w.storm, rain: w.rain, fog: w.fog, night: this.env.night, speed: this.boat.speed,

@@ -1283,6 +1283,15 @@ on. The whale's phrase is a one-off played over the cue, not a cue. A
 storm's cues are urgent: a 1.5 s hold instead of 8, and one bar between
 keys instead of two, so the music arrives with the storm.)
 
+(As built in 12.4: Sable comes second, under the title only, and above
+being ashore, so the foot race has its music. The horn plays the first two
+bars in the key of the cue that is on, 450 m before the Redwing can appear;
+crossing bows, where Sable used to appear at once, now waits 5 s after it.
+The tow is in A Mixolydian, the major mode that keeps the theme's G chord,
+and also plays while Sable is adrift. A race goes up to every layer while
+you lead or it's close, and down one while Sable leads by 30 m. What was
+measured is under 12.4 in [STATUS.md](STATUS.md).)
+
 **Done when:** each band, weather and rough zone at sea has its own music,
 and you can hear where you are; every biome and landmark has a theme you
 could hum; Sable's theme comes before their sails; music changes on the bar

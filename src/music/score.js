@@ -15,8 +15,8 @@
 //
 // It has a seeded RNG of its own and never touches the world's rng().
 import { mulberry32 } from '../util.js';
-import { THEMES, CUES, DRUMS, RANGES } from './themes.js';
-import { parseKey, parseChords, parseTune, parseBars, chordTone, stepAbove, shiftChord, toMode, chordInMode, noteMidi } from './notation.js';
+import { THEMES, CUES, DRUMS, RANGES, STINGS } from './themes.js';
+import { parseKey, parseChords, parseTune, parseBars, chordTone, stepAbove, shiftChord, toMode, chordInMode, noteMidi, keyShift, MODES } from './notation.js';
 
 const compiled = new Map();
 
@@ -50,17 +50,22 @@ export function compileCue(name, colour = null) {
 function parseCue(name, cue) {
   const theme = THEMES[cue.theme];
   if (!theme) throw new Error(`cue "${name}": no theme called "${cue.theme}"`);
-  // a cue can play its theme in another key of the same mode
+  // a cue can play its theme in another key, and in another mode (each note
+  // and chord takes the same step of the new mode: the tow's major Sable)
   const from = parseKey(theme.key), keyInfo = parseKey(cue.key || theme.key);
-  if (keyInfo.mode !== from.mode) throw new Error(`cue "${name}": ${cue.key} is not the mode of its theme (${theme.key})`);
   const up = (keyInfo.tonic - from.tonic + 12) % 12, semis = up > 6 ? up - 12 : up;
-  const chordsOf = (text) => parseChords(text).map((bar) => bar.map((ch) => shiftChord(ch, semis)));
+  const moved = keyInfo.mode === from.mode ? null : parseKey(cue.key.split(/\s+/)[0] + ' ' + from.mode);
+  const chordsOf = (text) => parseChords(text).map((bar) => bar.map((ch) => {
+    const c = shiftChord(ch, semis);
+    return moved ? chordInMode(c, moved, keyInfo.mode) : c;
+  }));
+  const noteOf = (midi) => (moved ? toMode(midi + semis, moved, keyInfo.mode) : midi + semis);
   const steps = theme.steps, barSec = (60 / cue.tempo) * theme.beats;
   const phrases = {};
   for (const id of cue.form) {
     const P = theme.phrases[id];
     if (!P) throw new Error(`cue "${name}": theme "${cue.theme}" has no phrase "${id}"`);
-    const chords = chordsOf(P.chords), tune = parseTune(P.tune, steps).map((bar) => bar.map((n) => ({ ...n, midi: n.midi + semis })));
+    const chords = chordsOf(P.chords), tune = parseTune(P.tune, steps).map((bar) => bar.map((n) => ({ ...n, midi: noteOf(n.midi) })));
     if (chords.length !== tune.length) throw new Error(`theme "${cue.theme}", phrase "${id}": ${chords.length} bars of chords but ${tune.length} of tune`);
     phrases[id] = { chords, tune };
   }
@@ -99,6 +104,33 @@ function coloured(C, rain, night) {
     if (M && shift !== undefined) out.layers.night = { voice: 'celesta', vol: M.vol * 0.45, from: M.from, shift: (M.shift || 0) + shift, steps: null };
   }
   return out;
+}
+
+/**
+ * The notes of a one-off phrase (STINGS) played over a cue in `key`:
+ * [{ midi, at, dur }] with `at` in seconds from its start. A phrase of a
+ * theme moves into the key that shares the cue's notes (as the one-shots
+ * do), then by an octave if that keeps it on its instrument.
+ */
+export function stingNotes(name, key = 'D major') {
+  const S = STINGS[name];
+  if (!S) throw new Error(`no sting called "${name}"`);
+  const K = parseKey(key);
+  if (!S.theme) {
+    return S.steps.map((step, i) => ({
+      midi: (S.oct + 1) * 12 + K.tonic + MODES[K.mode].scale[step % 7] + 12 * Math.floor(step / 7),
+      at: i * S.each, dur: S.each * 1.1,
+    }));
+  }
+  const T = THEMES[S.theme], P = T?.phrases[S.phrase];
+  if (!P) throw new Error(`sting "${name}": theme "${S.theme}" has no phrase "${S.phrase}"`);
+  const step = ((60 / S.tempo) * T.beats) / T.steps;
+  const bars = parseTune(P.tune, T.steps).slice(0, S.bars || Infinity);
+  let semis = keyShift(key, T.key) + (S.shift || 0);
+  const all = bars.flat().map((n) => n.midi), [lo, hi] = RANGES[S.voice].map(noteMidi);
+  if (Math.max(...all) + semis > hi) semis -= 12;
+  else if (Math.min(...all) + semis < lo) semis += 12;
+  return bars.flatMap((bar, b) => bar.map((n) => ({ midi: n.midi + semis, at: (b * T.steps + n.step) * step, dur: n.len * step * 0.96 })));
 }
 
 // The note two keys share that the bed holds between them: the new key's
