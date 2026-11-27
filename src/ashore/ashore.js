@@ -7,7 +7,7 @@
 // state.ashore[islandId] = { visited, coins: [id], caches: [id], chest: bool }
 // A level may carry story spots (level.spots, with `looks`: places that show a
 // line), a chest with a cosmetic of its own (chest.cosmetic) and life of its
-// own (level.update): see wreck.js, grove.js, temple.js.
+// own (level.update): see wreck.js, grove.js, temple.js, cinderhorn.js.
 // Quest items (retrieve quests, an anchor refit's fitting) wait at the level's
 // vault; their state lives in the quest, not here. Which islands the anchor
 // will hold at, and from how far out, is refits.js. Steam vents and crumbling
@@ -26,6 +26,7 @@ import { buildWreckLevel } from './wreck.js';
 import { buildGroveLevel } from './grove.js';
 import { buildArchwayLevel } from './archway.js';
 import { buildTempleLevel } from './temple.js';
+import { buildCinderhornLevel } from './cinderhorn.js';
 import { shoalOf } from './shapes.js';
 import { setSeaOrigin } from '../waves.js';
 import { CharacterController } from './controller.js';
@@ -36,7 +37,7 @@ import { Hazards } from './hazards.js';
 import { AnchorDrag } from './anchor-drag.js';
 
 // Hand-built levels for landmark islands, by island.landmark; the rest are generated.
-const LANDMARK_LEVELS = { grove: buildGroveLevel, arch: buildArchwayLevel, ruins: buildTempleLevel };
+const LANDMARK_LEVELS = { grove: buildGroveLevel, arch: buildArchwayLevel, ruins: buildTempleLevel, volcano: buildCinderhornLevel };
 
 // ------------------------------------------------------------- pickup art
 let coinGeo = null, pileGeo = null, postGeo = null, handGeo = null, bundleGeo = null, scrollGeo = null, fittingGeo = null;
@@ -376,7 +377,7 @@ export class Ashore {
     if (hz.launched) g.audio.play('vent');
     if (hz.cracked) g.audio.play('crumble', { volume: 0.45 });
     if (hz.fell) g.audio.play('crumble', { volume: 1, fall: true });
-    if ((ev.splashed || hz.burned) && this.splashT <= 0) this.splash();
+    if ((ev.splashed || hz.burned) && this.splashT <= 0) this.splash(false, hz.burned);
     else if (ev.landed && this.splashT <= 0 && this.fellFromLantern(this.lastGroundY - ctl.pos.y)) this.splash(true);
     if (ctl.grounded) this.lastGroundY = ctl.pos.y;
     this.splashT -= dt;
@@ -650,9 +651,13 @@ export class Ashore {
     await g.ui.fade(0, 0.4);
   }
 
-  /** Back to the last lantern: after falling in the water (or the lava), or (fell = true) a long fall from the climb. */
-  async splash(fell = false) {
-    const g = this.game, lava = !fell && this.level.lava;
+  /**
+   * Back to the last lantern: after falling in the water (or the lava: a level
+   * whose water is lava, or `burned`, a pool of it up a mountain), or
+   * (fell = true) a long fall from the climb.
+   */
+  async splash(fell = false, burned = false) {
+    const g = this.game, lava = !fell && (this.level.lava || burned);
     this.splashT = 2;
     if (lava) g.audio.play('sizzle');
     else if (!fell) g.audio.play('slam', { volume: 0.4 });

@@ -1137,6 +1137,7 @@ const tipBack = (parts, tilt = -0.2) => group(parts, { y: HC, z: -0.02, rx: tilt
 const BANDS = {
   circlet: { y: HC + 0.14, z: -0.02, rx: 0.15, clear: 0.025 },
   flowerCrown: { y: HC + 0.19, z: -0.03, rx: -0.3, clear: 0.045 },
+  goggles: { y: HC + 0.15, z: -0.02, rx: -0.2, clear: 0.03 },
 };
 /** Signed height of a head-space point above a band's plane. */
 function bandHeight(b, x, y, z) {
@@ -1372,6 +1373,24 @@ const HATS = {
         part(cone(0.025, 0.08, 3), '#4a8a3a', { x: Math.sin(a + 0.27) * 0.31, z: Math.cos(a + 0.27) * 0.31, ry: a, rz: PI / 2, order: 'YXZ' }),
       );
     }
+    return group(parts, { y: B.y, z: B.z, rx: B.rx });
+  },
+  goggles() {
+    // Mount Cinderhorn's find: brass goggles with smoked glass, pushed up on
+    // the forehead, on a leather strap round the head.
+    const B = BANDS.goggles, brass = '#c9973a', brass2 = '#9a6f24', leather = '#4a3526', glass = '#2b3138', shine = '#aeb9c4';
+    const parts = [part(tor(0.348, 0.02, 5, 32), leather, { rx: PI / 2, sz: 1.6 })];
+    for (const s of [-1, 1]) {
+      const x = s * 0.1, z = 0.335;
+      parts.push(
+        part(cyl(0.078, 0.07, 0.075, 12), brass, { x, z: z + 0.03, rx: PI / 2 }),
+        part(tor(0.078, 0.012, 5, 14), brass2, { x, z: z + 0.068 }),
+        part(cyl(0.064, 0.064, 0.012, 12), glass, { x, z: z + 0.07, rx: PI / 2 }),
+        part(sph(0.016, 6, 4), shine, { x: x - 0.025, y: 0.026, z: z + 0.078, sz: 0.4 }),
+        part(box(0.03, 0.045, 0.02), brass2, { x: s * 0.185, z: z - 0.01, ry: s * 0.5 }),
+      );
+    }
+    parts.push(part(box(0.06, 0.022, 0.022), brass2, { z: 0.385 }));
     return group(parts, { y: B.y, z: B.z, rx: B.rx });
   },
   circlet() {

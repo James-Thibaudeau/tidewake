@@ -125,6 +125,7 @@ export const STYLES = [
   S('hat', 'flowerCrown', 'Flower crown', 'found:grove', { hint: 'At the top of the Elder Grove' }),
   S('hat', 'souwester', "Sou'wester", 'found:arch', { hint: 'On the sea stack off Archway Isle' }),
   S('hat', 'circlet', 'Gold circlet', 'found:ruins', { hint: "On the Sunken Temple's broken gable" }),
+  S('hat', 'goggles', 'Smoked goggles', 'found:volcano', { hint: 'On the Horn of Mount Cinderhorn' }),
   S('hat', 'grandPith', "Grandpa's helmet", 'story', { hint: "Your grandfather's last gift" }),
   S('hat', 'rivalTricorn', "Sable's tricorn", 'story', { hint: 'A gift from a rival captain' }),
   S('hat', 'lantern', 'Lantern hat', 'sighting:ghostShip', { hint: 'For someone who keeps meeting the ghost ship' }),
@@ -164,7 +165,7 @@ export const STYLES = [
 
 export const SLOTS = ['hair', 'hat', 'top', 'bottom', 'boots', 'neck', 'extra'];
 // Styles whose look is fixed (colour pickers are hidden for these)
-export const FIXED_COLOR = new Set(['hat:none', 'hat:furHood', 'hat:flowerCrown', 'hat:souwester', 'hat:circlet', 'hat:grandPith', 'hat:rivalTricorn', 'hat:lantern',
+export const FIXED_COLOR = new Set(['hat:none', 'hat:furHood', 'hat:flowerCrown', 'hat:souwester', 'hat:circlet', 'hat:goggles', 'hat:grandPith', 'hat:rivalTricorn', 'hat:lantern',
   'neck:none', 'neck:shells', 'neck:grandScarf', 'neck:whaleTail', 'extra:none', 'extra:crabPin']);
 
 export function stylesFor(slot) { return STYLES.filter((s) => s.slot === slot); }

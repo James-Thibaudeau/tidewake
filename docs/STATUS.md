@@ -876,7 +876,105 @@ Updated 2026-11-27.
       frame on High at 2048×1536 (a tropical one 4.0 ms from the same spot).
     - Not done: a play by hand, a look on a phone, a listen to the new sounds,
       and the pacing check (chapter VI now needs Keel 2 and the tempered chain).
-  - [ ] 4.9 Mount Cinderhorn
+  - [x] 4.9 Mount Cinderhorn (design in
+    [mount-cinderhorn-level.md](mount-cinderhorn-level.md)): the crater
+    descent, Journal VI, the smoked goggles, the volcano rebuilt at sea. One
+    PR, sea view, level and story together. Nothing about the island's coast
+    or the landing changed, so the Cinder Rip's calm pocket is as it was.
+    - The walkable level (`cinderhorn-layout.js`, `cinderhorn.js`,
+      `cinderhorn-art.js`, `cinderhorn-life.js`), made of 4.8's vents,
+      crumbling basalt and lava: the black beach with grandfather's camp (his
+      kettle boiling on a vent of its own) and the old forge (the vault), up
+      the old lava flow and two basalt steps, a vent up to a shelf on the
+      mountain's face, a cinder ledge and two columns, a second vent and
+      shelf, four steps to the shoulder (the notch in the rim, 24 m). Then
+      down the inside of the crater wall, about two thirds of the way round:
+      shelves, column tops, a lantern halfway, a gap where lava pours down
+      the wall, cinder ledges that crumble turn about with slabs that hold;
+      the wall's foot, the ridge across the lake (one column of it crumbles)
+      and the knoll in the middle. The way out is the chimney: three vents,
+      one above the other, back up to the shoulder. Optional: across the tops
+      of basalt stacks on the broken rim (two crumble) to the Horn, and up
+      the column tops round it to the chest.
+    - A long fall here is 4.5 m (`fallBack.drop`), which keeps the chimney
+      one way and makes a miss on the broken rim cost a walk, not a climb.
+      The shoulder's, the knoll's and the Horn's lanterns offer "Climb down
+      to the beach". Falling in the lake says "Too hot!" (`ashore.js` tells a
+      pool of lava from a splash on a level whose water is the sea).
+    - Story: chapter VI's step is "Go ashore at Mount Cinderhorn. He went up
+      for a look inside." (`STEPS.ashore.VI`, with the no-anchor and no-chain
+      lines). The note on the sailcloth at his camp, Journal VI on his
+      bedroll on the knoll, and two things to look at: the view from the
+      shoulder and the tally marks on the slab beside the bedroll. Saves that
+      found VI at the camp keep it; finding VI in the level opens Sable's tow
+      as before (it keys off the chapter).
+    - The smoked goggles (`hat:goggles`, `found:volcano`, new in
+      `outfits.js`): brass, with dark glass, worn pushed up on the forehead.
+      The Horn's chest.
+    - Life (decor only, `cinderhorn-life.js`): the lake of lava and its
+      bubbles, the fall down the wall, sparks off the lake, steam from the
+      vents, the kettle and the forge, the crumbling pieces. The rock by the
+      lava is drawn a second time, unlit, with its heat for a colour: faint
+      by day, and at night the crater's light. `volcanic-life.js` now exports
+      the lava's texture, the vents' steam and the crumbling pieces
+      (`ventSteam`, `crumblingPieces`); generated islands look the same.
+    - The sea view (`sea-volcano.js`), in place of the nine smoke puffs: the
+      crater's jagged rim, the Horn (a hooked spire 72 m tall on the far side
+      of the rim), the lake of lava, and a river of lava that leaves by a
+      notch facing Port Haven and runs down the flank to the sea between
+      black banks, parting round an outcrop on the way. The lava creeps, a
+      column of smoke leans away from the crater, steam boils up where the
+      river meets the sea, a collar of cloud turns round the peak, and every
+      23 s the mountain throws a handful of glowing rocks. At night the lake
+      lights the smoke and the river is a bright thread to the shore.
+      `world.js` (`placeVolcano`, `buildVolcano`) picks the river's side
+      clear of the sunken treasure and sea stacks, stands the lake above the
+      ground inside the rim (186 m in this world), lays the lava on the
+      terrain as its mesh draws it, and keeps trees out of the river. No
+      hidden rocks: nothing changes for the boat.
+    - The chart's picture of the volcano has the Horn on its rim.
+    - `node tools/check.mjs cinderhorn`: the layout's limits (required gaps
+      up to 1.8 m, climbs up to 1.1 m and drops up to 2.5 m; the Horn up to
+      2.6 m), each vent's throw (no more than 6 m, to a ledge within 1.6 m,
+      nothing overhead), that the wall under every ledge of the descent is
+      too steep to stand on, that every lantern is on the way, that the
+      chimney can't be climbed down, and the test climber from the beach to
+      the knoll (41 s, 32 jumps, 2 throws), out by the chimney (8 s, 3
+      throws) and up the Horn (15 s, 17 jumps).
+    - Played through the real game loop by a scripted pilot steering the
+      touch stick by the camera, at a walk: the landing from the sea (the
+      heat line at tier 2, the prompt at tier 3, the no-anchor and no-chain
+      story lines), the note, beach to the knoll in 47 s with no misses and
+      the four lanterns on the way lit, Journal VI and the tally marks, out
+      by the chimney in 10 s, the view, "Climb down to the beach" and the row
+      back to the ship; the Horn in 34 s with two misses (each a long fall
+      back to the shoulder), the goggles from the chest. Falls: into the
+      lake ("Too hot!"), off the shoulder into the crater, down the chimney,
+      off the outside and onto the broken rim (each back to the lantern). A
+      save from before this change loads; one that already held Journal VI
+      keeps it and finds the bedroll bare. It found and fixed: column gaps
+      on the descent too wide for a part-way stick, two lanterns standing
+      just out of reach of the path, and a crest that could be walked along
+      past the Horn's jumps (now the broken rim).
+    - Gallery: subjects `volcano` (the sea view, on a plain cone standing in
+      for the island; `at=mountain|crown|horn|river|shore`) and `cinderhorn`
+      (the level; `at=overview|sea|beach|forge|flow|wall|vent|shoulder|crater|descent|fall|ridge|knoll|tally|chimney|rim|horn|tip|lantern`);
+      sheets `volcano`, `cinderhorn-places` and `cinderhorn-night`, read cell
+      by cell; the goggles on four hair styles.
+    - 3.0-3.4 ms a frame on High at 2400×1600 on the descent and the
+      shoulder (the temple: 2.7 at 2048×1536). At sea the mountain's top and
+      fire are 28,500 triangles and cost nothing that could be measured.
+    - Not done: a play by hand (especially the camera on the descent and
+      round the Horn, how the vents feel one after another up the chimney,
+      and whether the Horn's widest jumps are fair), a look on a phone, frame
+      time on Low, the pacing check (chapter VI needs Keel 2 and the tempered
+      chain), and Cinderhorn's music (it waits for the landmark themes, Phase
+      12). No new sounds; 4.8's vent, crumbling rock, hiss, bubbles and
+      rumble are still waiting for a listen. The ice spikes' offer says its
+      fitting is "at the top of" an island, but here it waits at the forge on
+      the beach (the temple's shrine has the same mismatch with the chain's
+      offer). `README.md` and `CLAUDE.md` don't list the temple's files and
+      gallery names from 4.7.
   - [ ] 4.10 Cold islands and 4.11 Frostspire
   - [x] Retrieve quests, including "Find the lost map fragment": offered by
     Harbormasters (Cartographers for the fragment) once the anchor is fitted.

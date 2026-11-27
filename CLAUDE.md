@@ -12,7 +12,8 @@ dependencies to install.** It deploys from `main` to GitHub Pages as-is.
   also opens with a comment saying what it owns.
 - Designs: `docs/feature-plan.md` (not built yet), `docs/shipped-plans.md`
   (built; reference only, 700 lines, read one section), `docs/rival-captain.md`,
-  `docs/elder-grove-level.md`, `docs/archway-isle-level.md`.
+  `docs/elder-grove-level.md`, `docs/archway-isle-level.md`,
+  `docs/sunken-temple-level.md`, `docs/mount-cinderhorn-level.md`.
 
 ## Check your work
 
@@ -36,8 +37,10 @@ placements in a toy sea), the score (themes parse and stay in key, every
 note is in its instrument's range, changes of cue, the rain and night
 colours, which cue each situation gets, no flip-flopping at a band's edge,
 `music`), the Elder Grove (its limits, and the climber from the beach
-to the crown) and Archway Isle (its limits, and the climber from the cove
-over the arch and up the stack). One group at a time:
+to the crown), Archway Isle (its limits, and the climber from the cove
+over the arch and up the stack) and Mount Cinderhorn (its limits and its
+vents' throws, and the climber from the beach down into the crater, out by
+the chimney and up the Horn, `cinderhorn`). One group at a time:
 `node tools/check.mjs imports`.
 
 It can't see rendering or behaviour. For those, use the browser: the game
@@ -111,13 +114,13 @@ gallery.frame()                            // draw before a screenshot when the 
 - The ship wears the paint yard's choices: `hullPaint`, `trim`, `deck`,
   `cloth`, `emblem`, `flag`, `pennant`, `figurehead` (ids from `paints.js`);
   `view=stem` is close on the figurehead, `view=masthead` the flags.
-- Subjects: `outfit`, `ship`, `prop`, `tree`, `arch`, `wreck`, `grove`,
-  `archway`, `level`, `sealife`. A big subject takes `at=<place>` with `view=spot` for
+- Subjects: `outfit`, `ship`, `prop`, `tree`, `arch`, `volcano`, `wreck`, `grove`,
+  `archway`, `cinderhorn`, `level`, `sealife`. A big subject takes `at=<place>` with `view=spot` for
   a close look at one place (`show=archway&at=keystone&view=spot`; a
   generated island's `level` takes `at=moat|cliff|mesa|chest|top`). The
   same parameters work in the URL: `gallery.html?show=ship&tier=4&light=night`.
 - **After changing how something looks, take the contact sheet that covers
-  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `paints`, `paint-parts`, `cloths`, `emblems`, `flags`, `figureheads`, `sealife`, `sea`, `shallows`, `rough`, `rogue`, `islands`, `island-places`…, or
+  it** (`tops-back`, `scarves`, `running`, `hats`, `ships`, `anchors`, `paints`, `paint-parts`, `cloths`, `emblems`, `flags`, `figureheads`, `sealife`, `sea`, `shallows`, `rough`, `rogue`, `islands`, `island-places`, `volcano`, `cinderhorn-places`, `cinderhorn-night`…, or
   `views` / `lights` / `distance` for the subject showing) and read every
   cell, not only the one you were fixing. A sheet takes the parameters
   already showing, so `gallery.set({ bottom: 'skirt' })` first narrows it.
@@ -191,7 +194,7 @@ game.events    emitter: dock, setSail, discover, haul, wreck, respawn, upgrade, 
   each core file for the map). Methods are
   called as `this.method()` wherever they live, so grep the method name to
   find it. New methods go in the part file that fits.
-- **Pure modules stay pure**: `ashore/modules.js`, `ashore/grove-layout.js`, `ashore/archway-layout.js`, `collide.js`,
+- **Pure modules stay pure**: `ashore/modules.js`, `ashore/grove-layout.js`, `ashore/archway-layout.js`, `ashore/cinderhorn-layout.js`, `collide.js`,
   `controller.js`, `shapes.js`, `save.js`, `paints.js`, `config.js`, `util.js`, `sea-zones.js`, `waves.js`, `rogue.js`,
   `cosmetics.js`, `sightings.js`, `music-cues.js`, `music/notation.js`, `music/themes.js`, `music/score.js` and the text files import no three.js and touch no DOM at
   load, so `tools/check.mjs` can run them in Node. Keep it that way.
