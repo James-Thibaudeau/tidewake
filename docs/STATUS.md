@@ -876,7 +876,7 @@ Updated 2026-11-27.
       frame on High at 2048×1536 (a tropical one 4.0 ms from the same spot).
     - Not done: a play by hand, a look on a phone, a listen to the new sounds,
       and the pacing check (chapter VI now needs Keel 2 and the tempered chain).
-  - [x] 4.9 Mount Cinderhorn (design in
+  - [x] 4.9 Mount Cinderhorn ([#71](https://github.com/James-Thibaudeau/tidewake/pull/71); design in
     [mount-cinderhorn-level.md](mount-cinderhorn-level.md)): the crater
     descent, Journal VI, the smoked goggles, the volcano rebuilt at sea. One
     PR, sea view, level and story together. Nothing about the island's coast

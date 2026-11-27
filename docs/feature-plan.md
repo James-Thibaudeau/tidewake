@@ -75,7 +75,7 @@ Two rules hold for every piece:
 | 4.6 | (done, #57) | Tropical islands (palm-top hops, tide pools, rope bridges) and the coral flukes, tier 2. Sable's relic scramble moves here | 4.3 |
 | 4.7 | (done) | The Sunken Temple: flooded ruins, Journal V, the gold circlet; the temple rebuilt at sea | 4.6 |
 | 4.8 | (done, #67) | Volcanic islands (lava, crumbling basalt) with the steam-vent launch, and the tempered chain, tier 3 | 4.3 |
-| 4.9 | (done) | Mount Cinderhorn: the crater descent, Journal VI, the smoked goggles; the volcano rebuilt at sea | 4.8 |
+| 4.9 | (done, #71) | Mount Cinderhorn: the crater descent, Journal VI, the smoked goggles; the volcano rebuilt at sea | 4.8 |
 | 4.10 | (done, #70) | Cold islands (ice that slides, snow pines, wind gusts), with the slide and the gust built for any level, and the ice spikes, tier 4. Until 4.11 Frostspire is a generated cold island | 4.3 |
 | 4.11 | `feature/frostspire` | Frostspire: the vertical climb, Journal VII, the fur hood; the spire rebuilt at sea | 4.10 |
 | 4.12 | `feature/ashore-critters` | Crabs that bump you back and gulls that swoop, on every biome | any biome |
