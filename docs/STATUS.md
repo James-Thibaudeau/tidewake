@@ -1148,7 +1148,7 @@ Updated 2026-11-27.
   stats. Four PRs, 10.1–10.4.
   - [x] **10.1 The paint yard** ([#65](https://github.com/James-Thibaudeau/tidewake/pull/65)):
     - **A Paint Yard tab at every port** (its own tab since
-      `feature/paint-yard-tab`; it began below the upgrades). Pick a part
+      [#66](https://github.com/James-Thibaudeau/tidewake/pull/66); it began below the upgrades). Pick a part
       (hull, trim, deck, sails, emblem, flag, pennant, figurehead), then a
       paint: one you own goes straight on, free; anything else is tried on a
       side view of your ship first, with a Buy button. "As built" puts a part
