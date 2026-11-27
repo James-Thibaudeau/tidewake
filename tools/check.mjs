@@ -2,7 +2,7 @@
 // Fast checks that need no browser and no dependencies:
 //
 //   node tools/check.mjs            everything (about a second)
-//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | paints | sea | music | seazones | rogue | ride | layout | climb | grove | archway
+//   node tools/check.mjs imports    one group: syntax | imports | names | text | dom | gallery | save | paints | sea | music | seazones | rogue | ride | layout | climb | grove | archway | temple
 //   node tools/check.mjs layout 500 layouts for 500 synthetic islands (default 150)
 //
 // Run it after every change. It catches the mistakes that otherwise only show
@@ -1473,6 +1473,27 @@ const checks = {
     const stack = climber(L, L.stack, 'stack', errors, 2);
     const s = v.stats;
     return { errors, note: `${s.pieces} pieces, ${s.coins} coins; cove to the east arm in ${main.toFixed(0)} s (${s.jumps} jumps), the stack in ${stack.toFixed(0)} s more (${s.stackJumps} jumps); ${climber.stats.retries} hops needed a second try` };
+  },
+
+  // The Sunken Temple: the layout keeps its design limits, and a test climber
+  // gets from the beach to the treasury, out by the breach, and up the gable.
+  async temple() {
+    const { buildTempleLayout, validateTemple } = await load('ashore/temple-layout.js');
+    const L = buildTempleLayout();
+    const v = validateTemple(L);
+    const errors = [...v.errors];
+    const { STYLES } = await load('cosmetics.js');
+    const { STEPS, LINES } = await load('story-text.js');
+    for (const c of L.chests) if (c.cosmetic && !STYLES.some((s) => s.id === c.cosmetic)) errors.push(`chest: no cosmetic "${c.cosmetic}"`);
+    const step = STEPS.ashore[L.spots.journal?.id];
+    if (!step?.text || !step.noAnchor || !step.noRefit || !step.where) errors.push(`story: STEPS.ashore.${L.spots.journal?.id} needs text, noAnchor, noRefit and where`);
+    for (const s of L.spots.looks) if (!LINES[s.text] && !LINES[`temple${s.text[0].toUpperCase()}${s.text.slice(1)}`]) errors.push(`story: no line for the ${s.id} spot`);
+    const climber = await testClimber();
+    const main = climber(L, L.route, 'main', errors, 2);
+    const out = climber(L, L.out, 'out', errors, 2);
+    const gable = climber(L, L.gable, 'gable', errors, 2);
+    const s = v.stats;
+    return { errors, note: `${s.pieces} pieces, ${s.coins} coins; beach to the treasury in ${main.toFixed(0)} s (${s.jumps} jumps), out by the breach in ${out.toFixed(0)} s, the gable in ${gable.toFixed(0)} s (${s.gableJumps} jumps); ${climber.stats.retries} hops needed a second try` };
   },
 };
 

@@ -124,7 +124,7 @@ export const STYLES = [
   S('hat', 'furHood', 'Fur hood', 'found:cold', { hint: 'Found in the frozen north' }),
   S('hat', 'flowerCrown', 'Flower crown', 'found:grove', { hint: 'At the top of the Elder Grove' }),
   S('hat', 'souwester', "Sou'wester", 'found:arch', { hint: 'On the sea stack off Archway Isle' }),
-  S('hat', 'circlet', 'Gold circlet', 'found:ruins', { hint: 'Hidden in the Sunken Temple' }),
+  S('hat', 'circlet', 'Gold circlet', 'found:ruins', { hint: "On the Sunken Temple's broken gable" }),
   S('hat', 'grandPith', "Grandpa's helmet", 'story', { hint: "Your grandfather's last gift" }),
   S('hat', 'rivalTricorn', "Sable's tricorn", 'story', { hint: 'A gift from a rival captain' }),
   S('hat', 'lantern', 'Lantern hat', 'sighting:ghostShip', { hint: 'For someone who keeps meeting the ghost ship' }),

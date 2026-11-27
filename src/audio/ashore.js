@@ -20,6 +20,7 @@ const STEPS = {
   leaf: ['bandpass', 3100, 1.3, 0.09, 0.16, 0],
   stone: ['highpass', 2300, 0.7, 0.035, 0.055, 135],
   wood: ['bandpass', 900, 2.2, 0.04, 0.07, 195],
+  water: ['bandpass', 1250, 0.7, 0.17, 0.2, 0],   // wading: a slosh
 };
 
 // What plays on an island, by biome and by day or night: [voice, shortest and

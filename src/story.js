@@ -23,7 +23,7 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
 const LANDMARK_FOR = { III: 'grove', IV: 'arch', V: 'ruins', VI: 'volcano', VII: 'frost' };
 // Journals that have moved into their landmark's level. There's no searching
 // for these from the sea: you drop anchor by the camp and go ashore.
-const IN_LEVEL = new Set(['III', 'IV']);
+const IN_LEVEL = new Set(['III', 'IV', 'V']);
 export const FINAL_CHAPTER = 10;
 
 const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (m, k) => (vars[k] ?? m));
@@ -147,6 +147,7 @@ export class Story {
       const I = W.islands.find((x) => x.landmark === lm);
       if (I) camps[id] = this.campOn(I, H, rng);
       if (I?.bay) this.campInBay(camps[id], I);
+      if (I?.temple) this.campAtTemple(camps[id], I);
     }
     return camps;
   }
@@ -163,6 +164,20 @@ export class Story {
     while (d < B.r + 14 && islandHeight(I, ...at(d)) < 1.6) d += 0.5;
     const [x, z] = at(d);
     Object.assign(c, { x, z, y: Math.max(0.4, islandHeight(I, x, z)), heading: headingOf(B.dx, B.dz), search: { x: B.x, z: B.z } });
+  }
+
+  /**
+   * On Sunken Temple Isle the camp is on the beach beside the temple, as it is
+   * in the level, and the story points at the end of the drowned colonnade.
+   * (Moved after campOn, like campInBay, so every other camp stays as it was.)
+   */
+  campAtTemple(c, I) {
+    const Tp = I.temple, [sx, sz] = Tp.toWorld(0, -150);
+    // beside the temple, just up the beach
+    let lz = -10, [x, z] = Tp.toWorld(46, lz);
+    while (lz < 60 && islandHeight(I, x, z) < 1.4) [x, z] = Tp.toWorld(46, (lz += 2));
+    const [fx, fz] = Tp.toWorld(46, lz - 30);
+    Object.assign(c, { x, z, y: Math.max(0.4, islandHeight(I, x, z)), heading: headingOf(fx - x, fz - z), search: { x: sx, z: sz } });
   }
 
   campOn(I, H, rng) {

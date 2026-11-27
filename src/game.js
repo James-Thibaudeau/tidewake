@@ -654,7 +654,7 @@ export class Game {
     this.ocean.update(this.camera);
     if (!onLand) {
       this.streamer.update(boat.pos.x, boat.pos.z, 1);
-      this.streamer.animate(this.elapsed, this.env.night);
+      this.streamer.animate(this.elapsed, this.env.night, this.boat.pos);
       this.streamer.lod(this.camera.position.x, this.camera.position.z, this.spyOn ? 55 / this.camera.fov : 1);
     }
 

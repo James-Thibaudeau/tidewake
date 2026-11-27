@@ -120,6 +120,12 @@ export const STEPS = {
       noRefit: "Grandpa's fourth journal is ashore at Archway Isle. Your anchor won't grip bare rock there. Ask the shipwright about a refit.",
       where: 'the keystone',
     },
+    V: {
+      text: 'Go ashore at Sunken Temple Isle. He went in to count the treasure.',
+      noAnchor: "Grandpa's fifth journal is ashore at Sunken Temple Isle. You'll need an anchor to land there, and a refit to hold in coral sand.",
+      noRefit: "Grandpa's fifth journal is ashore at Sunken Temple Isle. Your anchor drags in the coral sand there. Ask the shipwright about a refit.",
+      where: 'the treasury',
+    },
   },
   searchChest: { title: 'The chest under the bunk', text: "Return to Grandpa's wreck near Port Haven, climb aboard and open the old chest under his bunk." },
   letterHome: { title: 'The letter home', text: "Bring Grandpa's letters home to Grandma in Port Haven." },
@@ -172,6 +178,11 @@ export const LINES = {
   archNoteText: 'Pinned to his weather board, under a column of chalked readings, each lower than the last. Little cairns lead up the gully and round the cliff.',
   keystone: 'Scratched into the rock: two initials worn smooth, "SAILED THROUGH", and an arrow pointing out to sea.',
   souwester: "An oilskin storm hat, stiff with salt. Somebody sat out a squall up here. Try it on at any port's Tailor.",
+  templeNote: '"Gone in to count it. Every room, every carving, every coin."',
+  templeNoteText: 'Weighted down with a shell on his camp table, on top of a stack of charcoal rubbings. Strips of red sailcloth are tied round the columns out along the causeway.',
+  templeFish: 'Rows and rows of carved fish. Every single one of them looks slightly disappointed in you.',
+  templeStool: 'One camp stool, pulled up to the gold. Just the one.',
+  circlet: "A thin band of old gold. It has long forgotten what it was for. Try it on at any port's Tailor.",
 };
 
 // The sea zones (sea-zones.js), by id: the name shown on sailing in, and the warnings
